@@ -44,6 +44,7 @@ targets:
         NSLocalNetworkUsageDescription: ikut connects to a development server on your local network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        UIBackgroundModes: [location]
         NSLocationTemporaryUsageDescriptionDictionary:
           ConvoyTracking: Your exact position lets the others in your trip see where your car is.
     settings:
@@ -56,6 +57,8 @@ targets:
         product: FirebaseAuth
       - package: Firebase
         product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseFunctions
 
   ikutTests:
     type: bundle.unit-test

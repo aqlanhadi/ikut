@@ -30,6 +30,7 @@
 		941BE30C2A87EF38E26515B6 /* RouteGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A494FD1381005F8FB454B39 /* RouteGeometry.swift */; };
 		9B4CB838014CB0BD376988F7 /* Position.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE6A468C2B522F5226FFC78 /* Position.swift */; };
 		A73AAE0FC74B7C166FC40A05 /* CreateTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */; };
+		AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
 		BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34759F3D28A64C5908B2C7D /* AuthTests.swift */; };
@@ -100,6 +101,7 @@
 			files = (
 				C1EB4787B689F789FCE60B01 /* FirebaseAuth in Frameworks */,
 				2D0C6E3BE606EFBC1D986BBC /* FirebaseFirestore in Frameworks */,
+				AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -247,6 +249,7 @@
 			packageProductDependencies = (
 				A44815085CACEC69E8C24459 /* FirebaseAuth */,
 				4BB920043D7D18297D5A3B81 /* FirebaseFirestore */,
+				4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */,
 			);
 			productName = ikut;
 			productReference = E047C4D86365E2C469F00DA8 /* ikut.app */;
@@ -624,6 +627,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA7314A052C8159E2802837B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
 		4BB920043D7D18297D5A3B81 /* FirebaseFirestore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DA7314A052C8159E2802837B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
