@@ -4,12 +4,23 @@ import SwiftUI
 /// Shown after creating or joining a trip: join code, QR, share and the live list of cars.
 struct LobbyView: View {
     let onOpenMap: () -> Void
+    let onExit: () -> Void
+    @Environment(LocationPermission.self) private var location
     @State private var model: LobbyModel
+    @State private var session: TripSession
     @State private var copied = false
+    @State private var showAlwaysExplainer = false
+    @State private var confirmLeave = false
+    @State private var confirmEnd = false
+    @State private var isWorking = false
+    @State private var actionError: String?
 
-    init(tripId: String, onOpenMap: @escaping () -> Void) {
+    init(tripId: String, onOpenMap: @escaping () -> Void, onExit: @escaping () -> Void) {
         self.onOpenMap = onOpenMap
+        self.onExit = onExit
         _model = State(initialValue: LobbyModel(tripId: tripId))
+        _session = State(initialValue: TripSession(
+            tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
     }
 
     private var isOrganizer: Bool {
@@ -21,10 +32,12 @@ struct LobbyView: View {
         ScrollView {
             VStack(spacing: 24) {
                 header
+                statusBanner
                 if let trip = model.trip {
                     codeCard(trip.code)
                     carsSection
-                    if isOrganizer { organizerControls }
+                    if isOrganizer, !session.isEnded { organizerControls }
+                    leaveControls
                 } else if let message = model.errorMessage {
                     Text(message).font(.footnote).foregroundStyle(.red)
                 } else {
@@ -46,8 +59,68 @@ struct LobbyView: View {
         }
         .navigationTitle("Lobby")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { model.start() }
+        .onAppear {
+            model.start()
+            session.start()
+        }
+        // The session keeps running when another screen (the map) is pushed on top; it stops when
+        // the lobby is popped and the session is released.
         .onDisappear { model.stop() }
+        .onChange(of: session.isTracking) { _, tracking in
+            guard tracking else { return }
+            let action = LocationAccess.nextAction(
+                status: location.status, accuracy: location.accuracy, context: .goingToBackground)
+            if session.consumeAlwaysExplainer(action: action) { showAlwaysExplainer = true }
+        }
+        .sheet(isPresented: $showAlwaysExplainer) {
+            // Declining is fine: the background activity session keeps tracking alive on When In Use.
+            AlwaysLocationExplainerView(permission: location) { _ in showAlwaysExplainer = false }
+        }
+        .confirmationDialog("Leave this trip?", isPresented: $confirmLeave, titleVisibility: .visible) {
+            Button("Leave trip", role: .destructive) { run { try await session.leave(); onExit() } }
+        } message: {
+            Text("Your phone stops sharing its location.")
+        }
+        .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
+            Button("End trip", role: .destructive) { run { try await session.endTrip() } }
+        } message: {
+            Text("Everyone stops sharing their location. This can't be undone.")
+        }
+    }
+
+    private func run(_ action: @escaping () async throws -> Void) {
+        guard !isWorking else { return }
+        isWorking = true
+        actionError = nil
+        Task {
+            do { try await action() } catch { actionError = error.localizedDescription }
+            isWorking = false
+        }
+    }
+
+    @ViewBuilder
+    private var statusBanner: some View {
+        if session.isEnded {
+            exitBanner("Trip ended", systemImage: "flag.checkered")
+        } else if session.membershipLost && model.trip != nil {
+            exitBanner("You're no longer in this trip", systemImage: "person.fill.xmark")
+        } else if session.isTracking {
+            Label("Sharing location", systemImage: "location.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(.green.opacity(0.15), in: Capsule())
+        }
+    }
+
+    private func exitBanner(_ title: String, systemImage: String) -> some View {
+        VStack(spacing: 12) {
+            Label(title, systemImage: systemImage).font(.headline)
+            Button("Back to Home", action: onExit).buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var header: some View {
@@ -119,7 +192,25 @@ struct LobbyView: View {
 
     /// Room for future organizer controls (rename, remove members, ...).
     private var organizerControls: some View {
-        EmptyView()
+        Button(role: .destructive) { confirmEnd = true } label: {
+            Text("End trip").frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .disabled(isWorking)
+    }
+
+    @ViewBuilder
+    private var leaveControls: some View {
+        if !session.isEnded, !session.membershipLost {
+            Button(role: .destructive) { confirmLeave = true } label: {
+                Text("Leave trip").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
+        }
+        if let actionError {
+            Text(actionError).font(.footnote).foregroundStyle(.red)
+        }
     }
 }
 

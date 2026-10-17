@@ -25,9 +25,18 @@ final class JoinModel {
     @ObservationIgnored private var previewTask: Task<Void, Never>?
     @ObservationIgnored private var newCarNameEdited = false
 
-    init(displayName: String, api: any JoinAPI = LiveJoinAPI()) {
+    /// `initialCode` (e.g. from a link or QR) is normalised and shown straight away;
+    /// call `start()` once the screen appears to load its preview.
+    init(displayName: String, initialCode: String? = nil, api: any JoinAPI = LiveJoinAPI()) {
         self.displayName = displayName
         self.api = api
+        if let initialCode { code = JoinService.normalizeCode(initialCode) }
+    }
+
+    /// Loads the preview for a prefilled code; no-op without a complete code or if already loading/loaded.
+    func start() {
+        guard JoinService.isCompleteCode(code), preview == nil, !isLoadingPreview else { return }
+        loadPreview()
     }
 
     var cars: [PreviewCar] { preview?.cars ?? [] }

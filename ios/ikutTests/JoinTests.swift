@@ -109,6 +109,27 @@ struct JoinModelTests {
         #expect(model.preview == trip)
     }
 
+    @Test func prefilledCodeLoadsPreviewOnStart() async {
+        let model = JoinModel(displayName: "Sam", initialCode: "y5r-efn", api: FakeJoinAPI(preview: trip))
+        #expect(model.code == "Y5REFN")
+        #expect(model.preview == nil && !model.isLoadingPreview)
+        model.start()
+        #expect(model.isLoadingPreview)
+        await settle(model)
+        #expect(model.preview == trip)
+        model.start()
+        #expect(model.preview == trip)
+    }
+
+    @Test func incompleteOrMissingPrefillDoesNotLoad() {
+        let partial = JoinModel(displayName: "Sam", initialCode: "Y5R", api: FakeJoinAPI(preview: trip))
+        partial.start()
+        #expect(partial.code == "Y5R" && !partial.isLoadingPreview)
+        let none = JoinModel(displayName: "Sam", api: FakeJoinAPI(preview: trip))
+        none.start()
+        #expect(none.code.isEmpty && !none.isLoadingPreview)
+    }
+
     @Test func newCarDefaultsAndTrackerFollowsSelection() async {
         let model = JoinModel(displayName: "Sam", api: FakeJoinAPI(preview: trip))
         model.codeChanged("ABC234")
@@ -175,7 +196,7 @@ struct JoinEmulatorTests {
         #expect(preview.tripId == ids.tripId)
         #expect(preview.destinationName == "Ipoh")
         #expect(preview.cars == [
-            PreviewCar(id: ids.carId, name: "Aqlan's Myvi", color: TripService.palette[0], hasTracker: true)
+            PreviewCar(id: ids.carId, name: "Aqlan's Myvi", color: TripService.palette[0], hasTracker: true, number: 1)
         ])
 
         let result = try await api.join(

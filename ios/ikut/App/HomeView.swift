@@ -8,12 +8,19 @@ struct HomeView: View {
 
     private enum Route: Hashable {
         case create
-        case join
+        case join(code: String?)
         case lobby(tripId: String)
     }
 
+    /// A code from an opened link, waiting for the Join screen (set by `IkutApp`).
+    @Binding var pendingJoinCode: String?
+
     @State private var path: [Route] = []
     @State private var showDenied = false
+
+    init(pendingJoinCode: Binding<String?> = .constant(nil)) {
+        _pendingJoinCode = pendingJoinCode
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -31,7 +38,7 @@ struct HomeView: View {
                 .controlSize(.large)
                 .padding(.top, 24)
                 Button("Join a Trip") {
-                    Task { await open(.join) }
+                    Task { await open(.join(code: nil)) }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
@@ -47,22 +54,29 @@ struct HomeView: View {
                     CreateTripView(defaultName: auth.displayName.map { "\($0)'s trip" } ?? "") { tripId in
                         path = [.lobby(tripId: tripId)]
                     }
-                case .join:
-                    JoinTripView { tripId, _ in
+                case .join(let code):
+                    JoinTripView(initialCode: code) { tripId, _ in
                         path = [.lobby(tripId: tripId)]
                     }
                 case .lobby(let tripId):
                     // The live map (M1) replaces this no-op.
-                    LobbyView(tripId: tripId, onOpenMap: {})
+                    LobbyView(tripId: tripId, onOpenMap: {}, onExit: { path = [] })
                 }
             }
             .sheet(isPresented: $showDenied) {
                 LocationDeniedView { location.openSettings() }
             }
+            .onChange(of: pendingJoinCode, initial: true) {
+                guard let code = pendingJoinCode else { return }
+                pendingJoinCode = nil
+                // Don't pull someone out of a trip they're already in.
+                if path.contains(where: { if case .lobby = $0 { true } else { false } }) { return }
+                Task { await open(.join(code: code), replacing: true) }
+            }
         }
     }
 
-    private func open(_ route: Route) async {
+    private func open(_ route: Route, replacing: Bool = false) async {
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
@@ -73,7 +87,7 @@ struct HomeView: View {
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:
-                path.append(route)
+                if replacing { path = [route] } else { path.append(route) }
                 return
             }
         }

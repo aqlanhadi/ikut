@@ -4,6 +4,7 @@ import SwiftUI
 struct IkutApp: App {
     @State private var auth: AuthModel
     @State private var location = LocationPermission()
+    @State private var pendingJoinCode: String?
 
     init() {
         Backend.configure()
@@ -12,9 +13,12 @@ struct IkutApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(pendingJoinCode: $pendingJoinCode)
                 .environment(auth)
                 .environment(location)
+                .onOpenURL { url in
+                    if case .join(let code)? = DeepLink.parse(url) { pendingJoinCode = code }
+                }
         }
     }
 }

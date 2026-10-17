@@ -5,16 +5,20 @@ struct JoinTripView: View {
     @Environment(AuthModel.self) private var auth
     @State private var model: JoinModel
     @State private var codeText = ""
+    @State private var showScanner = false
     @FocusState private var codeFocused: Bool
     var onJoined: (_ tripId: String, _ carId: String) -> Void
 
-    init(onJoined: @escaping (_ tripId: String, _ carId: String) -> Void) {
-        _model = State(initialValue: JoinModel(displayName: ""))
+    init(initialCode: String? = nil, onJoined: @escaping (_ tripId: String, _ carId: String) -> Void) {
+        let model = JoinModel(displayName: "", initialCode: initialCode)
+        _model = State(initialValue: model)
+        _codeText = State(initialValue: model.code)
         self.onJoined = onJoined
     }
 
     init(model: JoinModel, onJoined: @escaping (_ tripId: String, _ carId: String) -> Void) {
         _model = State(initialValue: model)
+        _codeText = State(initialValue: model.code)
         self.onJoined = onJoined
     }
 
@@ -22,18 +26,20 @@ struct JoinTripView: View {
         @Bindable var model = model
         Form {
             Section {
-                TextField("Trip code", text: $codeText)
-                    .font(.system(.title, design: .monospaced, weight: .semibold))
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .keyboardType(.asciiCapable)
-                    .focused($codeFocused)
-                    .disabled(model.isJoining)
-                    .accessibilityLabel("Trip code")
-                    .onChange(of: codeText) {
-                        model.codeChanged(codeText)
-                        if codeText != model.code { codeText = model.code }
+                HStack {
+                    codeField
+                    if QRScannerView.isAvailable {
+                        Button {
+                            codeFocused = false
+                            showScanner = true
+                        } label: {
+                            Image(systemName: "qrcode.viewfinder").font(.title2)
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(model.isJoining)
+                        .accessibilityLabel("Scan QR code")
                     }
+                }
             } header: {
                 Text("Trip code")
             } footer: {
@@ -140,8 +146,27 @@ struct JoinTripView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if model.displayName.isEmpty { model.displayName = auth.displayName ?? "" }
-            codeFocused = true
+            if model.code.isEmpty { codeFocused = true }
+            model.start()
         }
+        .sheet(isPresented: $showScanner) {
+            QRScannerView { codeText = $0 }
+        }
+    }
+
+    private var codeField: some View {
+        TextField("Trip code", text: $codeText)
+            .font(.system(.title, design: .monospaced, weight: .semibold))
+            .textInputAutocapitalization(.characters)
+            .autocorrectionDisabled()
+            .keyboardType(.asciiCapable)
+            .focused($codeFocused)
+            .disabled(model.isJoining)
+            .accessibilityLabel("Trip code")
+            .onChange(of: codeText) {
+                model.codeChanged(codeText)
+                if codeText != model.code { codeText = model.code }
+            }
     }
 
     private var trackerHint: String {

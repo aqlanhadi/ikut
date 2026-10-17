@@ -7,6 +7,8 @@ struct PreviewCar: Sendable, Equatable, Identifiable {
     var name: String
     var color: String
     var hasTracker: Bool
+    /// Badge number; nil for cars created before numbering.
+    var number: Int? = nil
 }
 
 /// What `previewTrip` returns: no member ids or other personal data.
@@ -119,7 +121,9 @@ enum JoinService {
             guard let id = raw["id"] as? String, let name = raw["name"] as? String,
                 let color = raw["color"] as? String
             else { throw JoinError(message: "Unexpected response from the server.") }
-            return PreviewCar(id: id, name: name, color: color, hasTracker: raw["hasTracker"] as? Bool ?? false)
+            return PreviewCar(
+                id: id, name: name, color: color, hasTracker: raw["hasTracker"] as? Bool ?? false,
+                number: (raw["number"] as? NSNumber)?.intValue)
         }
         return TripPreview(tripId: tripId, name: name, destinationName: destination, cars: cars)
     }

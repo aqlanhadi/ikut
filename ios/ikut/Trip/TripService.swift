@@ -54,7 +54,7 @@ enum TripService {
     static func makeOrganizerCar(organizer: TripOrganizer, name: String, color: String) -> Car {
         Car(
             name: name, color: color, trackerUserId: organizer.id, isLead: true,
-            state: .convoy)
+            state: .convoy, number: 1)
     }
 
     /// Creates the trip and the organizer's member doc in one batch, then the organizer's car.

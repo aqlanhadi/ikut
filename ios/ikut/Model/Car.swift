@@ -17,4 +17,7 @@ struct Car: Codable, Sendable, Equatable, Identifiable {
     /// Meters along the main route where this car joins it; nil until known.
     var mergeOffset: Double?
     var state: CarState
+    /// Badge number shown on the map and in lists; 1 is the organizer's car, then highest existing + 1.
+    /// Optional because cars created before numbering existed have none.
+    var number: Int?
 }
