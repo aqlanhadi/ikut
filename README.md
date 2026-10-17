@@ -47,3 +47,9 @@ xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17
 # Include the emulator integration tests (start the Auth emulator first):
 TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
+
+Security rules tests (Firestore emulator, needs Java):
+
+```sh
+cd firebase/rules-tests && npm install && npm run test:emulator
+```

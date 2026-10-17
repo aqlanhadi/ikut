@@ -1,0 +1,13 @@
+{
+  "name": "ikut-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 rules.test.js",
+    "test:emulator": "cd .. && firebase emulators:exec --only firestore --project ikut-b1083 'npm --prefix rules-tests test'"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0"
+  }
+}

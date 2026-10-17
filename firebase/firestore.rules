@@ -1,8 +1,261 @@
 rules_version = '2';
 
-// Locked down until the real rules land (task S7).
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function tripPath(tripId) {
+      return /databases/$(database)/documents/trips/$(tripId);
+    }
+
+    function memberPath(tripId, userId) {
+      return /databases/$(database)/documents/trips/$(tripId)/members/$(userId);
+    }
+
+    function carPath(tripId, carId) {
+      return /databases/$(database)/documents/trips/$(tripId)/cars/$(carId);
+    }
+
+    // Current trip data (before this write).
+    function trip(tripId) {
+      return get(tripPath(tripId)).data;
+    }
+
+    function isMember(tripId) {
+      return isSignedIn() && exists(memberPath(tripId, request.auth.uid));
+    }
+
+    function isOrganizer(tripId) {
+      return isSignedIn() && trip(tripId).organizerId == request.auth.uid;
+    }
+
+    function tripActive(tripId) {
+      return trip(tripId).status == 'active';
+    }
+
+    // Optional field: absent or null counts as unset.
+    function optionalOf(data, key) {
+      return data.get(key, null);
+    }
+
+    // Validators.
+    function isString(v, minLen, maxLen) {
+      return v is string && v.size() >= minLen && v.size() <= maxLen;
+    }
+
+    function isNumber(v) {
+      return v is number;
+    }
+
+    function validTripShape(d) {
+      return d.keys().hasOnly(['name', 'code', 'organizerId', 'route', 'destination',
+                               'status', 'createdAt', 'lastActivityAt', 'endedAt'])
+        && d.keys().hasAll(['name', 'code', 'organizerId', 'route', 'destination', 'status', 'createdAt'])
+        && d.name is string
+        && d.route is string
+        && validDestination(d.destination);
+    }
+
+    function validDestination(v) {
+      return v is map
+        && v.keys().hasOnly(['name', 'coordinate'])
+        && v.keys().hasAll(['name', 'coordinate'])
+        && v.name is string
+        && v.coordinate is latlng;
+    }
+
+    function validCarFields(d) {
+      return d.name is string
+        && d.color is string
+        && d.state in ['joining', 'convoy']
+        && (optionalOf(d, 'route') == null || d.route is string)
+        && (optionalOf(d, 'mergeOffset') == null || d.mergeOffset is number);
+    }
+
+    function validPosition(d) {
+      return d.keys().hasOnly(['location', 'speed', 'heading', 'routeOffset',
+                               'convoyOffset', 'battery', 'updatedAt'])
+        && d.keys().hasAll(['location', 'speed', 'heading', 'routeOffset', 'updatedAt'])
+        && d.location is latlng
+        && d.speed is number && d.speed >= 0
+        && d.heading is number && d.heading >= 0 && d.heading < 360
+        && d.routeOffset is number && d.routeOffset >= 0
+        && (optionalOf(d, 'convoyOffset') == null
+            || (d.convoyOffset is number && d.convoyOffset >= 0))
+        && (optionalOf(d, 'battery') == null
+            || (d.battery is number && d.battery >= 0 && d.battery <= 1))
+        && d.updatedAt == request.time;
+    }
+
+    function validEvent(d) {
+      return d.keys().hasOnly(['type', 'category', 'severity', 'location', 'heading',
+                               'routeOffset', 'authorId', 'carId', 'createdAt',
+                               'expiresAt', 'message'])
+        && d.keys().hasAll(['type', 'category', 'severity', 'location', 'heading',
+                            'routeOffset', 'authorId', 'carId', 'createdAt'])
+        && isString(d.type, 1, 40)
+        && d.category in ['hazard', 'condition', 'stopRequest', 'status', 'message']
+        && d.severity in ['high', 'medium', 'low']
+        && d.location is latlng
+        && d.heading is number
+        && d.routeOffset is number
+        && d.authorId is string
+        && d.carId is string
+        && d.createdAt is timestamp
+        && d.createdAt > request.time - duration.value(5, 'm')
+        && d.createdAt < request.time + duration.value(5, 'm')
+        && (optionalOf(d, 'expiresAt') == null
+            || (d.expiresAt is timestamp && d.expiresAt > d.createdAt))
+        && (optionalOf(d, 'message') == null || isString(d.message, 0, 280));
+    }
+
+    // ---------- rules ----------
+
+    // Trips: members read; organizer creates and updates; nobody deletes.
+    match /trips/{tripId} {
+      allow get: if isMember(tripId);
+      allow list: if false;
+
+      allow create: if isSignedIn()
+        && validTripShape(request.resource.data)
+        && request.resource.data.organizerId == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.code.matches('^[A-Z0-9]{6}$')
+        && request.resource.data.createdAt == request.time
+        && optionalOf(request.resource.data, 'endedAt') == null
+        && (optionalOf(request.resource.data, 'lastActivityAt') == null
+            || request.resource.data.lastActivityAt is timestamp);
+
+      allow update: if isSignedIn()
+        && resource.data.organizerId == request.auth.uid
+        && resource.data.status == 'active'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'destination', 'route', 'status', 'lastActivityAt', 'endedAt'])
+        && validTripShape(request.resource.data)
+        && (request.resource.data.status == 'active'
+            || (request.resource.data.status == 'ended'
+                && request.resource.data.endedAt == request.time))
+        && (request.resource.data.status == 'ended'
+            || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['endedAt']))
+        && (optionalOf(request.resource.data, 'lastActivityAt') == null
+            || request.resource.data.lastActivityAt is timestamp);
+
+      allow delete: if false;
+
+      // Members: organizer bootstraps own doc; self updates; self or organizer deletes.
+      match /members/{userId} {
+        allow read: if isMember(tripId);
+
+        allow create: if isSignedIn()
+          && userId == request.auth.uid
+          && getAfter(tripPath(tripId)).data.organizerId == request.auth.uid
+          && getAfter(tripPath(tripId)).data.status == 'active'
+          && request.resource.data.keys().hasOnly(['displayName', 'carId', 'role', 'pushToken'])
+          && request.resource.data.keys().hasAll(['displayName', 'carId', 'role'])
+          && request.resource.data.role == 'organizer'
+          && isString(request.resource.data.displayName, 1, 30)
+          && request.resource.data.carId is string
+          && (optionalOf(request.resource.data, 'pushToken') == null
+              || request.resource.data.pushToken is string);
+
+        allow update: if isMember(tripId)
+          && userId == request.auth.uid
+          && tripActive(tripId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['displayName', 'carId', 'pushToken'])
+          && isString(request.resource.data.displayName, 1, 30)
+          && request.resource.data.carId is string
+          && (optionalOf(request.resource.data, 'pushToken') == null
+              || request.resource.data.pushToken is string);
+
+        allow delete: if isMember(tripId)
+          && tripActive(tripId)
+          && (userId == request.auth.uid || isOrganizer(tripId));
+      }
+
+      // Cars: members create; tracker/organizer/claimers update narrowly; organizer deletes.
+      match /cars/{carId} {
+        allow read: if isMember(tripId);
+
+        allow create: if isMember(tripId)
+          && tripActive(tripId)
+          && request.resource.data.keys().hasOnly(['name', 'color', 'trackerUserId',
+                                                   'isLead', 'route', 'mergeOffset', 'state'])
+          && request.resource.data.keys().hasAll(['name', 'color', 'isLead', 'state'])
+          && validCarFields(request.resource.data)
+          && request.resource.data.isLead is bool
+          && (request.resource.data.isLead == false || isOrganizer(tripId))
+          && (optionalOf(request.resource.data, 'trackerUserId') == null
+              || request.resource.data.trackerUserId == request.auth.uid);
+
+        allow update: if isMember(tripId)
+          && tripActive(tripId)
+          && validCarFields(request.resource.data)
+          && request.resource.data.isLead is bool
+          && (
+            // Claim a free car.
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId'])
+              && optionalOf(resource.data, 'trackerUserId') == null
+              && request.resource.data.trackerUserId == request.auth.uid)
+            // Release as the current tracker.
+            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId'])
+              && optionalOf(resource.data, 'trackerUserId') == request.auth.uid
+              && optionalOf(request.resource.data, 'trackerUserId') == null)
+            // Tracker updates route, mergeOffset, state.
+            || (optionalOf(resource.data, 'trackerUserId') == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['route', 'mergeOffset', 'state']))
+            // Organizer updates isLead and name.
+            || (isOrganizer(tripId)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['isLead', 'name']))
+          );
+
+        allow delete: if isOrganizer(tripId) && tripActive(tripId);
+      }
+
+      // Positions: only the car's current tracker writes, only while trip is active.
+      match /positions/{carId} {
+        allow read: if isMember(tripId);
+
+        allow create, update: if isMember(tripId)
+          && tripActive(tripId)
+          && get(carPath(tripId, carId)).data.get('trackerUserId', null) == request.auth.uid
+          && validPosition(request.resource.data);
+
+        allow delete: if false;
+      }
+
+      // Events: members create as themselves; author clears expiry; author/organizer delete.
+      match /events/{eventId} {
+        allow read: if isMember(tripId);
+
+        allow create: if isMember(tripId)
+          && tripActive(tripId)
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.carId
+               == get(memberPath(tripId, request.auth.uid)).data.carId
+          && validEvent(request.resource.data);
+
+        allow update: if isMember(tripId)
+          && tripActive(tripId)
+          && resource.data.authorId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
+          && (optionalOf(request.resource.data, 'expiresAt') == null
+              || request.resource.data.expiresAt is timestamp);
+
+        allow delete: if isMember(tripId)
+          && tripActive(tripId)
+          && (resource.data.authorId == request.auth.uid || isOrganizer(tripId));
+      }
+    }
+
+    // Everything else is denied.
     match /{document=**} {
       allow read, write: if false;
     }
