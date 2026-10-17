@@ -120,17 +120,11 @@ export async function joinTripTransaction(
         throw new HttpsError("resource-exhausted", `This trip is full (${MAX_MEMBERS} people).`);
       }
     }
-    let newCarNumber = 0;
-    if (input.car.kind === "new") {
-      // At most MAX_CARS docs, so reading them all is cheap; the badge number is the highest so far + 1.
-      const cars = await tx.get(carsCol);
-      if (cars.size >= MAX_CARS) {
-        throw new HttpsError("resource-exhausted", `This trip already has ${MAX_CARS} cars.`);
-      }
-      newCarNumber = 1 + Math.max(0, ...cars.docs.map((d) => (d.data() as Car).number ?? 0));
-    }
+    // At most MAX_CARS docs, so reading them all is cheap. Read before any writes.
+    const cars = input.car.kind === "new" ? await tx.get(carsCol) : null;
 
-    // Previous car: removed if the member leaves it empty, otherwise its tracker duty is released.
+    // Previous car: removed if the member leaves it empty (and it isn't the lead car),
+    // otherwise its tracker duty is released.
     let oldCarRef: FirebaseFirestore.DocumentReference | null = null;
     let deleteOldCar = false;
     if (existing && existing.carId !== carRef.id) {
@@ -147,6 +141,17 @@ export async function joinTripTransaction(
           oldCarRef = ref;
         }
       }
+    }
+
+    // Badge number: highest remaining car + 1. A car this transaction deletes is not counted,
+    // so switching to a new car does not bump the number.
+    let newCarNumber = 0;
+    if (cars) {
+      if (cars.size >= MAX_CARS) {
+        throw new HttpsError("resource-exhausted", `This trip already has ${MAX_CARS} cars.`);
+      }
+      const remaining = cars.docs.filter((d) => !(deleteOldCar && d.id === oldCarRef?.id));
+      newCarNumber = 1 + Math.max(0, ...remaining.map((d) => (d.data() as Car).number ?? 0));
     }
 
     // Writes.

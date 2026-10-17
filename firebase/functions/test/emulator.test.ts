@@ -165,6 +165,31 @@ describe("joinTrip (emulator)", () => {
     assert.equal(await num(b.body.result.carId), 3);
   });
 
+  it("rejoining with a new car repeatedly does not climb the badge number", async () => {
+    const { code, tripRef } = await seedTrip();
+    let carId = "";
+    for (let i = 0; i < 3; i++) {
+      const r = await call({ code, displayName: "Sam", car: newCar(`Car ${i}`), tracker: true }, user.token);
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      carId = r.body.result.carId;
+    }
+    // Only the lead car (1) and the member's current car exist; each old car was deleted.
+    assert.equal((await tripRef.collection("cars").get()).size, 2);
+    assert.equal((await tripRef.collection("cars").doc(carId).get()).data()!.number, 2);
+  });
+
+  it("leaving a shared car for a new car keeps the shared car and gives max + 1", async () => {
+    const { code, tripRef } = await seedTrip();
+    const other = await newUser();
+    const a = await call({ code, displayName: "Sam", car: newCar("Myvi"), tracker: true }, user.token);
+    await call({ code, displayName: "Ali", car: { existingCarId: a.body.result.carId }, tracker: false }, other.token);
+    const b = await call({ code, displayName: "Sam", car: newCar("Alza"), tracker: true }, user.token);
+    assert.equal(b.status, 200, JSON.stringify(b.body));
+    const shared = (await tripRef.collection("cars").doc(a.body.result.carId).get()).data();
+    assert.equal(shared?.number, 2);
+    assert.equal((await tripRef.collection("cars").doc(b.body.result.carId).get()).data()!.number, 3);
+  });
+
   it("re-join keeps tracker claim on same car", async () => {
     const { code } = await seedTrip();
     const a = await call({ code, displayName: "Sam", car: newCar(), tracker: true }, user.token);
