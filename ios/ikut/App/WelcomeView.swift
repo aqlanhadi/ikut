@@ -1,0 +1,98 @@
+import SwiftUI
+
+/// First screen, signed out or in: what ikut does, with the two ways in.
+struct WelcomeView: View {
+    var onStart: () -> Void
+    var onJoin: () -> Void
+
+    private struct Feature: Identifiable {
+        let symbol: String
+        let title: String
+        let detail: String
+        var id: String { title }
+    }
+
+    private let features = [
+        Feature(
+            symbol: "map", title: "Every car on one map",
+            detail: "See the whole convoy live, and how far each car is behind the lead."),
+        Feature(
+            symbol: "fuelpump", title: "Call a stop in one tap",
+            detail: "Ask for fuel, food or a rest, and everyone agrees on where."),
+        Feature(
+            symbol: "exclamationmark.triangle", title: "Warn the cars behind you",
+            detail: "Hazards you report are read aloud to the cars following."),
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                    .font(.system(size: 42, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 88, height: 88)
+                    .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(color: .black.opacity(0.14), radius: 9, y: 3)
+                    .accessibilityHidden(true)
+
+                Text("Welcome to ikut")
+                    .font(.largeTitle.bold())
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 28)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Drive together. Arrive together.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
+
+                VStack(alignment: .leading, spacing: 28) {
+                    ForEach(features) { feature in
+                        HStack(alignment: .top, spacing: 16) {
+                            Image(systemName: feature.symbol)
+                                .font(.system(size: 28, weight: .regular))
+                                .foregroundStyle(Color.ikutAccent)
+                                .frame(width: 36, height: 36)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(feature.title).font(.subheadline.weight(.semibold))
+                                Text(feature.detail).font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 44)
+            }
+            .padding(.horizontal, 32)
+            .padding(.top, 48)
+            .padding(.bottom, 16)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .background(Color(.systemBackground))
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 6) {
+                Text("Joining needs no account, just a name.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 14)
+                Button("Start a Trip", action: onStart)
+                    .buttonStyle(PillButtonStyle())
+                Button(action: onJoin) {
+                    Label("Join with Code or QR", systemImage: "qrcode")
+                }
+                .buttonStyle(LinkPillButtonStyle())
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 12)
+            .background(Color(.systemBackground))
+        }
+    }
+}
+
+#Preview {
+    WelcomeView(onStart: {}, onJoin: {})
+}

@@ -18,6 +18,9 @@ final class TrackingService {
     private var generation = 0
 
     private(set) var isTracking = false
+    /// Called on the main actor with every fix that was published, after the position is built.
+    var onFix: ((LocationFix) -> Void)?
+    private var fixWaiter: CheckedContinuation<LocationFix?, Never>?
 
     init(
         source: LocationSource? = nil,
@@ -35,6 +38,7 @@ final class TrackingService {
 
     /// Starts location updates and position writes. Restarts if already tracking.
     func start(tripId: String, carId: String, mainRoute: RouteLine, carRoute: RouteLine?) {
+        resolveFirstFix(nil)
         stop()
         generation += 1
         let current = generation
@@ -46,6 +50,29 @@ final class TrackingService {
         source.start { [weak self] fix in
             Task { @MainActor in self?.handle(fix, generation: current) }
         }
+    }
+
+    /// Waits for one fix without tracking, then stops location updates. Nil if cancelled, if
+    /// tracking is already running, or if another wait is pending.
+    func firstFix() async -> LocationFix? {
+        guard !isTracking, fixWaiter == nil else { return nil }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                fixWaiter = continuation
+                source.start { [weak self] fix in
+                    Task { @MainActor in self?.resolveFirstFix(fix) }
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.resolveFirstFix(nil) }
+        }
+    }
+
+    private func resolveFirstFix(_ fix: LocationFix?) {
+        guard let waiter = fixWaiter else { return }
+        fixWaiter = nil
+        source.stop()
+        waiter.resume(returning: fix)
     }
 
     /// Stops location updates immediately and drops anything not yet written.
@@ -65,5 +92,6 @@ final class TrackingService {
         let position = builder.build(from: fix, battery: PositionBuilder.battery(batteryLevel()))
         self.builder = builder
         publisher.submit(position)
+        onFix?(fix)
     }
 }

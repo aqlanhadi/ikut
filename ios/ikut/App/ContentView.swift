@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Placeholder root view until the welcome and trip flows land (T1, T3).
+/// Root view: a spinner while Firebase restores the session, then Home.
+/// Home shows the welcome screen whether or not the person is signed in; the name step
+/// happens there, when they pick Start or Join.
 struct ContentView: View {
     @Environment(AuthModel.self) private var auth
     /// Code from an opened join link; kept while signed out and handed to Home.
@@ -14,9 +16,7 @@ struct ContentView: View {
         switch auth.state {
         case .loading:
             ProgressView()
-        case .signedOut:
-            NameEntryView()
-        case .signedIn:
+        case .signedOut, .signedIn:
             HomeView(pendingJoinCode: $pendingJoinCode)
         }
     }

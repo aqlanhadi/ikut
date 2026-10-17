@@ -24,17 +24,19 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
         app.launch()
 
-        // A simulator that already ran the app may still be signed in.
-        let nameField = app.textFields["Your name"]
-        let joinButton = app.buttons["Join a Trip"]
-        if nameField.waitForExistence(timeout: 10), !joinButton.exists {
-            nameField.tap()
-            nameField.typeText(name)
+        // Welcome is the first screen whether or not a previous run left the simulator signed in.
+        let joinButton = app.buttons["Join with Code or QR"]
+        XCTAssertTrue(joinButton.waitForExistence(timeout: 15))
+        joinButton.tap()
+
+        // Signed out: the name sheet comes first.
+        let sheetName = app.textFields["Your name"]
+        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
+            sheetName.tap()
+            sheetName.typeText(name)
             app.buttons["Continue"].tap()
         }
 
-        XCTAssertTrue(joinButton.waitForExistence(timeout: 15))
-        joinButton.tap()
         app.tap()  // Lets the interruption monitor handle a location prompt.
 
         let codeField = app.textFields["Trip code"]
@@ -42,7 +44,7 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         codeField.tap()
         codeField.typeText(code)
 
-        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'New car'")).firstMatch
+        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'New Car'")).firstMatch
         XCTAssertTrue(newCar.waitForExistence(timeout: 20), "Trip preview didn't load")
 
         let joinNameField = app.textFields["Your name"]
@@ -57,7 +59,7 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
 
         app.buttons["Join Trip"].tap()
-        XCTAssertTrue(app.buttons["Go to map"].waitForExistence(timeout: 20), "Didn't reach the lobby")
+        XCTAssertTrue(app.buttons["Start Trip"].waitForExistence(timeout: 20), "Didn't reach the lobby")
     }
 
     private func replaceText(in field: XCUIElement, with text: String) {

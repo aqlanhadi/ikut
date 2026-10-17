@@ -1,0 +1,386 @@
+import MapKit
+import SwiftUI
+
+/// The live convoy map, following design/project/Map.dc.html: the main route in blue, joining cars'
+/// own routes dashed up to where they merge, a numbered marker per car, a trip pill at the top,
+/// mode controls on the right and the convoy panel (list, Joining, Report, Stop) at the bottom.
+///
+/// Push it with the lobby's existing session. `onRequestStop` is called from the panel's Stop
+/// button and the pill's menu; the caller shows whatever flow follows.
+struct TripMapView: View {
+    let session: TripSession
+    var onRequestStop: () -> Void
+    /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
+    private let liveServices: Bool
+
+    @State private var model: TripMapModel
+    @State private var alerts = AlertCenter()
+    @State private var toast = ReportToastModel()
+    @State private var camera: MapCameraPosition = .automatic
+    @State private var cameraHeading = 0.0
+    @State private var panelExpanded = true
+    @State private var reportContext: ReportContext?
+    @State private var showReport = false
+    @State private var askAboutAlerts = false
+    @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
+    @Environment(\.dismiss) private var dismiss
+
+    init(session: TripSession, onRequestStop: @escaping () -> Void = {}) {
+        self.session = session
+        self.onRequestStop = onRequestStop
+        liveServices = true
+        _model = State(initialValue: TripMapModel(session: session))
+    }
+
+    /// For the demo and previews: a model that is fed by hand and no live services.
+    init(session: TripSession, model: TripMapModel, onRequestStop: @escaping () -> Void = {}) {
+        self.session = session
+        self.onRequestStop = onRequestStop
+        liveServices = false
+        _model = State(initialValue: model)
+        _camera = State(initialValue: Self.position(for: model.cameraTarget) ?? .automatic)
+    }
+
+    var body: some View {
+        map
+            .ignoresSafeArea(edges: .bottom)
+            .overlay(alignment: .top) { topStack }
+            .overlay(alignment: .topTrailing) {
+                MapModeControl(mode: $model.mode)
+                    .padding(.top, 76)
+                    .padding(.trailing, 12)
+            }
+            .overlay(alignment: .bottom) {
+                ConvoyPanel(
+                    model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
+                    onReport: openReport, onStop: onRequestStop)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showReport) {
+                if let reportContext {
+                    ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
+                }
+            }
+            .alert("Get road alerts?", isPresented: $askAboutAlerts) {
+                Button("Turn on") { Task { await alerts.requestPermission() } }
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text("ikut can warn you about debris, breakdowns and stops ahead, even while the app is in the background.")
+            }
+            .onAppear(perform: appear)
+            .onDisappear(perform: disappear)
+            .task { await model.convoy.run() }
+            .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
+            .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
+            .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
+    }
+
+    // MARK: Map
+
+    private var map: some View {
+        Map(position: $camera) {
+            if model.mainRouteCoordinates.count > 1 {
+                MapPolyline(coordinates: model.mainRouteCoordinates)
+                    .stroke(MapPalette.routeCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
+                MapPolyline(coordinates: model.mainRouteCoordinates)
+                    .stroke(MapPalette.route, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
+            }
+            ForEach(model.overlays) { overlay in
+                let path = overlay.path.map(\.clCoordinate)
+                MapPolyline(coordinates: path)
+                    .stroke(.white, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
+                MapPolyline(coordinates: path)
+                    .stroke(
+                        Color(mapHex: overlay.colorHex),
+                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [6, 6]))
+                if let merge = overlay.merge {
+                    Annotation("Merge point", coordinate: merge.clCoordinate, anchor: .center) {
+                        MergePointView(colorHex: overlay.colorHex)
+                    }
+                    .annotationTitles(.hidden)
+                }
+            }
+            ForEach(model.markers) { marker in
+                Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
+                    MapMarkerView(marker: marker, cameraHeading: cameraHeading)
+                }
+                .annotationTitles(.hidden)
+            }
+        }
+        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+        .onMapCameraChange { context in cameraHeading = context.camera.heading }
+        // Any pan, pinch or rotate by the user hands the camera back to them.
+        .onChange(of: camera.positionedByUser) { _, byUser in
+            if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
+        }
+    }
+
+    private static func position(for target: CameraTarget?) -> MapCameraPosition? {
+        switch target {
+        case nil:
+            return nil
+        case .follow(let center, let distance)?:
+            return .camera(MapCamera(centerCoordinate: center.clCoordinate, distance: distance))
+        case .fit(let region)?:
+            return .region(MKCoordinateRegion(
+                center: region.center.clCoordinate,
+                span: MKCoordinateSpan(latitudeDelta: region.latitudeSpan, longitudeDelta: region.longitudeSpan)))
+        }
+    }
+
+    private func move(to target: CameraTarget?, animated: Bool) {
+        guard let next = Self.position(for: target) else { return }
+        if animated {
+            withAnimation(.easeInOut(duration: 0.8)) { camera = next }
+        } else {
+            camera = next
+        }
+    }
+
+    // MARK: Top
+
+    private var topStack: some View {
+        VStack(spacing: 8) {
+            tripPill
+            AlertBannerView(center: alerts)
+            ReportToastView(model: toast)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
+    }
+
+    private var tripPill: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(model.isEnded ? Color.gray : (model.isTracker ? MapPalette.live : Color.orange))
+                .frame(width: 10, height: 10)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(model.tripName.isEmpty ? "Trip" : model.tripName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(pillSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Menu {
+                Button("Back to lobby", systemImage: "chevron.backward") { dismiss() }
+                Button("Stop trip…", systemImage: "stop.circle", role: .destructive, action: onRequestStop)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Trip menu")
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 4)
+        .padding(.vertical, 2)
+        .background(.regularMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+    }
+
+    private var pillSubtitle: String {
+        var parts = [model.isEnded ? "Trip ended" : (model.isTracker ? "Sharing location" : "Not sharing location")]
+        if !model.tripCode.isEmpty { parts.append("Code \(model.tripCode)") }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: Actions and lifecycle
+
+    private func openReport() {
+        guard let context = model.reportContext(authorId: session.userId) else { return }
+        reportContext = context
+        showReport = true
+    }
+
+    /// Sessions fields that change what the map shows.
+    private var sessionSignature: SessionSignature {
+        SessionSignature(
+            trip: session.trip, car: session.car, positions: session.positions,
+            isTracking: session.isTracking, carId: session.member?.carId)
+    }
+
+    private struct SessionSignature: Equatable {
+        var trip: Trip?
+        var car: Car?
+        var positions: [String: Position]
+        var isTracking: Bool
+        var carId: String?
+    }
+
+    private func appear() {
+        move(to: model.cameraTarget, animated: false)
+        guard liveServices else { return }
+        model.start()
+        alerts.start(tripId: session.tripId, myUserId: session.userId)
+        if !askedAboutAlerts {
+            askedAboutAlerts = true
+            askAboutAlerts = true
+        }
+    }
+
+    private func disappear() {
+        guard liveServices else { return }
+        model.stop()
+        alerts.stop()
+    }
+}
+
+// MARK: - Palette
+
+enum MapPalette {
+    static let accent = Color(red: 0, green: 113 / 255, blue: 227 / 255)
+    static let route = Color(red: 10 / 255, green: 132 / 255, blue: 1)
+    static let routeCasing = Color(red: 0, green: 96 / 255, blue: 223 / 255)
+    static let live = Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255)
+    static let warning = Color(red: 201 / 255, green: 52 / 255, blue: 0)
+}
+
+extension Color {
+    /// "#RRGGBB" (the `#` is optional); gray when malformed.
+    init(mapHex hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let v = UInt32(s, radix: 16) else {
+            self = .gray
+            return
+        }
+        self.init(
+            red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255,
+            blue: Double(v & 0xFF) / 255)
+    }
+}
+
+// MARK: - Mode control
+
+/// Follow / fit buttons; neither is highlighted in free mode.
+struct MapModeControl: View {
+    @Binding var mode: MapMode
+
+    var body: some View {
+        VStack(spacing: 0) {
+            button(.follow, symbol: "location.fill", label: "Follow my car")
+            Divider().padding(.horizontal, 8)
+            button(.fit, symbol: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", label: "Fit whole convoy")
+        }
+        .frame(width: 44)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .sensoryFeedback(.selection, trigger: mode)
+    }
+
+    private func button(_ target: MapMode, symbol: String, label: String) -> some View {
+        Button { mode = target } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(mode == target ? MapPalette.accent : Color.primary)
+                .frame(width: 44, height: 46)
+        }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(mode == target ? .isSelected : [])
+    }
+}
+
+// MARK: - Markers
+
+/// A numbered badge in the car's color, an arrow showing the heading, and a name chip.
+/// Stale cars are dimmed and say how long ago they were seen; the designated lead has a small star.
+struct MapMarkerView: View {
+    var marker: MapMarker
+    var cameraHeading: Double
+
+    private let badge: CGFloat = 32
+
+    var body: some View {
+        ZStack {
+            if let heading = marker.heading {
+                Wedge()
+                    .fill(Color(mapHex: marker.colorHex))
+                    .overlay(Wedge().stroke(.white, lineWidth: 1.5))
+                    .frame(width: 14, height: 10)
+                    .frame(width: 58, height: 58, alignment: .top)
+                    .rotationEffect(.degrees(MapMarkerBuilder.rotation(heading: heading, cameraHeading: cameraHeading)))
+            }
+            Text(marker.number.map(String.init) ?? "·")
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: badge, height: badge)
+                .background(Color(mapHex: marker.colorHex), in: Circle())
+                .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+                .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                .overlay(alignment: .topTrailing) {
+                    if marker.isLead {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Color(red: 1, green: 0.8, blue: 0))
+                            .frame(width: 14, height: 14)
+                            .background(.white, in: Circle())
+                            .offset(x: 5, y: -5)
+                    }
+                }
+        }
+        .frame(width: 58, height: 58)
+        .overlay(alignment: .leading) {
+            Text(marker.label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(marker.isStale ? MapPalette.warning : Color.primary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(.regularMaterial, in: Capsule())
+                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                .padding(.leading, 50)
+        }
+        .opacity(marker.isStale ? 0.6 : 1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var text = marker.name
+        if marker.isLead { text += ", lead" }
+        if marker.isJoining { text += ", joining" }
+        if marker.isStale, let age = marker.ageText { text += ", last seen \(age)" }
+        return text
+    }
+}
+
+private struct Wedge: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// White dot with the joining car's color where its route meets the main route; the label hangs
+/// off to the right so the dot stays on the coordinate.
+struct MergePointView: View {
+    var colorHex: String
+
+    var body: some View {
+        Circle()
+            .fill(.white)
+            .overlay(Circle().strokeBorder(Color(mapHex: colorHex), lineWidth: 3))
+            .frame(width: 18, height: 18)
+            .overlay(alignment: .leading) {
+                Text("Merge")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(mapHex: colorHex))
+                    .fixedSize()
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                    .padding(.leading, 24)
+            }
+    }
+}

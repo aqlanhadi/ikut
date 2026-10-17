@@ -1,5 +1,6 @@
 import FirebaseAuth
 import FirebaseFirestore
+import CoreLocation
 import Foundation
 import Testing
 @testable import ikut
@@ -13,8 +14,28 @@ final class FakeTrackingController: TrackingControlling {
     private(set) var lastCarRoute: RouteLine?
     /// Records `isTracking` at the moment of each stop() call, to check ordering.
     var onStop: (() -> Void)?
+    var onFix: ((LocationFix) -> Void)?
+    /// What `firstFix()` returns; nil makes it return nil right away.
+    var firstFixResult: LocationFix? = LocationFix(
+        latitude: 38.5, longitude: -119.0, speed: 10, course: 90, timestamp: Date())
+    /// Shared event log to check ordering against the fake car-route service.
+    var events: EventLog?
+    private(set) var carRoutes: [RouteLine?] = []
+
+    func firstFix() async -> LocationFix? {
+        events?.add("firstFix")
+        return firstFixResult
+    }
+
+    /// Delivers a fix the way `TrackingService` does: only while tracking.
+    func emit(_ fix: LocationFix) {
+        guard isTracking else { return }
+        onFix?(fix)
+    }
 
     func start(tripId: String, carId: String, mainRoute: RouteLine, carRoute: RouteLine?) {
+        events?.add("start")
+        carRoutes.append(carRoute)
         isTracking = true
         startCount += 1
         lastCarId = carId
@@ -25,6 +46,37 @@ final class FakeTrackingController: TrackingControlling {
         stopCount += 1
         isTracking = false
         onStop?()
+    }
+}
+
+@MainActor
+final class EventLog {
+    private(set) var items: [String] = []
+    func add(_ item: String) { items.append(item) }
+}
+
+@MainActor
+final class FakeCarRoute: CarRouteControlling {
+    var routeLine: RouteLine?
+    var ensureError: Error?
+    /// When set, `ensureRoute` never returns (an offline write).
+    var ensureHangs = false
+    var nextEvent: CarRouteEvent = .none
+    var events: EventLog?
+    private(set) var ensureCalls = 0
+    private(set) var handled: [LocationFix] = []
+
+    func ensureRoute(at location: CLLocationCoordinate2D) async throws -> CarRoutePlan {
+        ensureCalls += 1
+        events?.add("ensure")
+        if ensureHangs { try await Task.sleep(for: .seconds(60)) }
+        if let ensureError { throw ensureError }
+        return CarRoutePlan(route: nil, mergeOffset: nil, state: .joining, kind: .merges)
+    }
+
+    func handle(fix: LocationFix) async -> CarRouteEvent {
+        handled.append(fix)
+        return nextEvent
     }
 }
 
@@ -62,6 +114,163 @@ struct SessionLogicTests {
         #expect(TripSessionLogic.routeLine(from: nil) == nil)
         #expect(TripSessionLogic.routeLine(from: "") == nil)
         #expect(TripSessionLogic.routeLine(from: "_p~iF~ps|U_ulLnnqC")?.coordinates.count == 2)
+    }
+}
+
+private let mainPolyline = "_p~iF~ps|U_ulLnnqC"
+private let ownPolyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+
+private func testTrip(route: String = mainPolyline, status: TripStatus = .active) -> Trip {
+    Trip(
+        id: "t1", name: "T", code: "ABC123", organizerId: "u1", route: route,
+        destination: Destination(name: "KB", coordinate: GeoPoint(latitude: 6.1, longitude: 102.2)),
+        status: status)
+}
+
+private func testCar(route: String? = nil, tracker: String? = "u1") -> Car {
+    Car(
+        id: "c1", name: "Car", color: "#000000", trackerUserId: tracker, isLead: true,
+        route: route, mergeOffset: nil, state: .joining, number: 1)
+}
+
+private let testMember = Member(id: "u1", displayName: "A", carId: "c1", role: .organizer)
+
+private let someFix = LocationFix(latitude: 38.6, longitude: -120.3, speed: 10, course: 90, timestamp: Date())
+
+@MainActor
+private func eventually(_ condition: () -> Bool) async throws {
+    for _ in 0..<100 {
+        if condition() { return }
+        try await Task.sleep(for: .milliseconds(20))
+    }
+}
+
+@MainActor
+private struct Rig {
+    let events = EventLog()
+    let tracker = FakeTrackingController()
+    let carRoute = FakeCarRoute()
+    let session: TripSession
+
+    init(ensureTimeout: Duration = .seconds(5)) {
+        let carRoute = self.carRoute
+        tracker.events = events
+        carRoute.events = events
+        session = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker,
+            carRouteFactory: { _, _, _, _ in carRoute }, ensureTimeout: ensureTimeout)
+    }
+
+    func becomeTracker(car: Car = testCar()) {
+        session.applyForTesting(trip: testTrip(), member: testMember, car: car)
+    }
+}
+
+@MainActor
+struct SessionCarRouteTests {
+    @Test func becomingTrackerEnsuresRouteOnceThenStartsWithOwnRoute() async throws {
+        let rig = Rig()
+        rig.carRoute.routeLine = TripSessionLogic.routeLine(from: ownPolyline)
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.events.items == ["firstFix", "ensure", "start"])
+        #expect(rig.carRoute.ensureCalls == 1)
+        #expect(rig.tracker.startCount == 1)
+        #expect(rig.tracker.carRoutes.first??.coordinates.count == 3)
+        #expect(rig.session.isTracking)
+    }
+
+    @Test func ensureFailureFallsBackToMainRoute() async throws {
+        let rig = Rig()
+        rig.carRoute.ensureError = RouteError.noRoute
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.startCount == 1)
+        #expect(rig.tracker.carRoutes.count == 1)
+        #expect(rig.tracker.carRoutes[0] == nil)
+        #expect(rig.events.items == ["firstFix", "ensure", "start"])
+    }
+
+    @Test func hangingEnsureTimesOutAndTracksMainRoute() async throws {
+        let rig = Rig(ensureTimeout: .milliseconds(100))
+        rig.carRoute.ensureHangs = true
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.startCount == 1)
+        #expect(rig.tracker.carRoutes[0] == nil)
+    }
+
+    @Test func everyFixReachesHandle() async throws {
+        let rig = Rig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        for i in 0..<3 {
+            rig.tracker.emit(LocationFix(latitude: 38.5 + Double(i) / 100, longitude: -120, speed: 5, course: 0, timestamp: Date()))
+        }
+        try await eventually { rig.carRoute.handled.count == 3 }
+        #expect(rig.carRoute.handled.count == 3)
+        #expect(rig.carRoute.handled.map(\.latitude) == [38.5, 38.51, 38.52])
+    }
+
+    @Test func rerouteRestartsExactlyOnceViaTheSnapshot() async throws {
+        let rig = Rig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.startCount == 1)
+
+        // The service reports a reroute; that alone must not restart.
+        rig.carRoute.nextEvent = .rerouted(CarRoutePlan(route: ownPolyline, mergeOffset: 10, state: .joining, kind: .merges))
+        rig.tracker.emit(someFix)
+        try await eventually { rig.carRoute.handled.count == 1 }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(rig.tracker.startCount == 1)
+
+        // The snapshot of the write restarts with the new route; repeats (e.g. a state change) do not.
+        rig.becomeTracker(car: testCar(route: ownPolyline))
+        #expect(rig.tracker.startCount == 2)
+        #expect(rig.tracker.carRoutes[1]?.coordinates.count == 3)
+        var converted = testCar(route: ownPolyline)
+        converted.state = .convoy
+        rig.becomeTracker(car: converted)
+        #expect(rig.tracker.startCount == 2)
+    }
+
+    @Test func startupSnapshotMatchingOwnRouteDoesNotRestart() async throws {
+        let rig = Rig()
+        rig.carRoute.routeLine = TripSessionLogic.routeLine(from: ownPolyline)
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        // Our own write comes back with the route we already track.
+        rig.becomeTracker(car: testCar(route: ownPolyline))
+        #expect(rig.tracker.startCount == 1)
+    }
+
+    @Test func losingTrackerDutyStopsEverything() async throws {
+        let rig = Rig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        rig.tracker.emit(someFix)
+        try await eventually { rig.carRoute.handled.count == 1 }
+
+        rig.becomeTracker(car: testCar(tracker: nil))
+        #expect(!rig.tracker.isTracking)
+        #expect(!rig.session.isTracking)
+        rig.tracker.emit(someFix)
+        // Even a fix delivered by a stale callback is dropped.
+        rig.tracker.onFix?(someFix)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(rig.carRoute.handled.count == 1)
+    }
+
+    @Test func losingDutyDuringStartupNeverStartsTracking() async throws {
+        let rig = Rig()
+        rig.carRoute.ensureHangs = true
+        rig.becomeTracker()
+        try await eventually { rig.carRoute.ensureCalls == 1 }
+        rig.becomeTracker(car: testCar(tracker: nil))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(rig.tracker.startCount == 0)
+        #expect(!rig.session.isTracking)
     }
 }
 
@@ -123,6 +332,41 @@ struct SessionEmulatorTests {
         try await Task.sleep(for: .seconds(1))
         #expect(other.startCount == 0)
         #expect(!otherSession.isTracking)
+    }
+
+
+    @Test func farTrackerGetsOwnRouteMergeOffsetAndJoiningState() async throws {
+        let s = try await makeTrip()
+        let tracker = FakeTrackingController()
+        // Far east of the main route's start; the fake route drives to it, then follows it.
+        tracker.firstFixResult = LocationFix(
+            latitude: 38.5, longitude: -119.0, speed: 10, course: 270, timestamp: Date())
+        let directions = SessionFakeDirections(coordinates: [
+            .init(latitude: 38.5, longitude: -119.0), .init(latitude: 38.5, longitude: -120.2),
+            .init(latitude: 40.7, longitude: -120.95),
+        ])
+        let session = TripSession(
+            tripId: s.tripId, userId: s.uid, tracker: tracker,
+            carRouteFactory: { tripId, carId, trip, car in
+                try CarRouteService(
+                    tripId: tripId, carId: carId, mainRoute: trip.route,
+                    destination: .init(latitude: 40.7, longitude: -120.95),
+                    route: car.route, state: car.state, directions: directions)
+            })
+        session.start()
+        defer { session.stop() }
+        try await eventually { tracker.isTracking }
+        #expect(tracker.isTracking)
+
+        try await eventually { session.car?.route != nil }
+        let car = try await carRef(s).getDocument(as: Car.self)
+        #expect(car.route != nil)
+        #expect(car.mergeOffset != nil)
+        #expect(car.state == .joining)
+        // Started once with the car doc as it was (the route is computed before tracking starts),
+        // then restarted at most once by the snapshot if it raced; never more.
+        #expect(tracker.startCount <= 2)
+        #expect(tracker.lastCarRoute != nil)
     }
 
     @Test func releasingTrackerDutyStopsTracking() async throws {
@@ -248,5 +492,12 @@ struct SessionEmulatorTests {
         #expect(session2.isEnded)
         #expect(!tracker2.isTracking)
         #expect(!organizerTracker.isTracking)
+    }
+}
+
+private struct SessionFakeDirections: CarRouteDirections {
+    var coordinates: [CLLocationCoordinate2D]
+    func route(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> [CLLocationCoordinate2D] {
+        coordinates
     }
 }

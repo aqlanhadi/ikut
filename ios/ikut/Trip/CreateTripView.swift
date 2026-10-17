@@ -110,70 +110,61 @@ struct CreateTripView: View {
 
     var body: some View {
         @Bindable var model = model
-        Form {
-            Section("Trip name") {
-                TextField("Trip name", text: $model.name)
-                    .textInputAutocapitalization(.words)
-                    .disabled(model.isCreating)
-                    .accessibilityLabel("Trip name")
-            }
-
-            Section("Destination") {
-                TextField("Search for a place", text: $model.query)
-                    .textInputAutocapitalization(.words)
-                    .submitLabel(.search)
-                    .disabled(model.isCreating)
-                    .accessibilityLabel("Destination search")
-                    .onChange(of: model.query) { model.queryChanged() }
-
-                if model.isSearching {
-                    ProgressView().accessibilityLabel("Searching")
+        ScrollView {
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
+                        Text("Name").frame(width: 64, alignment: .leading)
+                        TextField("Trip name", text: $model.name)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.words)
+                            .disabled(model.isCreating)
+                            .accessibilityLabel("Trip name")
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 52)
+                    RowDivider()
+                    destinationRow
                 }
-                ForEach(model.results) { result in
-                    Button { model.pick(result) } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(result.name).foregroundStyle(.primary)
-                            if !result.subtitle.isEmpty {
-                                Text(result.subtitle).font(.footnote).foregroundStyle(.secondary)
-                            }
+                .ikutCard()
+                .padding(.top, 20)
+
+                if model.isSearching || !model.results.isEmpty {
+                    resultsCard.padding(.top, 12)
+                }
+
+                if let message = model.errorMessage {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .accessibilityLabel("Error: \(message)")
+                        if model.destination != nil, model.route == nil, !model.isBuildingRoute {
+                            Button("Try again") { model.buildRoute() }
                         }
                     }
-                    .accessibilityLabel([result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
             }
-
-            if model.destination != nil {
-                Section("Route") {
-                    routeRow
+            .padding(.horizontal, 16)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.ikutScreen)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(action: create) {
+                if model.isCreating {
+                    ProgressView().tint(.white).accessibilityLabel("Creating trip")
+                } else {
+                    Text("Create Trip")
                 }
             }
-
-            if let message = model.errorMessage {
-                Section {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .accessibilityLabel("Error: \(message)")
-                    if model.destination != nil, model.route == nil, !model.isBuildingRoute {
-                        Button("Try again") { model.buildRoute() }
-                    }
-                }
-            }
-
-            Section {
-                Button(action: create) {
-                    HStack {
-                        Spacer()
-                        if model.isCreating {
-                            ProgressView().accessibilityLabel("Creating trip")
-                        } else {
-                            Text("Create Trip").bold()
-                        }
-                        Spacer()
-                    }
-                }
-                .disabled(!model.canCreate || auth.userID == nil)
-            }
+            .buttonStyle(PillButtonStyle())
+            .disabled(!model.canCreate || auth.userID == nil)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.ikutScreen)
         }
         .navigationTitle("New Trip")
         .navigationBarTitleDisplayMode(.inline)
@@ -182,21 +173,72 @@ struct CreateTripView: View {
         }
     }
 
-    @ViewBuilder
-    private var routeRow: some View {
-        if model.isBuildingRoute {
-            HStack(spacing: 8) {
-                ProgressView()
-                Text("Building route…").foregroundStyle(.secondary)
+    /// Red pin tile, the destination search field and, once picked, the route summary.
+    private var destinationRow: some View {
+        @Bindable var model = model
+        return HStack(spacing: 12) {
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.red, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                TextField("Search for a place", text: $model.query)
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.search)
+                    .disabled(model.isCreating)
+                    .accessibilityLabel("Destination search")
+                    .onChange(of: model.query) { model.queryChanged() }
+                routeSummary
             }
-            .accessibilityElement(children: .combine)
-        } else if let route = model.route, let destination = model.destination {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(destination.name)
-                Text(RouteFormat.summary(route)).font(.footnote).foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
+    }
+
+    @ViewBuilder
+    private var routeSummary: some View {
+        if model.isBuildingRoute {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Building route…")
+            }
+            .font(.footnote).foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+        } else if let route = model.route, model.destination != nil {
+            Text(RouteFormat.summary(route))
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var resultsCard: some View {
+        VStack(spacing: 0) {
+            if model.isSearching {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityLabel("Searching")
+            }
+            ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
+                if index > 0 || model.isSearching { RowDivider() }
+                Button { model.pick(result) } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(result.name).foregroundStyle(.primary)
+                        if !result.subtitle.isEmpty {
+                            Text(result.subtitle).font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel([result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+            }
+        }
+        .ikutCard()
     }
 
     private func create() {

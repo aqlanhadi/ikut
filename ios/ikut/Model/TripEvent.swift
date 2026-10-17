@@ -82,6 +82,16 @@ extension EventType: Codable {
     }
 }
 
+/// A place for a stop. On a stop event's `place` field it is the pinned stop (`pinnedBy` set by the
+/// lead car or organizer); on a vote's `suggestion` field it is a proposal (`pinnedBy` nil).
+struct StopPlace: Codable, Sendable, Equatable {
+    var name: String
+    var coordinate: GeoPoint
+    /// Meters along the main route.
+    var routeOffset: Double
+    var pinnedBy: String?
+}
+
 /// `trips/{tripId}/events/{eventId}`.
 struct TripEvent: Codable, Sendable, Equatable, Identifiable {
     @DocumentID var id: String?
@@ -98,6 +108,8 @@ struct TripEvent: Codable, Sendable, Equatable, Identifiable {
     /// nil means the event stays until resolved or cleared.
     var expiresAt: Date?
     var message: String?
+    /// The pinned stop; only ever set on stop requests, by the lead car or the organizer.
+    var place: StopPlace?
 
     /// Builds an event with category, severity and expiry derived from its type.
     init(

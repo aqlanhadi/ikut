@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Signed-in home until the real home with past trips lands.
+/// Home until the real one with past trips lands: the welcome screen with its two actions.
+/// Signed-out visitors give a name (sheet) before Create or Join.
 /// Gets location access good enough for a trip before opening Create Trip or Join.
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
@@ -17,6 +18,9 @@ struct HomeView: View {
 
     @State private var path: [Route] = []
     @State private var showDenied = false
+    @State private var showName = false
+    /// Where to go once the name step finishes.
+    @State private var afterName: Route?
 
     init(pendingJoinCode: Binding<String?> = .constant(nil)) {
         _pendingJoinCode = pendingJoinCode
@@ -24,30 +28,20 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(spacing: 12) {
-                Text("ikut")
-                    .font(.largeTitle.bold())
-                if let name = auth.displayName {
-                    Text("Signed in as \(name)")
-                        .foregroundStyle(.secondary)
-                }
-                Button("Start a Trip") {
-                    Task { await open(.create) }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.top, 24)
-                Button("Join a Trip") {
-                    Task { await open(.join(code: nil)) }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+            WelcomeView(
+                onStart: { begin(.create) },
+                onJoin: { begin(.join(code: nil)) }
+            )
+            .overlay(alignment: .topTrailing) {
+                #if DEBUG
                 Text(Backend.current.label)
-                    .font(.footnote.monospaced())
+                    .font(.caption2.monospaced())
                     .foregroundStyle(.secondary)
-                    .padding(.top, 24)
+                    .padding(.horizontal, 12)
+                    .accessibilityHidden(true)
+                #endif
             }
-            .padding()
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .create:
@@ -63,16 +57,41 @@ struct HomeView: View {
                     LobbyView(tripId: tripId, onOpenMap: {}, onExit: { path = [] })
                 }
             }
+            .sheet(isPresented: $showName) {
+                NameEntryView {
+                    showName = false
+                    guard let route = afterName else { return }
+                    afterName = nil
+                    Task {
+                        // Let the sheet finish dismissing before a permission prompt appears.
+                        try? await Task.sleep(for: .milliseconds(400))
+                        await open(route)
+                    }
+                }
+                .presentationDetents([.medium])
+            }
             .sheet(isPresented: $showDenied) {
                 LocationDeniedView { location.openSettings() }
             }
             .onChange(of: pendingJoinCode, initial: true) {
                 guard let code = pendingJoinCode else { return }
                 pendingJoinCode = nil
+                // A name comes first when signed out; the join carries on afterwards.
+                if auth.state != .signedIn { begin(.join(code: code)); return }
                 // Don't pull someone out of a trip they're already in.
                 if path.contains(where: { if case .lobby = $0 { true } else { false } }) { return }
                 Task { await open(.join(code: code), replacing: true) }
             }
+        }
+    }
+
+    /// Signed in: go straight to the route. Signed out: ask for a name first.
+    private func begin(_ route: Route) {
+        if auth.state == .signedIn {
+            Task { await open(route) }
+        } else {
+            afterName = route
+            showName = true
         }
     }
 

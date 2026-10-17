@@ -28,37 +28,66 @@ struct LobbyView: View {
         return trip.organizerId == Auth.auth().currentUser?.uid
     }
 
+    private var currentUserId: String? { Auth.auth().currentUser?.uid }
+    private var canLeave: Bool { !session.isEnded && !session.membershipLost }
+    private var canEnd: Bool { isOrganizer && !session.isEnded }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                header
+            VStack(spacing: 0) {
                 statusBanner
                 if let trip = model.trip {
-                    codeCard(trip.code)
-                    carsSection
-                    if isOrganizer, !session.isEnded { organizerControls }
-                    leaveControls
+                    tripCard(trip)
+                    CardHeader("Invite")
+                    inviteCard(trip.code)
+                    carsHeader
+                    carsCard
+                    if let actionError {
+                        Text(actionError)
+                            .font(.footnote).foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16).padding(.top, 12)
+                    }
                 } else if let message = model.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red)
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, 20)
                 } else {
                     ProgressView().padding(.top, 40)
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
         }
-        .safeAreaInset(edge: .bottom) {
-            Button(action: onOpenMap) {
-                Text("Go to map").font(.headline).frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-            .background(.bar)
+        .background(Color.ikutScreen)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button("Start Trip", action: onOpenMap)
+                .buttonStyle(PillButtonStyle())
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.ikutScreen)
         }
-        .navigationTitle("Lobby")
+        .navigationTitle("Trip lobby")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if canLeave || canEnd {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        if canEnd {
+                            Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
+                        }
+                        if canLeave {
+                            Button("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                                confirmLeave = true
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(isWorking)
+                    .accessibilityLabel("Trip options")
+                }
+            }
+        }
         .onAppear {
             model.start()
             session.start()
@@ -107,9 +136,10 @@ struct LobbyView: View {
         } else if session.isTracking {
             Label("Sharing location", systemImage: "location.fill")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.ikutPositive)
                 .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(.green.opacity(0.15), in: Capsule())
+                .background(Color.ikutPositive.opacity(0.15), in: Capsule())
+                .padding(.bottom, 4)
         }
     }
 
@@ -120,112 +150,128 @@ struct LobbyView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+        .ikutCard()
+        .padding(.bottom, 8)
     }
 
-    private var header: some View {
-        VStack(spacing: 4) {
-            Text(model.trip?.name ?? " ").font(.title2.bold())
-            if let destination = model.trip?.destination.name {
-                Label(destination, systemImage: "mappin.and.ellipse")
-                    .font(.subheadline).foregroundStyle(.secondary)
+    /// Read-only version of the New Trip card: name, then destination with its pin tile.
+    private func tripCard(_ trip: Trip) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Name").frame(width: 64, alignment: .leading)
+                Text(trip.name).frame(maxWidth: .infinity, alignment: .trailing)
             }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .accessibilityElement(children: .combine)
+            RowDivider()
+            HStack(spacing: 12) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Color.red, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(trip.destination.name)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 64)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Destination, \(trip.destination.name)")
         }
-        .multilineTextAlignment(.center)
+        .ikutCard()
     }
 
-    private func codeCard(_ code: String) -> some View {
-        VStack(spacing: 16) {
-            Text("Join code").font(.footnote).foregroundStyle(.secondary)
-            Text(code)
-                .font(.system(size: 44, weight: .bold, design: .monospaced))
-                .kerning(4)
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .textSelection(.enabled)
+    private func inviteCard(_ code: String) -> some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Join code").font(.footnote).foregroundStyle(.secondary)
+                Text(LobbyLogic.displayCode(code))
+                    .font(.system(size: 30, weight: .semibold, design: .monospaced))
+                    .kerning(2)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
+                HStack(spacing: 8) {
+                    ShareLink(item: LobbyLogic.shareText(code: code)) {
+                        Label("Share Link", systemImage: "square.and.arrow.up")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.ikutAccent)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 36)
+                            .background(Color.ikutAccent.opacity(0.10), in: Capsule())
+                    }
+                    Button {
+                        UIPasteboard.general.string = code
+                        copied = true
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            copied = false
+                        }
+                    } label: {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.ikutAccent)
+                            .frame(width: 36, height: 36)
+                            .background(Color.ikutAccent.opacity(0.10), in: Circle())
+                    }
+                    .accessibilityLabel(copied ? "Copied" : "Copy code")
+                }
+                .padding(.top, 8)
+            }
+            Spacer(minLength: 0)
             if let image = QRCode.image(for: LobbyLogic.joinURL(code: code)) {
                 Image(uiImage: image)
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 180, height: 180)
-                    .padding(12)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    .frame(width: 104, height: 104)
+                    .padding(6)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .accessibilityLabel("QR code to join with code \(code)")
             }
-            HStack(spacing: 12) {
-                Button {
-                    UIPasteboard.general.string = code
-                    copied = true
-                    Task {
-                        try? await Task.sleep(for: .seconds(2))
-                        copied = false
-                    }
-                } label: {
-                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                }
-                .buttonStyle(.bordered)
-
-                ShareLink(item: LobbyLogic.shareText(code: code)) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.bordered)
-            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 16))
+        .padding(16)
+        .ikutCard()
     }
 
-    private var carsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Cars").font(.headline)
-            if model.groupedCars.isEmpty {
-                Text("No cars yet").font(.subheadline).foregroundStyle(.secondary)
-            }
-            ForEach(model.groupedCars) { item in
-                CarRow(item: item)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private var carsHeader: some View {
+        let cars = model.groupedCars
+        let ready = cars.filter(\.hasTracker).count
+        return CardHeader("Cars", trailing: cars.isEmpty ? nil : "\(ready) of \(cars.count) ready")
     }
 
-    /// Room for future organizer controls (rename, remove members, ...).
-    private var organizerControls: some View {
-        Button(role: .destructive) { confirmEnd = true } label: {
-            Text("End trip").frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        .disabled(isWorking)
-    }
-
-    @ViewBuilder
-    private var leaveControls: some View {
-        if !session.isEnded, !session.membershipLost {
-            Button(role: .destructive) { confirmLeave = true } label: {
-                Text("Leave trip").frame(maxWidth: .infinity)
+    private var carsCard: some View {
+        let cars = model.groupedCars
+        return VStack(spacing: 0) {
+            if cars.isEmpty {
+                Text("No cars yet")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 58)
             }
-            .buttonStyle(.bordered)
-            .disabled(isWorking)
+            ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { RowDivider() }
+                CarRow(item: item, position: index + 1, currentUserId: currentUserId)
+            }
         }
-        if let actionError {
-            Text(actionError).font(.footnote).foregroundStyle(.red)
-        }
+        .ikutCard()
     }
 }
 
 private struct CarRow: View {
     let item: LobbyCar
+    /// 1-based place in the list, used when the car has no number of its own.
+    let position: Int
+    let currentUserId: String?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(LobbyColor.color(hex: item.car.color))
-                .frame(width: 14, height: 14)
-                .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            CarBadge(number: item.car.number ?? position, colorHex: item.car.color)
+            VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
-                    Text(item.car.name).font(.body.weight(.semibold))
+                    Text(item.car.name)
                     if item.car.isLead {
                         Text("Lead")
                             .font(.caption2.weight(.semibold))
@@ -233,29 +279,53 @@ private struct CarRow: View {
                             .background(.fill.secondary, in: Capsule())
                     }
                 }
-                Text(item.members.isEmpty ? "No one yet" : item.members.map(\.displayName).joined(separator: ", "))
-                    .font(.subheadline).foregroundStyle(.secondary)
+                Text(people)
+                    .font(.footnote).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            Label(item.hasTracker ? "Tracker" : "No tracker",
-                  systemImage: item.hasTracker ? "location.fill" : "location.slash")
-                .font(.caption)
-                .foregroundStyle(item.hasTracker ? Color.green : Color.secondary)
+            Text(item.hasTracker ? "Tracking" : "Waiting")
+                .font(.subheadline)
+                .foregroundStyle(item.hasTracker ? Color.ikutPositive : Color.ikutWarning)
         }
-        .padding(12)
-        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(minHeight: 58)
         .accessibilityElement(children: .combine)
+    }
+
+    private var people: String {
+        LobbyLogic.peopleLine(
+            members: item.members, trackerUserId: item.car.trackerUserId, currentUserId: currentUserId)
     }
 }
 
-enum LobbyColor {
-    /// "#RRGGBB" to a color; gray for anything malformed.
-    static func color(hex: String) -> Color {
-        let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
-        guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return .gray }
-        return Color(
-            red: Double((value >> 16) & 0xFF) / 255,
-            green: Double((value >> 8) & 0xFF) / 255,
-            blue: Double(value & 0xFF) / 255)
+/// Display strings for the lobby (kept here so the logic file stays untouched).
+extension LobbyLogic {
+    /// "K7M2QX" shown as "K7M 2QX".
+    static func displayCode(_ code: String) -> String {
+        guard code.count == 6 else { return code }
+        return "\(code.prefix(3)) \(code.suffix(3))"
+    }
+
+    /// "You (organizer, tracker) · Siti", "Wyna (tracker) · 3 others", "Daniel · no tracker yet".
+    static func peopleLine(members: [Member], trackerUserId: String?, currentUserId: String?) -> String {
+        guard !members.isEmpty else { return "No one yet" }
+        let ordered = members.filter { $0.id == currentUserId } + members.filter { $0.id != currentUserId }
+        func label(_ m: Member) -> String {
+            var roles: [String] = []
+            if m.role == .organizer { roles.append("organizer") }
+            if let id = m.id, id == trackerUserId { roles.append("tracker") }
+            let name = m.id == currentUserId ? "You" : m.displayName
+            return roles.isEmpty ? name : "\(name) (\(roles.joined(separator: ", ")))"
+        }
+        var parts: [String]
+        if ordered.count <= 2 {
+            parts = ordered.map(label)
+        } else {
+            parts = ordered.prefix(1).map(label)
+            parts.append("\(ordered.count - 1) others")
+        }
+        if trackerUserId == nil { parts.append("no tracker yet") }
+        return parts.joined(separator: " · ")
     }
 }
