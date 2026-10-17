@@ -27,7 +27,7 @@ let env;
 
 before(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'ikut-b1083',
+    projectId: 'demo-ikut-rules',
     firestore: {
       rules: readFileSync(join(here, '../firestore.rules'), 'utf8'),
       host: '127.0.0.1',

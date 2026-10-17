@@ -45,6 +45,10 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UIBackgroundModes: [location]
+        NSCameraUsageDescription: ikut uses the camera to scan a trip's QR code.
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.aqlan.ikut
+            CFBundleURLSchemes: [ikut]
         NSLocationTemporaryUsageDescriptionDictionary:
           ConvoyTracking: Your exact position lets the others in your trip see where your car is.
     settings:
