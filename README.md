@@ -30,3 +30,20 @@ open ikut.xcodeproj
 ```
 
 Debug builds talk to the local emulators (start them first). Set `IKUT_USE_PRODUCTION=1` in the scheme to hit the real project, or `IKUT_EMULATOR_HOST=<Mac's LAN IP>` when running on a real iPhone.
+
+## Cloud Functions
+
+TypeScript, Node 22 runtime, region asia-southeast1. `firebase/functions/src/model.ts` mirrors the Swift models in `ios/ikut/Model/`; keep the two in sync.
+
+```sh
+cd firebase/functions && npm install && npm run build
+```
+
+## Tests
+
+```sh
+cd ios
+xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17'
+# Include the emulator integration tests (start the Auth emulator first):
+TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17'
+```

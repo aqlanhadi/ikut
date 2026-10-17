@@ -22,8 +22,9 @@ enum Backend {
         #endif
     }
 
-    /// Call once at launch, before any other Firebase use.
+    /// Call at launch, before any other Firebase use. Safe to call again (e.g. from previews).
     static func configure() {
+        guard FirebaseApp.app() == nil else { return }
         FirebaseApp.configure()
 
         guard case .emulators(let host) = current else { return }
