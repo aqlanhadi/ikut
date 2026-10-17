@@ -1,0 +1,490 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB0B6EE647875B8999B3F6F /* BackendTests.swift */; };
+		2D0C6E3BE606EFBC1D986BBC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4BB920043D7D18297D5A3B81 /* FirebaseFirestore */; };
+		41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */; };
+		543F159C6474EEE812A787EF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAD86226D34FC774F9DB35D /* ContentView.swift */; };
+		6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */; };
+		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
+		C1EB4787B689F789FCE60B01 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A44815085CACEC69E8C24459 /* FirebaseAuth */; };
+		FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DBB4EC8798CACA623AE229 /* IkutApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C3CF7F54770CD454D64B0959 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D168A2D27FC6121C72BC9F0C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 347B7937203FF3F5070213DD;
+			remoteInfo = ikut;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1AB0B6EE647875B8999B3F6F /* BackendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendTests.swift; sourceTree = "<group>"; };
+		583B73D2368E1D00EF28CEBF /* ikutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ikutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		59DBB4EC8798CACA623AE229 /* IkutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkutApp.swift; sourceTree = "<group>"; };
+		6CAD86226D34FC774F9DB35D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		7DC390858FBBDA52C3ED0823 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		89E8EC027CCE192C122FA9F7 /* Backend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backend.swift; sourceTree = "<group>"; };
+		A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E047C4D86365E2C469F00DA8 /* ikut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ikut.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		05C61F26E499BD79273FEDAF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C1EB4787B689F789FCE60B01 /* FirebaseAuth in Frameworks */,
+				2D0C6E3BE606EFBC1D986BBC /* FirebaseFirestore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0C3C6779B68FE359CFD8B4DB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
+				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
+				59DBB4EC8798CACA623AE229 /* IkutApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		3AF58B37E0BAA6C0B1F3CA88 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E047C4D86365E2C469F00DA8 /* ikut.app */,
+				583B73D2368E1D00EF28CEBF /* ikutTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		962BCAA4615A543EA38FDB80 /* ikut */ = {
+			isa = PBXGroup;
+			children = (
+				7DC390858FBBDA52C3ED0823 /* Info.plist */,
+				0C3C6779B68FE359CFD8B4DB /* App */,
+				CBCA93C3E37C8B9AC1FB3203 /* Resources */,
+			);
+			path = ikut;
+			sourceTree = "<group>";
+		};
+		BFF5E8CAE9B78EAA68DD4F8D = {
+			isa = PBXGroup;
+			children = (
+				962BCAA4615A543EA38FDB80 /* ikut */,
+				D7B8B479794B7C1CA1E5773F /* ikutTests */,
+				3AF58B37E0BAA6C0B1F3CA88 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CBCA93C3E37C8B9AC1FB3203 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */,
+				7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		D7B8B479794B7C1CA1E5773F /* ikutTests */ = {
+			isa = PBXGroup;
+			children = (
+				1AB0B6EE647875B8999B3F6F /* BackendTests.swift */,
+			);
+			path = ikutTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		347B7937203FF3F5070213DD /* ikut */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F20B88B76E8FA35C1F93D714 /* Build configuration list for PBXNativeTarget "ikut" */;
+			buildPhases = (
+				738D3C7B6C3BEA2E152158EC /* Sources */,
+				EBFDC60EE273FA430AD4B9D9 /* Resources */,
+				05C61F26E499BD79273FEDAF /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ikut;
+			packageProductDependencies = (
+				A44815085CACEC69E8C24459 /* FirebaseAuth */,
+				4BB920043D7D18297D5A3B81 /* FirebaseFirestore */,
+			);
+			productName = ikut;
+			productReference = E047C4D86365E2C469F00DA8 /* ikut.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3D487084AB97B5D7CAEBE691 /* ikutTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60AF44F2B8885C4811A17394 /* Build configuration list for PBXNativeTarget "ikutTests" */;
+			buildPhases = (
+				9680ABF38F95D1F7B6C9C128 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FB7DC1E5EFC8FD13A9464C2F /* PBXTargetDependency */,
+			);
+			name = ikutTests;
+			packageProductDependencies = (
+			);
+			productName = ikutTests;
+			productReference = 583B73D2368E1D00EF28CEBF /* ikutTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D168A2D27FC6121C72BC9F0C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					347B7937203FF3F5070213DD = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					3D487084AB97B5D7CAEBE691 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 52BB5F539C4AF96553A4FF91 /* Build configuration list for PBXProject "ikut" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = BFF5E8CAE9B78EAA68DD4F8D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DA7314A052C8159E2802837B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3AF58B37E0BAA6C0B1F3CA88 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				347B7937203FF3F5070213DD /* ikut */,
+				3D487084AB97B5D7CAEBE691 /* ikutTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EBFDC60EE273FA430AD4B9D9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */,
+				6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		738D3C7B6C3BEA2E152158EC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */,
+				543F159C6474EEE812A787EF /* ContentView.swift in Sources */,
+				FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9680ABF38F95D1F7B6C9C128 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FB7DC1E5EFC8FD13A9464C2F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 347B7937203FF3F5070213DD /* ikut */;
+			targetProxy = C3CF7F54770CD454D64B0959 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1C64D374CC9C28DC60C7E6E8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikutTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ikut.app/ikut";
+			};
+			name = Release;
+		};
+		3C813C18FC8B8D8DE8378F40 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = ikut/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5E8FA879E79F578838EA8BF2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		8997DDE255A99339DDE171F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		B4075FAABBA021DA635FC7DE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikutTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ikut.app/ikut";
+			};
+			name = Debug;
+		};
+		C554BE8B89DC571B4D28DCBD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = ikut/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		52BB5F539C4AF96553A4FF91 /* Build configuration list for PBXProject "ikut" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8997DDE255A99339DDE171F0 /* Debug */,
+				5E8FA879E79F578838EA8BF2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		60AF44F2B8885C4811A17394 /* Build configuration list for PBXNativeTarget "ikutTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B4075FAABBA021DA635FC7DE /* Debug */,
+				1C64D374CC9C28DC60C7E6E8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F20B88B76E8FA35C1F93D714 /* Build configuration list for PBXNativeTarget "ikut" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C813C18FC8B8D8DE8378F40 /* Debug */,
+				C554BE8B89DC571B4D28DCBD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DA7314A052C8159E2802837B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4BB920043D7D18297D5A3B81 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA7314A052C8159E2802837B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		A44815085CACEC69E8C24459 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA7314A052C8159E2802837B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = D168A2D27FC6121C72BC9F0C /* Project object */;
+}
