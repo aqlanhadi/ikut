@@ -1,0 +1,32 @@
+# Local planning board (kept out of git)
+planning/
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Node / Firebase
+node_modules/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+database-debug.log*
+.firebase/
+*.tmp
+
+# Secrets
+.env
+.env.*
+*.p8
