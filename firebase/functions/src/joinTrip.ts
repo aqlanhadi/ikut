@@ -120,11 +120,14 @@ export async function joinTripTransaction(
         throw new HttpsError("resource-exhausted", `This trip is full (${MAX_MEMBERS} people).`);
       }
     }
+    let newCarNumber = 0;
     if (input.car.kind === "new") {
-      const n = (await tx.get(carsCol.count())).data().count;
-      if (n >= MAX_CARS) {
+      // At most MAX_CARS docs, so reading them all is cheap; the badge number is the highest so far + 1.
+      const cars = await tx.get(carsCol);
+      if (cars.size >= MAX_CARS) {
         throw new HttpsError("resource-exhausted", `This trip already has ${MAX_CARS} cars.`);
       }
+      newCarNumber = 1 + Math.max(0, ...cars.docs.map((d) => (d.data() as Car).number ?? 0));
     }
 
     // Previous car: removed if the member leaves it empty, otherwise its tracker duty is released.
@@ -163,6 +166,7 @@ export async function joinTripTransaction(
         color: input.car.color,
         isLead: false,
         state: "joining",
+        number: newCarNumber,
         ...(input.tracker ? { trackerUserId: uid } : {}),
       };
       tx.create(carRef, car);

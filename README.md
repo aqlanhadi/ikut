@@ -39,6 +39,19 @@ TypeScript, Node 22 runtime, region asia-southeast1. `firebase/functions/src/mod
 cd firebase/functions && npm install && npm run build
 ```
 
+## Data retention
+
+- Ended trips: positions and events are deleted 7 days after `trip.endedAt`. The trip doc is kept.
+- Expired events: removed 1 hour after `expiresAt`, in active and ended trips.
+- `purgeTripDataJob` (`firebase/functions/src/purgeTripDataJob.ts`, every 6 hours) is the guaranteed path for both. It runs in code, so it works without any console setup.
+- Optional: Firestore TTL on `events.expiresAt` also removes expired events, on Firestore's own schedule (typically within 24 hours). Enable it once per project:
+
+```sh
+gcloud firestore fields ttls update expiresAt --collection-group=events --enable-ttl --project=ikut-b1083
+```
+
+TTL does not cover positions, so the scheduled function remains the only thing that enforces the 7-day location promise.
+
 ## Tests
 
 ```sh

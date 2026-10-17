@@ -2,7 +2,10 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 import { initializeApp } from "firebase-admin/app";
-import { FieldValue, GeoPoint, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/firestore";
+
+import { endIdleTrips } from "../lib/endIdleTrips.js";
+import { purgeTripData } from "../lib/retention.js";
 
 const PROJECT = "ikut-b1083";
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
@@ -44,7 +47,7 @@ async function seedTrip(opts: { status?: "active" | "ended" } = {}) {
     status: opts.status ?? "active", createdAt: FieldValue.serverTimestamp(),
   });
   const carRef = tripRef.collection("cars").doc("lead");
-  await carRef.set({ name: "Lead", color: "blue", isLead: true, state: "joining", trackerUserId: organizerId });
+  await carRef.set({ name: "Lead", color: "blue", isLead: true, state: "joining", trackerUserId: organizerId, number: 1 });
   await tripRef.collection("members").doc(organizerId).set({ displayName: "Org", carId: "lead", role: "organizer" });
   return { code, tripRef, organizerId };
 }
@@ -65,7 +68,7 @@ describe("joinTrip (emulator)", () => {
     assert.equal(tripId, tripRef.id);
     assert.equal(trackerTaken, false);
     const car = (await tripRef.collection("cars").doc(carId).get()).data()!;
-    assert.deepEqual(car, { name: "Myvi", color: "red", isLead: false, state: "joining", trackerUserId: user.uid });
+    assert.deepEqual(car, { name: "Myvi", color: "red", isLead: false, state: "joining", number: 2, trackerUserId: user.uid });
     const member = (await tripRef.collection("members").doc(user.uid).get()).data()!;
     assert.deepEqual(member, { displayName: "Sam", carId, role: "member" });
     assert.ok((await tripRef.get()).data()!.lastActivityAt);
@@ -149,6 +152,16 @@ describe("joinTrip (emulator)", () => {
     await call({ code, displayName: "Sam", car: { existingCarId: "lead" }, tracker: false }, user.token);
     await call({ code, displayName: "Sam", car: newCar(), tracker: false }, user.token);
     assert.ok((await tripRef.collection("cars").doc("lead").get()).exists);
+  });
+
+  it("new cars get the next badge number", async () => {
+    const { code, tripRef } = await seedTrip();
+    const other = await newUser();
+    const a = await call({ code, displayName: "Sam", car: newCar("Myvi"), tracker: true }, user.token);
+    const b = await call({ code, displayName: "Ali", car: newCar("Alza"), tracker: true }, other.token);
+    const num = async (id: string) => (await tripRef.collection("cars").doc(id).get()).data()!.number;
+    assert.equal(await num(a.body.result.carId), 2);
+    assert.equal(await num(b.body.result.carId), 3);
   });
 
   it("re-join keeps tracker claim on same car", async () => {
@@ -251,7 +264,7 @@ describe("previewTrip (emulator)", () => {
       name: "T",
       destinationName: "D",
       cars: [
-        { id: "lead", name: "Lead", color: "blue", hasTracker: true },
+        { id: "lead", name: "Lead", color: "blue", hasTracker: true, number: 1 },
         { id: "second", name: "Alpha", color: "green", hasTracker: false },
       ],
     });
@@ -284,5 +297,159 @@ describe("previewTrip (emulator)", () => {
     assert.equal(bad.body.error.status, "INVALID_ARGUMENT");
     const anon = await callFn("previewTrip", { code: "ABCDEF" });
     assert.equal(anon.body.error.status, "UNAUTHENTICATED");
+  });
+});
+
+describe("endIdleTrips (emulator)", () => {
+  const NOW = new Date();
+  const hoursAgo = (h: number) => Timestamp.fromMillis(NOW.getTime() - h * 3_600_000);
+
+  async function seedAged(opts: {
+    status?: "active" | "ended";
+    createdH: number;
+    lastActivityH?: number;
+    positionH?: number;
+    eventH?: number;
+  }) {
+    const code = freshCode();
+    const tripRef = db.collection("trips").doc();
+    await tripRef.set({
+      name: "T", code, organizerId: "org-" + code, route: "",
+      destination: { name: "D", coordinate: new GeoPoint(1, 1) },
+      status: opts.status ?? "active", createdAt: hoursAgo(opts.createdH),
+      ...(opts.lastActivityH !== undefined ? { lastActivityAt: hoursAgo(opts.lastActivityH) } : {}),
+    });
+    if (opts.positionH !== undefined) {
+      await tripRef.collection("positions").doc("lead").set({
+        location: new GeoPoint(1, 1), speed: 0, heading: 0, routeOffset: 0, updatedAt: hoursAgo(opts.positionH),
+      });
+      // An older position from a second car must not matter.
+      await tripRef.collection("positions").doc("other").set({
+        location: new GeoPoint(1, 1), speed: 0, heading: 0, routeOffset: 0, updatedAt: hoursAgo(opts.positionH + 30),
+      });
+    }
+    if (opts.eventH !== undefined) {
+      await tripRef.collection("events").doc().set({ type: "message", category: "message", createdAt: hoursAgo(opts.eventH) });
+    }
+    return tripRef;
+  }
+  const status = async (ref: FirebaseFirestore.DocumentReference) => (await ref.get()).data()!;
+
+  it("keeps a fresh trip", async () => {
+    const ref = await seedAged({ createdH: 1 });
+    await endIdleTrips(db, NOW);
+    assert.equal((await status(ref)).status, "active");
+  });
+
+  it("keeps an old trip with a recent position", async () => {
+    const ref = await seedAged({ createdH: 30, lastActivityH: 20, positionH: 0.1 });
+    await endIdleTrips(db, NOW);
+    assert.equal((await status(ref)).status, "active");
+  });
+
+  it("keeps an old trip with a recent event", async () => {
+    const ref = await seedAged({ createdH: 30, positionH: 20, eventH: 2 });
+    await endIdleTrips(db, NOW);
+    assert.equal((await status(ref)).status, "active");
+  });
+
+  it("ends an old trip with old positions", async () => {
+    const ref = await seedAged({ createdH: 30, lastActivityH: 20, positionH: 15, eventH: 16 });
+    await endIdleTrips(db, NOW);
+    const d = await status(ref);
+    assert.equal(d.status, "ended");
+    assert.ok(d.endedAt instanceof Timestamp);
+  });
+
+  it("handles a trip without lastActivityAt", async () => {
+    const old = await seedAged({ createdH: 30 });
+    const recent = await seedAged({ createdH: 30, positionH: 1 });
+    await endIdleTrips(db, NOW);
+    assert.equal((await status(old)).status, "ended");
+    assert.equal((await status(recent)).status, "active");
+  });
+
+  it("leaves an already ended trip untouched", async () => {
+    const ref = await seedAged({ status: "ended", createdH: 40 });
+    const before = await ref.get();
+    await endIdleTrips(db, NOW);
+    const after = await ref.get();
+    assert.equal(after.updateTime!.isEqual(before.updateTime!), true);
+    assert.equal(after.data()!.endedAt, undefined);
+  });
+
+  it("is idempotent", async () => {
+    const ref = await seedAged({ createdH: 30 });
+    await endIdleTrips(db, NOW);
+    const first = (await status(ref)).endedAt;
+    await endIdleTrips(db, NOW);
+    assert.ok((await status(ref)).endedAt.isEqual(first));
+  });
+});
+
+describe("purgeTripData (emulator)", () => {
+  const NOW = new Date();
+  const at = (hours: number) => Timestamp.fromMillis(NOW.getTime() - hours * 3_600_000);
+  const point = new GeoPoint(1, 1);
+
+  async function seedRetentionTrip(opts: { status: "active" | "ended"; endedH?: number }) {
+    const code = freshCode();
+    const tripRef = db.collection("trips").doc();
+    await tripRef.set({
+      name: "T", code, organizerId: "org-" + code, route: "",
+      destination: { name: "D", coordinate: point },
+      status: opts.status, createdAt: at(400),
+      ...(opts.endedH !== undefined ? { endedAt: at(opts.endedH) } : {}),
+    });
+    await tripRef.collection("positions").doc("lead").set({
+      location: point, speed: 0, heading: 0, routeOffset: 0, updatedAt: at(1),
+    });
+    return tripRef;
+  }
+  async function addEvent(tripRef: FirebaseFirestore.DocumentReference, id: string, expiresAt?: Timestamp) {
+    await tripRef.collection("events").doc(id).set({
+      type: "message", category: "message", severity: "low", location: point, heading: 0, routeOffset: 0,
+      authorId: "x", carId: "lead", createdAt: at(1), ...(expiresAt ? { expiresAt } : {}),
+    });
+  }
+
+  it("deletes positions and events of a trip ended 8 days ago, keeps the trip doc", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    await addEvent(ref, "e1");
+    const before = (await ref.get()).data()!;
+    await purgeTripData(db, NOW);
+    assert.equal((await ref.collection("positions").get()).size, 0);
+    assert.equal((await ref.collection("events").get()).size, 0);
+    const after = await ref.get();
+    assert.equal(after.exists, true);
+    assert.equal(after.data()!.status, "ended");
+    assert.ok(after.data()!.endedAt.isEqual(before.endedAt));
+  });
+
+  it("keeps a trip ended 2 days ago intact", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 2 });
+    await addEvent(ref, "e1");
+    await purgeTripData(db, NOW);
+    assert.equal((await ref.collection("positions").get()).size, 1);
+    assert.equal((await ref.collection("events").get()).size, 1);
+    assert.equal((await ref.get()).data()!.status, "ended");
+  });
+
+  it("deletes an active trip's event that expired 2 hours ago", async () => {
+    const ref = await seedRetentionTrip({ status: "active" });
+    await addEvent(ref, "expired", at(2));
+    await purgeTripData(db, NOW);
+    assert.equal((await ref.collection("events").doc("expired").get()).exists, false);
+    assert.equal((await ref.collection("positions").get()).size, 1);
+    assert.equal((await ref.get()).data()!.status, "active");
+  });
+
+  it("keeps a non-expired event and an event without expiresAt", async () => {
+    const ref = await seedRetentionTrip({ status: "active" });
+    await addEvent(ref, "future", Timestamp.fromMillis(NOW.getTime() + 3_600_000));
+    await addEvent(ref, "forever");
+    await purgeTripData(db, NOW);
+    assert.equal((await ref.collection("events").doc("future").get()).exists, true);
+    assert.equal((await ref.collection("events").doc("forever").get()).exists, true);
   });
 });

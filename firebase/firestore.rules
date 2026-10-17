@@ -74,7 +74,9 @@ service cloud.firestore {
         && d.color is string
         && d.state in ['joining', 'convoy']
         && (optionalOf(d, 'route') == null || d.route is string)
-        && (optionalOf(d, 'mergeOffset') == null || d.mergeOffset is number);
+        && (optionalOf(d, 'mergeOffset') == null || d.mergeOffset is number)
+        && (optionalOf(d, 'number') == null
+            || (d.number is int && d.number >= 1 && d.number <= 99));
     }
 
     function validPosition(d) {
@@ -185,7 +187,8 @@ service cloud.firestore {
         allow create: if isMember(tripId)
           && tripActive(tripId)
           && request.resource.data.keys().hasOnly(['name', 'color', 'trackerUserId',
-                                                   'isLead', 'route', 'mergeOffset', 'state'])
+                                                   'isLead', 'route', 'mergeOffset', 'state',
+                                                   'number'])
           && request.resource.data.keys().hasAll(['name', 'color', 'isLead', 'state'])
           && validCarFields(request.resource.data)
           && request.resource.data.isLead is bool

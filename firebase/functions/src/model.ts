@@ -47,6 +47,8 @@ export interface Car {
   /** Meters along the main route where this car joins it. */
   mergeOffset?: number;
   state: CarState;
+  /** Badge number shown on the map and in lists; 1 is the organizer's car, then highest existing + 1. */
+  number?: number;
 }
 
 /** trips/{tripId}/members/{userId} */
@@ -96,6 +98,7 @@ export interface PreviewCar {
   name: string;
   color: string;
   hasTracker: boolean;
+  number?: number;
 }
 
 export interface PreviewTripResult {

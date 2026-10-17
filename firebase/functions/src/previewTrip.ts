@@ -22,6 +22,7 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
       name: data.name,
       color: data.color,
       hasTracker: typeof data.trackerUserId === "string" && data.trackerUserId.length > 0,
+      ...(typeof data.number === "number" ? { number: data.number } : {}),
       isLead: data.isLead === true,
     }))
     // Lead car first, then by name, so the list is stable.
