@@ -20,8 +20,17 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>IKUTEmulatorHost</key>
+	<string>$(IKUT_EMULATOR_HOST)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>ikut connects to a development server on your local network.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.</string>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>

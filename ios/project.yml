@@ -18,7 +18,9 @@ settings:
     SWIFT_VERSION: "6.0"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ""
+    # Personal (free) team; switch to the paid team ID once enrollment (S1) is approved.
+    DEVELOPMENT_TEAM: Y67R3NPM7F
+    IKUT_EMULATOR_HOST: ""
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
 
@@ -37,6 +39,11 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSLocationWhenInUseUsageDescription: ikut shows your car to the others in your trip while the trip is active.
         NSLocationAlwaysAndWhenInUseUsageDescription: ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.
+        # Debug-only: lets a phone reach the emulators on the Mac. Empty in normal builds.
+        IKUTEmulatorHost: $(IKUT_EMULATOR_HOST)
+        NSLocalNetworkUsageDescription: ikut connects to a development server on your local network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         NSLocationTemporaryUsageDescriptionDictionary:
           ConvoyTracking: Your exact position lets the others in your trip see where your car is.
     settings:

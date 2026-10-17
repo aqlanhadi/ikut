@@ -7,7 +7,8 @@ import Foundation
 ///
 /// Debug builds use the local emulators (`firebase emulators:start` in firebase/)
 /// unless launched with `IKUT_USE_PRODUCTION=1`. Release builds always use production.
-/// On a real device, set `IKUT_EMULATOR_HOST` to the Mac's LAN address in the scheme.
+/// On a real device, build with `IKUT_EMULATOR_HOST=<Mac's LAN address>` (baked into
+/// Info.plist) or set the same environment variable in the scheme.
 enum Backend {
     case emulators(host: String)
     case production
@@ -16,7 +17,9 @@ enum Backend {
         #if DEBUG
         let env = ProcessInfo.processInfo.environment
         if env["IKUT_USE_PRODUCTION"] == "1" { return .production }
-        return .emulators(host: env["IKUT_EMULATOR_HOST"] ?? "127.0.0.1")
+        let built = Bundle.main.object(forInfoDictionaryKey: "IKUTEmulatorHost") as? String
+        let host = env["IKUT_EMULATOR_HOST"] ?? built.flatMap { $0.isEmpty ? nil : $0 } ?? "127.0.0.1"
+        return .emulators(host: host)
         #else
         return .production
         #endif
