@@ -104,8 +104,29 @@ enum MapDemo {
         Backend.configure()
         return NavigationStack {
             TripMapView(
-                session: TripSession(tripId: "demo", userId: "u-c1"), model: model(), onRequestStop: {})
+                session: TripSession(tripId: "demo", userId: "u-c1"), model: model(), stopState: ProcessInfo.processInfo.environment["IKUT_MAP_DEMO_NO_STOP"] == nil ? stopRequest() : nil)
         }
+    }
+
+    /// Wyna asks for a fuel stop and proposes a station; Aqlan (the lead) has agreed, the others haven't answered.
+    static func stopRequest(now: Date = Date()) -> StopRequestState {
+        let proposal = StopPlace(
+            name: "Petronas Tapah R&R", coordinate: GeoPoint(latitude: 4.21, longitude: 101.26),
+            routeOffset: 52_000, pinnedBy: nil)
+        func row(_ id: String, _ n: Int, _ color: String, _ name: String, mine: Bool = false,
+                 _ status: StopRequestState.VoteStatus) -> StopRequestState.Row {
+            .init(carId: id, number: n, colorHex: color, name: name, isMine: mine, status: status, suggestion: nil)
+        }
+        return StopRequestState(
+            eventId: "demo-stop", type: .stopFuel, requesterCarId: "c2", requesterNumber: 2,
+            requesterName: "Wyna", askedAt: now.addingTimeInterval(-90),
+            rows: [
+                row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true, .waiting),
+                row("c2", 2, "#D9480F", "Wyna’s X70", .agreed),
+                row("c4", 4, "#7C3AED", "Daniel’s City", .waiting),
+            ],
+            place: nil, proposal: proposal, alternatives: [], viewerAgrees: false, canPin: true,
+            canResolve: false, viewerOffset: 40_000, isResolved: false)
     }
 
     private static func bearing(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {

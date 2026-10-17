@@ -20,4 +20,6 @@ struct Car: Codable, Sendable, Equatable, Identifiable {
     /// Badge number shown on the map and in lists; 1 is the organizer's car, then highest existing + 1.
     /// Optional because cars created before numbering existed have none.
     var number: Int?
+    /// When the tracker paused sharing; nil when sharing. Treat as expired after `TripSessionLogic.pauseExpiry`.
+    var pausedAt: Date?
 }

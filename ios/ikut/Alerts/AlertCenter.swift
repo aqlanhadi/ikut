@@ -141,6 +141,18 @@ final class AlertCenter {
         guard policy != nil else { return }
         let fresh = policy!.newEvents(from: events, now: now())
         for event in fresh { await announce(event: event) }
+        let pinned = policy!.newlyPinned(from: events, excluding: fresh)
+        for event in pinned { await announcePinned(event: event) }
+    }
+
+    /// "Stop pinned: {place}", once, for a stop request that was announced before it had a place.
+    @discardableResult
+    func announcePinned(event: TripEvent) async -> Bool {
+        guard let tripId, let eventId = event.id, let place = event.place,
+              announced.contains(eventId), announced.insert(AlertWording.pinnedAlertId(eventId: eventId)).inserted
+        else { return false }
+        deliver(AlertWording.pinnedAlert(for: event, place: place, tripId: tripId, now: now()))
+        return true
     }
 
     private func deliver(_ alert: TripAlert) {

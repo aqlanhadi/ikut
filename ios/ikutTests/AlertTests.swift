@@ -394,6 +394,60 @@ struct AlertCenterTests {
         #expect(rig.speaker.stops >= 1)
     }
 
+    private func pinned(_ e: TripEvent, _ name: String = "Petronas Tapah") -> TripEvent {
+        var e = e
+        e.place = StopPlace(name: name, coordinate: GeoPoint(latitude: 3, longitude: 101), routeOffset: 100, pinnedBy: "lead")
+        return e
+    }
+
+    @Test func pinnedPlaceIsAnnouncedOnceAfterTheRequest() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        let request = alertEvent(.stopFuel, id: "s1")
+        rig.source.emit([request])
+        await alertUntil { rig.speaker.spoken.count == 1 }
+        rig.source.emit([pinned(request)])
+        await alertUntil { rig.speaker.spoken.count == 2 }
+        rig.source.emit([pinned(request)])
+        rig.source.emit([pinned(request, "Elsewhere")])
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(rig.speaker.spoken.map(\.key) == ["s1", "s1@pinned"])
+        #expect(rig.speaker.spoken.last?.text == "Stop pinned: Petronas Tapah")
+        #expect(rig.center.current?.title == "Stop pinned")
+    }
+
+    @Test func pinnedPlaceIsSkippedForTheRequestersOwnCar() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        let mine = alertEvent(.stopFuel, id: "s1", author: "me")
+        rig.source.emit([mine])
+        rig.source.emit([pinned(mine)])
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(rig.speaker.spoken.isEmpty)
+    }
+
+    @Test func pinnedPlaceIsSkippedWhenTheRequestWasNeverAnnounced() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        // Old backlog stop request: seen but not announced.
+        rig.source.emit([alertEvent(.stopFuel, id: "old", ago: 900)])
+        rig.source.emit([pinned(alertEvent(.stopFuel, id: "old", ago: 900))])
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(rig.speaker.spoken.isEmpty)
+    }
+
+    @Test func requestArrivingAlreadyPinnedIsAnnouncedOnce() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        rig.source.emit([pinned(alertEvent(.stopFood, id: "s2"))])
+        await alertUntil { !rig.speaker.spoken.isEmpty }
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(rig.speaker.spoken.map(\.key) == ["s2"])
+    }
+
     @Test func notificationIdentifiersArePerTrip() {
         #expect(AlertCenter.categoryIdentifier(tripId: "abc") == "ikut.alerts.abc")
         #expect(AlertCenter.threadIdentifier(tripId: "abc") == "ikut.trip.abc")

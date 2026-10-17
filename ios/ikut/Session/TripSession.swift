@@ -25,6 +25,9 @@ final class TripSession {
     private(set) var isClosing = false
     private(set) var isTracking = false
 
+    /// True while this car's sharing is paused: the tracker paused it here, or the car doc says so
+    /// (e.g. after a relaunch) and the pause has not expired.
+    var isPaused: Bool { TripSessionLogic.isPaused(pausedAt: pauseStart, now: clock()) }
     var isEnded: Bool { trip?.status == .ended }
     var isOrganizer: Bool { trip?.organizerId == userId && !userId.isEmpty }
 
@@ -48,6 +51,14 @@ final class TripSession {
     /// Signature of the own route `TrackingService` was last started with.
     @ObservationIgnored private var trackedCarRoute: [Double]?
     @ObservationIgnored private var explainerShown = false
+    /// Set the instant this user pauses, before the write lands; cleared on resume or losing tracker duty.
+    private var localPausedAt: Date?
+    @ObservationIgnored private let clock: () -> Date
+    @ObservationIgnored private let pauseWriter: PauseWriter?
+    @ObservationIgnored private var expiryTask: Task<Void, Never>?
+    @ObservationIgnored private var expiryFor: Date?
+
+    private var pauseStart: Date? { localPausedAt ?? car?.pausedAt }
 
     private struct SessionKey: Equatable {
         var carId: String
@@ -59,8 +70,12 @@ final class TripSession {
         carRouteFactory: @escaping CarRouteFactory = {
             try TripSessionLogic.makeCarRouteService(tripId: $0, carId: $1, trip: $2, car: $3)
         },
-        ensureTimeout: Duration = .seconds(8)
+        ensureTimeout: Duration = .seconds(8),
+        clock: @escaping () -> Date = { Date() },
+        pauseWriter: PauseWriter? = nil
     ) {
+        self.clock = clock
+        self.pauseWriter = pauseWriter
         self.tripId = tripId
         self.userId = userId
         self.tracker = tracker ?? TrackingService()
@@ -72,6 +87,7 @@ final class TripSession {
 
     isolated deinit {
         startupTask?.cancel()
+        expiryTask?.cancel()
         tracker.onFix = nil
         tracker.stop()
         removeListeners()
@@ -135,7 +151,7 @@ final class TripSession {
         do {
             if car?.trackerUserId == userId, let carId = member?.carId ?? car?.id {
                 try await db.document(FirestorePaths.car(tripId: tripId, carId: carId))
-                    .updateData(["trackerUserId": FieldValue.delete()])
+                    .updateData(["trackerUserId": FieldValue.delete(), "pausedAt": FieldValue.delete()])
             }
             try await db.document(FirestorePaths.member(tripId: tripId, userId: userId)).delete()
         } catch {
@@ -144,6 +160,68 @@ final class TripSession {
             throw error
         }
         stop()
+    }
+
+    // MARK: - Pause
+
+    /// Tracker only: stops tracking right away (before any network call), then writes `pausedAt` so the
+    /// other members see "Paused" instead of a stale position. If the write fails the pause stays in
+    /// effect locally (nothing is shared) and the error is thrown so the caller can offer a retry.
+    func pauseSharing() async throws {
+        guard !isClosing, !isPaused, let carId = car?.id, car?.trackerUserId == userId, trip?.status == .active else { return }
+        let now = clock()
+        localPausedAt = now
+        stopTrackingNow()
+        syncExpiryTimer()
+        try await writePausedAt(now, carId: carId)
+    }
+
+    /// Clears `pausedAt`, then restarts tracking through the normal `reevaluate` path. If the write fails
+    /// the pause stays and the error is thrown.
+    func resumeSharing() async throws {
+        guard !isClosing, isPaused, let carId = car?.id else { return }
+        try await writePausedAt(nil, carId: carId)
+        localPausedAt = nil
+        car?.pausedAt = nil
+        reevaluate()
+    }
+
+    private func writePausedAt(_ date: Date?, carId: String) async throws {
+        if let pauseWriter {
+            try await pauseWriter(carId, date)
+            return
+        }
+        try await db.document(FirestorePaths.car(tripId: tripId, carId: carId))
+            .updateData(["pausedAt": date.map { Timestamp(date: $0) } ?? FieldValue.delete()])
+    }
+
+    /// One timer for the pause in effect: when it expires tracking resumes by itself and the stale
+    /// field is cleared best-effort.
+    private func syncExpiryTimer() {
+        let start = pauseStart
+        guard start != expiryFor else { return }
+        expiryTask?.cancel()
+        expiryTask = nil
+        expiryFor = start
+        guard let start else { return }
+        // An already-expired pause needs no timer (isPaused is false); scheduling one would re-enter
+        // reevaluate() forever while a stale pausedAt stays on the car doc.
+        let delay = start.addingTimeInterval(TripSessionLogic.pauseExpiry).timeIntervalSince(clock())
+        guard delay > 0 else { return }
+        expiryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self, self.expiryFor == start else { return }
+            await self.pauseExpired()
+        }
+    }
+
+    private func pauseExpired() async {
+        let carId = car?.id
+        let wasTracker = car?.trackerUserId == userId
+        localPausedAt = nil
+        expiryFor = nil
+        reevaluate()
+        if wasTracker, let carId, car?.pausedAt != nil { try? await writePausedAt(nil, carId: carId) }
     }
 
     /// Organizer only: stops tracking right away, then marks the trip ended.
@@ -234,9 +312,13 @@ final class TripSession {
     /// tracking runs with. A reroute by the car-route service lands here through the snapshot of its own write.
     private func reevaluate() {
         guard !isClosing else { return }
-        let wants = TripSessionLogic.shouldTrack(
+        let duty = TripSessionLogic.shouldTrack(
             userId: userId, tripStatus: trip?.status, isMember: member != nil,
             trackerUserId: car?.trackerUserId)
+        // Losing tracker duty while paused drops the local pause; the doc's pause is the next tracker's to resume.
+        if !duty { localPausedAt = nil }
+        syncExpiryTimer()
+        let wants = duty && !isPaused
         guard wants, let trip, let car, let carId = car.id else {
             if tracker.isTracking || sessionKey != nil { stopTrackingNow() }
             isTracking = tracker.isTracking

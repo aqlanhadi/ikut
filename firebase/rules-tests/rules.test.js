@@ -12,6 +12,7 @@ import {
   GeoPoint,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -182,6 +183,28 @@ describe('cars', () => {
     assertFails(updateDoc(doc(db('other'), `trips/${T}/cars/carA`), { trackerUserId: null })));
   it('tracker can change route, mergeOffset, state', () =>
     assertSucceeds(updateDoc(car('carA'), { route: 'abc', mergeOffset: 12.5, state: 'convoy' })));
+  it('tracker can pause with a timestamp', () => assertSucceeds(updateDoc(car('carA'), { pausedAt: ts() })));
+  it('tracker can resume by clearing pausedAt', async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await updateDoc(doc(c.firestore(), `trips/${T}/cars/carA`), { pausedAt: ts() });
+    });
+    await assertSucceeds(updateDoc(car('carA'), { pausedAt: deleteField() }));
+  });
+  it('tracker can set pausedAt to null', () => assertSucceeds(updateDoc(car('carA'), { pausedAt: null })));
+  it('pausedAt must be a timestamp', () => assertFails(updateDoc(car('carA'), { pausedAt: 'now' })));
+  it('pausedAt as a number fails', () => assertFails(updateDoc(car('carA'), { pausedAt: 123 })));
+  it('non-tracker member cannot pause', () =>
+    assertFails(updateDoc(doc(db('other'), `trips/${T}/cars/carA`), { pausedAt: ts() })));
+  it('organizer who is not the tracker cannot pause', () =>
+    assertFails(updateDoc(doc(db('org'), `trips/${T}/cars/carA`), { pausedAt: ts() })));
+  it('pause on an ended trip fails', async () => {
+    await seed({ ended: true });
+    await assertFails(updateDoc(car('carA'), { pausedAt: ts() }));
+  });
+  it('tracker can release and clear a pause together', () =>
+    assertSucceeds(updateDoc(car('carA'), { trackerUserId: null, pausedAt: deleteField() })));
+  it('release cannot set a pause', () =>
+    assertFails(updateDoc(car('carA'), { trackerUserId: null, pausedAt: ts() })));
   it('tracker cannot change isLead', () => assertFails(updateDoc(car('carA'), { isLead: true })));
   it('non-tracker member cannot change route', () =>
     assertFails(updateDoc(doc(db('other'), `trips/${T}/cars/carA`), { route: 'abc' })));

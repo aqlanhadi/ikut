@@ -37,6 +37,18 @@ enum AlertWording {
             spoken: spoken(for: event, car: car, distance: distance))
     }
 
+    /// "Stop pinned: Petronas Tapah", for a stop request whose place was just pinned.
+    static func pinnedAlert(for event: TripEvent, place: StopPlace, tripId: String, now: Date) -> TripAlert {
+        TripAlert(
+            id: pinnedAlertId(eventId: event.id ?? ""), eventId: event.id ?? "", tripId: tripId,
+            type: event.type, category: event.category, severity: event.severity, distance: nil,
+            title: "Stop pinned",
+            body: "\(place.name) · \(relativeTime(since: event.createdAt, now: now))",
+            spoken: "Stop pinned: \(place.name)")
+    }
+
+    static func pinnedAlertId(eventId: String) -> String { "\(eventId)@pinned" }
+
     static func alertId(eventId: String, approach: Bool) -> String {
         approach ? "\(eventId)@approach" : eventId
     }

@@ -5,11 +5,12 @@ import SwiftUI
 /// own routes dashed up to where they merge, a numbered marker per car, a trip pill at the top,
 /// mode controls on the right and the convoy panel (list, Joining, Report, Stop) at the bottom.
 ///
-/// Push it with the lobby's existing session. `onRequestStop` is called from the panel's Stop
-/// button and the pill's menu; the caller shows whatever flow follows.
+/// Push it with the lobby's existing session (never a second one). The Stop button opens the
+/// request sheet, an open stop request shows as a card above the panel, and the pill's menu can go
+/// back to the lobby, leave or end the trip; leaving and ending call `onExit` to return to Home.
 struct TripMapView: View {
     let session: TripSession
-    var onRequestStop: () -> Void
+    var onExit: () -> Void
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
     private let liveServices: Bool
 
@@ -22,21 +23,45 @@ struct TripMapView: View {
     @State private var reportContext: ReportContext?
     @State private var showReport = false
     @State private var askAboutAlerts = false
+    @State private var stopState: StopRequestState?
+    @State private var stopSheet: StopSheet?
+    @State private var stopError: String?
+    @State private var confirmLeave = false
+    @State private var confirmEnd = false
+    @State private var isWorking = false
+    @State private var mapMaxX: CGFloat = 0
     @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
     @Environment(\.dismiss) private var dismiss
 
-    init(session: TripSession, onRequestStop: @escaping () -> Void = {}) {
+    /// What the stop sheet is showing.
+    private enum StopSheet: Identifiable {
+        case request
+        case suggest(StopRequestState)
+
+        var id: String {
+            switch self {
+            case .request: "request"
+            case .suggest(let state): "suggest-\(state.eventId)"
+            }
+        }
+    }
+
+    init(session: TripSession, onExit: @escaping () -> Void = {}) {
         self.session = session
-        self.onRequestStop = onRequestStop
+        self.onExit = onExit
         liveServices = true
         _model = State(initialValue: TripMapModel(session: session))
     }
 
     /// For the demo and previews: a model that is fed by hand and no live services.
-    init(session: TripSession, model: TripMapModel, onRequestStop: @escaping () -> Void = {}) {
+    init(
+        session: TripSession, model: TripMapModel, stopState: StopRequestState? = nil,
+        onExit: @escaping () -> Void = {}
+    ) {
         self.session = session
-        self.onRequestStop = onRequestStop
+        self.onExit = onExit
         liveServices = false
+        _stopState = State(initialValue: stopState)
         _model = State(initialValue: model)
         _camera = State(initialValue: Self.position(for: model.cameraTarget) ?? .automatic)
     }
@@ -45,21 +70,45 @@ struct TripMapView: View {
         map
             .ignoresSafeArea(edges: .bottom)
             .overlay(alignment: .top) { topStack }
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { mapMaxX = $0 }
             .overlay(alignment: .topTrailing) {
                 MapModeControl(mode: $model.mode)
                     .padding(.top, 76)
                     .padding(.trailing, 12)
             }
             .overlay(alignment: .bottom) {
-                ConvoyPanel(
-                    model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
-                    onReport: openReport, onStop: onRequestStop)
+                VStack(spacing: 8) {
+                    stopCard
+                    ConvoyPanel(
+                        model: model, expanded: panelBinding, canReport: model.myCarId != nil,
+                        onReport: openReport, onStop: { stopSheet = .request })
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showReport) {
                 if let reportContext {
                     ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
                 }
+            }
+            .sheet(item: $stopSheet) { sheet in
+                if let context = stopContext {
+                    switch sheet {
+                    case .request:
+                        RequestStopSheet(context: context)
+                    case .suggest(let state):
+                        RequestStopSheet(context: context, suggestingFor: state)
+                    }
+                }
+            }
+            .confirmationDialog("Leave this trip?", isPresented: $confirmLeave, titleVisibility: .visible) {
+                Button("Leave trip", role: .destructive) { run { try await session.leave(); onExit() } }
+            } message: {
+                Text("Your phone stops sharing its location.")
+            }
+            .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
+                Button("End trip", role: .destructive) { run { try await session.endTrip(); onExit() } }
+            } message: {
+                Text("Everyone stops sharing their location. This can't be undone.")
             }
             .alert("Get road alerts?", isPresented: $askAboutAlerts) {
                 Button("Turn on") { Task { await alerts.requestPermission() } }
@@ -70,6 +119,10 @@ struct TripMapView: View {
             .onAppear(perform: appear)
             .onDisappear(perform: disappear)
             .task { await model.convoy.run() }
+            .task(id: StopListenKey(carId: model.myCarId, routeLength: model.mainRoute?.length)) {
+                guard liveServices, let context = stopContext else { return }
+                for await state in StopService.listen(context: context) { stopState = state }
+            }
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
@@ -95,14 +148,14 @@ struct TripMapView: View {
                         style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [6, 6]))
                 if let merge = overlay.merge {
                     Annotation("Merge point", coordinate: merge.clCoordinate, anchor: .center) {
-                        MergePointView(colorHex: overlay.colorHex)
+                        MergePointView(colorHex: overlay.colorHex, containerWidth: mapMaxX)
                     }
                     .annotationTitles(.hidden)
                 }
             }
             ForEach(model.markers) { marker in
                 Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
-                    MapMarkerView(marker: marker, cameraHeading: cameraHeading)
+                    MapMarkerView(marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX)
                 }
                 .annotationTitles(.hidden)
             }
@@ -144,6 +197,7 @@ struct TripMapView: View {
             tripPill
             AlertBannerView(center: alerts)
             ReportToastView(model: toast)
+            if let stopError { errorBanner(stopError) }
         }
         .padding(.horizontal, 12)
         .padding(.top, 4)
@@ -167,13 +221,21 @@ struct TripMapView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
                 Button("Back to lobby", systemImage: "chevron.backward") { dismiss() }
-                Button("Stop trip…", systemImage: "stop.circle", role: .destructive, action: onRequestStop)
+                if canEnd {
+                    Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
+                }
+                if canLeave {
+                    Button("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                        confirmLeave = true
+                    }
+                }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
             }
+            .disabled(isWorking)
             .accessibilityLabel("Trip menu")
         }
         .padding(.leading, 16)
@@ -187,6 +249,76 @@ struct TripMapView: View {
         var parts = [model.isEnded ? "Trip ended" : (model.isTracker ? "Sharing location" : "Not sharing location")]
         if !model.tripCode.isEmpty { parts.append("Code \(model.tripCode)") }
         return parts.joined(separator: " · ")
+    }
+
+    // MARK: Stops
+
+    /// The convoy list folds away while a stop request is open, so the card has the room.
+    private var panelBinding: Binding<Bool> {
+        Binding(get: { panelExpanded && stopState == nil }, set: { panelExpanded = $0 })
+    }
+
+    private var stopContext: StopContext? {
+        model.stopContext(tripId: session.tripId, userId: session.userId, isOrganizer: session.isOrganizer)
+    }
+
+    private struct StopListenKey: Equatable {
+        var carId: String?
+        var routeLength: Double?
+    }
+
+    @ViewBuilder
+    private var stopCard: some View {
+        if let state = stopState, let context = stopContext {
+            ScrollView {
+                StopRequestCard(
+                    state: state,
+                    actions: StopService.actions(
+                        context: context, state: state,
+                        suggestAnother: { stopSheet = .suggest(state) },
+                        onError: { showStopError($0) }))
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+            .frame(maxHeight: 520)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8)
+            .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.red.opacity(0.9), in: Capsule())
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+            .accessibilityElement(children: .combine)
+    }
+
+    private func showStopError(_ error: Error) {
+        stopError = error.localizedDescription
+        Task {
+            try? await Task.sleep(for: .seconds(6))
+            stopError = nil
+        }
+    }
+
+    // MARK: Leave and end
+
+    private var canLeave: Bool { !session.isEnded && !session.membershipLost }
+    private var canEnd: Bool { session.isOrganizer && !session.isEnded }
+
+    private func run(_ action: @escaping () async throws -> Void) {
+        guard !isWorking else { return }
+        isWorking = true
+        Task {
+            do { try await action() } catch { showStopError(error) }
+            isWorking = false
+        }
     }
 
     // MARK: Actions and lifecycle
@@ -238,6 +370,12 @@ enum MapPalette {
     static let routeCasing = Color(red: 0, green: 96 / 255, blue: 223 / 255)
     static let live = Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255)
     static let warning = Color(red: 201 / 255, green: 52 / 255, blue: 0)
+    /// Stale-car chip text: the warning red on light, a lighter orange on dark so it stays legible.
+    static let staleChipText = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1, green: 159 / 255, blue: 10 / 255, alpha: 1)
+            : UIColor(red: 176 / 255, green: 40 / 255, blue: 0, alpha: 1)
+    })
 }
 
 extension Color {
@@ -292,7 +430,11 @@ struct MapModeControl: View {
 struct MapMarkerView: View {
     var marker: MapMarker
     var cameraHeading: Double
+    /// Width of the map, so the chip can flip to the left near the right edge.
+    var containerWidth: CGFloat = 0
 
+    @State private var markerX: CGFloat?
+    @State private var chipWidth: CGFloat = 120
     private let badge: CGFloat = 32
 
     var body: some View {
@@ -324,21 +466,27 @@ struct MapMarkerView: View {
                 }
         }
         .frame(width: 58, height: 58)
-        .overlay(alignment: .leading) {
+        .opacity(marker.isStale ? 0.6 : 1)
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { markerX = $0 }
+        .overlay(alignment: side == .trailing ? .leading : .trailing) {
             Text(marker.label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isStale ? MapPalette.warning : Color.primary)
+                .foregroundStyle(marker.isStale ? MapPalette.staleChipText : Color.primary)
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(.regularMaterial, in: Capsule())
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                .padding(.leading, 50)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
+                .padding(side == .trailing ? .leading : .trailing, MapChipPlacement.gap)
         }
-        .opacity(marker.isStale ? 0.6 : 1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+    }
+
+    private var side: MapChipPlacement.Side {
+        MapChipPlacement.side(markerX: markerX, chipWidth: chipWidth, containerWidth: containerWidth)
     }
 
     private var accessibilityText: String {
@@ -362,25 +510,38 @@ private struct Wedge: Shape {
 }
 
 /// White dot with the joining car's color where its route meets the main route; the label hangs
-/// off to the right so the dot stays on the coordinate.
+/// off to the side so the dot stays on the coordinate. The label is dark-on-material with the
+/// car's color as its outline, so it reads in light and dark mode.
 struct MergePointView: View {
     var colorHex: String
+    var containerWidth: CGFloat = 0
+
+    @State private var dotX: CGFloat?
+    @State private var chipWidth: CGFloat = 70
+
+    private var side: MapChipPlacement.Side {
+        // The dot is 18 wide, so its chip sits closer than a marker's.
+        MapChipPlacement.side(markerX: dotX.map { $0 - 16 }, chipWidth: chipWidth, containerWidth: containerWidth)
+    }
 
     var body: some View {
         Circle()
             .fill(.white)
             .overlay(Circle().strokeBorder(Color(mapHex: colorHex), lineWidth: 3))
             .frame(width: 18, height: 18)
-            .overlay(alignment: .leading) {
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { dotX = $0 }
+            .overlay(alignment: side == .trailing ? .leading : .trailing) {
                 Text("Merge")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(mapHex: colorHex))
+                    .foregroundStyle(Color.primary)
                     .fixedSize()
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(.regularMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color(mapHex: colorHex), lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                    .padding(.leading, 24)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
+                    .padding(side == .trailing ? .leading : .trailing, 24)
             }
     }
 }

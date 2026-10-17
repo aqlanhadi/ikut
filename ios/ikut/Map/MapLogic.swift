@@ -332,3 +332,44 @@ enum MapReportSnapshot {
             previousOffset: nil, capturedAt: now)
     }
 }
+
+// MARK: - Chip placement
+
+/// Which side of its marker a name chip goes on. Chips sit to the right unless that would run
+/// past the usable width (screen edge, minus the room kept for the camera mode control).
+enum MapChipPlacement {
+    enum Side: Equatable, Sendable { case trailing, leading }
+
+    /// Space kept at the right edge for the mode control (44 pt wide, 12 pt from the edge) plus a gap.
+    static let reservedTrailing: CGFloat = 68
+    /// Distance from the marker's center to the near edge of its chip.
+    static let gap: CGFloat = 50
+
+    /// `markerX` is the marker's center in screen space, `containerWidth` the map's width. An
+    /// unknown position (before the first layout) keeps the chip on the right.
+    static func side(
+        markerX: CGFloat?, chipWidth: CGFloat, containerWidth: CGFloat,
+        reservedTrailing: CGFloat = reservedTrailing
+    ) -> Side {
+        guard let markerX, containerWidth > 0 else { return .trailing }
+        let rightEnd = markerX + gap + chipWidth
+        if rightEnd <= containerWidth - reservedTrailing { return .trailing }
+        // Flip only if the left side has room; otherwise stay where more of it is visible.
+        let leftStart = markerX - gap - chipWidth
+        return leftStart >= 8 || leftStart > containerWidth - reservedTrailing - rightEnd ? .leading : .trailing
+    }
+}
+
+// MARK: - Stop host helpers
+
+extension TripMapModel {
+    /// What the stop sheet and card need from this screen; nil until the trip knows my car.
+    func stopContext(tripId: String, userId: String, isOrganizer: Bool) -> StopContext? {
+        guard let carId = myCarId else { return nil }
+        return StopContext(
+            tripId: tripId, userId: userId, carId: carId, isOrganizer: isOrganizer,
+            snapshot: { [weak self] in self?.reportSnapshot() },
+            mainRoute: mainRoute,
+            frontOffset: { [weak self] in self?.convoy.convoy.first?.convoyOffset })
+    }
+}

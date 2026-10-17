@@ -250,13 +250,17 @@ service cloud.firestore {
               && optionalOf(resource.data, 'trackerUserId') == null
               && request.resource.data.trackerUserId == request.auth.uid)
             // Release as the current tracker.
-            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId'])
+            // Releasing also clears a pause, so the next tracker does not inherit it.
+            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId', 'pausedAt'])
               && optionalOf(resource.data, 'trackerUserId') == request.auth.uid
-              && optionalOf(request.resource.data, 'trackerUserId') == null)
-            // Tracker updates route, mergeOffset, state.
+              && optionalOf(request.resource.data, 'trackerUserId') == null
+              && optionalOf(request.resource.data, 'pausedAt') == null)
+            // Tracker updates route, mergeOffset, state, pausedAt (timestamp, or null/absent to resume).
             || (optionalOf(resource.data, 'trackerUserId') == request.auth.uid
               && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['route', 'mergeOffset', 'state']))
+                   .hasOnly(['route', 'mergeOffset', 'state', 'pausedAt'])
+              && (optionalOf(request.resource.data, 'pausedAt') == null
+                  || request.resource.data.pausedAt is timestamp))
             // Organizer updates isLead and name.
             || (isOrganizer(tripId)
               && request.resource.data.diff(resource.data).affectedKeys()

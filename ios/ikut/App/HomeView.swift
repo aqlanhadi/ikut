@@ -53,8 +53,7 @@ struct HomeView: View {
                         path = [.lobby(tripId: tripId)]
                     }
                 case .lobby(let tripId):
-                    // The live map (M1) replaces this no-op.
-                    LobbyView(tripId: tripId, onOpenMap: {}, onExit: { path = [] })
+                    LobbyView(tripId: tripId, onExit: { path = [] })
                 }
             }
             .sheet(isPresented: $showName) {

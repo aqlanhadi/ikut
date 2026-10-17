@@ -3,7 +3,6 @@ import SwiftUI
 
 /// Shown after creating or joining a trip: join code, QR, share and the live list of cars.
 struct LobbyView: View {
-    let onOpenMap: () -> Void
     let onExit: () -> Void
     @Environment(LocationPermission.self) private var location
     @State private var model: LobbyModel
@@ -14,9 +13,9 @@ struct LobbyView: View {
     @State private var confirmEnd = false
     @State private var isWorking = false
     @State private var actionError: String?
+    @State private var showMap = false
 
-    init(tripId: String, onOpenMap: @escaping () -> Void, onExit: @escaping () -> Void) {
-        self.onOpenMap = onOpenMap
+    init(tripId: String, onExit: @escaping () -> Void) {
         self.onExit = onExit
         _model = State(initialValue: LobbyModel(tripId: tripId))
         _session = State(initialValue: TripSession(
@@ -60,11 +59,15 @@ struct LobbyView: View {
         }
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button("Start Trip", action: onOpenMap)
+            Button("Start Trip") { showMap = true }
                 .buttonStyle(PillButtonStyle())
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.ikutScreen)
+        }
+        // The map shares this lobby's session; the lobby stays on the stack underneath it.
+        .navigationDestination(isPresented: $showMap) {
+            TripMapView(session: session, onExit: onExit)
         }
         .navigationTitle("Trip lobby")
         .navigationBarTitleDisplayMode(.inline)

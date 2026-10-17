@@ -35,6 +35,9 @@ protocol CarRouteControlling: AnyObject {
 
 extension CarRouteService: CarRouteControlling {}
 
+/// Writes (a date) or clears (nil) `pausedAt` on the car doc; tests substitute a fake.
+typealias PauseWriter = @MainActor (_ carId: String, _ pausedAt: Date?) async throws -> Void
+
 /// Builds the car-route service for one tracking session from the trip and car docs.
 typealias CarRouteFactory = @MainActor (_ tripId: String, _ carId: String, _ trip: Trip, _ car: Car) throws -> CarRouteControlling
 
@@ -45,6 +48,21 @@ enum TripSessionLogic {
     ) -> Bool {
         guard !userId.isEmpty, tripStatus == .active, isMember else { return false }
         return trackerUserId == userId
+    }
+
+    /// A pause lasts at most this long; after it, every client treats the car as sharing again and the
+    /// tracker's own session resumes by itself. Covers a forgotten pause, a crash or a relaunch.
+    static let pauseExpiry: TimeInterval = 30 * 60
+
+    /// True while `pausedAt` is set, not in the future by more than a skew allowance, and younger than `pauseExpiry`.
+    static func isPaused(pausedAt: Date?, now: Date) -> Bool {
+        guard let pausedAt else { return false }
+        return now.timeIntervalSince(pausedAt) < pauseExpiry
+    }
+
+    /// Whether other members should show this car as paused ("Paused" instead of "Last seen ...").
+    static func isPaused(_ car: Car?, now: Date) -> Bool {
+        isPaused(pausedAt: car?.pausedAt, now: now)
     }
 
     /// The explainer is shown at most once per session, and only when the permission logic asks for it.

@@ -110,6 +110,30 @@ struct SessionLogicTests {
         #expect(TripSessionLogic.shouldPresentAlwaysExplainer(action: wiu, alreadyShown: false))
     }
 
+    @Test func pauseIsActiveUntilItExpires() {
+        let now = Date()
+        let expiry = TripSessionLogic.pauseExpiry
+        #expect(!TripSessionLogic.isPaused(pausedAt: nil, now: now))
+        #expect(TripSessionLogic.isPaused(pausedAt: now, now: now))
+        #expect(TripSessionLogic.isPaused(pausedAt: now.addingTimeInterval(-expiry + 1), now: now))
+        #expect(!TripSessionLogic.isPaused(pausedAt: now.addingTimeInterval(-expiry), now: now))
+        // A stale pause is not a pause.
+        #expect(!TripSessionLogic.isPaused(pausedAt: now.addingTimeInterval(-3 * expiry), now: now))
+        // Clock skew: a pause stamped slightly in the future still counts.
+        #expect(TripSessionLogic.isPaused(pausedAt: now.addingTimeInterval(30), now: now))
+    }
+
+    @Test func isPausedReadsTheCar() {
+        let now = Date()
+        var car = testCar()
+        #expect(!TripSessionLogic.isPaused(car, now: now))
+        car.pausedAt = now.addingTimeInterval(-60)
+        #expect(TripSessionLogic.isPaused(car, now: now))
+        car.pausedAt = now.addingTimeInterval(-TripSessionLogic.pauseExpiry - 1)
+        #expect(!TripSessionLogic.isPaused(car, now: now))
+        #expect(!TripSessionLogic.isPaused(nil, now: now))
+    }
+
     @Test func routeLineDecoding() {
         #expect(TripSessionLogic.routeLine(from: nil) == nil)
         #expect(TripSessionLogic.routeLine(from: "") == nil)
@@ -271,6 +295,169 @@ struct SessionCarRouteTests {
         try await Task.sleep(for: .milliseconds(100))
         #expect(rig.tracker.startCount == 0)
         #expect(!rig.session.isTracking)
+    }
+}
+
+@MainActor
+final class PauseWrites {
+    var items: [Date?] = []
+}
+
+@MainActor
+final class PauseClock {
+    var now = Date()
+}
+
+@MainActor
+struct SessionPauseTests {
+    private func makeRig(_ clock: PauseClock = PauseClock()) -> (rig: PausedRig, writes: PauseWrites) {
+        let writes = PauseWrites()
+        return (PausedRig(clock: clock, writes: writes), writes)
+    }
+
+    @Test func pauseStopsTrackingBeforeTheWrite() async throws {
+        let (rig, writes) = makeRig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        var trackingAtWrite: Bool?
+        rig.onWrite = { trackingAtWrite = rig.tracker.isTracking }
+        try await rig.session.pauseSharing()
+        #expect(trackingAtWrite == false)
+        #expect(!rig.tracker.isTracking)
+        #expect(!rig.session.isTracking)
+        #expect(rig.session.isPaused)
+        #expect(writes.items.count == 1)
+        #expect(writes.items[0] != nil)
+        // The snapshot of the write (and others) does not restart tracking while paused.
+        var paused = testCar()
+        paused.pausedAt = writes.items[0]
+        rig.becomeTracker(car: paused)
+        rig.becomeTracker(car: testCar())
+        #expect(!rig.tracker.isTracking)
+        #expect(rig.tracker.startCount == 1)
+    }
+
+    @Test func pausedFixesAreDropped() async throws {
+        let (rig, _) = makeRig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        try await rig.session.pauseSharing()
+        rig.tracker.onFix?(someFix)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(rig.carRoute.handled.isEmpty)
+    }
+
+    @Test func resumeClearsThenRestarts() async throws {
+        let (rig, writes) = makeRig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        try await rig.session.pauseSharing()
+        #expect(rig.tracker.startCount == 1)
+        try await rig.session.resumeSharing()
+        #expect(writes.items.count == 2)
+        #expect(writes.items[1] == nil)
+        #expect(!rig.session.isPaused)
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+        #expect(rig.tracker.startCount == 2)
+    }
+
+    @Test func failedResumeStaysPaused() async throws {
+        let (rig, _) = makeRig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        try await rig.session.pauseSharing()
+        rig.failWrites = true
+        await #expect(throws: (any Error).self) { try await rig.session.resumeSharing() }
+        #expect(rig.session.isPaused)
+        #expect(!rig.tracker.isTracking)
+    }
+
+    @Test func stalePauseIsTreatedAsNotPaused() async throws {
+        let clock = PauseClock()
+        let (rig, _) = makeRig(clock)
+        var stale = testCar()
+        stale.pausedAt = clock.now.addingTimeInterval(-TripSessionLogic.pauseExpiry - 60)
+        rig.becomeTracker(car: stale)
+        #expect(!rig.session.isPaused)
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+
+        // A fresh pause on the doc (e.g. after a relaunch) keeps a new session from tracking.
+        let (other, _) = makeRig(clock)
+        var fresh = testCar()
+        fresh.pausedAt = clock.now.addingTimeInterval(-60)
+        other.becomeTracker(car: fresh)
+        #expect(other.session.isPaused)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(other.tracker.startCount == 0)
+    }
+
+    @Test func losingTrackerDutyWhilePausedClearsLocalPause() async throws {
+        let (rig, _) = makeRig()
+        rig.becomeTracker()
+        try await eventually { rig.tracker.isTracking }
+        try await rig.session.pauseSharing()
+        #expect(rig.session.isPaused)
+        rig.becomeTracker(car: testCar(tracker: nil))
+        #expect(!rig.session.isPaused)
+        // Getting the car back later starts normally, not paused.
+        rig.becomeTracker(car: testCar())
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+    }
+
+    @Test func pauseIsIgnoredWhenNotTracker() async throws {
+        let (rig, writes) = makeRig()
+        rig.becomeTracker(car: testCar(tracker: "u2"))
+        try await rig.session.pauseSharing()
+        #expect(!rig.session.isPaused)
+        #expect(writes.items.isEmpty)
+    }
+
+    @Test func pauseExpiresOnItsOwn() async throws {
+        let (rig, _) = makeRig()
+        // The doc carries a pause that has 50 ms left, so the expiry timer is scheduled for ~50 ms.
+        rig.clock.now = Date()
+        var paused = testCar()
+        paused.pausedAt = rig.clock.now.addingTimeInterval(-TripSessionLogic.pauseExpiry + 0.05)
+        rig.becomeTracker(car: paused)
+        #expect(rig.session.isPaused)
+        #expect(!rig.tracker.isTracking)
+        // By the time the timer fires the clock is past the expiry.
+        rig.clock.now = Date().addingTimeInterval(1)
+        try await eventually { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+        #expect(!rig.session.isPaused)
+    }
+}
+
+@MainActor
+final class PausedRig {
+    let events = EventLog()
+    let tracker = FakeTrackingController()
+    let carRoute = FakeCarRoute()
+    let clock: PauseClock
+    var failWrites = false
+    var onWrite: (() -> Void)?
+    private(set) var session: TripSession!
+
+    init(clock: PauseClock, writes: PauseWrites) {
+        self.clock = clock
+        let carRoute = self.carRoute
+        session = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker,
+            carRouteFactory: { _, _, _, _ in carRoute }, ensureTimeout: .seconds(5),
+            clock: { [clock] in clock.now },
+            pauseWriter: { [unowned self] _, date in
+                self.onWrite?()
+                if self.failWrites { throw RouteError.noRoute }
+                writes.items.append(date)
+            })
+    }
+
+    func becomeTracker(car: Car = testCar()) {
+        session.applyForTesting(trip: testTrip(), member: testMember, car: car)
     }
 }
 
@@ -492,6 +679,54 @@ struct SessionEmulatorTests {
         #expect(session2.isEnded)
         #expect(!tracker2.isTracking)
         #expect(!organizerTracker.isTracking)
+    }
+
+    @Test func pausedAtIsWrittenAndSeenByAnotherMember() async throws {
+        let s = try await makeTrip()
+        nonisolated(unsafe) let trackerUser = try #require(Auth.auth().currentUser)
+        let code = try await Firestore.firestore().document(FirestorePaths.trip(s.tripId))
+            .getDocument(as: Trip.self).code
+
+        // A second member joins another car and listens to the trip.
+        try Auth.auth().signOut()
+        try await AuthModel().signInAsGuest(name: "Siti")
+        _ = try await LiveJoinAPI().join(
+            code: code, displayName: "Siti", car: .new(name: "Siti's car", color: "#D9480F"), tracker: false)
+        nonisolated(unsafe) let otherUser = try #require(Auth.auth().currentUser)
+        // The tracker pauses.
+        try await Auth.auth().updateCurrentUser(trackerUser)
+        let tracker = FakeTrackingController()
+        let session = TripSession(tripId: s.tripId, userId: s.uid, tracker: tracker)
+        session.start()
+        defer { session.stop() }
+        try await eventually { tracker.isTracking }
+        #expect(tracker.isTracking)
+        try await session.pauseSharing()
+        #expect(!tracker.isTracking)
+        #expect(session.isPaused)
+        let doc = try await carRef(s).getDocument(as: Car.self)
+        #expect(TripSessionLogic.isPaused(doc, now: Date()))
+
+        // The other member reads it and the car counts as paused.
+        try await Auth.auth().updateCurrentUser(otherUser)
+        let seen = try await carRef(s).getDocument(as: Car.self)
+        #expect(TripSessionLogic.isPaused(seen, now: Date()))
+
+        // A member who is not the tracker cannot clear or set it.
+        await #expect(throws: (any Error).self) {
+            try await carRef(s).updateData(["pausedAt": FieldValue.delete()])
+        }
+        await #expect(throws: (any Error).self) {
+            try await carRef(s).updateData(["pausedAt": Timestamp(date: Date())])
+        }
+
+        // Resuming clears it.
+        try await Auth.auth().updateCurrentUser(trackerUser)
+        try await session.resumeSharing()
+        try await eventually { tracker.isTracking }
+        #expect(tracker.isTracking)
+        let resumed = try await carRef(s).getDocument(as: Car.self)
+        #expect(resumed.pausedAt == nil)
     }
 }
 

@@ -503,6 +503,53 @@ struct TripMapEmulatorTests {
     }
 }
 
+// MARK: - Chip placement and stop host
+
+struct MapChipPlacementTests {
+    @Test func chipStaysOnTheRightWhenItFits() {
+        #expect(MapChipPlacement.side(markerX: 100, chipWidth: 80, containerWidth: 430) == .trailing)
+        #expect(MapChipPlacement.side(markerX: nil, chipWidth: 80, containerWidth: 430) == .trailing)
+        #expect(MapChipPlacement.side(markerX: 300, chipWidth: 80, containerWidth: 0) == .trailing)
+    }
+
+    @Test func chipFlipsLeftNearTheRightEdge() {
+        // The stale chip "Daniel · 2 min ago" (~140 pt) beside a marker at x = 330 on a 430 pt screen.
+        #expect(MapChipPlacement.side(markerX: 330, chipWidth: 140, containerWidth: 430) == .leading)
+    }
+
+    @Test func chipKeepsClearOfTheModeControl() {
+        // Would fit before the screen edge but not before the control's column.
+        #expect(MapChipPlacement.side(markerX: 260, chipWidth: 80, containerWidth: 430) == .leading)
+        #expect(MapChipPlacement.side(markerX: 230, chipWidth: 80, containerWidth: 430) == .trailing)
+    }
+
+    @Test func chipStaysRightWhenNeitherSideFitsAndLeftIsWorse() {
+        #expect(MapChipPlacement.side(markerX: 40, chipWidth: 500, containerWidth: 430) == .trailing)
+    }
+}
+
+@MainActor
+struct MapStopContextTests {
+    @Test func buildsContextFromModelAndConvoy() throws {
+        let model = MapDemo.model()
+        let context = try #require(model.stopContext(tripId: "t1", userId: "u-c1", isOrganizer: true))
+        #expect(context.tripId == "t1")
+        #expect(context.userId == "u-c1")
+        #expect(context.carId == "c1")
+        #expect(context.isOrganizer)
+        #expect(context.mainRoute != nil)
+        // The front car is Aqlan's, so suggestions start ahead of it.
+        #expect(context.frontOffset() == model.convoy.convoy.first?.convoyOffset)
+        #expect((context.frontOffset() ?? 0) > 0)
+        #expect(context.snapshot() != nil)
+    }
+
+    @Test func noContextUntilMyCarIsKnown() {
+        let model = TripMapModel(session: nil)
+        #expect(model.stopContext(tripId: "t", userId: "u", isOrganizer: false) == nil)
+    }
+}
+
 #if DEBUG
 import SwiftUI
 import UIKit

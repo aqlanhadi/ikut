@@ -59,7 +59,13 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
 
         app.buttons["Join Trip"].tap()
-        XCTAssertTrue(app.buttons["Start Trip"].waitForExistence(timeout: 20), "Didn't reach the lobby")
+        let startTrip = app.buttons["Start Trip"]
+        XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
+
+        // Start Trip pushes the live map on the lobby's session.
+        startTrip.tap()
+        XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
+        XCTAssertTrue(app.buttons["Trip menu"].exists)
     }
 
     private func replaceText(in field: XCUIElement, with text: String) {
