@@ -104,12 +104,13 @@ struct StopRequestCard: View {
         Button { actions.pin(place) } label: {
             VStack(spacing: 0) {
                 Text(title).font(.headline).lineLimit(1)
-                if prominent { Text(subtitle).font(.caption).lineLimit(1).opacity(0.8) }
+                if prominent { Text(subtitle).font(.caption).lineLimit(1).opacity(0.85) }
                 else { Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             }
             .frame(maxWidth: .infinity, minHeight: 50)
-            .background(prominent ? Color.primary : Color(.secondarySystemBackground), in: Capsule())
-            .foregroundStyle(prominent ? Color(.systemBackground) : Color.primary)
+            // Secondary style: the soft accent fill and accent text of the lobby's Share Link button.
+            .background(prominent ? Color.ikutAccent.opacity(0.14) : Color(.secondarySystemBackground), in: Capsule())
+            .foregroundStyle(prominent ? Color.ikutAccent : Color.primary)
         }
         .buttonStyle(.plain)
     }

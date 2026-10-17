@@ -496,4 +496,58 @@ struct ConvoyTests {
         #expect(m.arrivingText == nil)
         #expect(m.convoyRows[0].trailingSecondary == "Calculating ETA")
     }
+
+    // MARK: Paused cars
+
+    private func pausedCar(_ id: String, ago: TimeInterval, lead: Bool = false) -> Car {
+        var c = car(id, lead: lead)
+        c.pausedAt = Self.now.addingTimeInterval(-ago)
+        return c
+    }
+
+    @Test func pausedCarIsNotStaleAndShowsPaused() {
+        let s = order([car("1"), pausedCar("2", ago: 120)],
+                      ["1": pos(offset: 9000), "2": pos(offset: 5000, age: 300)])
+        let paused = s.convoy.first { $0.id == "2" }
+        #expect(paused?.isPaused == true)
+        #expect(paused?.isStale == false)
+    }
+
+    @MainActor @Test func pausedRowSubtitleIsPausedNotLastSeen() {
+        let m = ConvoyModel(clock: { Self.now })
+        m.update(cars: [car("1"), pausedCar("2", ago: 120)],
+                 positions: ["1": pos(offset: 9000), "2": pos(offset: 5000, age: 300)])
+        let row = m.convoyRows.first { $0.id == "2" }
+        #expect(row?.subtitle == "Paused")
+        #expect(row?.subtitleIsWarning == false)
+        #expect(row?.isStale == false)
+    }
+
+    @Test func expiredPauseFallsBackToLastSeen() {
+        let expired = pausedCar("2", ago: TripSessionLogic.pauseExpiry + 1)
+        let s = order([car("1"), expired], ["1": pos(offset: 9000), "2": pos(offset: 5000, age: 300)])
+        let entry = s.convoy.first { $0.id == "2" }
+        #expect(entry?.isPaused == false)
+        #expect(entry?.isStale == true)
+    }
+
+    @Test func pausedFrontIsNotTheETAReference() {
+        let s = order([pausedCar("1", ago: 60), car("2")], ["1": pos(offset: 9000, age: 200), "2": pos(offset: 5000)])
+        #expect(s.front?.id == "1")
+        #expect(s.etaReference?.id == "2")
+    }
+
+    @Test func pausedJoiningCarIsNotStale() {
+        var c = car("3", state: .joining)
+        c.pausedAt = Self.now.addingTimeInterval(-10)
+        let s = order([car("1"), c], ["1": pos(offset: 9000), "3": pos(offset: nil, age: 300, routeOffset: 100)])
+        #expect(s.joining.first?.isPaused == true)
+        #expect(s.joining.first?.isStale == false)
+    }
+
+    @Test func pausedBannerCountsDownInWholeMinutes() {
+        #expect(PausedBannerText.message(remaining: 28 * 60 - 20) == "Sharing paused · resumes automatically in 28 min")
+        #expect(PausedBannerText.message(remaining: 5) == "Sharing paused · resumes automatically in 1 min")
+        #expect(PausedBannerText.message(remaining: -3) == "Sharing paused · resumes automatically in 1 min")
+    }
 }

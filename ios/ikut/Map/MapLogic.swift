@@ -43,44 +43,51 @@ struct MapMarker: Identifiable, Equatable, Sendable {
     /// Still on its own route, not merged into the convoy yet.
     var isJoining: Bool
     var isMine: Bool
+    /// The tracker paused sharing (and the pause has not expired). Shown instead of the age.
+    var isPaused = false
 
-    /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago".
+    /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
     var label: String {
         var parts = [MapMarkerBuilder.shortName(name)]
         if isJoining { parts.append("joining") }
-        if isStale, let ageText { parts.append(ageText) }
+        if isPaused {
+            parts.append("Paused")
+        } else if isStale, let ageText {
+            parts.append(ageText)
+        }
         return parts.joined(separator: " · ")
     }
 }
 
 enum MapMarkerBuilder {
     /// A marker for every car that has a position: the convoy first, then the joining cars.
-    static func markers(from snapshot: ConvoySnapshot, myCarId: String?) -> [MapMarker] {
+    static func markers(from snapshot: ConvoySnapshot, myCarId: String?, now: Date = Date()) -> [MapMarker] {
         var result: [MapMarker] = []
         for e in snapshot.convoy {
             result.append(marker(
                 id: e.id, car: e.car, position: e.position, isStale: e.isStale, age: e.age,
-                isJoining: false, myCarId: myCarId))
+                isJoining: false, myCarId: myCarId, now: now))
         }
         for e in snapshot.joining {
             guard let position = e.position else { continue }
             result.append(marker(
                 id: e.id, car: e.car, position: position, isStale: e.isStale, age: e.age,
-                isJoining: true, myCarId: myCarId))
+                isJoining: true, myCarId: myCarId, now: now))
         }
         return result
     }
 
     private static func marker(
         id: String, car: Car, position: Position, isStale: Bool, age: TimeInterval?,
-        isJoining: Bool, myCarId: String?
+        isJoining: Bool, myCarId: String?, now: Date
     ) -> MapMarker {
         MapMarker(
             id: id, number: car.number, name: car.name, colorHex: car.color,
             coordinate: MapCoordinate(latitude: position.location.latitude, longitude: position.location.longitude),
             heading: validHeading(position.heading), isStale: isStale,
             ageText: isStale ? agoText(age ?? 0) : nil,
-            isLead: car.isLead, isJoining: isJoining, isMine: id == myCarId)
+            isLead: car.isLead, isJoining: isJoining, isMine: id == myCarId,
+            isPaused: TripSessionLogic.isPaused(car, now: now))
     }
 
     /// A heading in 0..<360, or nil when it is missing (negative or not a number).

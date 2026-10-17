@@ -9,7 +9,7 @@ struct ConvoyRowText: Equatable, Identifiable, Sendable {
     var number: Int?
     var name: String
     var color: String
-    /// "Lead · 96 km/h", "92 km/h" or "Last seen 2 min ago".
+    /// "Lead · 96 km/h", "92 km/h", "Paused" or "Last seen 2 min ago".
     var subtitle: String
     /// The subtitle is a warning (stale car).
     var subtitleIsWarning: Bool
@@ -232,9 +232,11 @@ final class ConvoyModel {
     var convoyRows: [ConvoyRowText] {
         convoy.map { e in
             let leadPrefix = e.isLead ? "Lead · " : ""
-            let subtitle = e.isStale
-                ? ConvoyFormat.lastSeen(age: e.age ?? 0)
-                : leadPrefix + ConvoyFormat.speed(metersPerSecond: e.speed)
+            let subtitle = e.isPaused
+                ? ConvoyFormat.paused
+                : e.isStale
+                    ? ConvoyFormat.lastSeen(age: e.age ?? 0)
+                    : leadPrefix + ConvoyFormat.speed(metersPerSecond: e.speed)
             let primary: String
             let secondary: String
             if let gap = e.gap {
@@ -258,7 +260,9 @@ final class ConvoyModel {
         joining.map { e in
             JoiningRowText(
                 id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
-                subtitle: e.isStale
+                subtitle: e.isPaused
+                    ? ConvoyFormat.paused
+                    : e.isStale
                     ? ConvoyFormat.lastSeen(age: e.age ?? 0)
                     : (e.position == nil ? "Waiting for location" : ConvoyFormat.speed(metersPerSecond: e.speed)),
                 subtitleIsWarning: e.isStale,

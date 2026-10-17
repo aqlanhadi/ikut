@@ -15,7 +15,10 @@ struct ConvoyEntry: Equatable, Identifiable, Sendable {
     var isFront: Bool
     /// The designated lead (`Car.isLead`); not necessarily the front.
     var isLead: Bool
+    /// Position is old. Never true while `isPaused`: a paused car is expected to go quiet.
     var isStale: Bool
+    /// The tracker paused sharing (`TripSessionLogic.isPaused`); the last position is frozen.
+    var isPaused = false
     /// Seconds since the last position; nil when the position has no timestamp yet.
     var age: TimeInterval?
     /// Gap to the car ahead; nil for the front car.
@@ -44,6 +47,7 @@ struct JoiningEntry: Equatable, Identifiable, Sendable {
     var timeToMerge: TimeInterval?
     var speed: Double
     var isStale: Bool
+    var isPaused = false
     var age: TimeInterval?
 }
 
@@ -59,9 +63,9 @@ struct ConvoySnapshot: Equatable, Sendable {
     var front: ConvoyEntry? { convoy.first }
     /// The designated lead car, if it is in the convoy.
     var lead: ConvoyEntry? { convoy.first(where: \.isLead) }
-    /// The car whose ETA is requested: the front-most car with a fresh position. A stale car's
+    /// The car whose ETA is requested: the front-most car with a fresh, unpaused position. A stale car's
     /// position says little about where it is now, so it must not anchor everyone's ETA.
-    var etaReference: ConvoyEntry? { convoy.first(where: { !$0.isStale }) }
+    var etaReference: ConvoyEntry? { convoy.first(where: { !$0.isStale && !$0.isPaused }) }
     /// Front to back, meters. Nil with fewer than two cars.
     var spread: Double? {
         guard let first = convoy.first, let last = convoy.last, convoy.count > 1 else { return nil }
@@ -125,12 +129,13 @@ enum ConvoyOrdering {
             let position = positions[id]
             let speed = effectiveSpeed(speeds[id] ?? position?.speed, config: config)
             let age = position?.updatedAt.map { max(0, now.timeIntervalSince($0)) }
-            let stale = (age ?? 0) > config.staleAfter
+            let paused = TripSessionLogic.isPaused(car, now: now)
+            let stale = !paused && (age ?? 0) > config.staleAfter
 
             if let position, let offset = position.convoyOffset {
                 convoy.append(ConvoyEntry(
                     id: id, car: car, position: position, convoyOffset: offset, speed: speed,
-                    isFront: false, isLead: car.isLead, isStale: stale, age: age,
+                    isFront: false, isLead: car.isLead, isStale: stale, isPaused: paused, age: age,
                     gap: nil, timeBehindReference: nil))
             } else if position != nil || car.state == .joining {
                 let distance = position.flatMap {
@@ -138,7 +143,7 @@ enum ConvoyOrdering {
                 }
                 joining.append(JoiningEntry(
                     id: id, car: car, position: position, distanceToMerge: distance,
-                    timeToMerge: distance.map { $0 / speed }, speed: speed, isStale: stale, age: age))
+                    timeToMerge: distance.map { $0 / speed }, speed: speed, isStale: stale, isPaused: paused, age: age))
             }
         }
 
@@ -155,7 +160,7 @@ enum ConvoyOrdering {
                 distance: distance, time: time,
                 isSeparated: distance > config.separationDistance || time > config.separationTime)
         }
-        if let ref = convoy.firstIndex(where: { !$0.isStale }) {
+        if let ref = convoy.firstIndex(where: { !$0.isStale && !$0.isPaused }) {
             var total: TimeInterval = 0
             convoy[ref].timeBehindReference = 0
             for i in (ref + 1)..<max(ref + 1, convoy.count) {

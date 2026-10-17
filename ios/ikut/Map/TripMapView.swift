@@ -119,6 +119,7 @@ struct TripMapView: View {
             .onAppear(perform: appear)
             .onDisappear(perform: disappear)
             .task { await model.convoy.run() }
+            .task { await model.hazards.run() }
             .task(id: StopListenKey(carId: model.myCarId, routeLength: model.mainRoute?.length)) {
                 guard liveServices, let context = stopContext else { return }
                 for await state in StopService.listen(context: context) { stopState = state }
@@ -152,6 +153,12 @@ struct TripMapView: View {
                     }
                     .annotationTitles(.hidden)
                 }
+            }
+            ForEach(model.hazards.markers) { hazard in
+                Annotation(hazard.label, coordinate: hazard.coordinate, anchor: .center) {
+                    HazardMapContent(marker: hazard)
+                }
+                .annotationTitles(.hidden)
             }
             ForEach(model.markers) { marker in
                 Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
@@ -195,6 +202,15 @@ struct TripMapView: View {
     private var topStack: some View {
         VStack(spacing: 8) {
             tripPill
+            if session.isPaused {
+                PausedBanner(session: session, onError: { message in
+                    stopError = message
+                    Task {
+                        try? await Task.sleep(for: .seconds(6))
+                        stopError = nil
+                    }
+                })
+            }
             AlertBannerView(center: alerts)
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
@@ -347,7 +363,14 @@ struct TripMapView: View {
     private func appear() {
         move(to: model.cameraTarget, animated: false)
         guard liveServices else { return }
+        model.regionMonitorFactory = { [session] in
+            HazardRegionMonitor(
+                backend: CLMonitorRegionMonitor(name: "ikut.hazards.\(session.tripId)"),
+                notifier: LocalHazardNotifier(tripId: session.tripId),
+                isForeground: { UIApplication.shared.applicationState == .active })
+        }
         model.start()
+        model.startHazardAlerts(announcer: alerts, userId: session.userId)
         alerts.start(tripId: session.tripId, myUserId: session.userId)
         if !askedAboutAlerts {
             askedAboutAlerts = true
@@ -471,7 +494,7 @@ struct MapMarkerView: View {
         .overlay(alignment: side == .trailing ? .leading : .trailing) {
             Text(marker.label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isStale ? MapPalette.staleChipText : Color.primary)
+                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 9)
@@ -493,7 +516,11 @@ struct MapMarkerView: View {
         var text = marker.name
         if marker.isLead { text += ", lead" }
         if marker.isJoining { text += ", joining" }
-        if marker.isStale, let age = marker.ageText { text += ", last seen \(age)" }
+        if marker.isPaused {
+            text += ", sharing paused"
+        } else if marker.isStale, let age = marker.ageText {
+            text += ", last seen \(age)"
+        }
         return text
     }
 }

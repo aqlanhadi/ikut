@@ -197,7 +197,7 @@ struct ConvoyRowView: View {
                 Text(row.name).font(.body).lineLimit(1)
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.warning : Color(.secondaryLabel))
+                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
@@ -227,7 +227,7 @@ struct JoiningRowView: View {
                 Text(row.name).font(.body).lineLimit(1)
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.warning : Color(.secondaryLabel))
+                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {

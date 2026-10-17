@@ -34,6 +34,9 @@ enum ConvoyFormat {
         "\(Int((max(0, metersPerSecond.isFinite ? metersPerSecond : 0) * 3.6).rounded())) km/h"
     }
 
+    /// Subtitle of a car whose tracker paused sharing.
+    static let paused = "Paused"
+
     /// "Last seen 2 min ago" for a stale position `age` seconds old. Under a minute is "just now".
     static func lastSeen(age: TimeInterval) -> String {
         let a = max(0, age.isFinite ? age : 0)

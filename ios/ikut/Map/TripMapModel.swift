@@ -15,6 +15,8 @@ import Observation
 @Observable @MainActor
 final class TripMapModel {
     let convoy: ConvoyModel
+    /// Hazard markers: events not expired and not yet passed by every car.
+    let hazards: HazardModel
 
     /// Free once the user pans; the map view sets it from the mode control and from gestures.
     var mode: MapMode = .follow
@@ -42,6 +44,22 @@ final class TripMapModel {
     @ObservationIgnored private var fallbackPoints: [MapCoordinate] = []
     @ObservationIgnored private var ownRoutes: [String: RouteLine] = [:]
 
+    // Hazards
+    @ObservationIgnored private let eventSource: @Sendable (String) -> AsyncStream<[TripEvent]>
+    @ObservationIgnored private var eventsTask: Task<Void, Never>?
+    @ObservationIgnored private var events: [TripEvent] = []
+    @ObservationIgnored private var alertAnnouncer: (any AlertAnnouncing)?
+    @ObservationIgnored private var alertUserId: String?
+    @ObservationIgnored private var approach: ApproachMonitor?
+    @ObservationIgnored private var approachCarId: String?
+    /// My joining route (nil once merged), decoded once per change.
+    @ObservationIgnored private var myOwnRouteKey: String?
+    @ObservationIgnored private var myOwnRoute: RouteLine?
+    /// Builds the region monitor when this phone is the tracker; nil (demo, tests) means none.
+    @ObservationIgnored var regionMonitorFactory: (@MainActor () -> HazardRegionMonitor)?
+    @ObservationIgnored private var regions: HazardRegionMonitor?
+    @ObservationIgnored private var hazardsRunning = false
+
     private struct OverlayKey: Equatable {
         var id: String?
         var route: String?
@@ -50,14 +68,21 @@ final class TripMapModel {
     }
 
     /// `session` nil makes a model that is only fed through `apply` (previews, tests).
-    init(session: TripSession?, db: Firestore? = nil, convoy: ConvoyModel = ConvoyModel()) {
+    init(
+        session: TripSession?, db: Firestore? = nil, convoy: ConvoyModel = ConvoyModel(),
+        hazards: HazardModel = HazardModel(),
+        eventSource: @escaping @Sendable (String) -> AsyncStream<[TripEvent]> = { EventService.listen(tripId: $0) }
+    ) {
         self.session = session
         self.db = db
         self.convoy = convoy
+        self.hazards = hazards
+        self.eventSource = eventSource
     }
 
     isolated deinit {
         listener?.remove()
+        eventsTask?.cancel()
     }
 
     // MARK: Lifecycle
@@ -66,6 +91,7 @@ final class TripMapModel {
     func start() {
         sync()
         guard listener == nil, let session else { return }
+        listenToEvents(tripId: session.tripId)
         let db = db ?? Firestore.firestore()
         listener = db.collection(FirestorePaths.cars(tripId: session.tripId))
             .addSnapshotListener { [weak self] snapshot, _ in
@@ -77,6 +103,7 @@ final class TripMapModel {
     func stop() {
         listener?.remove()
         listener = nil
+        stopHazards()
     }
 
     /// Reads trip, my car and positions from the session. Call when any of them changes.
@@ -98,6 +125,7 @@ final class TripMapModel {
         self.isTracker = isTracker
         self.isEnded = isEnded
         self.positions = positions
+        var routeChanged = false
         if let trip {
             tripName = trip.name
             tripCode = Self.formatCode(trip.code)
@@ -108,10 +136,14 @@ final class TripMapModel {
                 fallbackPoints = [mainRoute?.coordinates.first, mainRoute?.coordinates.last]
                     .compactMap { $0.map(MapCoordinate.init) }
                 convoy.setMainRoute(mainRoute)
+                hazards.setMainRoute(mainRoute)
+                routeChanged = true
                 recomputeOverlays()
             }
         }
         convoy.update(cars: cars, positions: positions)
+        hazards.setPositions(positions)
+        feedHazardServices(routeChanged: routeChanged)
     }
 
     /// New car list from the listener. Overlays are rebuilt only when a route or state changed.
@@ -119,6 +151,7 @@ final class TripMapModel {
         self.cars = cars
         recomputeOverlays()
         convoy.update(cars: cars, positions: positions)
+        hazards.setCars(cars)
     }
 
     private func recomputeOverlays() {
@@ -155,13 +188,111 @@ final class TripMapModel {
     /// What the camera should show right now; nil in free mode.
     var cameraTarget: CameraTarget? {
         let markers = self.markers
+        // Fit keeps the hazards in view too: the one ahead of the convoy is what the driver wants to see.
+        let hazardPoints = hazards.markers.map { MapCoordinate(latitude: $0.latitude, longitude: $0.longitude) }
         return MapCameraLogic.target(
             mode: mode, me: myCoordinate,
-            fresh: markers.filter { !$0.isStale }.map(\.coordinate),
-            all: markers.map(\.coordinate), fallback: fallbackPoints)
+            fresh: markers.filter { !$0.isStale }.map(\.coordinate) + hazardPoints,
+            all: markers.map(\.coordinate) + hazardPoints, fallback: fallbackPoints)
     }
 
     var separationWarning: String? { SeparationWarning.text(convoy.snapshot.separatedGaps) }
+
+    // MARK: Hazards
+
+    /// Starts approach alerts (announced through `announcer`) and, for the tracker, region monitoring.
+    /// Call when the map appears; `stop()` ends them.
+    func startHazardAlerts(announcer: any AlertAnnouncing, userId: String) {
+        alertAnnouncer = announcer
+        alertUserId = userId
+        hazardsRunning = true
+        feedHazardServices(routeChanged: true)
+    }
+
+    /// New events from the listener (or the demo).
+    func setEvents(_ events: [TripEvent]) {
+        self.events = events
+        hazards.setEvents(events)
+        approach?.setEvents(events)
+        feedHazardServices(routeChanged: false)
+    }
+
+    private func listenToEvents(tripId: String) {
+        guard eventsTask == nil else { return }
+        let stream = eventSource(tripId)
+        eventsTask = Task { [weak self] in
+            for await events in stream {
+                guard !Task.isCancelled, let self else { return }
+                self.setEvents(events)
+            }
+        }
+    }
+
+    private func stopHazards() {
+        eventsTask?.cancel()
+        eventsTask = nil
+        hazardsRunning = false
+        approach = nil
+        approachCarId = nil
+        stopRegions()
+    }
+
+    private func stopRegions() {
+        guard let regions else { return }
+        self.regions = nil
+        Task { await regions.stop() }
+    }
+
+    /// Pushes my latest fix to the approach monitor and the region monitor. My car is measured on my
+    /// own route while joining (no `convoyOffset` yet), else on the main one.
+    private func feedHazardServices(routeChanged: Bool, now: Date = Date()) {
+        guard hazardsRunning, let carId = myCarId else { return }
+        let ownEncoded = myCar?.state == .joining ? myCar?.route : nil
+        let ownChanged = ownEncoded != myOwnRouteKey
+        if ownChanged {
+            myOwnRouteKey = ownEncoded
+            myOwnRoute = TripSessionLogic.routeLine(from: ownEncoded)
+        }
+        if let announcer = alertAnnouncer, approach == nil || approachCarId != carId {
+            let monitor = ApproachMonitor(announcer: announcer, myCarId: carId, myUserId: alertUserId)
+            monitor.setEvents(events)
+            monitor.setMainRoute(mainRoute)
+            monitor.setOwnRoute(myOwnRoute)
+            approach = monitor
+            approachCarId = carId
+        } else {
+            if routeChanged { approach?.setMainRoute(mainRoute) }
+            if ownChanged { approach?.setOwnRoute(myOwnRoute) }
+        }
+        let wantsRegions = isTracker && !isEnded
+        if wantsRegions, regions == nil, let factory = regionMonitorFactory {
+            let monitor = factory()
+            monitor.start()
+            regions = monitor
+        } else if !wantsRegions {
+            stopRegions()
+        }
+        // A fix that is not fresh (the tracker paused or lost signal) says nothing about where I am now.
+        guard let position = positions[carId], HazardLogic.isFresh(position, now: now, config: .default) else { return }
+        approach?.update(position: position, now: now)
+        updateRegions(position: position, carId: carId, now: now)
+    }
+
+    private func updateRegions(position: Position, carId: String, now: Date) {
+        guard let regions else { return }
+        let route = position.convoyOffset != nil ? mainRoute : myOwnRoute
+        let offset = position.convoyOffset ?? position.routeOffset
+        // Hazards already hidden (passed by everyone) don't need a wake-up.
+        let shown = Set(hazards.markers.map(\.id))
+        let events = events
+        let hidden = Set(events.map(HazardGeometry.key(for:))).subtracting(shown)
+        let userId = alertUserId
+        Task {
+            await regions.update(
+                events: events, route: route, myOffset: offset, myCarId: carId, myUserId: userId,
+                exclude: hidden, now: now)
+        }
+    }
 
     // MARK: Report
 

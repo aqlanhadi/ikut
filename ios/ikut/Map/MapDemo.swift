@@ -96,6 +96,15 @@ enum MapDemo {
         let model = TripMapModel(session: nil, convoy: convoy)
         model.apply(trip: trip, myCar: cars[0], myCarId: "c1", positions: positions, isTracker: true)
         model.setCars(cars)
+        // Debris 3 km ahead of the lead car, reported 4 minutes ago by Wyna.
+        if let spot = main.coordinate(atOffset: tapah + 3_000) {
+            var debris = TripEvent(
+                type: .debris, location: GeoPoint(latitude: spot.latitude, longitude: spot.longitude),
+                heading: 0, routeOffset: tapah + 3_000, authorId: "u-c2", carId: "c2",
+                createdAt: now.addingTimeInterval(-240))
+            debris.id = "demo-debris"
+            model.setEvents([debris])
+        }
         model.mode = .fit
         return model
     }

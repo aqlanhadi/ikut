@@ -69,6 +69,21 @@ struct MapMarkerTests {
         #expect(m.label == "Daniel · 2 min ago")
     }
 
+    @Test func pausedCarSaysPausedInsteadOfAge() {
+        var paused = car("a", name: "Daniel’s City", number: 4)
+        paused.pausedAt = t0.addingTimeInterval(-300)
+        let snap = snapshot(cars: [paused], positions: ["a": position(age: 125)])
+        let m = MapMarkerBuilder.markers(from: snap, myCarId: nil, now: t0)[0]
+        #expect(m.isPaused)
+        #expect(m.label == "Daniel · Paused")
+        // An old pause has expired; the age is shown again.
+        paused.pausedAt = t0.addingTimeInterval(-TripSessionLogic.pauseExpiry - 1)
+        let expired = MapMarkerBuilder.markers(
+            from: snapshot(cars: [paused], positions: ["a": position(age: 125)]), myCarId: nil, now: t0)[0]
+        #expect(!expired.isPaused)
+        #expect(expired.label == "Daniel · 2 min ago")
+    }
+
     @Test func freshCarIsNotStale() {
         let snap = snapshot(cars: [car("a")], positions: ["a": position(age: 59)])
         let m = MapMarkerBuilder.markers(from: snap, myCarId: nil)[0]

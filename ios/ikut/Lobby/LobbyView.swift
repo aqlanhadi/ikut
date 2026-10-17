@@ -30,11 +30,17 @@ struct LobbyView: View {
     private var currentUserId: String? { Auth.auth().currentUser?.uid }
     private var canLeave: Bool { !session.isEnded && !session.membershipLost }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
+    /// Pause and resume are for the phone that is broadcasting (or paused while it was).
+    private var canPause: Bool { (session.isTracking || session.isPaused) && !session.isEnded && !session.membershipLost }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 statusBanner
+                if session.isPaused && !session.isEnded && !session.membershipLost {
+                    PausedBanner(session: session, onError: { actionError = $0 })
+                        .padding(.bottom, 4)
+                }
                 if let trip = model.trip {
                     tripCard(trip)
                     CardHeader("Invite")
@@ -72,9 +78,20 @@ struct LobbyView: View {
         .navigationTitle("Trip lobby")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if canLeave || canEnd {
+            if canLeave || canEnd || canPause {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if canPause {
+                            if session.isPaused {
+                                Button("Resume sharing", systemImage: "play.fill") {
+                                    run { try await session.resumeSharing() }
+                                }
+                            } else {
+                                Button("Pause sharing", systemImage: "pause.fill") {
+                                    run { try await session.pauseSharing() }
+                                }
+                            }
+                        }
                         if canEnd {
                             Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
                         }
@@ -136,7 +153,7 @@ struct LobbyView: View {
             exitBanner("Trip ended", systemImage: "flag.checkered")
         } else if session.membershipLost && model.trip != nil {
             exitBanner("You're no longer in this trip", systemImage: "person.fill.xmark")
-        } else if session.isTracking {
+        } else if session.isTracking && !session.isPaused {
             Label("Sharing location", systemImage: "location.fill")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(Color.ikutPositive)
