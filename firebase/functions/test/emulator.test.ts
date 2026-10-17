@@ -119,6 +119,38 @@ describe("joinTrip (emulator)", () => {
     assert.equal((await tripRef.collection("members").doc(user.uid).get()).data()!.carId, c.body.result.carId);
   });
 
+  it("moving out of a car leaves no empty car behind", async () => {
+    const { code, tripRef } = await seedTrip();
+    const a = await call({ code, displayName: "Sam", car: newCar("Myvi"), tracker: true }, user.token);
+    const b = await call({ code, displayName: "Sam", car: newCar("Alza"), tracker: true }, user.token);
+    assert.equal(b.status, 200, JSON.stringify(b.body));
+    assert.equal((await tripRef.collection("cars").doc(a.body.result.carId).get()).exists, false);
+    assert.equal((await tripRef.collection("cars").get()).size, 2);
+    // Leaving for the lead car still removes the empty one.
+    const c = await call({ code, displayName: "Sam", car: { existingCarId: "lead" }, tracker: false }, user.token);
+    assert.equal(c.status, 200, JSON.stringify(c.body));
+    assert.equal((await tripRef.collection("cars").doc(b.body.result.carId).get()).exists, false);
+  });
+
+  it("moving out of a shared car keeps it and releases tracker", async () => {
+    const { code, tripRef } = await seedTrip();
+    const other = await newUser();
+    const a = await call({ code, displayName: "Sam", car: newCar("Myvi"), tracker: true }, user.token);
+    await call({ code, displayName: "Ali", car: { existingCarId: a.body.result.carId }, tracker: false }, other.token);
+    await call({ code, displayName: "Sam", car: newCar("Alza"), tracker: true }, user.token);
+    const old = (await tripRef.collection("cars").doc(a.body.result.carId).get()).data();
+    assert.ok(old, "shared car should remain");
+    assert.equal(old.trackerUserId, undefined);
+  });
+
+  it("the lead car is never removed", async () => {
+    const { code, tripRef, organizerId } = await seedTrip();
+    await tripRef.collection("members").doc(organizerId).update({ carId: "elsewhere" });
+    await call({ code, displayName: "Sam", car: { existingCarId: "lead" }, tracker: false }, user.token);
+    await call({ code, displayName: "Sam", car: newCar(), tracker: false }, user.token);
+    assert.ok((await tripRef.collection("cars").doc("lead").get()).exists);
+  });
+
   it("re-join keeps tracker claim on same car", async () => {
     const { code } = await seedTrip();
     const a = await call({ code, displayName: "Sam", car: newCar(), tracker: true }, user.token);

@@ -35,6 +35,20 @@
                ReferencedContainer = "container:ikut.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1358EC4767333147817215F1"
+               BuildableName = "ikutUITests.xctest"
+               BlueprintName = "ikutUITests"
+               ReferencedContainer = "container:ikut.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,6 +75,17 @@
                BlueprintIdentifier = "3D487084AB97B5D7CAEBE691"
                BuildableName = "ikutTests.xctest"
                BlueprintName = "ikutTests"
+               ReferencedContainer = "container:ikut.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1358EC4767333147817215F1"
+               BuildableName = "ikutUITests.xctest"
+               BlueprintName = "ikutUITests"
                ReferencedContainer = "container:ikut.xcodeproj">
             </BuildableReference>
          </TestableReference>

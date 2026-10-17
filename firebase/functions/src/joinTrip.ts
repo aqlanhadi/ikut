@@ -127,12 +127,23 @@ export async function joinTripTransaction(
       }
     }
 
-    // Previous car, to release tracker duty if the member moves.
+    // Previous car: removed if the member leaves it empty, otherwise its tracker duty is released.
     let oldCarRef: FirebaseFirestore.DocumentReference | null = null;
+    let deleteOldCar = false;
     if (existing && existing.carId !== carRef.id) {
       const ref = carsCol.doc(existing.carId);
       const oldSnap = await tx.get(ref);
-      if (oldSnap.exists && (oldSnap.data() as Car).trackerUserId === uid) oldCarRef = ref;
+      if (oldSnap.exists) {
+        const oldCar = oldSnap.data() as Car;
+        const riders = await tx.get(membersCol.where("carId", "==", ref.id).limit(2));
+        const othersInside = riders.docs.some((d) => d.id !== uid);
+        if (!othersInside && !oldCar.isLead) {
+          oldCarRef = ref;
+          deleteOldCar = true;
+        } else if (oldCar.trackerUserId === uid) {
+          oldCarRef = ref;
+        }
+      }
     }
 
     // Writes.
@@ -159,7 +170,12 @@ export async function joinTripTransaction(
       tx.update(carRef, { trackerUserId: uid });
     }
 
-    if (oldCarRef) tx.update(oldCarRef, { trackerUserId: FieldValue.delete() });
+    if (oldCarRef && deleteOldCar) {
+      tx.delete(oldCarRef);
+      tx.delete(tripRef.collection("positions").doc(oldCarRef.id));
+    } else if (oldCarRef) {
+      tx.update(oldCarRef, { trackerUserId: FieldValue.delete() });
+    }
 
     if (existing) {
       tx.update(memberRef, { displayName: input.displayName, carId: carRef.id });

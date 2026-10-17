@@ -72,12 +72,27 @@ targets:
     dependencies:
       - target: ikut
 
+  ikutUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ikutUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikutUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ikut
+    dependencies:
+      - target: ikut
+
 schemes:
   ikut:
     build:
       targets:
         ikut: all
         ikutTests: [test]
+        ikutUITests: [test]
     test:
       targets:
         - ikutTests
+        - ikutUITests

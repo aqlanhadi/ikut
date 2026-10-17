@@ -48,6 +48,14 @@ xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17
 TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
+A simulator can stand in for a second person. This UI test signs in and joins an existing
+trip with a new car (it's skipped unless a code is given):
+
+```sh
+TEST_RUNNER_IKUT_JOIN_CODE=Y5REFN TEST_RUNNER_IKUT_JOIN_NAME=Wyna \
+  xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:ikutUITests
+```
+
 Security rules tests (Firestore emulator, needs Java):
 
 ```sh

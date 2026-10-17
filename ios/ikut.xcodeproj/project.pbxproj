@@ -53,6 +53,7 @@
 		D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991414E381145C07351D7F20 /* LocationDeniedView.swift */; };
 		D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D417D8CDD8A80CCF181936 /* TrackingTests.swift */; };
 		D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */; };
+		DC9B81DCD81642680E58F12B /* JoinAsSecondMemberUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2539E4B214F18444DA0A00 /* JoinAsSecondMemberUITests.swift */; };
 		E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */; };
 		E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */; };
 		EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F2A2E1542D39038AFC98D /* AlwaysLocationExplainerView.swift */; };
@@ -64,6 +65,13 @@
 
 /* Begin PBXContainerItemProxy section */
 		C3CF7F54770CD454D64B0959 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D168A2D27FC6121C72BC9F0C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 347B7937203FF3F5070213DD;
+			remoteInfo = ikut;
+		};
+		DD82B631BB2549F1854EC4E6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = D168A2D27FC6121C72BC9F0C /* Project object */;
 			proxyType = 1;
@@ -83,6 +91,7 @@
 		1A494FD1381005F8FB454B39 /* RouteGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometry.swift; sourceTree = "<group>"; };
 		1AB0B6EE647875B8999B3F6F /* BackendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendTests.swift; sourceTree = "<group>"; };
 		1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyModel.swift; sourceTree = "<group>"; };
+		24BB05DEBD1D95C5141FBF56 /* ikutUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ikutUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2519810884A2F43AD0A1C337 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		28BB58A9FD28B315E822A8F2 /* PositionPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionPublisher.swift; sourceTree = "<group>"; };
 		28F201EC357C45D84BC4395C /* EventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTests.swift; sourceTree = "<group>"; };
@@ -101,6 +110,7 @@
 		7C2769228FEE1D9534950492 /* TripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripService.swift; sourceTree = "<group>"; };
 		7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7DC390858FBBDA52C3ED0823 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7E2539E4B214F18444DA0A00 /* JoinAsSecondMemberUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinAsSecondMemberUITests.swift; sourceTree = "<group>"; };
 		89911FBE6E40CB98D46C337F /* Polyline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polyline.swift; sourceTree = "<group>"; };
 		89E8EC027CCE192C122FA9F7 /* Backend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backend.swift; sourceTree = "<group>"; };
 		991414E381145C07351D7F20 /* LocationDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationDeniedView.swift; sourceTree = "<group>"; };
@@ -179,6 +189,7 @@
 			children = (
 				E047C4D86365E2C469F00DA8 /* ikut.app */,
 				583B73D2368E1D00EF28CEBF /* ikutTests.xctest */,
+				24BB05DEBD1D95C5141FBF56 /* ikutUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -203,6 +214,14 @@
 				3F6CFFB42E42435BAB445863 /* JoinTripView.swift */,
 			);
 			path = Join;
+			sourceTree = "<group>";
+		};
+		9432B6EF8EFD3744D9183D32 /* ikutUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7E2539E4B214F18444DA0A00 /* JoinAsSecondMemberUITests.swift */,
+			);
+			path = ikutUITests;
 			sourceTree = "<group>";
 		};
 		95BF705126B2886084F55255 /* Route */ = {
@@ -245,6 +264,7 @@
 			children = (
 				962BCAA4615A543EA38FDB80 /* ikut */,
 				D7B8B479794B7C1CA1E5773F /* ikutTests */,
+				9432B6EF8EFD3744D9183D32 /* ikutUITests */,
 				3AF58B37E0BAA6C0B1F3CA88 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -316,6 +336,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1358EC4767333147817215F1 /* ikutUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 764350F0AA92B0F62C0F99F4 /* Build configuration list for PBXNativeTarget "ikutUITests" */;
+			buildPhases = (
+				8BCEB5CABC7122DC86438571 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C28B717A6869F36089531056 /* PBXTargetDependency */,
+			);
+			name = ikutUITests;
+			packageProductDependencies = (
+			);
+			productName = ikutUITests;
+			productReference = 24BB05DEBD1D95C5141FBF56 /* ikutUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		347B7937203FF3F5070213DD /* ikut */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F20B88B76E8FA35C1F93D714 /* Build configuration list for PBXNativeTarget "ikut" */;
@@ -365,6 +403,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					1358EC4767333147817215F1 = {
+						DevelopmentTeam = Y67R3NPM7F;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 347B7937203FF3F5070213DD;
+					};
 					347B7937203FF3F5070213DD = {
 						DevelopmentTeam = Y67R3NPM7F;
 						ProvisioningStyle = Automatic;
@@ -394,6 +437,7 @@
 			targets = (
 				347B7937203FF3F5070213DD /* ikut */,
 				3D487084AB97B5D7CAEBE691 /* ikutTests */,
+				1358EC4767333147817215F1 /* ikutUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -454,6 +498,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8BCEB5CABC7122DC86438571 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC9B81DCD81642680E58F12B /* JoinAsSecondMemberUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9680ABF38F95D1F7B6C9C128 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -476,6 +528,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		C28B717A6869F36089531056 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 347B7937203FF3F5070213DD /* ikut */;
+			targetProxy = DD82B631BB2549F1854EC4E6 /* PBXContainerItemProxy */;
+		};
 		FB7DC1E5EFC8FD13A9464C2F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 347B7937203FF3F5070213DD /* ikut */;
@@ -580,6 +637,23 @@
 			};
 			name = Release;
 		};
+		80B31C2F6CC6DE03A0F256A6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikutUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ikut;
+			};
+			name = Debug;
+		};
 		8997DDE255A99339DDE171F0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -683,6 +757,23 @@
 			};
 			name = Release;
 		};
+		E5E1246366C4B7C5016E207F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikutUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ikut;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -700,6 +791,15 @@
 			buildConfigurations = (
 				B4075FAABBA021DA635FC7DE /* Debug */,
 				1C64D374CC9C28DC60C7E6E8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		764350F0AA92B0F62C0F99F4 /* Build configuration list for PBXNativeTarget "ikutUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				80B31C2F6CC6DE03A0F256A6 /* Debug */,
+				E5E1246366C4B7C5016E207F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
