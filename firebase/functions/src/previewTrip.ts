@@ -1,0 +1,40 @@
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { findActiveTripId, normalizeCode } from "./joinTrip.js";
+import type { Car, PreviewCar, PreviewTripResult, Trip } from "./model.js";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Read-only view of an active trip for someone who is not a member yet. No member ids or tracker uids. */
+export async function previewTripData(db: Firestore, tripId: string): Promise<PreviewTripResult> {
+  const tripRef = db.collection("trips").doc(tripId);
+  const [tripSnap, carsSnap] = await Promise.all([tripRef.get(), tripRef.collection("cars").get()]);
+  const trip = tripSnap.data() as Trip | undefined;
+  if (!tripSnap.exists || !trip || trip.status !== "active") {
+    throw new HttpsError("not-found", "No active trip with that code");
+  }
+  const cars: PreviewCar[] = carsSnap.docs
+    .map((d) => ({ id: d.id, data: d.data() as Car }))
+    .map(({ id, data }) => ({
+      id,
+      name: data.name,
+      color: data.color,
+      hasTracker: typeof data.trackerUserId === "string" && data.trackerUserId.length > 0,
+      isLead: data.isLead === true,
+    }))
+    // Lead car first, then by name, so the list is stable.
+    .sort((a, b) => Number(b.isLead) - Number(a.isLead) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    .map(({ isLead: _isLead, ...car }) => car);
+  return { tripId, name: trip.name, destinationName: trip.destination.name, cars };
+}
+
+export const previewTrip = onCall(async (request): Promise<PreviewTripResult> => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
+  if (!isRecord(request.data)) throw new HttpsError("invalid-argument", "Invalid request.");
+  const code = normalizeCode(request.data.code);
+  const db = getFirestore();
+  const tripId = await findActiveTripId(db, code);
+  return previewTripData(db, tripId);
+});

@@ -88,7 +88,8 @@ enum TripService {
             from: member, forDocument: tripRef.collection("members").document(organizer.id))
         try await batch.commit()
 
-        try await carRef.setData(from: car)
+        // Encode first: `setData(from:)` has no async overload, so awaiting it wouldn't wait for the server.
+        try await carRef.setData(Firestore.Encoder().encode(car))
         return (tripRef.documentID, carRef.documentID)
     }
 }

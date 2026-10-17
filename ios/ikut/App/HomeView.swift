@@ -1,17 +1,22 @@
 import SwiftUI
 
-/// Signed-in home until the real home, lobby and join screens land (T3, T4).
-/// Gets location access good enough for a trip before opening Create Trip.
+/// Signed-in home until the real home with past trips lands.
+/// Gets location access good enough for a trip before opening Create Trip or Join.
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(LocationPermission.self) private var location
 
-    @State private var showCreate = false
+    private enum Route: Hashable {
+        case create
+        case join
+        case lobby(tripId: String)
+    }
+
+    @State private var path: [Route] = []
     @State private var showDenied = false
-    @State private var createdTripID: String?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 12) {
                 Text("ikut")
                     .font(.largeTitle.bold())
@@ -19,27 +24,36 @@ struct HomeView: View {
                     Text("Signed in as \(name)")
                         .foregroundStyle(.secondary)
                 }
-                if let createdTripID {
-                    Label("Trip created: \(createdTripID)", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .padding(.top, 8)
-                }
                 Button("Start a Trip") {
-                    Task { await startTrip() }
+                    Task { await open(.create) }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .padding(.top, 24)
+                Button("Join a Trip") {
+                    Task { await open(.join) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
                 Text(Backend.current.label)
                     .font(.footnote.monospaced())
                     .foregroundStyle(.secondary)
                     .padding(.top, 24)
             }
             .padding()
-            .navigationDestination(isPresented: $showCreate) {
-                CreateTripView(defaultName: auth.displayName.map { "\($0)'s trip" } ?? "") { tripID in
-                    createdTripID = tripID
-                    showCreate = false
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .create:
+                    CreateTripView(defaultName: auth.displayName.map { "\($0)'s trip" } ?? "") { tripId in
+                        path = [.lobby(tripId: tripId)]
+                    }
+                case .join:
+                    JoinTripView { tripId, _ in
+                        path = [.lobby(tripId: tripId)]
+                    }
+                case .lobby(let tripId):
+                    // The live map (M1) replaces this no-op.
+                    LobbyView(tripId: tripId, onOpenMap: {})
                 }
             }
             .sheet(isPresented: $showDenied) {
@@ -48,7 +62,7 @@ struct HomeView: View {
         }
     }
 
-    private func startTrip() async {
+    private func open(_ route: Route) async {
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
@@ -59,7 +73,7 @@ struct HomeView: View {
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:
-                showCreate = true
+                path.append(route)
                 return
             }
         }

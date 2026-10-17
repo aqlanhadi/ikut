@@ -89,3 +89,18 @@ export interface TripEvent {
   expiresAt?: Timestamp;
   message?: string;
 }
+
+/** previewTrip callable result: what a non-member may see before joining. */
+export interface PreviewCar {
+  id: string;
+  name: string;
+  color: string;
+  hasTracker: boolean;
+}
+
+export interface PreviewTripResult {
+  tripId: string;
+  name: string;
+  destinationName: string;
+  cars: PreviewCar[];
+}

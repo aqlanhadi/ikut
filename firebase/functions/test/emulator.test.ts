@@ -195,3 +195,62 @@ describe("joinTrip (emulator)", () => {
     assert.equal(ok.status, 200);
   });
 });
+
+async function callFn(fn: string, data: unknown, token?: string): Promise<CallResult> {
+  const res = await fetch(`http://127.0.0.1:5001/${PROJECT}/asia-southeast1/${fn}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ data }),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+describe("previewTrip (emulator)", () => {
+  let user: { uid: string; token: string };
+  before(async () => { user = await newUser(); });
+
+  it("returns trip name, destination and cars without personal data", async () => {
+    const { code, tripRef, organizerId } = await seedTrip();
+    await tripRef.collection("cars").doc("second").set({ name: "Alpha", color: "green", isLead: false, state: "joining" });
+    const r = await callFn("previewTrip", { code: ` ${code.toLowerCase().slice(0, 3)}-${code.slice(3)} ` }, user.token);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(r.body.result, {
+      tripId: tripRef.id,
+      name: "T",
+      destinationName: "D",
+      cars: [
+        { id: "lead", name: "Lead", color: "blue", hasTracker: true },
+        { id: "second", name: "Alpha", color: "green", hasTracker: false },
+      ],
+    });
+    assert.ok(!JSON.stringify(r.body).includes(organizerId));
+  });
+
+  it("previews, then joins the previewed car", async () => {
+    const { code, tripRef } = await seedTrip();
+    const p = await callFn("previewTrip", { code }, user.token);
+    const car = p.body.result.cars[0];
+    const j = await call({ code, displayName: "Sam", car: { existingCarId: car.id }, tracker: car.hasTracker }, user.token);
+    assert.equal(j.status, 200, JSON.stringify(j.body));
+    assert.equal(j.body.result.tripId, p.body.result.tripId);
+    assert.equal(j.body.result.carId, car.id);
+    assert.equal(j.body.result.trackerTaken, true);
+    assert.ok((await tripRef.collection("members").doc(user.uid).get()).exists);
+  });
+
+  it("rejects unknown and ended trips with not-found", async () => {
+    const unknown = await callFn("previewTrip", { code: "ZZZZZZ" }, user.token);
+    assert.equal(unknown.status, 404);
+    assert.equal(unknown.body.error.status, "NOT_FOUND");
+    const { code } = await seedTrip({ status: "ended" });
+    const ended = await callFn("previewTrip", { code }, user.token);
+    assert.equal(ended.body.error.status, "NOT_FOUND");
+  });
+
+  it("rejects bad codes and signed-out callers", async () => {
+    const bad = await callFn("previewTrip", { code: "abc" }, user.token);
+    assert.equal(bad.body.error.status, "INVALID_ARGUMENT");
+    const anon = await callFn("previewTrip", { code: "ABCDEF" });
+    assert.equal(anon.body.error.status, "UNAUTHENTICATED");
+  });
+});
