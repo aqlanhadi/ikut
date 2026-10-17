@@ -6,6 +6,7 @@ import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/fi
 
 import { endIdleTrips } from "../lib/endIdleTrips.js";
 import { purgeTripData } from "../lib/retention.js";
+import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 
 const PROJECT = "ikut-b1083";
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
@@ -451,5 +452,111 @@ describe("purgeTripData (emulator)", () => {
     await purgeTripData(db, NOW);
     assert.equal((await ref.collection("events").doc("future").get()).exists, true);
     assert.equal((await ref.collection("events").doc("forever").get()).exists, true);
+  });
+});
+
+describe("member cleanup (emulator)", () => {
+  const point = new GeoPoint(1, 1);
+
+  // Each trip gets an auto-generated id, so tests never collide with other suites or agents.
+  async function seedCleanupTrip(status: "active" | "ended" = "active") {
+    const code = freshCode();
+    const tripRef = db.collection("trips").doc();
+    await tripRef.set({
+      name: "T", code, organizerId: "org", route: "", destination: { name: "D", coordinate: point },
+      status, createdAt: FieldValue.serverTimestamp(),
+    });
+    await tripRef.collection("cars").doc("lead").set({ name: "Lead", color: "blue", isLead: true, state: "joining", number: 1, trackerUserId: "org" });
+    await tripRef.collection("members").doc("org").set({ displayName: "Org", carId: "lead", role: "organizer" });
+    return tripRef;
+  }
+  async function addCar(tripRef: FirebaseFirestore.DocumentReference, carId: string, trackerUserId?: string) {
+    await tripRef.collection("cars").doc(carId).set({
+      name: carId, color: "green", isLead: false, state: "joining", number: 2,
+      ...(trackerUserId ? { trackerUserId } : {}),
+    });
+    await tripRef.collection("positions").doc(carId).set({ location: point, speed: 0, heading: 0, routeOffset: 0, updatedAt: FieldValue.serverTimestamp() });
+  }
+  async function addMember(tripRef: FirebaseFirestore.DocumentReference, uid: string, carId: string) {
+    await tripRef.collection("members").doc(uid).set({ displayName: uid, carId, role: "member" });
+  }
+  /**
+   * Calls cleanup directly with the leaver's data. The member doc is deliberately NOT deleted here:
+   * deleting it would also fire the real onMemberDeleted trigger and race these assertions.
+   * cleanupAfterMemberLeft ignores the leaver's own doc when counting riders, so this matches the trigger.
+   */
+  async function leave(tripRef: FirebaseFirestore.DocumentReference, uid: string) {
+    const removed = (await tripRef.collection("members").doc(uid).get()).data() as { carId: string };
+    return cleanupAfterMemberLeft(db, tripRef.id, uid, removed);
+  }
+
+  it("last member leaves a non-lead car: car and position deleted", async () => {
+    const ref = await seedCleanupTrip();
+    await addCar(ref, "c2", "m1");
+    await addMember(ref, "m1", "c2");
+    const outcome = await leave(ref, "m1");
+    assert.deepEqual(outcome, { kind: "deleted" });
+    assert.equal((await ref.collection("cars").doc("c2").get()).exists, false);
+    assert.equal((await ref.collection("positions").doc("c2").get()).exists, false);
+    assert.equal((await ref.collection("cars").doc("lead").get()).exists, true);
+  });
+
+  it("member leaves a shared car they tracked: car kept, tracker released", async () => {
+    const ref = await seedCleanupTrip();
+    await addCar(ref, "c2", "m1");
+    await addMember(ref, "m1", "c2");
+    await addMember(ref, "m2", "c2");
+    const outcome = await leave(ref, "m1");
+    assert.deepEqual(outcome, { kind: "kept", trackerReleased: true });
+    const car = (await ref.collection("cars").doc("c2").get()).data()!;
+    assert.equal("trackerUserId" in car, false);
+    assert.equal((await ref.collection("positions").doc("c2").get()).exists, true);
+    assert.equal((await ref.collection("members").doc("m2").get()).data()!.carId, "c2");
+  });
+
+  it("member leaves a shared car they did not track: car untouched", async () => {
+    const ref = await seedCleanupTrip();
+    await addCar(ref, "c2", "m2");
+    await addMember(ref, "m1", "c2");
+    await addMember(ref, "m2", "c2");
+    const before = (await ref.collection("cars").doc("c2").get()).data()!;
+    const outcome = await leave(ref, "m1");
+    assert.deepEqual(outcome, { kind: "kept", trackerReleased: false });
+    assert.deepEqual((await ref.collection("cars").doc("c2").get()).data(), before);
+    assert.equal((await ref.collection("positions").doc("c2").get()).exists, true);
+  });
+
+  it("last member leaves the lead car: car kept", async () => {
+    const ref = await seedCleanupTrip();
+    const outcome = await leave(ref, "org");
+    assert.deepEqual(outcome, { kind: "kept", trackerReleased: true });
+    const lead = await ref.collection("cars").doc("lead").get();
+    assert.equal(lead.exists, true);
+    assert.equal("trackerUserId" in lead.data()!, false);
+  });
+
+  it("ended trip: nothing changes", async () => {
+    const ref = await seedCleanupTrip("ended");
+    await addCar(ref, "c2", "m1");
+    await addMember(ref, "m1", "c2");
+    const before = (await ref.collection("cars").doc("c2").get()).data()!;
+    const outcome = await leave(ref, "m1");
+    assert.deepEqual(outcome, { kind: "skipped", reason: "trip-not-active" });
+    assert.deepEqual((await ref.collection("cars").doc("c2").get()).data(), before);
+    assert.equal((await ref.collection("positions").doc("c2").get()).exists, true);
+  });
+
+  it("trigger fires when a member doc is deleted in the functions emulator", async () => {
+    const ref = await seedCleanupTrip();
+    await addCar(ref, "c9", "m9");
+    await addMember(ref, "m9", "c9");
+    await ref.collection("members").doc("m9").delete();
+    const carRef = ref.collection("cars").doc("c9");
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && (await carRef.get()).exists) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    assert.equal((await carRef.get()).exists, false, "car c9 still exists 5s after member delete");
+    assert.equal((await ref.collection("positions").doc("c9").get()).exists, false);
   });
 });

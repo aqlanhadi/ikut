@@ -38,6 +38,23 @@ service cloud.firestore {
       return trip(tripId).status == 'active';
     }
 
+    // The caller's own car in this trip (via their member doc).
+    function myCar(tripId) {
+      return get(carPath(tripId, get(memberPath(tripId, request.auth.uid)).data.carId)).data;
+    }
+
+    // The caller tracks the lead car.
+    function isLeadTracker(tripId) {
+      return isMember(tripId)
+        && myCar(tripId).isLead == true
+        && myCar(tripId).get('trackerUserId', null) == request.auth.uid;
+    }
+
+    // Lead car's tracker or the organizer: the people who may pin or resolve a stop.
+    function isLeadOrOrganizer(tripId) {
+      return isOrganizer(tripId) || isLeadTracker(tripId);
+    }
+
     // Optional field: absent or null counts as unset.
     function optionalOf(data, key) {
       return data.get(key, null);
@@ -116,6 +133,33 @@ service cloud.firestore {
         && (optionalOf(d, 'message') == null || isString(d.message, 0, 280));
     }
 
+    // A pinned stop place: where the convoy will stop, set by the person writing it.
+    function validPlace(v) {
+      return v is map
+        && v.keys().hasOnly(['name', 'coordinate', 'routeOffset', 'pinnedBy'])
+        && v.keys().hasAll(['name', 'coordinate', 'routeOffset', 'pinnedBy'])
+        && isString(v.name, 1, 100)
+        && v.coordinate is latlng
+        && v.routeOffset is number && v.routeOffset >= 0
+        && v.pinnedBy == request.auth.uid;
+    }
+
+    // A place someone suggests for a stop (no pinnedBy; only the lead car's pin carries that).
+    function validSuggestion(v) {
+      return v is map
+        && v.keys().hasOnly(['name', 'coordinate', 'routeOffset'])
+        && v.keys().hasAll(['name', 'coordinate', 'routeOffset'])
+        && isString(v.name, 1, 100)
+        && v.coordinate is latlng
+        && v.routeOffset is number && v.routeOffset >= 0;
+    }
+
+    // A stop request that has not been resolved (expiresAt unset or in the future).
+    function openStop(ev) {
+      return ev.category == 'stopRequest'
+        && (optionalOf(ev, 'expiresAt') == null || ev.expiresAt > request.time);
+    }
+
     // ---------- rules ----------
 
     // Trips: members read; organizer creates and updates; nobody deletes.
@@ -165,13 +209,13 @@ service cloud.firestore {
           && (optionalOf(request.resource.data, 'pushToken') == null
               || request.resource.data.pushToken is string);
 
+        // carId is never changed by a client; only joinTrip (admin SDK) moves a member between cars.
         allow update: if isMember(tripId)
           && userId == request.auth.uid
           && tripActive(tripId)
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['displayName', 'carId', 'pushToken'])
+               .hasOnly(['displayName', 'pushToken'])
           && isString(request.resource.data.displayName, 1, 30)
-          && request.resource.data.carId is string
           && (optionalOf(request.resource.data, 'pushToken') == null
               || request.resource.data.pushToken is string);
 
@@ -247,14 +291,47 @@ service cloud.firestore {
 
         allow update: if isMember(tripId)
           && tripActive(tripId)
-          && resource.data.authorId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
-          && (optionalOf(request.resource.data, 'expiresAt') == null
-              || request.resource.data.expiresAt is timestamp);
+          && (
+            // Author sets or clears expiresAt (clear, resolve).
+            (resource.data.authorId == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
+              && (optionalOf(request.resource.data, 'expiresAt') == null
+                  || request.resource.data.expiresAt is timestamp))
+            // Lead car or organizer pins the place of an open stop request.
+            || (isLeadOrOrganizer(tripId)
+              && openStop(resource.data)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['place'])
+              && validPlace(request.resource.data.place))
+            // Lead car or organizer resolves (expires) a stop request.
+            || (isLeadOrOrganizer(tripId)
+              && resource.data.category == 'stopRequest'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
+              && request.resource.data.expiresAt is timestamp)
+          );
 
         allow delete: if isMember(tripId)
           && tripActive(tripId)
           && (resource.data.authorId == request.auth.uid || isOrganizer(tripId));
+
+        // Stop votes: one doc per car, written by a member of that car while the stop is open.
+        // A vote may carry a suggested place; the car that asked for the stop proposes its place this way.
+        match /votes/{carId} {
+          allow read: if isMember(tripId);
+
+          allow create, update: if isMember(tripId)
+            && tripActive(tripId)
+            && get(memberPath(tripId, request.auth.uid)).data.carId == carId
+            && openStop(get(/databases/$(database)/documents/trips/$(tripId)/events/$(eventId)).data)
+            && request.resource.data.keys().hasOnly(['userId', 'agree', 'at', 'suggestion'])
+            && request.resource.data.keys().hasAll(['userId', 'agree', 'at'])
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.agree is bool
+            && request.resource.data.at == request.time
+            && (optionalOf(request.resource.data, 'suggestion') == null
+                || validSuggestion(request.resource.data.suggestion));
+
+          allow delete: if false;
+        }
       }
     }
 

@@ -137,8 +137,14 @@ describe('members', () => {
     assertFails(setDoc(doc(db('stranger'), `trips/${T}/members/stranger`), memberDoc({ role: 'organizer' }))));
   it('organizer cannot create a member doc for another user', () =>
     assertFails(setDoc(doc(db('org'), `trips/${T}/members/stranger`), memberDoc())));
-  it('member can change displayName, carId, pushToken', () =>
-    assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy', carId: 'carB', pushToken: 'tok' })));
+  it('member can update displayName', () =>
+    assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy' })));
+  it('member can set pushToken', () =>
+    assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { pushToken: 'tok' })));
+  it('member cannot change own carId', () =>
+    assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { carId: 'carB' })));
+  it('member cannot change carId alongside allowed fields', () =>
+    assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy', carId: 'carB', pushToken: 'tok' })));
   it('member cannot change own role', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { role: 'organizer' })));
   it('organizer cannot change own role', () =>
@@ -287,5 +293,149 @@ describe('review: impersonation and escalation', () => {
     });
     await assertFails(getDocs(collection(db('x'), `trips/${T}/events`)));
     await assertFails(getDoc(doc(db('x'), `trips/${T}/positions/carA`)));
+  });
+});
+
+// Stop requests: votes per car, pinned place, resolve. Seed: 'mem' is on carA (author),
+// 'other' on carB, 'org' (organizer) on carO. Lead car is carO, tracked by 'lead' (a member of carO's
+// trip with their own member doc pointing at carO) unless a test says otherwise.
+describe('stop requests', () => {
+  const stop = (over = {}) => event({ type: 'stopFuel', category: 'stopRequest', severity: 'medium', ...over });
+  const place = (over = {}) => ({ name: 'R&R Tapah', coordinate: pt, routeOffset: 18000, pinnedBy: 'lead', ...over });
+  const evRef = (uid, id = 'stop1') => doc(db(uid), `trips/${T}/events/${id}`);
+  const voteRef = (uid, carId, id = 'stop1') => doc(db(uid), `trips/${T}/events/${id}/votes/${carId}`);
+  const vote = (uid, over = {}) => ({ userId: uid, agree: true, at: serverTimestamp(), ...over });
+
+  beforeEach(async () => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (c) => {
+      const f = c.firestore();
+      await setDoc(doc(f, `trips/${T}/members/lead`), memberDoc({ displayName: 'Lead', carId: 'carO' }));
+      await setDoc(doc(f, `trips/${T}/cars/carO`), carDoc({ name: 'Car O', isLead: true, trackerUserId: 'lead' }));
+      await setDoc(doc(f, `trips/${T}/events/stop1`), stop());
+      await setDoc(doc(f, `trips/${T}/events/stopDone`), stop({ expiresAt: ts(1000) }));
+    });
+  });
+
+  describe('votes', () => {
+    it('member votes for own car', () => assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem'))));
+    it('member can change own car vote', async () => {
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { agree: false })));
+    });
+    it('another member of the same car can update the car vote', async () => {
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/members/mate`), memberDoc({ displayName: 'Mate' }));
+      });
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertSucceeds(setDoc(voteRef('mate', 'carA'), vote('mate', { agree: false })));
+    });
+    it('member cannot vote for another car', () => assertFails(setDoc(voteRef('mem', 'carB'), vote('mem'))));
+    it('userId must be the caller', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('other'))));
+    it('agree must be a bool', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { agree: 'yes' }))));
+    it('extra field fails', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { weight: 5 }))));
+    it('missing field fails', () => {
+      const v = vote('mem');
+      delete v.agree;
+      return assertFails(setDoc(voteRef('mem', 'carA'), v));
+    });
+    it('client timestamp fails', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { at: ts() }))));
+    it('non-member cannot vote', () => assertFails(setDoc(voteRef('stranger', 'carA'), vote('stranger'))));
+    it('cannot vote on a resolved stop', () => assertFails(setDoc(voteRef('mem', 'carA', 'stopDone'), vote('mem'))));
+    it('cannot vote on a non-stop event', () => assertFails(setDoc(voteRef('mem', 'carA', 'ev1'), vote('mem'))));
+    it('cannot vote on a missing event', () => assertFails(setDoc(voteRef('mem', 'carA', 'nope'), vote('mem'))));
+    it('cannot vote on an ended trip', async () => {
+      await seed({ ended: true });
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/events/stop1`), stop());
+      });
+      await assertFails(setDoc(voteRef('mem', 'carA'), vote('mem')));
+    });
+    it('vote may carry a suggested place', () =>
+      assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: 'Petronas', coordinate: pt, routeOffset: 1000 } }))));
+    it('suggestion with pinnedBy fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: 'P', coordinate: pt, routeOffset: 1, pinnedBy: 'mem' } }))));
+    it('suggestion with empty name fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: '', coordinate: pt, routeOffset: 1 } }))));
+    it('suggestion with bad coordinate fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: 'P', coordinate: 'here', routeOffset: 1 } }))));
+    it('member can read votes', async () => {
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertSucceeds(getDocs(collection(db('other'), `trips/${T}/events/stop1/votes`)));
+    });
+    it('non-member cannot read votes', () =>
+      assertFails(getDocs(collection(db('stranger'), `trips/${T}/events/stop1/votes`))));
+    it('votes cannot be deleted', async () => {
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertFails(deleteDoc(voteRef('mem', 'carA')));
+    });
+  });
+
+  describe('pinned place', () => {
+    it('lead car tracker can pin', () => assertSucceeds(updateDoc(evRef('lead'), { place: place() })));
+    it('organizer can pin', () => assertSucceeds(updateDoc(evRef('org'), { place: place({ pinnedBy: 'org' }) })));
+    it('lead can re-pin a different place', async () => {
+      await assertSucceeds(updateDoc(evRef('lead'), { place: place() }));
+      await assertSucceeds(updateDoc(evRef('lead'), { place: place({ name: 'Other R&R' }) }));
+    });
+    it('non-lead member cannot pin', () => assertFails(updateDoc(evRef('other'), { place: place({ pinnedBy: 'other' }) })));
+    it('stop author who is not lead cannot pin', () => assertFails(updateDoc(evRef('mem'), { place: place({ pinnedBy: 'mem' }) })));
+    it('non-member cannot pin', () => assertFails(updateDoc(evRef('stranger'), { place: place({ pinnedBy: 'stranger' }) })));
+    it('a lead flag on a car someone else tracks does not grant pinning', async () => {
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/cars/carO`), carDoc({ isLead: true, trackerUserId: 'someoneElse' }));
+      });
+      await assertFails(updateDoc(evRef('lead'), { place: place() }));
+    });
+    it('pinnedBy must be the caller', () => assertFails(updateDoc(evRef('lead'), { place: place({ pinnedBy: 'org' }) })));
+    it('empty name fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ name: '' }) })));
+    it('name over 100 chars fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ name: 'x'.repeat(101) }) })));
+    it('coordinate must be a geopoint', () =>
+      assertFails(updateDoc(evRef('lead'), { place: place({ coordinate: { lat: 1, lng: 2 } }) })));
+    it('negative routeOffset fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ routeOffset: -1 }) })));
+    it('extra place field fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ rating: 5 }) })));
+    it('place with missing field fails', () => {
+      const p = place();
+      delete p.routeOffset;
+      return assertFails(updateDoc(evRef('lead'), { place: p }));
+    });
+    it('place must be a map', () => assertFails(updateDoc(evRef('lead'), { place: 'Tapah' })));
+    it('cannot pin and change another field in one write', () =>
+      assertFails(updateDoc(evRef('lead'), { place: place(), message: 'hi' })));
+    it('cannot pin a resolved stop', () => assertFails(updateDoc(evRef('lead', 'stopDone'), { place: place() })));
+    it('cannot pin a hazard event', () => assertFails(updateDoc(evRef('lead', 'ev1'), { place: place() })));
+    it('cannot pin on an ended trip', async () => {
+      await seed({ ended: true });
+      await env.withSecurityRulesDisabled(async (c) => {
+        const f = c.firestore();
+        await setDoc(doc(f, `trips/${T}/members/lead`), memberDoc({ carId: 'carO' }));
+        await setDoc(doc(f, `trips/${T}/cars/carO`), carDoc({ isLead: true, trackerUserId: 'lead' }));
+        await setDoc(doc(f, `trips/${T}/events/stop1`), stop());
+      });
+      await assertFails(updateDoc(evRef('lead'), { place: place() }));
+    });
+    it('place cannot be supplied when creating the stop', () =>
+      assertFails(setDoc(evRef('mem', 'new'), stop({ place: place({ pinnedBy: 'mem' }) }))));
+    it('member can create a stop request', () => assertSucceeds(setDoc(evRef('mem', 'new'), stop())));
+  });
+
+  describe('resolve', () => {
+    it('author can resolve', () => assertSucceeds(updateDoc(evRef('mem'), { expiresAt: ts() })));
+    it('organizer can resolve', () => assertSucceeds(updateDoc(evRef('org'), { expiresAt: ts() })));
+    it('lead car tracker can resolve', () => assertSucceeds(updateDoc(evRef('lead'), { expiresAt: ts() })));
+    it('other member cannot resolve', () => assertFails(updateDoc(evRef('other'), { expiresAt: ts() })));
+    it('non-member cannot resolve', () => assertFails(updateDoc(evRef('stranger'), { expiresAt: ts() })));
+    it('organizer cannot expire a hazard they did not author', () =>
+      assertFails(updateDoc(evRef('org', 'ev1'), { expiresAt: ts() })));
+    it('lead cannot clear expiresAt to reopen', () => assertFails(updateDoc(evRef('lead', 'stopDone'), { expiresAt: null })));
+    it('lead cannot change other fields while resolving', () =>
+      assertFails(updateDoc(evRef('lead'), { expiresAt: ts(), message: 'x' })));
+    it('resolve fails on an ended trip', async () => {
+      await seed({ ended: true });
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/events/stop1`), stop());
+      });
+      await assertFails(updateDoc(evRef('mem'), { expiresAt: ts() }));
+    });
   });
 });
