@@ -1,0 +1,22 @@
+import SwiftUI
+
+/// Shown when location access is denied or restricted and the trip can't show the user's car.
+struct LocationDeniedView: View {
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Location is off", systemImage: "location.slash.fill")
+        } description: {
+            Text("ikut needs your location during a trip so the others can see your car. Turn it on in Settings.")
+        } actions: {
+            Button("Open Settings", action: onOpenSettings)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+        }
+    }
+}
+
+#Preview {
+    LocationDeniedView(onOpenSettings: {})
+}

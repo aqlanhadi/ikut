@@ -22,6 +22,15 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>ConvoyTracking</key>
+		<string>Your exact position lets the others in your trip see where your car is.</string>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ikut shows your car to the others in your trip while the trip is active.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

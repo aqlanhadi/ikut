@@ -35,6 +35,10 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
+        NSLocationWhenInUseUsageDescription: ikut shows your car to the others in your trip while the trip is active.
+        NSLocationAlwaysAndWhenInUseUsageDescription: ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.
+        NSLocationTemporaryUsageDescriptionDictionary:
+          ConvoyTracking: Your exact position lets the others in your trip see where your car is.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikut

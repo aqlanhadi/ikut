@@ -11,7 +11,9 @@
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test": "node --test test/unit.test.ts",
+    "test:emulator": "npm run build && cd .. && firebase emulators:exec --project ikut-b1083 --only auth,firestore,functions \"node --test functions/test/emulator.test.ts\""
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",

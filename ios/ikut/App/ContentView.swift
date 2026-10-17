@@ -11,20 +11,7 @@ struct ContentView: View {
         case .signedOut:
             NameEntryView()
         case .signedIn:
-            VStack(spacing: 12) {
-                Text("ikut")
-                    .font(.largeTitle.bold())
-                Text("Drive together. Arrive together.")
-                    .foregroundStyle(.secondary)
-                if let name = auth.displayName {
-                    Text("Signed in as \(name)")
-                }
-                Text(Backend.current.label)
-                    .font(.footnote.monospaced())
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 24)
-            }
-            .padding()
+            HomeView()
         }
     }
 }
@@ -33,4 +20,5 @@ struct ContentView: View {
     Backend.configure()
     return ContentView()
         .environment(AuthModel())
+        .environment(LocationPermission())
 }
