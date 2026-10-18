@@ -100,3 +100,13 @@ schemes:
       targets:
         - ikutTests
         - ikutUITests
+  # For device installs (field tests, battery runs): Release always talks to production,
+  # so the app works when launched from the home screen.
+  ikut-release:
+    build:
+      targets:
+        ikut: all
+    run:
+      config: Release
+    archive:
+      config: Release
