@@ -100,3 +100,9 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 3. **Alert banner hidden behind the stop card** (`TripMapView.topStack` vs `stopCard`): with a stop request open, the approach banner is
    partly covered by the card (see `06-approach-alert.png` from an earlier run). Layering/space issue.
 4. Observation: a GPS-only gap never makes a car stale (heartbeat re-writes the last position), see Things to know. Probably intended; worth a decision.
+
+## Production smoke test
+
+`node prod-smoke.mjs` runs one short trip against the real Firebase project (from
+`ios/ikut/Resources/GoogleService-Info.plist`): anonymous sign-in, create, `previewTrip`, `joinTrip`,
+positions, end. It deletes its two anonymous users; the ended trip is purged by `purgeTripDataJob`.
