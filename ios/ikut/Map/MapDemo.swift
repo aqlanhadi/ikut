@@ -48,7 +48,7 @@ enum MapDemo {
         return out
     }
 
-    static func model(now: Date = Date()) -> TripMapModel {
+    static func model(now: Date = Date(), fiveCars: Bool = false) -> TripMapModel {
         let main = RouteLine(densify(mainWaypoints))
         let own = RouteLine(densify(joiningWaypoints))
         let tapah = main.project(.init(latitude: 4.2000, longitude: 101.2600))?.offset ?? 0
@@ -67,17 +67,18 @@ enum MapDemo {
                 updatedAt: now.addingTimeInterval(-age))
         }
 
-        let cars = [
+        var cars = [
             car("c1", "Aqlan’s Myvi", "#2563EB", number: 1, lead: true),
             car("c2", "Wyna’s X70", "#D9480F", number: 2),
             car("c3", "Hafiz’s Hilux", "#0F766E", number: 3, state: .joining, route: Polyline.encode(own.coordinates)),
             car("c4", "Daniel’s City", "#7C3AED", number: 4),
         ]
+        if fiveCars { cars.append(car("c5", "Faiz’s car", "#BE185D", number: 5)) }
         // 12 km short of the merge point, at 84 km/h.
         let hafizOffset = max(0, (own.length) - 12_000)
         let hafizPoint = own.coordinate(atOffset: hafizOffset) ?? own.coordinates[0]
         let hafizAhead = own.coordinate(atOffset: hafizOffset + 50) ?? hafizPoint
-        let positions: [String: Position] = [
+        var positions: [String: Position] = [
             "c1": onMain(tapah, speed: 96 / 3.6, age: 4),
             "c2": onMain(tapah - 1_800, speed: 92 / 3.6, age: 6),
             "c4": onMain(tapah - 6_400, speed: 80 / 3.6, age: 125),
@@ -86,6 +87,7 @@ enum MapDemo {
                 speed: 84 / 3.6, heading: bearing(hafizPoint, hafizAhead), routeOffset: hafizOffset,
                 convoyOffset: nil, battery: 0.6, updatedAt: now.addingTimeInterval(-3)),
         ]
+        if fiveCars { positions["c5"] = onMain(tapah - 8_000, speed: 90 / 3.6, age: 5) }
         let trip = Trip(
             id: "demo", name: "Balik kampung raya", code: "K7M2QX", organizerId: "u-c1",
             route: Polyline.encode(main.coordinates),
@@ -111,14 +113,37 @@ enum MapDemo {
 
     static func view() -> some View {
         Backend.configure()
+        let env = ProcessInfo.processInfo.environment
+        let five = env["IKUT_MAP_DEMO_CARS"] == "5"
         return NavigationStack {
             TripMapView(
-                session: TripSession(tripId: "demo", userId: "u-c1"), model: model(), stopState: ProcessInfo.processInfo.environment["IKUT_MAP_DEMO_NO_STOP"] == nil ? stopRequest() : nil)
+                session: TripSession(tripId: "demo", userId: "u-c1"), model: model(fiveCars: five),
+                stopState: env["IKUT_MAP_DEMO_NO_STOP"] == nil ? stopRequest(fiveCars: five) : nil,
+                alerts: banner(env["IKUT_MAP_DEMO_ALERT"]))
         }
     }
 
+    /// `IKUT_MAP_DEMO_ALERT=stop` or `debris` shows that banner at the top, to check it against the card.
+    static func banner(_ kind: String?) -> AlertCenter {
+        let center = AlertCenter(bannerDuration: .seconds(3_600))
+        switch kind {
+        case "stop":
+            center.showForDemo(TripAlert(
+                id: "demo-stop", eventId: "demo-stop", tripId: "demo", type: .stopFuel, category: .stopRequest,
+                severity: .low, distance: nil, title: "Stop request", body: "Wyna’s car wants to stop for fuel",
+                spoken: ""))
+        case "debris":
+            center.showForDemo(TripAlert(
+                id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
+                severity: .high, distance: 500, title: "Debris ahead in 500 meters",
+                body: "Debris reported by Wyna’s car", spoken: ""))
+        default: break
+        }
+        return center
+    }
+
     /// Wyna asks for a fuel stop and proposes a station; Aqlan (the lead) has agreed, the others haven't answered.
-    static func stopRequest(now: Date = Date()) -> StopRequestState {
+    static func stopRequest(now: Date = Date(), fiveCars: Bool = false) -> StopRequestState {
         let proposal = StopPlace(
             name: "Petronas Tapah R&R", coordinate: GeoPoint(latitude: 4.21, longitude: 101.26),
             routeOffset: 52_000, pinnedBy: nil)
@@ -133,7 +158,7 @@ enum MapDemo {
                 row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true, .waiting),
                 row("c2", 2, "#D9480F", "Wyna’s X70", .agreed),
                 row("c4", 4, "#7C3AED", "Daniel’s City", .waiting),
-            ],
+            ] + (fiveCars ? [row("c5", 5, "#BE185D", "Faiz’s car", .waiting)] : []),
             place: nil, proposal: proposal, alternatives: [], viewerAgrees: false, canPin: true,
             canResolve: false, viewerOffset: 40_000, isResolved: false)
     }

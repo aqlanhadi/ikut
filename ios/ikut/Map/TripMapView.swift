@@ -30,6 +30,7 @@ struct TripMapView: View {
     @State private var confirmEnd = false
     @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
+    @State private var mapHeight: CGFloat = 0
     @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
     @Environment(\.dismiss) private var dismiss
 
@@ -56,8 +57,9 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopState: StopRequestState? = nil,
-        onExit: @escaping () -> Void = {}
+        alerts: AlertCenter = AlertCenter(), onExit: @escaping () -> Void = {}
     ) {
+        _alerts = State(initialValue: alerts)
         self.session = session
         self.onExit = onExit
         liveServices = false
@@ -71,10 +73,16 @@ struct TripMapView: View {
             .ignoresSafeArea(edges: .bottom)
             .overlay(alignment: .top) { topStack }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { mapMaxX = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapHeight = $0 }
             .overlay(alignment: .topTrailing) {
-                MapModeControl(mode: $model.mode)
-                    .padding(.top, 76)
-                    .padding(.trailing, 12)
+                // The stop card takes over the screen, and the controls would only sit under it or
+                // under the banner's close button.
+                if stopState == nil {
+                    MapModeControl(mode: $model.mode)
+                        .padding(.top, bannerShowing ? 156 : 76)
+                        .padding(.trailing, 12)
+                        .animation(.snappy, value: bannerShowing)
+                }
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 8) {
@@ -82,7 +90,9 @@ struct TripMapView: View {
                     ConvoyPanel(
                         model: model, expanded: panelBinding, canReport: model.myCarId != nil,
                         onReport: openReport, onStop: { stopSheet = .request })
+                        .layoutPriority(1)
                 }
+                .frame(maxHeight: maxBottomHeight, alignment: .bottom)
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showReport) {
@@ -200,6 +210,13 @@ struct TripMapView: View {
 
     // MARK: Top
 
+    private var bannerHiding: Set<EventCategory> { stopState == nil ? [] : [.stopRequest] }
+
+    private var bannerShowing: Bool {
+        guard let alert = alerts.current else { return false }
+        return !bannerHiding.contains(alert.category)
+    }
+
     private var topStack: some View {
         VStack(spacing: 8) {
             tripPill
@@ -212,7 +229,8 @@ struct TripMapView: View {
                     }
                 })
             }
-            AlertBannerView(center: alerts)
+            // The stop card says the same thing, so its own banner would only crowd the top.
+            AlertBannerView(center: alerts, hiding: bannerHiding)
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }
@@ -275,6 +293,14 @@ struct TripMapView: View {
         Binding(get: { panelExpanded && stopState == nil }, set: { panelExpanded = $0 })
     }
 
+    /// The most the card and panel may take together: the map (already below the status bar) minus
+    /// the pill and a banner on top.
+    /// The card's voter list scrolls to fit.
+    private var maxBottomHeight: CGFloat? {
+        guard mapHeight > 0 else { return nil }
+        return mapHeight - (bannerShowing ? 150 : 66)
+    }
+
     private var stopContext: StopContext? {
         model.stopContext(tripId: session.tripId, userId: session.userId, isOrganizer: session.isOrganizer)
     }
@@ -287,18 +313,12 @@ struct TripMapView: View {
     @ViewBuilder
     private var stopCard: some View {
         if let state = stopState, let context = stopContext {
-            ScrollView {
-                StopRequestCard(
-                    state: state,
-                    actions: StopService.actions(
-                        context: context, state: state,
-                        suggestAnother: { stopSheet = .suggest(state) },
-                        onError: { showStopError($0) }))
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollIndicators(.hidden)
-            .frame(maxHeight: 520)
-            .fixedSize(horizontal: false, vertical: true)
+            StopRequestCard(
+                state: state,
+                actions: StopService.actions(
+                    context: context, state: state,
+                    suggestAnother: { stopSheet = .suggest(state) },
+                    onError: { showStopError($0) }))
             .padding(.horizontal, 8)
             .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))

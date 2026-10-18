@@ -6,18 +6,39 @@ struct StopRequestCard: View {
     let state: StopRequestState
     let actions: StopRequestActions
 
+    /// The voter list (and pin choices) is as tall as its rows, and gives way when the card is
+    /// squeezed into less room by its parent, then scrolls; the header and the buttons stay put,
+    /// so "Agree to Stop" is always reachable on a small screen.
+    @State private var listHeight: CGFloat?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
-            placeCard
-            votes
-            if state.canPin && state.place == nil { pinSection }
-            buttons
+            header.fixedSize(horizontal: false, vertical: true)
+            placeCard.fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    votes
+                    if state.canPin && state.place == nil { pinSection }
+                }
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.onChange(of: proxy.size.height, initial: true) { _, height in listHeight = height }
+                    })
+            }
+            .frame(minHeight: min(listHeight ?? 88, 88), maxHeight: listHeight)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+            buttons.fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
         .padding(.top, 18)
         .padding(.bottom, 18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 38, style: .continuous))
+        // The design's 94% white over a blur: thick enough that nothing behind the card reads through.
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 38, style: .continuous)
+            shape.fill(.regularMaterial)
+            shape.fill(Color(.systemBackground).opacity(0.94))
+        }
         .accessibilityElement(children: .contain)
     }
 

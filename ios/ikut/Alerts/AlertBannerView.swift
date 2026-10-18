@@ -4,10 +4,13 @@ import SwiftUI
 /// there is no alert and when the alert times out.
 struct AlertBannerView: View {
     var center: AlertCenter
+    /// Categories not to show right now, e.g. a stop request while its own card is up. The alert
+    /// stays current in the center (and still times out); only the banner is held back.
+    var hiding: Set<EventCategory> = []
 
     var body: some View {
         Group {
-            if let alert = center.current {
+            if let alert = center.current, !hiding.contains(alert.category) {
                 banner(alert)
             }
         }

@@ -165,6 +165,11 @@ final class AlertCenter {
         if readAloud() { speaker.enqueue(alert.spoken, key: alert.id) }
     }
 
+    #if DEBUG
+    /// Puts `alert` on the banner without any event source, for the map demo.
+    func showForDemo(_ alert: TripAlert) { show(alert) }
+    #endif
+
     /// Shows the banner unless a more severe alert is still on screen.
     private func show(_ alert: TripAlert) {
         if let current, current.severity.rank > alert.severity.rank { return }
