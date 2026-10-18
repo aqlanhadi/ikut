@@ -1,0 +1,15 @@
+{
+  "name": "ikut-qa",
+  "private": true,
+  "type": "module",
+  "description": "Multi-car convoy simulation for ikut (Firebase emulators)",
+  "scripts": {
+    "gpx": "node generate-gpx.mjs",
+    "sim": "node convoy-sim.mjs",
+    "test": "node --test lib/"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "firebase": "^12.0.0"
+  }
+}

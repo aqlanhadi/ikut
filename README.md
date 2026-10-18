@@ -69,6 +69,8 @@ TEST_RUNNER_IKUT_JOIN_CODE=Y5REFN TEST_RUNNER_IKUT_JOIN_NAME=Wyna \
   xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:ikutUITests
 ```
 
+Multi-car simulated drives (4 scripted cars plus a real simulator as the fifth) are in [`qa/`](qa/README.md).
+
 Security rules tests (Firestore emulator, needs Java):
 
 ```sh

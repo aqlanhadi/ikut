@@ -237,7 +237,7 @@ final class CLMonitorRegionMonitor: RegionMonitoring {
     private var monitor: CLMonitor?
     private var ids: Set<String> = []
 
-    init(name: String = "ikut.hazards") { self.name = name }
+    init(name: String = "ikutHazards") { self.name = name }
 
     private func ensureMonitor() async -> CLMonitor {
         if let monitor { return monitor }

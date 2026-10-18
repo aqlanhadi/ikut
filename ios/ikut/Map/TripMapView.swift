@@ -157,6 +157,7 @@ struct TripMapView: View {
             ForEach(model.hazards.markers) { hazard in
                 Annotation(hazard.label, coordinate: hazard.coordinate, anchor: .center) {
                     HazardMapContent(marker: hazard)
+                        .accessibilityIdentifier("hazard.marker")
                 }
                 .annotationTitles(.hidden)
             }
@@ -365,7 +366,7 @@ struct TripMapView: View {
         guard liveServices else { return }
         model.regionMonitorFactory = { [session] in
             HazardRegionMonitor(
-                backend: CLMonitorRegionMonitor(name: "ikut.hazards.\(session.tripId)"),
+                backend: CLMonitorRegionMonitor(name: "ikutHazards\(session.tripId)"),
                 notifier: LocalHazardNotifier(tripId: session.tripId),
                 isForeground: { UIApplication.shared.applicationState == .active })
         }

@@ -77,6 +77,7 @@ struct ConvoyPanel: View {
         .padding(.bottom, 6)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("convoy.header")
     }
 
     private var list: some View {
@@ -112,6 +113,7 @@ struct ConvoyPanel: View {
                     .padding(.top, 12)
                     .padding(.bottom, 2)
                     .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("convoy.joining.header")
                 ForEach(convoy.joiningRows) { row in
                     JoiningRowView(row: row)
                 }
@@ -144,9 +146,9 @@ struct ConvoyPanel: View {
                 Label {
                     Text("Stop")
                 } icon: {
-                    Image(systemName: "minus.octagon.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .red)
+                    // minus.octagon.fill is missing on iOS 27; a plain red octagon reads as a stop sign.
+                    Image(systemName: "octagon.fill")
+                        .foregroundStyle(.red)
                 }
                 .font(.headline)
                 .frame(width: 130, height: 50)
@@ -214,6 +216,7 @@ struct ConvoyRowView: View {
         .padding(.horizontal, 4)
         .opacity(row.isStale ? 0.6 : 1)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
 
@@ -239,5 +242,6 @@ struct JoiningRowView: View {
         .padding(.horizontal, 4)
         .opacity(row.isStale ? 0.6 : 1)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
