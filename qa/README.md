@@ -101,6 +101,18 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
    partly covered by the card (see `06-approach-alert.png` from an earlier run). Layering/space issue.
 4. Observation: a GPS-only gap never makes a car stale (heartbeat re-writes the last position), see Things to know. Probably intended; worth a decision.
 
+## Battery watch (real drives)
+
+`node battery-watch.mjs <TRIP CODE>` records a real tracker phone's battery and position writes
+during a drive (L5, Q2). It joins the trip as a passenger named "Battery watch" in the tracked car
+(add `--car "<name>"` when more than one car is tracked), writes every update to
+`qa/battery/<CODE>-<time>.csv`, and flags silences over 60 s as they happen. Ctrl-C or ending the
+trip prints the drain per hour and the gaps.
+
+It reads from Firebase, not the phone, so the phone can be anywhere with signal. The Mac must stay
+awake and online; the script runs `caffeinate`, but a closed lid on battery still sleeps the Mac.
+A gap means no signal or a suspended app; the two look the same from here.
+
 ## Production smoke test
 
 `node prod-smoke.mjs` runs one short trip against the real Firebase project (from

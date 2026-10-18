@@ -30,3 +30,6 @@ database-debug.log*
 .env
 .env.*
 *.p8
+
+# Battery-watch recordings (qa/battery-watch.mjs)
+qa/battery/

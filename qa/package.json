@@ -6,7 +6,7 @@
   "scripts": {
     "gpx": "node generate-gpx.mjs",
     "sim": "node convoy-sim.mjs",
-    "test": "node --test lib/"
+    "test": "node --test 'lib/*.test.mjs'"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
