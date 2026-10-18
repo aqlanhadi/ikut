@@ -31,6 +31,9 @@ struct ConvoyPanel: View {
         .padding(.top, 6)
         .padding(.bottom, 18)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 38, style: .continuous))
+        // While the list collapses (e.g. a stop card slides in above), the outgoing rows would
+        // otherwise draw outside the shrinking panel and over the card.
+        .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
         .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
         .padding(.horizontal, 8)
         .padding(.bottom, 8)

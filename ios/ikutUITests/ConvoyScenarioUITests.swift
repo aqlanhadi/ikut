@@ -119,6 +119,8 @@ final class ConvoyScenarioUITests: XCTestCase {
             try waitFor("pinned place on the card", timeout: 40 / speed + 30) {
                 app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Petronas Tapah R&R'")).firstMatch.exists
             }
+            // Let the card's entrance and the panel's collapse finish before capturing.
+            Thread.sleep(forTimeInterval: 1)
             shot("08-stop-request")
             agree.tap()
             try waitFor("agreement shown", timeout: 15) {
