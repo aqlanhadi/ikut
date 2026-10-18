@@ -36,6 +36,7 @@ enum Backend {
     static func configure() {
         guard FirebaseApp.app() == nil else { return }
         FirebaseApp.configure()
+        defer { dropUserFromOtherBackend() }
 
         guard case .emulators(let host) = current else { return }
         Auth.auth().useEmulator(withHost: host, port: 9099)
@@ -47,6 +48,23 @@ enum Backend {
         // Keep emulator data out of the on-device cache so restarts start clean.
         settings.cacheSettings = MemoryCacheSettings()
         Firestore.firestore().settings = settings
+    }
+
+    private static let userBackendKey = "ikut.userBackend"
+
+    /// Signs out a saved user that belongs to a different backend.
+    ///
+    /// Auth keeps its user in the Keychain, which outlives reinstalls, so a phone that ran a
+    /// Debug build against the emulators still holds an emulator user in a Release build.
+    /// Production can't refresh that user's token, and every Firestore write then retries
+    /// forever. UserDefaults is wiped on reinstall, so a missing value also counts as a mismatch.
+    private static func dropUserFromOtherBackend() {
+        let kind = if case .production = current { "production" } else { "emulators" }
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: userBackendKey) != kind, Auth.auth().currentUser != nil {
+            try? Auth.auth().signOut()
+        }
+        defaults.set(kind, forKey: userBackendKey)
     }
 
     var label: String {
