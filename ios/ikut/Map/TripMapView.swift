@@ -607,6 +607,17 @@ struct MapMarkerView: View {
                 .background(Color(mapHex: marker.colorHex), in: Circle())
                 .overlay(Circle().strokeBorder(.white, lineWidth: 3))
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                .overlay(alignment: .bottomTrailing) {
+                    if marker.hasArrived {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 8, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(width: 15, height: 15)
+                            .background(Color.ikutPositive, in: Circle())
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                            .offset(x: 5, y: 5)
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     if marker.isLead {
                         Image(systemName: "star.fill")
@@ -624,12 +635,16 @@ struct MapMarkerView: View {
         .overlay(alignment: side == .trailing ? .leading : .trailing) {
             Text(marker.label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
+                .foregroundStyle(marker.isMine ? Color.white
+                    : marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(.regularMaterial, in: Capsule())
+                .background {
+                    // My own label is the accent blue so "Me" stands out from the white chips.
+                    if marker.isMine { Capsule().fill(MapPalette.accent) } else { Capsule().fill(.regularMaterial) }
+                }
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                 .padding(side == .trailing ? .leading : .trailing, MapChipPlacement.gap)
@@ -643,7 +658,8 @@ struct MapMarkerView: View {
     }
 
     private var accessibilityText: String {
-        var text = marker.name
+        var text = marker.isMine ? ConvoyFormat.me : marker.name
+        if marker.hasArrived { text += ", arrived" }
         if marker.isLead { text += ", lead" }
         if marker.isJoining { text += ", joining" }
         if marker.isPaused {

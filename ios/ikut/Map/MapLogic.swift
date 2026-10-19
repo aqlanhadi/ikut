@@ -45,10 +45,12 @@ struct MapMarker: Identifiable, Equatable, Sendable {
     var isMine: Bool
     /// The tracker paused sharing (and the pause has not expired). Shown instead of the age.
     var isPaused = false
+    /// Reached the destination: the badge shows a small check.
+    var hasArrived = false
 
-    /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
+    /// "Me" for my car; "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
     var label: String {
-        var parts = [MapMarkerBuilder.shortName(name)]
+        var parts = [isMine ? ConvoyFormat.me : MapMarkerBuilder.shortName(name)]
         if isJoining { parts.append("joining") }
         if isPaused {
             parts.append("Paused")
@@ -66,7 +68,7 @@ enum MapMarkerBuilder {
         for e in snapshot.convoy {
             result.append(marker(
                 id: e.id, car: e.car, position: e.position, isStale: e.isStale, age: e.age,
-                isJoining: false, myCarId: myCarId, now: now))
+                isJoining: false, myCarId: myCarId, now: now, hasArrived: e.hasArrived))
         }
         for e in snapshot.joining {
             guard let position = e.position else { continue }
@@ -79,7 +81,7 @@ enum MapMarkerBuilder {
 
     private static func marker(
         id: String, car: Car, position: Position, isStale: Bool, age: TimeInterval?,
-        isJoining: Bool, myCarId: String?, now: Date
+        isJoining: Bool, myCarId: String?, now: Date, hasArrived: Bool = false
     ) -> MapMarker {
         MapMarker(
             id: id, number: car.number, name: car.name, colorHex: car.color,
@@ -87,7 +89,7 @@ enum MapMarkerBuilder {
             heading: validHeading(position.heading), isStale: isStale,
             ageText: isStale ? agoText(age ?? 0) : nil,
             isLead: car.isLead, isJoining: isJoining, isMine: id == myCarId,
-            isPaused: TripSessionLogic.isPaused(car, now: now))
+            isPaused: TripSessionLogic.isPaused(car, now: now), hasArrived: hasArrived)
     }
 
     /// A heading in 0..<360, or nil when it is missing (negative or not a number).

@@ -19,6 +19,10 @@ struct ConvoyRowText: Equatable, Identifiable, Sendable {
     var trailingSecondary: String
     var isStale: Bool
     var isSeparated: Bool
+    /// The row is the viewer's own car: its name reads "Me".
+    var isMine = false
+    /// Reached the destination: the trailing column shows an "Arrived" pill.
+    var hasArrived = false
 }
 
 struct JoiningRowText: Equatable, Identifiable, Sendable {
@@ -229,8 +233,12 @@ final class ConvoyModel {
         return ConvoyFormat.arriving(date, locale: locale, timeZone: timeZone)
     }
 
-    var convoyRows: [ConvoyRowText] {
+    var convoyRows: [ConvoyRowText] { convoyRows(myCarId: nil) }
+
+    /// The rows, with the viewer's own car named "Me".
+    func convoyRows(myCarId: String?) -> [ConvoyRowText] {
         convoy.map { e in
+            let mine = e.id == myCarId
             let leadPrefix = e.isLead ? "Lead · " : ""
             let subtitle = e.isPaused
                 ? ConvoyFormat.paused
@@ -239,7 +247,10 @@ final class ConvoyModel {
                     : leadPrefix + ConvoyFormat.speed(metersPerSecond: e.speed)
             let primary: String
             let secondary: String
-            if let gap = e.gap {
+            if e.hasArrived {
+                primary = ConvoyFormat.arrived
+                secondary = ""
+            } else if let gap = e.gap {
                 primary = ConvoyFormat.distance(gap.distance)
                 secondary = ConvoyFormat.behind(gap.time)
             } else {
@@ -249,17 +260,20 @@ final class ConvoyModel {
                 } ?? "Calculating ETA"
             }
             return ConvoyRowText(
-                id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
+                id: e.id, number: e.car.number, name: mine ? ConvoyFormat.me : e.car.name, color: e.car.color,
                 subtitle: subtitle, subtitleIsWarning: e.isStale,
                 trailingPrimary: primary, trailingSecondary: secondary,
-                isStale: e.isStale, isSeparated: e.gap?.isSeparated ?? false)
+                isStale: e.isStale, isSeparated: !e.hasArrived && (e.gap?.isSeparated ?? false),
+                isMine: mine, hasArrived: e.hasArrived)
         }
     }
 
-    var joiningRows: [JoiningRowText] {
+    var joiningRows: [JoiningRowText] { joiningRows(myCarId: nil) }
+
+    func joiningRows(myCarId: String?) -> [JoiningRowText] {
         joining.map { e in
             JoiningRowText(
-                id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
+                id: e.id, number: e.car.number, name: e.id == myCarId ? ConvoyFormat.me : e.car.name, color: e.car.color,
                 subtitle: e.isPaused
                     ? ConvoyFormat.paused
                     : e.isStale

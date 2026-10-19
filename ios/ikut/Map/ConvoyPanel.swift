@@ -80,8 +80,15 @@ struct ConvoyPanel: View {
         return convoy.arrival(forCar: reference.id)
     }
 
-    /// "On the move" while the front car is driving, "Stopped" once it isn't, "Waiting" with no cars.
+    private var mineArrived: Bool { convoy.snapshot.hasArrived(model.myCarId) }
+
+    /// "Everyone's arrived" / "Arrived" once the cars (or mine) are in; else "On the move" while the
+    /// front car is driving, "Stopped" once it isn't, "Waiting" with no cars.
     private var motion: (text: String, color: Color, dot: Color) {
+        if let arrived = ConvoyFormat.arrivalStatus(
+            mineArrived: mineArrived, everyoneArrived: convoy.snapshot.everyoneArrived) {
+            return (arrived, Color.ikutPositive, .green)
+        }
         guard let front = convoy.snapshot.etaReference else {
             return ("Waiting", Color.ikutWarning, .orange)
         }
@@ -139,7 +146,7 @@ struct ConvoyPanel: View {
                     .font(.system(size: endSize, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                if let arrive {
+                if let arrive, !mineArrived {
                     Text("Arrive \(Text(arrive).foregroundStyle(Color.ikutPositive).fontWeight(.semibold))")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -168,10 +175,13 @@ struct ConvoyPanel: View {
     @ViewBuilder
     private var progress: some View {
         if let length = routeLength, let front = convoy.snapshot.front {
-            let driven = min(max(front.convoyOffset, 0), length)
+            // The bar and "to go" describe my trip when I'm in the convoy (the front may already be in).
+            let driven = min(max((myEntry ?? front).convoyOffset, 0), length)
             ConvoyProgressBar(
                 fraction: driven / length,
-                cars: convoy.convoy.reversed().map { (min(max($0.convoyOffset / length, 0), 1), $0.car.color) },
+                cars: convoy.convoy.reversed().map {
+                    (min(max($0.convoyOffset / length, 0), 1), $0.car.color, $0.id == model.myCarId)
+                },
                 hazards: model.hazards.markers.compactMap { $0.mainOffset.map { min(max($0 / length, 0), 1) } }
             )
             .padding(.horizontal, 4)
@@ -191,11 +201,15 @@ struct ConvoyPanel: View {
         }
     }
 
-    /// "63 km · 41 min to go", or just the distance before an ETA arrives.
+    /// "63 km · 41 min to go", just the distance before an ETA arrives, "Arrived" once I'm in.
     private func toGo(remaining: Double) -> String {
-        guard let arrival = frontArrival else { return "\(ConvoyFormat.distance(remaining)) to go" }
-        return "\(ConvoyFormat.distance(remaining)) · \(ConvoyFormat.duration(arrival.timeIntervalSinceNow)) to go"
+        let subject = myEntry ?? convoy.snapshot.front
+        let arrival = subject.flatMap { convoy.arrival(forCar: $0.id) } ?? frontArrival
+        return ConvoyFormat.toGo(
+            remaining: remaining, travelTime: arrival?.timeIntervalSinceNow, arrived: subject?.hasArrived ?? false)
     }
+
+    private var myEntry: ConvoyEntry? { convoy.convoy.first(where: { $0.id == model.myCarId }) }
 
     /// Collapsed only (MapCollapsed.dc.html): overlapping car dots (dashed for joining cars), then
     /// "3 cars driving · Hafiz joins in 18 min · 6.4 km spread" and a chevron. Tapping expands.
@@ -286,12 +300,12 @@ struct ConvoyPanel: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
-            ForEach(Array(convoy.convoyRows.enumerated()), id: \.element.id) { index, row in
+            ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 { Divider().padding(.leading, 44) }
                 ConvoyRowView(row: row)
             }
             // Joining cars follow in the same list; their dashed badges set them apart.
-            ForEach(Array(convoy.joiningRows.enumerated()), id: \.element.id) { index, row in
+            ForEach(Array(convoy.joiningRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 || !convoy.convoyRows.isEmpty { Divider().padding(.leading, 44) }
                 JoiningRowView(row: row)
             }
@@ -337,7 +351,8 @@ struct ConvoyPanel: View {
 /// color. Fractions are 0...1 along the main route; cars are drawn back to front.
 private struct ConvoyProgressBar: View {
     var fraction: Double
-    var cars: [(Double, String)]
+    /// Fraction, color hex, mine (drawn with a blue ring).
+    var cars: [(Double, String, Bool)]
     var hazards: [Double]
 
     var body: some View {
@@ -358,6 +373,9 @@ private struct ConvoyProgressBar: View {
                     Circle()
                         .fill(Color(mapHex: car.1))
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                        .overlay {
+                            if car.2 { Circle().strokeBorder(MapPalette.accent, lineWidth: 2).padding(-2) }
+                        }
                         .frame(width: 18, height: 18)
                         .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
                         .position(x: min(max(w * car.0, 9), w - 9), y: 15)
@@ -404,20 +422,34 @@ struct ConvoyRowView: View {
         HStack(spacing: 12) {
             RowBadge(number: row.number, colorHex: row.color)
             VStack(alignment: .leading, spacing: 0) {
-                Text(row.name).font(.body).lineLimit(1)
+                if row.isMine {
+                    MeCapsule()
+                } else {
+                    Text(row.name).font(.body).lineLimit(1)
+                }
                 Text(row.subtitle)
                     .font(.footnote)
                     .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(row.trailingPrimary)
-                    .font(.body.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(row.isSeparated ? MapPalette.warning : Color.primary)
-                Text(row.trailingSecondary)
-                    .font(.footnote)
-                    .foregroundStyle(Color(.secondaryLabel))
+            if row.hasArrived {
+                Label(row.trailingPrimary, systemImage: "checkmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.ikutPositive)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.green.opacity(0.14), in: Capsule())
+                    .accessibilityIdentifier("convoy.row.arrived")
+            } else {
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(row.trailingPrimary)
+                        .font(.body.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(row.isSeparated ? MapPalette.warning : Color.primary)
+                    Text(row.trailingSecondary)
+                        .font(.footnote)
+                        .foregroundStyle(Color(.secondaryLabel))
+                }
             }
         }
         .frame(minHeight: 54)
@@ -428,6 +460,18 @@ struct ConvoyRowView: View {
     }
 }
 
+/// "Me" in a subtle blue capsule, for my own row.
+private struct MeCapsule: View {
+    var body: some View {
+        Text(ConvoyFormat.me)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(MapPalette.accent)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 2)
+            .background(MapPalette.accent.opacity(0.14), in: Capsule())
+    }
+}
+
 struct JoiningRowView: View {
     var row: JoiningRowText
 
@@ -435,7 +479,7 @@ struct JoiningRowView: View {
         HStack(spacing: 12) {
             RowBadge(number: row.number, colorHex: row.color, dashed: true)
             VStack(alignment: .leading, spacing: 0) {
-                Text(row.name).font(.body).lineLimit(1)
+                if row.name == ConvoyFormat.me { MeCapsule() } else { Text(row.name).font(.body).lineLimit(1) }
                 Text(row.subtitle)
                     .font(.footnote)
                     .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))

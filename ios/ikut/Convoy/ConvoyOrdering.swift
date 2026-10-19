@@ -26,6 +26,8 @@ struct ConvoyEntry: Equatable, Identifiable, Sendable {
     /// Time behind the ETA reference car (the front-most fresh car), summed over the gaps between.
     /// Zero for the reference itself; nil for cars ahead of it (stale fronts).
     var timeBehindReference: TimeInterval?
+    /// Within `ConvoyArrival.radius` of the end of the main route.
+    var hasArrived = false
 
     struct Gap: Equatable, Sendable {
         var distance: Double
@@ -72,6 +74,23 @@ struct ConvoySnapshot: Equatable, Sendable {
         return first.convoyOffset - last.convoyOffset
     }
     var separatedGaps: [ConvoyEntry] { convoy.filter { $0.gap?.isSeparated == true } }
+    /// Every car (convoy and joining) has reached the destination; false with no cars.
+    var everyoneArrived: Bool { !convoy.isEmpty && joining.isEmpty && convoy.allSatisfy(\.hasArrived) }
+    func hasArrived(_ carId: String?) -> Bool {
+        guard let carId else { return false }
+        return convoy.first(where: { $0.id == carId })?.hasArrived ?? false
+    }
+}
+
+/// When a car counts as arrived: its offset along the main route is within `radius` meters of the
+/// route's end (the destination). Pure.
+enum ConvoyArrival {
+    static let radius: Double = 150
+
+    static func hasArrived(offset: Double, routeLength: Double?) -> Bool {
+        guard let routeLength, routeLength > 0, offset.isFinite else { return false }
+        return offset >= routeLength - radius
+    }
 }
 
 /// Orders the convoy and works out gaps. Pure: everything comes in as arguments.
@@ -136,7 +155,8 @@ enum ConvoyOrdering {
                 convoy.append(ConvoyEntry(
                     id: id, car: car, position: position, convoyOffset: offset, speed: speed,
                     isFront: false, isLead: car.isLead, isStale: stale, isPaused: paused, age: age,
-                    gap: nil, timeBehindReference: nil))
+                    gap: nil, timeBehindReference: nil,
+                    hasArrived: ConvoyArrival.hasArrived(offset: offset, routeLength: mainRoute?.length)))
             } else if position != nil || car.state == .joining {
                 let distance = position.flatMap {
                     distanceToMerge(car: car, position: $0, mainRoute: mainRoute, ownMergeOffset: ownMergeOffsets[id])

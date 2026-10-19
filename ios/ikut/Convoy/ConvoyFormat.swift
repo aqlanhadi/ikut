@@ -34,6 +34,27 @@ enum ConvoyFormat {
         "\(Int((max(0, metersPerSecond.isFinite ? metersPerSecond : 0) * 3.6).rounded())) km/h"
     }
 
+    /// The viewer's own car, wherever the convoy names cars.
+    static let me = "Me"
+
+    /// A car that reached the destination.
+    static let arrived = "Arrived"
+
+    /// The panel's status pill: "Everyone's arrived" once all cars are in, "Arrived" once mine is,
+    /// nil otherwise (the caller shows motion).
+    static func arrivalStatus(mineArrived: Bool, everyoneArrived: Bool) -> String? {
+        if everyoneArrived { return "Everyone\u{2019}s arrived" }
+        return mineArrived ? arrived : nil
+    }
+
+    /// The "to go" line under the progress bar: "Arrived" once I'm in, else "63 km · 41 min to go",
+    /// or just the distance without an ETA.
+    static func toGo(remaining: Double, travelTime: TimeInterval?, arrived: Bool) -> String {
+        if arrived { return Self.arrived }
+        guard let travelTime else { return "\(distance(remaining)) to go" }
+        return "\(distance(remaining)) · \(duration(travelTime)) to go"
+    }
+
     /// Subtitle of a car whose tracker paused sharing.
     static let paused = "Paused"
 

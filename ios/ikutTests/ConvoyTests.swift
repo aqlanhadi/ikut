@@ -575,3 +575,60 @@ struct ConvoyTests {
         #expect(PausedBannerText.message(remaining: -3) == "Sharing paused · resumes automatically in 1 min")
     }
 }
+
+// MARK: - Me and arrival
+
+extension ConvoyTests {
+    @Test func arrivalRuleIsWithin150mOfRouteEnd() {
+        #expect(!ConvoyArrival.hasArrived(offset: 19_849, routeLength: 20_000))
+        #expect(ConvoyArrival.hasArrived(offset: 19_850, routeLength: 20_000))
+        #expect(ConvoyArrival.hasArrived(offset: 20_100, routeLength: 20_000))
+        #expect(!ConvoyArrival.hasArrived(offset: 20_000, routeLength: nil))
+        #expect(!ConvoyArrival.hasArrived(offset: 0, routeLength: 0))
+    }
+
+    @Test func snapshotMarksArrivedCarsAndEveryone() {
+        let s = order([car("1"), car("2")], ["1": pos(offset: 19_950), "2": pos(offset: 12_000)], main: Self.main)
+        #expect(s.convoy.map(\.hasArrived) == [true, false])
+        #expect(s.hasArrived("1"))
+        #expect(!s.hasArrived("2"))
+        #expect(!s.hasArrived(nil))
+        #expect(!s.everyoneArrived)
+        let all = order([car("1"), car("2")], ["1": pos(offset: 19_990), "2": pos(offset: 19_900)], main: Self.main)
+        #expect(all.everyoneArrived)
+        #expect(!ConvoySnapshot.empty.everyoneArrived)
+        // Without a route nobody has arrived.
+        #expect(!order([car("1")], ["1": pos(offset: 19_990)]).everyoneArrived)
+    }
+
+    @Test func arrivalStatusAndToGoText() {
+        #expect(ConvoyFormat.arrivalStatus(mineArrived: false, everyoneArrived: false) == nil)
+        #expect(ConvoyFormat.arrivalStatus(mineArrived: true, everyoneArrived: false) == "Arrived")
+        #expect(ConvoyFormat.arrivalStatus(mineArrived: true, everyoneArrived: true) == "Everyone\u{2019}s arrived")
+        #expect(ConvoyFormat.toGo(remaining: 0, travelTime: 10, arrived: true) == "Arrived")
+        #expect(ConvoyFormat.toGo(remaining: 63_000, travelTime: 41 * 60, arrived: false) == "63 km · 41 min to go")
+        #expect(ConvoyFormat.toGo(remaining: 850, travelTime: nil, arrived: false) == "850 m to go")
+    }
+
+    @MainActor @Test func rowsNameMyCarMeAndShowArrived() {
+        let m = makeModel(MockETA(), Clock())
+        m.setMainRoute(Self.main)
+        m.update(cars: [car("1"), car("2")], positions: ["1": pos(offset: 19_950), "2": pos(offset: 15_000)])
+        let rows = m.convoyRows(myCarId: "2")
+        #expect(rows.map(\.name) == ["Car 1", "Me"])
+        #expect(rows.map(\.isMine) == [false, true])
+        #expect(rows[0].hasArrived)
+        #expect(rows[0].trailingPrimary == "Arrived")
+        #expect(!rows[1].hasArrived)
+        #expect(m.convoyRows.map(\.name) == ["Car 1", "Car 2"])
+    }
+
+    @Test func myMarkerReadsMeAndArrivedMarkerIsFlagged() {
+        let s = order([car("1"), car("2")], ["1": pos(offset: 19_950), "2": pos(offset: 15_000)], main: Self.main)
+        let markers = MapMarkerBuilder.markers(from: s, myCarId: "1", now: Self.now)
+        #expect(markers[0].label == "Me")
+        #expect(markers[0].hasArrived)
+        #expect(markers[1].label == "Car 2")
+        #expect(!markers[1].hasArrived)
+    }
+}
