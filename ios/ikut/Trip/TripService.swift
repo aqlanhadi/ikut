@@ -33,6 +33,9 @@ enum TripService {
         return "\(displayName)'s trip"
     }
 
+    /// "Trip to Ipoh": the name a trip gets when created from Where to?; the organizer can rename it.
+    static func defaultTripName(destination: String) -> String { "Trip to \(destination)" }
+
     static func makeTrip(
         name: String, code: String, organizerId: String,
         destination: DestinationResult, route: BuiltRoute
@@ -103,6 +106,42 @@ enum TripService {
     }
 }
 
+extension TripService {
+    /// Organizer only (rules): renames the trip.
+    @MainActor
+    static func rename(tripId: String, to name: String) async throws {
+        let ref = Firestore.firestore().collection(FirestorePaths.trips).document(tripId)
+        guard try await ServerWrite.commit({ try await ref.updateData(["name": name]) }) else {
+            throw ServerWrite.Offline()
+        }
+    }
+
+    /// Any member (rules): records when the trip first started. Write-once; fails harmlessly if already set.
+    @MainActor
+    static func markStarted(tripId: String) async {
+        let ref = Firestore.firestore().collection(FirestorePaths.trips).document(tripId)
+        _ = try? await ServerWrite.commit({ try await ref.updateData(["startedAt": FieldValue.serverTimestamp()]) })
+    }
+
+    /// Organizer only (rules): points the trip at a new destination and main route.
+    @MainActor
+    static func changeDestination(tripId: String, to destination: DestinationResult, route: BuiltRoute) async throws {
+        let ref = Firestore.firestore().collection(FirestorePaths.trips).document(tripId)
+        let data: [String: Any] = [
+            "destination": [
+                "name": destination.name,
+                "coordinate": GeoPoint(
+                    latitude: destination.coordinate.latitude, longitude: destination.coordinate.longitude),
+            ],
+            "route": route.polyline,
+        ]
+        nonisolated(unsafe) let payload = data
+        guard try await ServerWrite.commit({ try await ref.updateData(payload) }) else {
+            throw ServerWrite.Offline()
+        }
+    }
+}
+
 /// Display formatting for route summaries.
 enum RouteFormat {
     /// "205 km"
@@ -120,6 +159,14 @@ enum RouteFormat {
         case (_, 0): return "\(hours) hr"
         default: return "\(hours) hr \(minutes) min"
         }
+    }
+
+    /// "2h 25m", "45m": the compact form for stat tiles.
+    static func shortDuration(_ seconds: Double) -> String {
+        let totalMinutes = max(1, Int((seconds / 60).rounded()))
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        return hours == 0 ? "\(minutes)m" : "\(hours)h \(String(format: "%02d", minutes))m"
     }
 
     /// "205 km · 2 hr 25 min via E1"

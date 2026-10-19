@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// First screen, signed out or in: what ikut does, with the two ways in.
+/// First screen until "Get Started": what ikut does, then on to Home (or straight to Join).
 struct WelcomeView: View {
-    var onStart: () -> Void
+    var onGetStarted: () -> Void
     var onJoin: () -> Void
 
     private struct Feature: Identifiable {
@@ -79,7 +79,7 @@ struct WelcomeView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 14)
-                Button("Start a Trip", action: onStart)
+                Button("Get Started", action: onGetStarted)
                     .buttonStyle(PillButtonStyle())
                 Button(action: onJoin) {
                     Label("Join with Code or QR", systemImage: "qrcode")
@@ -94,5 +94,5 @@ struct WelcomeView: View {
 }
 
 #Preview {
-    WelcomeView(onStart: {}, onJoin: {})
+    WelcomeView(onGetStarted: {}, onJoin: {})
 }

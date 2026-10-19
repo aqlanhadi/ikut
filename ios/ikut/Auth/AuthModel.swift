@@ -29,6 +29,26 @@ final class AuthModel {
             let name = user?.displayName
             Task { @MainActor in self?.apply(uid: uid, name: name) }
         }
+        Task { await Self.dropMissingUser() }
+    }
+
+    /// Signs out a saved user the backend no longer has (the emulators were restarted, or the
+    /// account was deleted). Auth keeps the user in the Keychain, so the app would otherwise
+    /// look signed in while every Firestore write fails for want of a token.
+    private static func dropMissingUser() async {
+        guard let user = Auth.auth().currentUser else { return }
+        do {
+            try await user.reload()
+        } catch let error as NSError where isMissingUser(error) {
+            try? Auth.auth().signOut()
+        } catch {
+            // Offline or a server hiccup: keep the user.
+        }
+    }
+
+    nonisolated static func isMissingUser(_ error: NSError) -> Bool {
+        guard error.domain == AuthErrorDomain, let code = AuthErrorCode(rawValue: error.code) else { return false }
+        return [AuthErrorCode.userNotFound, .userDisabled, .userTokenExpired, .invalidUserToken].contains(code)
     }
 
     deinit {

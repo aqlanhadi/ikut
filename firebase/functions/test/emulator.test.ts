@@ -82,6 +82,15 @@ describe("joinTrip (emulator)", () => {
     assert.equal("trackerUserId" in car, false);
   });
 
+  it("never gives two cars the same colour", async () => {
+    const { code, tripRef } = await seedTrip();
+    await tripRef.collection("cars").doc("c2").set({ name: "Car2", color: "#D9480F", isLead: false, state: "joining", number: 2 });
+    const r = await call({ code, displayName: "Sam", car: { newCar: { name: "Dup", color: "#d9480f" } }, tracker: false }, user.token);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const car = (await tripRef.collection("cars").doc(r.body.result.carId).get()).data()!;
+    assert.equal(car.color, "#2563EB");
+  });
+
   it("joins an existing car with free tracker", async () => {
     const { code, tripRef } = await seedTrip();
     await tripRef.collection("cars").doc("c2").set({ name: "Car2", color: "green", isLead: false, state: "joining" });

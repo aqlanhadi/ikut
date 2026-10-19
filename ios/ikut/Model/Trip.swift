@@ -25,5 +25,7 @@ struct Trip: Codable, Sendable, Equatable, Identifiable {
     @ServerTimestamp var createdAt: Date?
     /// Bumped on activity; trips idle for 12 hours are ended.
     var lastActivityAt: Date?
+    /// When a member first tapped Start Trip (server time); nil until the trip is underway.
+    var startedAt: Date?
     var endedAt: Date?
 }

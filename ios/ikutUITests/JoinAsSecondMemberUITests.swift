@@ -24,8 +24,9 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
         app.launch()
 
-        // Welcome is the first screen whether or not a previous run left the simulator signed in.
-        let joinButton = app.buttons["Join with Code or QR"]
+        // Welcome on a first run, Home ("Join Trip") once a previous run got past it.
+        let joinButton = app.buttons
+            .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: 15))
         joinButton.tap()
 
@@ -44,7 +45,7 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         codeField.tap()
         codeField.typeText(code)
 
-        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'New Car'")).firstMatch
+        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'A new car'")).firstMatch
         XCTAssertTrue(newCar.waitForExistence(timeout: 20), "Trip preview didn't load")
 
         let joinNameField = app.textFields["Your name"]
@@ -59,13 +60,21 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
 
         app.buttons["Join Trip"].tap()
-        let startTrip = app.buttons["Start Trip"]
+        let startTrip = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
         XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
 
         // Start Trip pushes the live map on the lobby's session.
         startTrip.tap()
+        // The Always-location explainer covers the map when only While Using is granted.
+        let notNow = app.buttons["Not now"]
+        if notNow.waitForExistence(timeout: 5) { notNow.tap() }
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         XCTAssertTrue(app.buttons["Trip menu"].exists)
+
+        // TEST_RUNNER_IKUT_HOLD_SECONDS keeps the map open, e.g. for `qa/demo.mjs`.
+        if let hold = env["IKUT_HOLD_SECONDS"].flatMap(Double.init) {
+            _ = XCTWaiter().wait(for: [XCTestExpectation(description: "hold on the map")], timeout: hold)
+        }
     }
 
     private func replaceText(in field: XCUIElement, with text: String) {

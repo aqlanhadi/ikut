@@ -23,6 +23,9 @@ final class TripMapModel {
 
     private(set) var cars: [Car] = []
     private(set) var tripName = ""
+    /// When the trip started, for "Left 12:11": the trip's `createdAt`. A trip goes live (and its
+    /// cars start sharing) the moment it is created, so this is the convoy's departure time.
+    private(set) var departedAt: Date?
     /// "K7M 2QX".
     private(set) var tripCode = ""
     private(set) var mainRoute: RouteLine?
@@ -128,6 +131,7 @@ final class TripMapModel {
         var routeChanged = false
         if let trip {
             tripName = trip.name
+            departedAt = trip.startedAt ?? trip.createdAt
             tripCode = Self.formatCode(trip.code)
             convoy.destinationName = trip.destination.name
             if trip.route != mainRouteString {

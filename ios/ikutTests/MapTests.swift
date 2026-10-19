@@ -57,7 +57,8 @@ struct MapMarkerTests {
         #expect(markers[1].colorHex == "#D9480F")
         #expect(markers[1].isMine)
         #expect(!markers[1].isLead)
-        #expect(markers[1].label == "Wyna")
+        // My own car reads "Me" rather than its name.
+        #expect(markers[1].label == "Me")
     }
 
     @Test func staleCarIsFlaggedWithAge() {
@@ -181,16 +182,6 @@ struct MapCameraTests {
         #expect(region.center.longitude == tapah.longitude)
     }
 
-    @Test func aspectKeepsTheCarsAtTheTopOfAWideFit() throws {
-        let west = MapCoordinate(latitude: 4.2, longitude: 101.0)
-        let east = MapCoordinate(latitude: 4.2, longitude: 101.2)
-        let region = try #require(MapCameraLogic.fitRegion([west, east], padding: none, aspect: 2))
-        #expect(abs(region.longitudeSpan - 0.2) < 1e-9)
-        #expect(abs(region.latitudeSpan - 0.4) < 1e-9)
-        // The north edge stays at the cars (plus half the minimum span); the extra height is to the south.
-        #expect(abs(region.center.latitude + region.latitudeSpan / 2 - 4.205) < 1e-9)
-    }
-
     @Test func fitRegionOfNothingIsNil() {
         #expect(MapCameraLogic.fitRegion([]) == nil)
     }
@@ -199,16 +190,36 @@ struct MapCameraTests {
         #expect(MapCameraLogic.target(mode: .free, me: tapah, fresh: [tapah], all: [tapah], fallback: []) == nil)
     }
 
-    @Test func followCentersOnMeLiftedSouth() throws {
+    @Test func followCentersOnMe() throws {
+        // Exactly on me: the map's safe-area padding puts that center in the middle of the visible part.
         let target = try #require(MapCameraLogic.target(mode: .follow, me: tapah, fresh: [bidor], all: [bidor], fallback: []))
-        guard case .follow(let center, let distance) = target else {
-            Issue.record("expected follow")
-            return
-        }
-        #expect(distance == MapCameraLogic.followDistance)
-        #expect(center.longitude == tapah.longitude)
-        #expect(center.latitude < tapah.latitude)
-        #expect(tapah.latitude - center.latitude < 0.02)
+        #expect(target == .follow(center: tapah, distance: MapCameraLogic.followDistance))
+    }
+
+    @Test func defaultFitPaddingIsEvenAroundTheCars() throws {
+        let region = try #require(MapCameraLogic.fitRegion([tapah, bidor]))
+        #expect(abs(region.center.latitude - 4.15) < 1e-9)
+        #expect(abs(region.center.longitude - 101.275) < 1e-9)
+    }
+
+    @Test func obscuredInsetsPassThroughWhenTheMapHasRoom() {
+        let insets = MapObscuredInsets.insets(mapHeight: 800, top: 60, bottom: 380)
+        #expect(insets.top == 60)
+        #expect(insets.bottom == 380)
+    }
+
+    @Test func obscuredInsetsShrinkToLeaveAVisibleStrip() {
+        let insets = MapObscuredInsets.insets(mapHeight: 800, top: 140, bottom: 700)
+        #expect(abs(800 - insets.top - insets.bottom - MapObscuredInsets.minimumVisible) < 1e-9)
+        // In proportion: the bottom keeps five times the top.
+        #expect(abs(insets.bottom / insets.top - 5) < 1e-9)
+    }
+
+    @Test func obscuredInsetsAreZeroBeforeLayout() {
+        let insets = MapObscuredInsets.insets(mapHeight: 0, top: 60, bottom: 380)
+        #expect(insets.top == 0 && insets.bottom == 0)
+        let negative = MapObscuredInsets.insets(mapHeight: 800, top: -4, bottom: 300)
+        #expect(negative.top == 0 && negative.bottom == 300)
     }
 
     @Test func followWithoutALocationFitsTheConvoy() throws {

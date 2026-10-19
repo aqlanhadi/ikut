@@ -1,4 +1,5 @@
 import FirebaseAuth
+import FirebaseFirestore
 import Foundation
 import Testing
 @testable import ikut
@@ -48,6 +49,53 @@ struct LobbyTests {
         #expect(image.size.width > 0)
         #expect(image.size.width == image.size.height)
     }
+
+    @Test func catchUpLineNamesCarsWithoutATracker() {
+        let tracked = LobbyCar(car: car("a", "Aqlan's Myvi", tracker: "u1"), members: [member("u1", "Aqlan", car: "a")])
+        let daniel = LobbyCar(car: car("d", "Daniel's City"), members: [member("u4", "Daniel", car: "d")])
+        let siti = LobbyCar(car: car("s", "Siti's Axia"), members: [member("u5", "Siti", car: "s")])
+        let empty = LobbyCar(car: car("e", "Spare car"), members: [])
+
+        #expect(LobbyLogic.catchUpLine([tracked]) == nil)
+        #expect(LobbyLogic.catchUpLine([tracked, daniel]) == "Daniel can catch up on the road")
+        #expect(LobbyLogic.catchUpLine([daniel, siti]) == "Daniel and Siti can catch up on the road")
+        #expect(LobbyLogic.catchUpLine([empty]) == "Spare car can catch up on the road")
+        #expect(LobbyLogic.catchUpLine([daniel, siti, empty]) == "3 cars can catch up on the road")
+    }
+
+    private func trip(status: TripStatus = .active, startedAt: Date? = nil) -> Trip {
+        Trip(id: "t", name: "Trip", code: "ABC123", organizerId: "u1", route: "",
+             destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 4.6, longitude: 101.1)),
+             status: status, startedAt: startedAt)
+    }
+
+    @Test func notStartedBeforeStartTrip() {
+        #expect(!LobbyLogic.isStarted(trip: trip(), cars: [car("c1", "One", lead: true, tracker: "u1")]))
+        #expect(!LobbyLogic.isStarted(trip: nil, cars: []))
+    }
+
+    @Test func startedWhenStartedAtIsSet() {
+        #expect(LobbyLogic.isStarted(trip: trip(startedAt: Date()), cars: []))
+    }
+
+    @Test func startedWhenACarIsAlreadyInConvoy() {
+        var c = car("c1", "One")
+        c.state = .convoy
+        #expect(LobbyLogic.isStarted(trip: trip(), cars: [c]))
+    }
+
+    @Test func endedTripIsNeverStarted() {
+        #expect(!LobbyLogic.isStarted(trip: trip(status: .ended, startedAt: Date()), cars: []))
+    }
+
+    @Test func onTheRoadLine() {
+        let utc = TimeZone(identifier: "UTC")!
+        let at = Date(timeIntervalSince1970: 21 * 3600 + 35 * 60)
+        let line = LobbyLogic.onTheRoadLine(startedAt: at, locale: Locale(identifier: "en_US"), timeZone: utc)
+        #expect(line?.hasPrefix("On the road since 9:35") == true)
+        #expect(line?.hasSuffix("PM") == true)
+        #expect(LobbyLogic.onTheRoadLine(startedAt: nil) == nil)
+    }
 }
 
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
@@ -87,4 +135,5 @@ struct LobbyEmulatorTests {
         #expect(grouped[0].members.map(\.displayName) == ["Aqlan"])
         #expect(grouped[0].hasTracker)
     }
+
 }

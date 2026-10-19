@@ -71,7 +71,7 @@ service cloud.firestore {
 
     function validTripShape(d) {
       return d.keys().hasOnly(['name', 'code', 'organizerId', 'route', 'destination',
-                               'status', 'createdAt', 'lastActivityAt', 'endedAt'])
+                               'status', 'createdAt', 'lastActivityAt', 'endedAt', 'startedAt'])
         && d.keys().hasAll(['name', 'code', 'organizerId', 'route', 'destination', 'status', 'createdAt'])
         && d.name is string
         && d.route is string
@@ -190,6 +190,13 @@ service cloud.firestore {
             || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['endedAt']))
         && (optionalOf(request.resource.data, 'lastActivityAt') == null
             || request.resource.data.lastActivityAt is timestamp);
+
+      // Any member records when the trip first started (Start Trip); once, server time only.
+      allow update: if isMember(tripId)
+        && resource.data.status == 'active'
+        && resource.data.get('startedAt', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['startedAt'])
+        && request.resource.data.startedAt == request.time;
 
       allow delete: if false;
 

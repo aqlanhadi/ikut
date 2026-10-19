@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, isEventPastGrace, shouldPurgeTripData } from "../src/retention.ts";
-import { normalizeCode, normalizeName, parseJoinInput } from "../src/joinTrip.ts";
+import { normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
 
@@ -121,5 +121,17 @@ describe("isEventPastGrace", () => {
   it("keeps a future event and one without expiresAt", () => {
     assert.equal(isEventPastGrace({ expiresAt: at(HOUR) }, now), false);
     assert.equal(isEventPastGrace({}, now), false);
+  });
+});
+
+describe("pickCarColor", () => {
+  it("keeps a free requested colour", () => assert.equal(pickCarColor("#7C3AED", ["#2563EB"]), "#7C3AED"));
+  it("replaces a taken colour with the first free palette colour", () => {
+    assert.equal(pickCarColor("#D9480F", ["#2563EB", "#0F766E", "#D9480F"]), "#7C3AED");
+    assert.equal(pickCarColor("#d9480f", ["#2563EB", "#D9480F"]), "#0F766E");
+  });
+  it("cycles by car count when the palette is exhausted", () => {
+    const all = ["#2563EB", "#D9480F", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
+    assert.equal(pickCarColor("#2563EB", all), "#2563EB");
   });
 });

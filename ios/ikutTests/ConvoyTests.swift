@@ -155,6 +155,76 @@ struct ConvoyTests {
         #expect(ConvoyFormat.lastSeen(age: 200_000) == "Last seen 2 d ago")
     }
 
+    @Test func placeShortNames() {
+        #expect(ConvoyFormat.placeShortName("Kuala Lumpur") == "KL")
+        #expect(ConvoyFormat.placeShortName(" kuala lumpur ") == "KL")
+        #expect(ConvoyFormat.placeShortName("Petaling Jaya") == "PJ")
+        #expect(ConvoyFormat.placeShortName("Johor Bahru") == "JB")
+        #expect(ConvoyFormat.placeShortName("Kota Kinabalu") == "KK")
+        #expect(ConvoyFormat.placeShortName("Kota Bharu") == "KB")
+        #expect(ConvoyFormat.placeShortName("San Francisco") == "SF")
+        #expect(ConvoyFormat.placeShortName("Ipoh") == "Ipoh")
+        #expect(ConvoyFormat.placeShortName("Seremban") == "Seremban")
+        #expect(ConvoyFormat.placeShortName("") == "")
+    }
+
+    @Test func convoySummaryText() {
+        let full = ConvoyFormat.convoySummary(driving: 3, joinerName: "Hafiz\u{2019}s Hilux", joinIn: 18 * 60, spread: 6400)
+        #expect(full.driving == "3 cars driving")
+        #expect(full.joining == "Hafiz joins in 18 min")
+        #expect(full.spread == "6.4 km spread")
+        let one = ConvoyFormat.convoySummary(driving: 1, joinerName: nil, joinIn: nil, spread: nil)
+        #expect(one.driving == "1 car driving")
+        #expect(one.joining == nil && one.spread == nil)
+        #expect(ConvoyFormat.convoySummary(driving: 2, joinerName: "Wyna's X70", joinIn: nil, spread: nil).joining == "Wyna joining")
+    }
+
+    @Test func convoySummaryNamesMyJoiningCarYou() {
+        let mine = ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: 18 * 60, spread: nil, joinerIsMe: true)
+        #expect(mine.joining == "You join in 18 min")
+        #expect(ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: 75 * 60, spread: nil, joinerIsMe: true).joining
+            == "You join in 1 h 15 min")
+        #expect(ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: nil, spread: nil, joinerIsMe: true).joining
+            == "You\u{2019}re joining")
+        // Someone else's car keeps its name.
+        #expect(ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: 18 * 60, spread: nil, joinerIsMe: false).joining
+            == "Daniel joins in 18 min")
+    }
+
+    @Test func convoyMotion() {
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: true, frontSpeed: 0) == .everyoneArrived)
+        #expect(ConvoyFormat.motion(mineArrived: true, everyoneArrived: false, frontSpeed: 20) == .arrived)
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: false, frontSpeed: 20) == .moving)
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: false, frontSpeed: 3) == .stopped)
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: false, frontSpeed: nil) == .waiting)
+        #expect(ConvoyFormat.Motion.everyoneArrived.text == "Everyone\u{2019}s arrived")
+        #expect(ConvoyFormat.Motion.arrived.text == "Arrived")
+        #expect(ConvoyFormat.Motion.moving.text == "On the move")
+        #expect(ConvoyFormat.Motion.stopped.text == "Stopped")
+        #expect(ConvoyFormat.Motion.waiting.text == "Waiting")
+        #expect(ConvoyFormat.Motion.moving.isPositive && !ConvoyFormat.Motion.stopped.isPositive)
+    }
+
+    @Test func tripPillSubtitle() {
+        func line(_ motion: ConvoyFormat.Motion?, ended: Bool = false, paused: Bool = false, sharing: Bool = true,
+                  code: String = "K7M 2QX", withCode: Bool = true) -> String {
+            ConvoyFormat.tripPillParts(
+                motion: motion, ended: ended, paused: paused, sharing: sharing, code: code, withCode: withCode)
+            .joined(separator: " · ")
+        }
+        #expect(line(.moving) == "On the move · Sharing location · Code K7M 2QX")
+        #expect(line(.moving, withCode: false) == "On the move · Sharing location")
+        #expect(line(.arrived, sharing: false) == "Arrived · Not sharing location · Code K7M 2QX")
+        #expect(line(.stopped, paused: true) == "Stopped · Sharing paused · Code K7M 2QX")
+        #expect(line(.everyoneArrived, code: "") == "Everyone\u{2019}s arrived · Sharing location")
+        #expect(line(.everyoneArrived, ended: true) == "Trip ended · Code K7M 2QX")
+        #expect(line(nil) == "Sharing location · Code K7M 2QX")
+    }
+
     // MARK: Joining
 
     private func joiningFixture() -> (cars: [Car], merges: [String: Double], main: RouteLine) {
@@ -549,5 +619,62 @@ struct ConvoyTests {
         #expect(PausedBannerText.message(remaining: 28 * 60 - 20) == "Sharing paused · resumes automatically in 28 min")
         #expect(PausedBannerText.message(remaining: 5) == "Sharing paused · resumes automatically in 1 min")
         #expect(PausedBannerText.message(remaining: -3) == "Sharing paused · resumes automatically in 1 min")
+    }
+}
+
+// MARK: - Me and arrival
+
+extension ConvoyTests {
+    @Test func arrivalRuleIsWithin150mOfRouteEnd() {
+        #expect(!ConvoyArrival.hasArrived(offset: 19_849, routeLength: 20_000))
+        #expect(ConvoyArrival.hasArrived(offset: 19_850, routeLength: 20_000))
+        #expect(ConvoyArrival.hasArrived(offset: 20_100, routeLength: 20_000))
+        #expect(!ConvoyArrival.hasArrived(offset: 20_000, routeLength: nil))
+        #expect(!ConvoyArrival.hasArrived(offset: 0, routeLength: 0))
+    }
+
+    @Test func snapshotMarksArrivedCarsAndEveryone() {
+        let s = order([car("1"), car("2")], ["1": pos(offset: 19_950), "2": pos(offset: 12_000)], main: Self.main)
+        #expect(s.convoy.map(\.hasArrived) == [true, false])
+        #expect(s.hasArrived("1"))
+        #expect(!s.hasArrived("2"))
+        #expect(!s.hasArrived(nil))
+        #expect(!s.everyoneArrived)
+        let all = order([car("1"), car("2")], ["1": pos(offset: 19_990), "2": pos(offset: 19_900)], main: Self.main)
+        #expect(all.everyoneArrived)
+        #expect(!ConvoySnapshot.empty.everyoneArrived)
+        // Without a route nobody has arrived.
+        #expect(!order([car("1")], ["1": pos(offset: 19_990)]).everyoneArrived)
+    }
+
+    @Test func arrivalStatusAndToGoText() {
+        #expect(ConvoyFormat.arrivalStatus(mineArrived: false, everyoneArrived: false) == nil)
+        #expect(ConvoyFormat.arrivalStatus(mineArrived: true, everyoneArrived: false) == "Arrived")
+        #expect(ConvoyFormat.arrivalStatus(mineArrived: true, everyoneArrived: true) == "Everyone\u{2019}s arrived")
+        #expect(ConvoyFormat.toGo(remaining: 0, travelTime: 10, arrived: true) == "Arrived")
+        #expect(ConvoyFormat.toGo(remaining: 63_000, travelTime: 41 * 60, arrived: false) == "63 km · 41 min to go")
+        #expect(ConvoyFormat.toGo(remaining: 850, travelTime: nil, arrived: false) == "850 m to go")
+    }
+
+    @MainActor @Test func rowsNameMyCarMeAndShowArrived() {
+        let m = makeModel(MockETA(), Clock())
+        m.setMainRoute(Self.main)
+        m.update(cars: [car("1"), car("2")], positions: ["1": pos(offset: 19_950), "2": pos(offset: 15_000)])
+        let rows = m.convoyRows(myCarId: "2")
+        #expect(rows.map(\.name) == ["Car 1", "Me"])
+        #expect(rows.map(\.isMine) == [false, true])
+        #expect(rows[0].hasArrived)
+        #expect(rows[0].trailingPrimary == "Arrived")
+        #expect(!rows[1].hasArrived)
+        #expect(m.convoyRows.map(\.name) == ["Car 1", "Car 2"])
+    }
+
+    @Test func myMarkerReadsMeAndArrivedMarkerIsFlagged() {
+        let s = order([car("1"), car("2")], ["1": pos(offset: 19_950), "2": pos(offset: 15_000)], main: Self.main)
+        let markers = MapMarkerBuilder.markers(from: s, myCarId: "1", now: Self.now)
+        #expect(markers[0].label == "Me")
+        #expect(markers[0].hasArrived)
+        #expect(markers[1].label == "Car 2")
+        #expect(!markers[1].hasArrived)
     }
 }

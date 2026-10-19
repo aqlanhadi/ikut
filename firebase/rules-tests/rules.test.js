@@ -126,8 +126,30 @@ describe('trips', () => {
     await seed({ ended: true });
     await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { name: 'x' }));
   });
+  it('any member can record startedAt once with server time', async () => {
+    await assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}`), { startedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db('other'), `trips/${T}`), { startedAt: serverTimestamp() }));
+  });
+  it('startedAt needs server time and cannot ride along other fields', async () => {
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { startedAt: ts() }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { startedAt: serverTimestamp(), name: 'Hax' }));
+  });
+  it('non-member cannot set startedAt', () =>
+    assertFails(updateDoc(doc(db('stranger'), `trips/${T}`), { startedAt: serverTimestamp() })));
+  it('startedAt on an ended trip fails', async () => {
+    await seed({ ended: true });
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { startedAt: serverTimestamp() }));
+  });
   it('delete always fails (organizer)', () => assertFails(deleteDoc(doc(db('org'), `trips/${T}`))));
   it('delete always fails (member)', () => assertFails(deleteDoc(doc(db('mem'), `trips/${T}`))));
+});
+
+describe('trip startedAt is write-once', () => {
+  it('cannot be overwritten', async () => {
+    await seed();
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc({ startedAt: ts(5000) })));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { startedAt: serverTimestamp() }));
+  });
 });
 
 describe('members', () => {

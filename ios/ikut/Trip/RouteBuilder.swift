@@ -6,6 +6,8 @@ struct DestinationResult: Sendable, Equatable, Identifiable {
     var name: String
     var subtitle: String
     var coordinate: CLLocationCoordinate2D
+    /// `MKPointOfInterestCategory` raw value; nil for addresses, towns and other non-POI results.
+    var category: String? = nil
 
     var id: String { "\(name)|\(coordinate.latitude)|\(coordinate.longitude)" }
 
@@ -31,12 +33,14 @@ struct BuiltRoute: Sendable, Equatable {
 enum RouteError: LocalizedError, Equatable {
     case locationUnavailable
     case noRoute
+    case timedOut
     case failed(String)
 
     var errorDescription: String? {
         switch self {
-        case .locationUnavailable: "Turn on location to build the route."
+        case .locationUnavailable: "Can't find your location. Check that location is on, then try again."
         case .noRoute: "No driving route found to that destination."
+        case .timedOut: "Getting the route took too long. Check your connection and try again."
         case .failed(let message): message
         }
     }
@@ -58,23 +62,44 @@ enum RouteBuilder {
             return DestinationResult(
                 name: name,
                 subtitle: item.placemark.title ?? "",
-                coordinate: item.placemark.coordinate
+                coordinate: item.placemark.coordinate,
+                category: item.pointOfInterestCategory?.rawValue
             )
         }
     }
 
+    static let locationTimeout: Duration = .seconds(10)
+    static let directionsTimeout: Duration = .seconds(20)
+
     /// Fastest driving route from the current location to `destination`.
+    ///
+    /// Gets the fix itself rather than using `MKMapItem.forCurrentLocation()`, which waits
+    /// forever without one (indoors, before GPS locks, a simulator with no location set).
     @MainActor
     static func buildRoute(to destination: CLLocationCoordinate2D) async throws -> BuiltRoute {
+        let here = try await currentLocation()
         let request = MKDirections.Request()
-        request.source = MKMapItem.forCurrentLocation()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: here))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
         request.transportType = .automobile
         request.requestsAlternateRoutes = false
 
-        let response: MKDirections.Response
+        nonisolated(unsafe) let directions = MKDirections(request: request)
         do {
-            response = try await MKDirections(request: request).calculate()
+            return try await withTimeout(directionsTimeout, error: RouteError.timedOut) {
+                let response = try await directions.calculate()
+                guard let route = response.routes.first else { throw RouteError.noRoute }
+                return BuiltRoute(
+                    distance: route.distance,
+                    travelTime: route.expectedTravelTime,
+                    name: route.name,
+                    polyline: Polyline.encode(coordinates(of: route.polyline))
+                )
+            } onTimeout: {
+                directions.cancel()
+            }
+        } catch let error as RouteError {
+            throw error
         } catch let error as MKError where error.code == .directionsNotFound {
             throw RouteError.noRoute
         } catch let error as NSError where isLocationError(error) {
@@ -82,13 +107,61 @@ enum RouteBuilder {
         } catch {
             throw RouteError.failed(error.localizedDescription)
         }
+    }
+
+    /// A recent fix: the cached one if it's under a minute old, else the first live update.
+    @MainActor
+    static func currentLocation() async throws -> CLLocationCoordinate2D {
+        if let cached = CLLocationManager().location, -cached.timestamp.timeIntervalSinceNow < 60 {
+            return cached.coordinate
+        }
+        return try await withTimeout(locationTimeout, error: RouteError.locationUnavailable) {
+            for try await update in CLLocationUpdate.liveUpdates(.automotiveNavigation) {
+                if let location = update.location { return location.coordinate }
+            }
+            throw RouteError.locationUnavailable
+        }
+    }
+
+    /// Runs `work`, throwing `error` (after calling `onTimeout`) if it hasn't finished within `limit`.
+    @MainActor
+    static func withTimeout<T: Sendable>(
+        _ limit: Duration, error: RouteError,
+        _ work: @escaping @MainActor @Sendable () async throws -> T,
+        onTimeout: @escaping @MainActor @Sendable () -> Void = {}
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await work() }
+            group.addTask {
+                try await Task.sleep(for: limit)
+                await onTimeout()
+                throw error
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
+    }
+
+    /// Town or city name for a coordinate ("Kuala Lumpur"); nil when the lookup fails.
+    @MainActor
+    static func placeName(at coordinate: CLLocationCoordinate2D) async -> String? {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
+        return placemark?.locality ?? placemark?.subAdministrativeArea ?? placemark?.name
+    }
+
+    /// Driving distance, time and road name between two points, without the polyline.
+    @MainActor
+    static func drive(
+        from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D
+    ) async throws -> (distance: Double, travelTime: Double, name: String) {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = .automobile
+        let response = try await MKDirections(request: request).calculate()
         guard let route = response.routes.first else { throw RouteError.noRoute }
-        return BuiltRoute(
-            distance: route.distance,
-            travelTime: route.expectedTravelTime,
-            name: route.name,
-            polyline: Polyline.encode(coordinates(of: route.polyline))
-        )
+        return (route.distance, route.expectedTravelTime, route.name)
     }
 
     private static func isLocationError(_ error: NSError) -> Bool {

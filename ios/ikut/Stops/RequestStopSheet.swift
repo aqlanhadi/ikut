@@ -81,6 +81,21 @@ final class RequestStopModel {
         searchTask = Task { await runSearch(for: reason) }
     }
 
+    /// Back to the reason tiles.
+    func clearReason() {
+        searchTask?.cancel()
+        reason = nil
+        picked = nil
+        candidates = []
+        search = .idle
+        sending = .idle
+    }
+
+    /// Search done (with or without places) and nothing in flight: the request can go by itself.
+    var isReadyToAutoSend: Bool {
+        existing == nil && canSend && (search == .loaded || search == .failed)
+    }
+
     private func runSearch(for reason: StopReason) async {
         search = .loading
         let snapshot = context.snapshot()
@@ -96,6 +111,8 @@ final class RequestStopModel {
                 type: reason.type, route: route, fromOffset: from, searcher: searcher)
             guard !Task.isCancelled, self.reason == reason else { return }
             candidates = found
+            // A new request goes with the nearest place unless the sender picks another.
+            if existing == nil { picked = found.first?.id }
             search = .loaded
         } catch {
             guard !Task.isCancelled, self.reason == reason else { return }
@@ -127,12 +144,17 @@ final class RequestStopModel {
     }
 }
 
-/// "Ask for a stop": pick a reason, see places ahead on the route, send it to the convoy.
-/// With `suggestingFor`, the same sheet picks another place for an open request.
+/// "Pit stop" (RequestStop.dc.html): one tap on a reason finds the nearest place ahead and sends
+/// the request by itself after a short countdown, unless the sender changes or cancels it.
+/// With `suggestingFor`, the same sheet instead lists places to suggest for an open request.
 struct RequestStopSheet: View {
     @State private var model: RequestStopModel
     var onSent: () -> Void
     @Environment(\.dismiss) private var dismiss
+    /// When the countdown sends the request; nil while it isn't counting.
+    @State private var sendAt: Date?
+
+    static let autoSendDelay: TimeInterval = 5
 
     init(
         context: StopContext, suggestingFor existing: StopRequestState? = nil, service: any StopServing = StopService(),
@@ -143,20 +165,236 @@ struct RequestStopSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                if model.existing == nil { reasonChips }
-                content
-                sendButton
+        if model.existing == nil {
+            oneTap
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    content
+                    sendButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 20)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 20)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
     }
+
+    // MARK: One tap (new request)
+
+    private var oneTap: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let reason = model.reason {
+                confirm(reason)
+            } else {
+                tiles
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 20)
+        .padding(.bottom, 12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .onChange(of: model.isReadyToAutoSend, initial: true) { _, ready in
+            sendAt = ready ? Date().addingTimeInterval(Self.autoSendDelay) : nil
+        }
+        .onChange(of: model.picked) {
+            // Picking another place restarts the countdown so there's time to see it.
+            if model.isReadyToAutoSend { sendAt = Date().addingTimeInterval(Self.autoSendDelay) }
+        }
+        .task(id: sendAt) {
+            guard let sendAt else { return }
+            try? await Task.sleep(for: .seconds(max(0, sendAt.timeIntervalSinceNow)))
+            guard !Task.isCancelled, self.sendAt == sendAt else { return }
+            send()
+        }
+    }
+
+    private var tiles: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pit stop").font(.title2.bold())
+                    Text("One tap. We’ll find the next good place.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                closeButton
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                ForEach(StopReason.all) { reason in
+                    Button { model.choose(reason) } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: reason.symbol)
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(Color.orange, in: Circle())
+                            Text(reason.label).font(.headline).foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 112)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func confirm(_ reason: StopReason) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(Self.title(for: reason)).font(.title2.bold())
+                Spacer()
+                Button("Change") {
+                    sendAt = nil
+                    model.clearReason()
+                }
+                .font(.body.weight(.semibold))
+                .disabled(model.sending == .sending)
+            }
+
+            chosenPlace(reason)
+
+            if model.candidates.count > 1 {
+                Menu {
+                    Picker("Place", selection: $model.picked) {
+                        ForEach(model.candidates) { candidate in
+                            Text("\(candidate.name) · \(ConvoyFormat.distance(candidate.distanceAhead))")
+                                .tag(Optional(candidate.id))
+                        }
+                    }
+                } label: {
+                    Label("Other places ahead", systemImage: "list.bullet")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if case .failed(let message) = model.sending {
+                Text(message).font(.footnote).foregroundStyle(.red)
+            } else {
+                Text("Sends by itself. No need to touch anything else.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+            countdownButton
+            Button("Cancel", role: .cancel) { dismiss() }
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+    }
+
+    @ViewBuilder
+    private func chosenPlace(_ reason: StopReason) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: reason.symbol)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .background(Color.orange, in: Circle())
+            if model.search == .idle || model.search == .loading {
+                Text("Finding the next good place…").foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                ProgressView()
+            } else if let chosen = model.chosen {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(chosen.name).font(.body.weight(.semibold)).lineLimit(1)
+                    Text(chosen.whereText).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                }
+                Spacer(minLength: 4)
+                Text(chosen.costText).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
+            } else {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("No place found ahead").font(.body.weight(.semibold))
+                    Text("The lead car chooses where.").font(.footnote).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Accent pill that fills up as the countdown runs; tapping sends straight away.
+    private var countdownButton: some View {
+        Button(action: send) {
+            TimelineView(.animation(minimumInterval: 0.1, paused: sendAt == nil)) { context in
+                let left = sendAt.map { max(0, $0.timeIntervalSince(context.date)) }
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.accentColor)
+                    if let left {
+                        GeometryReader { proxy in
+                            Capsule()
+                                .fill(Color.white.opacity(0.22))
+                                .frame(width: proxy.size.width * (1 - left / Self.autoSendDelay))
+                        }
+                    }
+                    Group {
+                        if model.sending == .sending {
+                            ProgressView().tint(.white)
+                        } else if let left {
+                            Text("Sending to convoy in \(Int(left.rounded(.up)))s")
+                        } else {
+                            Text("Send now")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .font(.headline)
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .frame(height: 50)
+                .clipShape(Capsule())
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!model.canSend)
+        .accessibilityLabel("Send now")
+        .accessibilityHint("Sends by itself in a few seconds")
+    }
+
+    private var closeButton: some View {
+        Button { dismiss() } label: {
+            Image(systemName: "xmark")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, height: 44)
+                .background(.quaternary, in: Circle())
+        }
+        .accessibilityLabel("Close")
+    }
+
+    private func send() {
+        sendAt = nil
+        Task {
+            if await model.send() {
+                onSent()
+                dismiss()
+            }
+        }
+    }
+
+    /// "Need gas", "Toilet break", "Food stop", "Quick rest".
+    static func title(for reason: StopReason) -> String {
+        switch reason.type {
+        case .stopFuel: "Need gas"
+        case .stopToilet: "Toilet break"
+        case .stopFood: "Food stop"
+        default: "Quick rest"
+        }
+    }
+
+    // MARK: Suggest another place (existing request)
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -177,26 +415,6 @@ struct RequestStopSheet: View {
                     .background(.quaternary, in: Circle())
             }
             .accessibilityLabel("Close")
-        }
-    }
-
-    private var reasonChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(StopReason.all) { reason in
-                    let selected = model.reason == reason
-                    Button { model.choose(reason) } label: {
-                        Label(reason.label, systemImage: reason.symbol)
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 44)
-                            .background(selected ? Color.primary : Color(.secondarySystemBackground), in: Capsule())
-                            .foregroundStyle(selected ? Color(.systemBackground) : Color.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                }
-            }
         }
     }
 

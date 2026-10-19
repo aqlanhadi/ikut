@@ -1,0 +1,143 @@
+import FirebaseFirestore
+import Foundation
+import Observation
+
+/// Fetches what a recap needs once (members can still read an ended trip and its subcollections),
+/// merges it with the copy cached on the phone, and caches the result.
+enum RecapService {
+    @MainActor static func fetch(tripId: String, db: Firestore = Firestore.firestore()) async throws -> RecapSnapshot {
+        let trip = try await db.document(FirestorePaths.trip(tripId)).getDocument(as: Trip.self)
+        let cars = try await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments()
+            .documents.compactMap { try? $0.data(as: Car.self) }
+        let members = try await db.collection(FirestorePaths.members(tripId: tripId)).getDocuments()
+            .documents.compactMap { try? $0.data(as: Member.self) }
+        // Positions and events may already be purged (7 days after the end); an empty list is fine.
+        let positions = (try? await db.collection(FirestorePaths.positions(tripId: tripId)).getDocuments()
+            .documents.compactMap { try? $0.data(as: Position.self) }) ?? []
+        let events = (try? await db.collection(FirestorePaths.events(tripId: tripId)).getDocuments()
+            .documents.compactMap { try? $0.data(as: TripEvent.self) }) ?? []
+
+        return RecapSnapshot(
+            tripId: tripId, name: trip.name, destinationName: trip.destination.name,
+            destinationLatitude: trip.destination.coordinate.latitude,
+            destinationLongitude: trip.destination.coordinate.longitude,
+            route: trip.route, createdAt: trip.createdAt, endedAt: trip.endedAt,
+            cars: cars.compactMap { c in
+                c.id.map { RecapCar(id: $0, name: c.name, color: c.color, number: c.number, isLead: c.isLead) }
+            },
+            memberNames: Dictionary(members.compactMap { m in m.id.map { ($0, m.displayName) } }, uniquingKeysWith: { a, _ in a }),
+            memberCars: Dictionary(members.compactMap { m in m.id.map { ($0, m.carId) } }, uniquingKeysWith: { a, _ in a }),
+            positions: positions.compactMap { p in
+                p.id.map {
+                    RecapPosition(carId: $0, latitude: p.location.latitude, longitude: p.location.longitude,
+                                  convoyOffset: p.convoyOffset, updatedAt: p.updatedAt)
+                }
+            },
+            events: events.compactMap { e in
+                e.id.map {
+                    RecapEvent(id: $0, type: e.type.rawValue, carId: e.carId, authorId: e.authorId,
+                               latitude: e.location.latitude, longitude: e.location.longitude,
+                               createdAt: e.createdAt, expiresAt: e.expiresAt, message: e.message,
+                               placeName: e.place?.name)
+                }
+            }
+            .sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) })
+    }
+
+    // MARK: Cache
+
+    private static func cacheURL(_ tripId: String) -> URL? {
+        guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        let folder = dir.appendingPathComponent("recaps", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let safe = tripId.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        return folder.appendingPathComponent("\(safe).json")
+    }
+
+    static func cached(tripId: String) -> RecapSnapshot? {
+        guard let url = cacheURL(tripId), let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(RecapSnapshot.self, from: data)
+    }
+
+    static func save(_ snapshot: RecapSnapshot) {
+        guard let url = cacheURL(snapshot.tripId), let data = try? JSONEncoder().encode(snapshot) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+}
+
+/// Loads a recap: the cached copy straight away, then the merged fresh one.
+@Observable @MainActor
+final class RecapModel {
+    let tripId: String
+    private(set) var snapshot: RecapSnapshot?
+    private(set) var recap: Recap?
+    private(set) var originName: String?
+    private(set) var errorMessage: String?
+
+    init(tripId: String) {
+        self.tripId = tripId
+        if let cached = RecapService.cached(tripId: tripId) { apply(cached) }
+    }
+
+    /// For previews and the screenshot test.
+    init(snapshot: RecapSnapshot, originName: String? = nil) {
+        tripId = snapshot.tripId
+        self.originName = originName
+        apply(snapshot)
+    }
+
+    func load() async {
+        do {
+            let fresh = try await RecapService.fetch(tripId: tripId)
+            let merged = RecapLogic.merge(cached: RecapService.cached(tripId: tripId), fresh: fresh)
+            RecapService.save(merged)
+            PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt)
+            apply(merged)
+            errorMessage = nil
+        } catch {
+            if snapshot == nil { errorMessage = "Couldn't load this trip. \(error.localizedDescription)" }
+        }
+        if originName == nil, let first = snapshot.flatMap({ Polyline.decode($0.route).first }) {
+            originName = await RouteBuilder.placeName(at: first)
+            if let snapshot { apply(snapshot) }
+        }
+    }
+
+    private func apply(_ s: RecapSnapshot) {
+        snapshot = s
+        recap = RecapLogic.recap(s, originName: originName)
+    }
+}
+
+/// Trips this phone has been in, newest first (UserDefaults). The server has no per-user trip
+/// list (trips can't be listed), so Home's "Past trips" is built from this.
+enum PastTrips {
+    struct Entry: Codable, Equatable, Identifiable {
+        var id: String
+        var name: String
+        var destination: String
+        var endedAt: Date?
+        var seenAt: Date
+    }
+
+    private static let key = "ikut.pastTrips"
+    private static let limit = 30
+
+    static func all(defaults: UserDefaults = .standard) -> [Entry] {
+        guard let data = defaults.data(forKey: key), let list = try? JSONDecoder().decode([Entry].self, from: data) else { return [] }
+        return list
+    }
+
+    static func record(tripId: String, name: String, destination: String, endedAt: Date?, now: Date = Date(), defaults: UserDefaults = .standard) {
+        var list = all(defaults: defaults)
+        list = upsert(list, Entry(id: tripId, name: name, destination: destination, endedAt: endedAt, seenAt: now))
+        if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: key) }
+    }
+
+    /// Replaces or inserts at the front; an ended trip stays ended; keeps at most `limit`.
+    static func upsert(_ list: [Entry], _ entry: Entry) -> [Entry] {
+        var entry = entry
+        if let old = list.first(where: { $0.id == entry.id }), entry.endedAt == nil { entry.endedAt = old.endedAt }
+        return Array(([entry] + list.filter { $0.id != entry.id }).prefix(limit))
+    }
+}

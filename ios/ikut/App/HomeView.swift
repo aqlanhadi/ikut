@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Home until the real one with past trips lands: the welcome screen with its two actions.
+/// Root navigation: the welcome screen until "Get Started", then Home (`TripsHomeView`).
 /// Signed-out visitors give a name (sheet) before Create or Join.
 /// Gets location access good enough for a trip before opening Create Trip or Join.
 struct HomeView: View {
@@ -11,12 +11,14 @@ struct HomeView: View {
         case create
         case join(code: String?)
         case lobby(tripId: String)
+        case recap(tripId: String)
     }
 
     /// A code from an opened link, waiting for the Join screen (set by `IkutApp`).
     @Binding var pendingJoinCode: String?
 
     @State private var path: [Route] = []
+    @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
     @State private var showDenied = false
     @State private var showName = false
     /// Where to go once the name step finishes.
@@ -28,24 +30,39 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            WelcomeView(
-                onStart: { begin(.create) },
-                onJoin: { begin(.join(code: nil)) }
-            )
-            .overlay(alignment: .topTrailing) {
-                #if DEBUG
-                Text(Backend.current.label)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
-                    .accessibilityHidden(true)
-                #endif
+            Group {
+                if hasSeenWelcome {
+                    TripsHomeView(
+                        onNewTrip: { begin(.create) },
+                        onJoin: { begin(.join(code: nil)) },
+                        onOpenTrip: { entry in
+                            path.append(entry.endedAt == nil ? .lobby(tripId: entry.id) : .recap(tripId: entry.id))
+                        }
+                    )
+                } else {
+                    WelcomeView(
+                        onGetStarted: { hasSeenWelcome = true },
+                        onJoin: {
+                            hasSeenWelcome = true
+                            begin(.join(code: nil))
+                        }
+                    )
+                    .overlay(alignment: .topTrailing) {
+                        #if DEBUG
+                        Text(Backend.current.label)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .accessibilityHidden(true)
+                        #endif
+                    }
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .create:
-                    CreateTripView(defaultName: auth.displayName.map { "\($0)'s trip" } ?? "") { tripId in
+                    CreateTripView { tripId in
                         path = [.lobby(tripId: tripId)]
                     }
                 case .join(let code):
@@ -53,7 +70,9 @@ struct HomeView: View {
                         path = [.lobby(tripId: tripId)]
                     }
                 case .lobby(let tripId):
-                    LobbyView(tripId: tripId, onExit: { path = [] })
+                    LobbyView(tripId: tripId, onExit: { path = [] }, onEnded: { path = [.recap(tripId: $0)] })
+                case .recap(let tripId):
+                    RecapView(tripId: tripId, onDone: { path = [] })
                 }
             }
             .sheet(isPresented: $showName) {

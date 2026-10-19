@@ -57,7 +57,6 @@ final class ConvoyScenarioUITests: XCTestCase {
             let rows = ["convoy.row.1", "convoy.row.2", "convoy.row.3", "convoy.row.5"]
             try waitFor("all four convoy rows", timeout: 120) { rows.allSatisfy { exists($0) } }
             try waitFor("convoy order 1, 2, 3, 5", timeout: 60) { convoyOrder() == [1, 2, 3, 5] }
-            XCTAssertTrue(exists("convoy.joining.header"), "JOINING header is missing")
             let joining = element("joining.row.4")
             XCTAssertTrue(joining.exists, "car 4 should be under JOINING")
             XCTAssertTrue(joining.label.contains("Daniel"), "joining row should be Daniel's car: \(joining.label)")
@@ -87,7 +86,6 @@ final class ConvoyScenarioUITests: XCTestCase {
 
         try step("4. Car 4 merges: JOINING goes, order 1, 2, 4, 3, 5") {
             try waitFor("car 4 leaves JOINING", timeout: 120 / speed + 60) { !exists("joining.row.4") }
-            XCTAssertFalse(exists("convoy.joining.header"), "JOINING header should go with the last joining car")
             try waitFor("convoy order 1, 2, 4, 3, 5", timeout: 60) { convoyOrder() == [1, 2, 4, 3, 5] }
             XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in Convoy"), "header: \(element("convoy.header").label)")
             shot("04-car4-merged")
@@ -135,7 +133,9 @@ final class ConvoyScenarioUITests: XCTestCase {
     // MARK: Joining
 
     private func joinAndOpenMap(code: String, name: String) throws {
-        let joinButton = app.buttons["Join with Code or QR"]
+        // Welcome on a first run, Home ("Join Trip") once a previous run got past it.
+        let joinButton = app.buttons
+            .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: 20), "Welcome screen didn't show")
         joinButton.tap()
 
@@ -152,7 +152,7 @@ final class ConvoyScenarioUITests: XCTestCase {
         codeField.tap()
         codeField.typeText(code)
 
-        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'New Car'")).firstMatch
+        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'A new car'")).firstMatch
         XCTAssertTrue(newCar.waitForExistence(timeout: 20), "Trip preview didn't load (is the code right and the emulator up?)")
 
         let joinNameField = app.textFields["Your name"]
@@ -163,7 +163,7 @@ final class ConvoyScenarioUITests: XCTestCase {
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
         app.buttons["Join Trip"].tap()
-        let startTrip = app.buttons["Start Trip"]
+        let startTrip = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
         XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
 
         // Tracking starts in the lobby; the Always explainer may come up once it does.

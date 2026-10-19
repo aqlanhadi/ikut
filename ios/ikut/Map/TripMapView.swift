@@ -11,6 +11,8 @@ import SwiftUI
 struct TripMapView: View {
     let session: TripSession
     var onExit: () -> Void
+    /// The trip ended (organizer or server): the owner shows the recap.
+    var onEnded: () -> Void = {}
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
     private let liveServices: Bool
 
@@ -26,11 +28,22 @@ struct TripMapView: View {
     @State private var stopState: StopRequestState?
     @State private var stopSheet: StopSheet?
     @State private var stopError: String?
+    @State private var stopCardMemory: StopCardMemory?
     @State private var confirmLeave = false
     @State private var confirmEnd = false
     @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
+    /// The banner stack's height, and the top of the bottom panel (with any card) against the
+    /// map's bottom edge, for `mapInsets`. The panel sits above the home indicator, so its own
+    /// height would leave that strip out.
+    @State private var topHeight: CGFloat = 0
+    @State private var panelMinY: CGFloat = 0
+    @State private var mapMaxY: CGFloat = 0
+    /// The hazard approach alert being followed: full screen, then a pill until it's passed.
+    @State private var approach: TripAlert?
+    @State private var showApproach = false
+    @State private var passedText: String?
     @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
     @Environment(\.dismiss) private var dismiss
 
@@ -47,9 +60,10 @@ struct TripMapView: View {
         }
     }
 
-    init(session: TripSession, onExit: @escaping () -> Void = {}) {
+    init(session: TripSession, onExit: @escaping () -> Void = {}, onEnded: @escaping () -> Void = {}) {
         self.session = session
         self.onExit = onExit
+        self.onEnded = onEnded
         liveServices = true
         _model = State(initialValue: TripMapModel(session: session))
     }
@@ -71,15 +85,21 @@ struct TripMapView: View {
     var body: some View {
         map
             .ignoresSafeArea(edges: .bottom)
-            .overlay(alignment: .top) { topStack }
+            .overlay(alignment: .top) {
+                topStack.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
+            }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { mapMaxX = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapHeight = $0 }
+            // The map runs on under the home indicator, past the frame seen here.
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY + $0.safeAreaInsets.bottom } action: {
+                mapMaxY = $0
+            }
             .overlay(alignment: .topTrailing) {
                 // The stop card takes over the screen, and the controls would only sit under it or
                 // under the banner's close button.
-                if stopState == nil {
+                if !stopCardOpen {
                     MapModeControl(mode: $model.mode)
-                        .padding(.top, bannerShowing ? 156 : 76)
+                        .padding(.top, bannerShowing ? 164 : 84)
                         .padding(.trailing, 12)
                         .animation(.snappy, value: bannerShowing)
                 }
@@ -89,9 +109,11 @@ struct TripMapView: View {
                     stopCard
                     ConvoyPanel(
                         model: model, expanded: panelBinding, canReport: model.myCarId != nil,
+                        nextStop: stopState?.place,
                         onReport: openReport, onStop: { stopSheet = .request })
                         .layoutPriority(1)
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { panelMinY = $0 }
                 .frame(maxHeight: maxBottomHeight, alignment: .bottom)
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -116,7 +138,8 @@ struct TripMapView: View {
                 Text("Your phone stops sharing its location.")
             }
             .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
-                Button("End trip", role: .destructive) { run { try await session.endTrip(); onExit() } }
+                // Ending flips session.isEnded, which opens the recap (onEnded).
+                Button("End trip", role: .destructive) { run { try await session.endTrip() } }
             } message: {
                 Text("Everyone stops sharing their location. This can't be undone.")
             }
@@ -126,6 +149,7 @@ struct TripMapView: View {
             } message: {
                 Text("ikut can warn you about debris, breakdowns and stops ahead, even while the app is in the background.")
             }
+            .onChange(of: session.isEnded) { _, ended in if ended { onEnded() } }
             .onAppear(perform: appear)
             .onDisappear(perform: disappear)
             .task { await model.convoy.run() }
@@ -137,6 +161,15 @@ struct TripMapView: View {
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
+            // The panel folding or a banner coming and going moves the visible middle; recenter on it.
+            .onChange(of: mapInsets) { _, _ in move(to: model.cameraTarget, animated: true) }
+            .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
+            .task(id: approach?.id) { await watchApproach() }
+            .fullScreenCover(isPresented: $showApproach) {
+                if let approach {
+                    ApproachAlertView(alert: approach, model: model) { showApproach = false }
+                }
+            }
     }
 
     // MARK: Map
@@ -179,11 +212,22 @@ struct TripMapView: View {
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+        // MapKit centers the camera, and fits regions, inside the safe area: keeping the banner and
+        // panel out of it puts my car in the middle of the map that can actually be seen.
+        .safeAreaPadding(.top, mapInsets.top)
+        .safeAreaPadding(.bottom, mapInsets.bottom)
         .onMapCameraChange { context in cameraHeading = context.camera.heading }
         // Any pan, pinch or rotate by the user hands the camera back to them.
         .onChange(of: camera.positionedByUser) { _, byUser in
             if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
         }
+    }
+
+    /// What the banner stack and the panel cover, as the map's extra safe area.
+    private var mapInsets: EdgeInsets {
+        let insets = MapObscuredInsets.insets(
+            mapHeight: mapHeight, top: topHeight, bottom: panelMinY > 0 ? mapMaxY - panelMinY : 0)
+        return EdgeInsets(top: insets.top, leading: 0, bottom: insets.bottom, trailing: 0)
     }
 
     private static func position(for target: CameraTarget?) -> MapCameraPosition? {
@@ -213,8 +257,45 @@ struct TripMapView: View {
     private var bannerHiding: Set<EventCategory> { stopState == nil ? [] : [.stopRequest] }
 
     private var bannerShowing: Bool {
+        if approach != nil || passedText != nil { return true }
         guard let alert = alerts.current else { return false }
         return !bannerHiding.contains(alert.category)
+    }
+
+    /// A hazard approach alert (one with a distance) takes the full screen; others stay banners.
+    private func followApproachIfNeeded() {
+        guard let alert = alerts.current, alert.category == .hazard, alert.distance != nil,
+              alert.id != approach?.id else { return }
+        approach = alert
+        passedText = nil
+        showApproach = true
+    }
+
+    /// Keeps the pill until the hazard is behind, then says so briefly. Gives up after a few
+    /// minutes when the distance can't be worked out (e.g. this car hasn't merged).
+    private func watchApproach() async {
+        guard let alert = approach else { return }
+        let started = Date()
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            let distance = model.approachDistance(eventId: alert.eventId)
+            if let distance, distance <= 0 {
+                let label = model.hazards.markers.first { $0.id == alert.eventId }?.label.lowercased() ?? "hazard"
+                withAnimation(.snappy) {
+                    approach = nil
+                    showApproach = false
+                    passedText = "Passed the \(label)"
+                }
+                try? await Task.sleep(for: .seconds(3))
+                withAnimation(.snappy) { passedText = nil }
+                return
+            }
+            if distance == nil, Date().timeIntervalSince(started) > 180 {
+                withAnimation(.snappy) { approach = nil }
+                return
+            }
+        }
     }
 
     private var topStack: some View {
@@ -230,7 +311,20 @@ struct TripMapView: View {
                 })
             }
             // The stop card says the same thing, so its own banner would only crowd the top.
-            AlertBannerView(center: alerts, hiding: bannerHiding)
+            if let approach, !showApproach {
+                ApproachPill(alert: approach, model: model) { showApproach = true }
+            }
+            AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
+            if let passedText {
+                Label(passedText, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color(white: 0.11).opacity(0.96), in: Capsule())
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }
@@ -241,17 +335,22 @@ struct TripMapView: View {
     private var tripPill: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(model.isEnded ? Color.gray : (model.isTracker ? MapPalette.live : Color.orange))
+                .fill(pillDot)
                 .frame(width: 10, height: 10)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(model.tripName.isEmpty ? "Trip" : model.tripName)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                Text(pillSubtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                // With the code when it fits, else without; the last resort truncates.
+                ViewThatFits(in: .horizontal) {
+                    pillSubtitle(withCode: true)
+                    pillSubtitle(withCode: false)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .accessibilityIdentifier("trip.pill.status")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
@@ -273,24 +372,69 @@ struct TripMapView: View {
             .disabled(isWorking)
             .accessibilityLabel("Trip menu")
         }
+        // Map.dc.html: 6 pt top and bottom, 16 pt before the dot, 4 pt after the 44 pt menu button,
+        // so the pill is 56 pt tall in every state.
         .padding(.leading, 16)
         .padding(.trailing, 4)
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
+        .frame(minHeight: 56)
         .background(.regularMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
     }
 
-    private var pillSubtitle: String {
-        var parts = [model.isEnded ? "Trip ended" : (model.isTracker ? "Sharing location" : "Not sharing location")]
-        if !model.tripCode.isEmpty { parts.append("Code \(model.tripCode)") }
-        return parts.joined(separator: " · ")
+    /// The convoy's motion ("On the move", "Arrived", ...), shown first in the pill.
+    private var motion: ConvoyFormat.Motion {
+        let snapshot = model.convoy.snapshot
+        return ConvoyFormat.motion(
+            mineArrived: snapshot.hasArrived(model.myCarId), everyoneArrived: snapshot.everyoneArrived,
+            frontSpeed: snapshot.etaReference?.speed)
+    }
+
+    /// Gray once ended, amber while paused or not sharing, else live green.
+    private var pillDot: Color {
+        if model.isEnded { return .gray }
+        return model.isTracker && !session.isPaused ? MapPalette.live : .orange
+    }
+
+    /// "On the move · Sharing location · Code K7M 2QX", the motion in green (or amber when stopped).
+    private func pillSubtitle(withCode: Bool) -> Text {
+        let parts = ConvoyFormat.tripPillParts(
+            motion: motion, ended: model.isEnded, paused: session.isPaused, sharing: model.isTracker,
+            code: model.tripCode, withCode: withCode)
+        let motionText = model.isEnded ? nil : motion.text
+        var text = Text("")
+        for (i, part) in parts.enumerated() {
+            if i > 0 { text = text + Text(" · ") }
+            if i == 0, part == motionText {
+                text = text + Text(part).fontWeight(.semibold)
+                    .foregroundStyle(motion.isPositive ? Color.ikutPositive : Color.ikutWarning)
+            } else {
+                text = text + Text(part)
+            }
+        }
+        return text
     }
 
     // MARK: Stops
 
-    /// The convoy list folds away while a stop request is open, so the card has the room.
+    /// The convoy list folds away while the stop card is open, so the card has the room; opening the
+    /// list folds the card into its chip.
     private var panelBinding: Binding<Bool> {
-        Binding(get: { panelExpanded && stopState == nil }, set: { panelExpanded = $0 })
+        Binding(
+            get: { panelExpanded && !stopCardOpen },
+            set: { expanded in
+                panelExpanded = expanded
+                if expanded, stopCardOpen, let state = stopState {
+                    var m = StopLogic.nextCardMemory(stopCardMemory, state: state)
+                    m.collapsed = true
+                    stopCardMemory = m
+                }
+            })
+    }
+
+    private var stopCardOpen: Bool {
+        guard let state = stopState else { return false }
+        return !StopLogic.nextCardMemory(stopCardMemory, state: state).collapsed
     }
 
     /// The most the card and panel may take together: the map (already below the status bar) minus
@@ -298,7 +442,7 @@ struct TripMapView: View {
     /// The card's voter list scrolls to fit.
     private var maxBottomHeight: CGFloat? {
         guard mapHeight > 0 else { return nil }
-        return mapHeight - (bannerShowing ? 150 : 66)
+        return mapHeight - (bannerShowing ? 158 : 74)
     }
 
     private var stopContext: StopContext? {
@@ -313,8 +457,8 @@ struct TripMapView: View {
     @ViewBuilder
     private var stopCard: some View {
         if let state = stopState, let context = stopContext {
-            StopRequestCard(
-                state: state,
+            StopRequestOverlay(
+                state: state, memory: $stopCardMemory,
                 actions: StopService.actions(
                     context: context, state: state,
                     suggestAnother: { stopSheet = .suggest(state) },
@@ -498,6 +642,17 @@ struct MapMarkerView: View {
                 .background(Color(mapHex: marker.colorHex), in: Circle())
                 .overlay(Circle().strokeBorder(.white, lineWidth: 3))
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                .overlay(alignment: .bottomTrailing) {
+                    if marker.hasArrived {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 8, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(width: 15, height: 15)
+                            .background(Color.ikutPositive, in: Circle())
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                            .offset(x: 5, y: 5)
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     if marker.isLead {
                         Image(systemName: "star.fill")
@@ -515,12 +670,16 @@ struct MapMarkerView: View {
         .overlay(alignment: side == .trailing ? .leading : .trailing) {
             Text(marker.label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
+                .foregroundStyle(marker.isMine ? Color.white
+                    : marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(.regularMaterial, in: Capsule())
+                .background {
+                    // My own label is the accent blue so "Me" stands out from the white chips.
+                    if marker.isMine { Capsule().fill(MapPalette.accent) } else { Capsule().fill(.regularMaterial) }
+                }
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                 .padding(side == .trailing ? .leading : .trailing, MapChipPlacement.gap)
@@ -534,7 +693,8 @@ struct MapMarkerView: View {
     }
 
     private var accessibilityText: String {
-        var text = marker.name
+        var text = marker.isMine ? ConvoyFormat.me : marker.name
+        if marker.hasArrived { text += ", arrived" }
         if marker.isLead { text += ", lead" }
         if marker.isJoining { text += ", joining" }
         if marker.isPaused {

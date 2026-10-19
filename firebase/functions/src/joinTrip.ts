@@ -168,7 +168,7 @@ export async function joinTripTransaction(
     if (input.car.kind === "new") {
       const car: Car = {
         name: input.car.name,
-        color: input.car.color,
+        color: pickCarColor(input.car.color, (cars?.docs ?? []).map((d) => (d.data() as Car).color)),
         isLead: false,
         state: "joining",
         number: newCarNumber,
@@ -196,6 +196,20 @@ export async function joinTripTransaction(
 
     return { tripId, carId: carRef.id, trackerTaken };
   });
+}
+
+/** Keep in sync with TripService.palette in the iOS app. */
+export const CAR_PALETTE = ["#2563EB", "#D9480F", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
+
+/**
+ * The requested colour if no car in the trip uses it, else the first palette colour that is free
+ * (cycling by car count once every palette colour is taken). Runs inside the join transaction, so
+ * concurrent joins and stale client previews cannot produce two cars of one colour.
+ */
+export function pickCarColor(requested: string, existing: string[]): string {
+  const used = new Set(existing.map((c) => c.toUpperCase()));
+  if (!used.has(requested.toUpperCase())) return requested;
+  return CAR_PALETTE.find((c) => !used.has(c)) ?? CAR_PALETTE[existing.length % CAR_PALETTE.length]!;
 }
 
 /** Look up the single active trip with this code. */
