@@ -97,10 +97,15 @@ final class LocationPermission {
             let waiter = Waiter(continuation: continuation, until: until)
             self.waiter = waiter
             request()
-            // No prompt means no resign-active; don't hang on it.
+            // No prompt means no resign-active; don't hang on it. While the status is still
+            // notDetermined a prompt is up even if no resign-active arrived (the location prompt
+            // on iOS 27 doesn't always send one), so keep waiting for the delegate's answer:
+            // giving up here dropped the person back on Home after they tapped Allow.
             Task {
                 try? await Task.sleep(for: .seconds(1))
-                if self.waiter === waiter, !sawPrompt { refresh(); finishWait() }
+                guard self.waiter === waiter, !sawPrompt else { return }
+                refresh()
+                if self.waiter === waiter, status != .notDetermined { finishWait() }
             }
         }
     }

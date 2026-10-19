@@ -27,6 +27,7 @@
 		2209A42F9B1AEA04759BE495 /* RouteBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC25F12D0D5B216081BE3808 /* RouteBuilder.swift */; };
 		27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9256AE8480413335567EC1FC /* HazardModel.swift */; };
 		2CA9EF5B48F8F9C50734F591 /* ReportContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71B82F24EB5831D1B00E8EF6 /* ReportContext.swift */; };
+		2CEB063315CCBBD0FC44B088 /* TwoPhoneConvoyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D56ABF41D0A65788959592 /* TwoPhoneConvoyUITests.swift */; };
 		2D0C6E3BE606EFBC1D986BBC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4BB920043D7D18297D5A3B81 /* FirebaseFirestore */; };
 		303337D10340B4EF477BB00E /* StopService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85031A857FFEE9A7F7CEE986 /* StopService.swift */; };
 		3238E7CD833C608EF250940E /* EventService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4374E90353623C476DD233DD /* EventService.swift */; };
@@ -182,6 +183,7 @@
 		4374E90353623C476DD233DD /* EventService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventService.swift; sourceTree = "<group>"; };
 		55CC3926DEEA6AE07A394182 /* JoinTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTests.swift; sourceTree = "<group>"; };
 		56BDE68F366CE545C453468B /* ServerWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerWrite.swift; sourceTree = "<group>"; };
+		56D56ABF41D0A65788959592 /* TwoPhoneConvoyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoPhoneConvoyUITests.swift; sourceTree = "<group>"; };
 		573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSpeechEngine.swift; sourceTree = "<group>"; };
 		583B73D2368E1D00EF28CEBF /* ikutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ikutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		59DBB4EC8798CACA623AE229 /* IkutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkutApp.swift; sourceTree = "<group>"; };
@@ -388,6 +390,7 @@
 				6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */,
 				E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */,
 				7E2539E4B214F18444DA0A00 /* JoinAsSecondMemberUITests.swift */,
+				56D56ABF41D0A65788959592 /* TwoPhoneConvoyUITests.swift */,
 			);
 			path = ikutUITests;
 			sourceTree = "<group>";
@@ -809,6 +812,7 @@
 				A5D7587052DDAC3FD53CC733 /* ConvoyScenarioUITests.swift in Sources */,
 				11CA80C194C3B109415910D3 /* CreateTripUITests.swift in Sources */,
 				DC9B81DCD81642680E58F12B /* JoinAsSecondMemberUITests.swift in Sources */,
+				2CEB063315CCBBD0FC44B088 /* TwoPhoneConvoyUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

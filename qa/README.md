@@ -35,6 +35,44 @@ Debug > Simulate Location > Add GPX File to Workspace... and pick it. For a prod
 `ConvoyScenarioUITests`' sibling `CreateTripUITests` walks name, New Trip, Where to?, lobby and Start Trip;
 `TEST_RUNNER_IKUT_HOLD_SECONDS=420` leaves it on the map for a drive.
 
+## Two-phone convoy
+
+```sh
+node run-convoy2.mjs                 # builds, then about 4-5 minutes of test; RESULT: PASS / FAIL
+node run-convoy2.mjs --skip-build    # reuse /tmp/ikut-dd-convoy2
+node run-convoy2.mjs --ask-location  # phone B starts without location permission and answers the system prompt
+```
+
+Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 (`C0A40D2A`), phone B
+(car 2) a second simulator, `ikut-convoy-2` (iPhone 17 Pro, iOS 27.0, created on first use if missing). The script boots
+both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
+`ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
+time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
+report and stop votes. The three take turns through marker files in `$TMPDIR/ikut-qa/convoy2-sync` (`a.code`, `b.lobby`,
+`cars.joined`, `go`, ...); any failure writes `abort` there and every side stops waiting.
+
+What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the script checks Firestore alongside):
+
+1. A creates the trip in the UI (name, New Trip, Where to? Ipoh, lobby) and reads the code off the lobby.
+2. B joins with the code as a new car; the script joins cars 3 and 4; both lobbies read "4 of 4 ready"; numbers 1, 2, 3, 4.
+3. Both tap Start Trip. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
+   from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
+4. A reports Debris from the Report sheet; B sees the marker and gets the full-screen approach alert. Car 3 then reports an
+   accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.
+5. B taps Pit stop, Fuel; the request sends itself. A sees the card and agrees, cars 3 and 4 vote (car 3 suggests a place if
+   B's phone found none), A pins it, B's card shows it pinned, A taps Everyone has arrived and both cards go.
+6. B goes back to the lobby and pauses sharing: A's row 2 reads "Paused", `pausedAt` is set; Resume clears both.
+7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
+   the map menu and lands on Home, B's lobby says "Trip ended", the trip doc is `ended`.
+
+Screenshots: `qa/screens/convoy2/A-*.png`, `B-*.png`. Logs: `$TMPDIR/ikut-qa/convoy2-A.log`, `convoy2-B.log` (and the
+`.xcresult` bundles next to them). To watch, open Xcode > Window > Devices and Simulators (or the Simulator app with both
+devices shown) while it runs. The script waits while another run on the shared simulator (`/tmp/ikut-dd-map`) is going.
+
+Not covered: the hazard marker clearing after everyone passes and the signal-drop/stale case (both in `run-ui.mjs`);
+the drive is short, so nobody reaches the destination. xcodebuild on the second simulator sometimes doesn't exit after
+its suite finishes; the script takes the suite's result and kills it after 60 s.
+
 ## Layout
 
 | Path | What |
@@ -46,6 +84,7 @@ Debug > Simulate Location > Add GPX File to Workspace... and pick it. For a prod
 | `lib/route.mjs`, `lib/tracking.mjs` | JS ports of the Swift logic, each function annotated with its source file. |
 | `lib/scenario.mjs` | The script: cars, speeds, gap, timeline. |
 | `run-ui.mjs` | One-command orchestrator with the app in the loop. |
+| `run-convoy2.mjs` | Two simulators (organizer and joiner) plus two scripted cars, see Two-phone convoy. |
 
 ## The drive
 
@@ -109,7 +148,10 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 1. **Crash on opening the map as tracker**: `CLMonitor` names with dots threw. Fixed in `0fd1e3a`.
 2. **Stop button icon missing** on iOS 27 (`minus.octagon.fill`): now `octagon.fill`.
 3. **Alert banner hidden behind the stop card**: fixed in `15f5cdc`.
-4. Open question: a GPS-only gap never makes a car stale (the heartbeat re-writes the last position),
+4. **First-run Join/New Trip went back to Home after Allow** (two-phone run): on iOS 27 the location prompt doesn't always
+   make the app resign active, so `LocationPermission` gave up after 1 s with the status still undetermined. It now keeps
+   waiting for the answer while the status is undetermined.
+5. Open question: a GPS-only gap never makes a car stale (the heartbeat re-writes the last position),
    see Things to know. Probably intended; worth a decision.
 
 ## Battery watch (real drives)
