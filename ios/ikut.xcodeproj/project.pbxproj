@@ -60,6 +60,7 @@
 		66086EF8F71F7F9414B5ED2F /* LiveSpeechEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */; };
 		66B1B1B98B60E2439AD59234 /* ConvoyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB0A694CC1459C9224678CC /* ConvoyModel.swift */; };
 		66E1D3BEB35CA17544C67084 /* JoinService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBDD23345E4B5753BEC3866D /* JoinService.swift */; };
+		64669982F98F4B989B4100F6 /* DemoSecondPhoneUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9114A0B2F0EA15E6EE18AE29 /* DemoSecondPhoneUITests.swift */; };
 		6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */; };
 		6B6E898BB79ED1F3A1C67B5B /* CarRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */; };
 		6C9407949E903A1B7BD7E03E /* Member.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA475AFBE5E8DF067171FDC /* Member.swift */; };
@@ -221,6 +222,7 @@
 		A65171C412E1666014BC2347 /* LocationPermissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPermissionTests.swift; sourceTree = "<group>"; };
 		A69797704602A7657261A60C /* DeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLink.swift; sourceTree = "<group>"; };
 		A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarBadge.swift; sourceTree = "<group>"; };
+		9114A0B2F0EA15E6EE18AE29 /* DemoSecondPhoneUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSecondPhoneUITests.swift; sourceTree = "<group>"; };
 		A9B60214D010449BFA91F229 /* TripServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripServiceTests.swift; sourceTree = "<group>"; };
 		AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsHomeView.swift; sourceTree = "<group>"; };
 		B1C004029CF785E6F7B0DC74 /* PolylineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineTests.swift; sourceTree = "<group>"; };
@@ -399,6 +401,7 @@
 			isa = PBXGroup;
 			children = (
 				1A494FD1381005F8FB454B39 /* RouteGeometry.swift */,
+				9114A0B2F0EA15E6EE18AE29 /* DemoSecondPhoneUITests.swift */,
 			);
 			path = Route;
 			sourceTree = "<group>";
@@ -838,6 +841,7 @@
 				E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */,
 				E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */,
 				16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */,
+				64669982F98F4B989B4100F6 /* DemoSecondPhoneUITests.swift in Sources */,
 				EDBF46FA09C4587FEFC09278 /* SessionTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
 				D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */,

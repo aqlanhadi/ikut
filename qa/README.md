@@ -174,21 +174,27 @@ positions, end. It deletes its two anonymous users; the ended trip is purged by 
 
 ## Live demo
 
-`node demo.mjs` is a ten-minute, real-time (1x) show for a person watching the shared iPhone 17 simulator. The script
-creates a trip as a scripted organizer, prints the code, and joins the phone as "Faiz" through
-`JoinAsSecondMemberUITests` (which holds the map open via `TEST_RUNNER_IKUT_HOLD_SECONDS`). Cast: Aisha (lead), the
-phone, Hafiz (slowest) and Daniel (joining from his own road, merging between the phone and Hafiz). The route is a 16.3 km
-piece of `data/osrm-main.json` driven at 95 km/h, so no network is needed. Timeline (T = seconds after go): spread grows
-from the start; 90 debris reported ahead (phone alert at about 119); 150-270 Hafiz loses signal (stale "Last seen"
-from about 210); 330 Daniel merges; 390 Hafiz requests a pit stop, votes follow, 425 pinned, 500 resolved; 580 the
-phone arrives; 620 end.
+`node demo.mjs` is a ten-minute, real-time (1x) show for people watching two simulators: the shared iPhone 17 (Faiz,
+`JoinAsSecondMemberUITests`) and `ikut-convoy-2` (Daniel, `DemoSecondPhoneUITests`). The script creates a trip as a
+scripted organizer, prints the code, and joins both phones through UI tests that hold the map open
+(`TEST_RUNNER_IKUT_HOLD_SECONDS`). Cast: Aisha (lead, scripted), phone 1, Hafiz (slowest, scripted) and phone 2, which
+joins as the new car "Daniel's City" on Daniel's own road (`data/osrm-car4.json`) and merges between phone 1 and Hafiz.
+The route is a 16.3 km piece of `data/osrm-main.json` driven at 95 km/h, so no network is needed. Timeline (T = seconds
+after go): spread grows from the start; 90 debris reported ahead (phone 1 alert at about 119); 127 Daniel starts driving;
+150-270 Hafiz loses signal (stale "Last seen" from about 210); 330 Daniel merges; 390 phone 2 taps Pit stop > Fuel (the
+script writes a marker file the test waits for), Aisha and Hafiz vote, 425 Aisha pins "R&R Demo" (2 km ahead of the lead,
+clamped before the destination), 500 resolved; 580 phone 1 arrives; 620 end.
 
 ```sh
 node demo.mjs --dry-run          # print the timeline and check the geometry, no Firebase, no simulator
 node demo.mjs --no-app --seconds 30   # scripted cars only, against the emulators
 node demo.mjs --skip-build       # the real thing, reusing the build in --derived-data (/tmp/ikut-dd-q1)
+node demo.mjs --one-phone        # the old show: only the iPhone 17, scripted Daniel, Hafiz requests the stop
+# both simulators shared with other agents: take the locks first
+simlock.sh C0A40D2A-0607-4B95-A1BE-F8C9190D81C1 simlock.sh FD0ACD10-F3C4-4797-8DB8-A6F554585CC1 node demo.mjs
 ```
 
-Other options: `--udid`, `--name`, `--speed N` (dev only; the signal-drop staleness needs <= 2.5). The phone's location is
-driven with `simctl location start`, restarted every 20 s from where it should be. Not covered: the phone does not vote
-or request a stop (watch only), and the trip is left active unless `--end-trip`.
+Other options: `--udid`, `--udid2`, `--name`, `--speed N` (dev only; the signal-drop staleness needs <= 2.5). Both
+simulators get `location-always`, are parked on their start (re-sent every 5 s, nudged, until the app reports a position),
+and are driven with `simctl location start`, restarted every 20 s from where each should be. Not covered: phone 1 does not
+vote or request a stop (watch only), and the trip is left active unless `--end-trip`.

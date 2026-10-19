@@ -3,8 +3,14 @@
 //
 //   node demo.mjs                  # build + run: phone joins by UI test, then the demo plays at 1x
 //   node demo.mjs --skip-build     # reuse the build in --derived-data
+//   node demo.mjs --one-phone      # only the iPhone 17 (Faiz); Daniel is scripted again and Hafiz requests the stop
 //   node demo.mjs --dry-run        # no Firebase, no simulator: print the timeline and sanity-check the geometry
 //   node demo.mjs --no-app [--seconds 30]   # scripted cars only against the emulators, no simulator
+//
+// Default is two phones (--one-phone for the old single-phone show): the iPhone 17 is Faiz (JoinAsSecondMemberUITests) and
+// `ikut-convoy-2` is Daniel (DemoSecondPhoneUITests): it joins as the new car "Daniel's City", starts on Daniel's own road,
+// merges at the planned point, and at T+390 taps Pit stop > Fuel itself (the script writes a marker file the test waits for).
+// Wrap the run in qa's simlock helper for both simulators when other agents share them.
 //
 // Cast (front to back at the start): Aisha (lead, scripted), Faiz (the phone, car on the simulator), Hafiz (scripted,
 // slowest) and Daniel (scripted, joining from his own road and merging between the phone and Hafiz).
@@ -42,7 +48,7 @@ const REGION = 'asia-southeast1';
 
 const o = {
   udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // shared iPhone 17: never create or erase simulators
-  name: 'Faiz', derivedData: '/tmp/ikut-dd-q1', skipBuild: false, host: '127.0.0.1', speed: 1,
+  udid2: 'FD0ACD10-F3C4-4797-8DB8-A6F554585CC1', twoPhones: true, name: 'Faiz', derivedData: '/tmp/ikut-dd-q1', skipBuild: false, host: '127.0.0.1', speed: 1,
   dryRun: false, noApp: false, seconds: null, waitTimeout: 900, endTrip: false,
   logs: path.join(os.tmpdir(), 'ikut-qa'),
 };
@@ -50,6 +56,9 @@ for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
   const next = () => process.argv[++i];
   if (a === '--udid') o.udid = next();
+  else if (a === '--udid2') o.udid2 = next();
+  else if (a === '--one-phone') o.twoPhones = false;
+  else if (a === '--two-phones') o.twoPhones = true;
   else if (a === '--name') o.name = next();
   else if (a === '--derived-data') o.derivedData = next();
   else if (a === '--skip-build') o.skipBuild = true;
@@ -156,9 +165,25 @@ const phoneAtT = (offset) => (offset - PHONE.start) / PHONE.speed;
 const HAZARD_AT = 90;
 const hazardOffset = offsetOf('lead', HAZARD_AT);
 const ALERT_AT = Math.round(phoneAtT(hazardOffset - 500));
+const syncDir = path.join(os.tmpdir(), 'ikut-qa', 'demo2-sync');
 const STOP_AT = 390;
-const stopPlaceOffset = () => offsetOf('lead', STOP_AT) + 3000;
+// 2 km ahead of the lead when the stop is requested, but always before the destination.
+const stopPlaceOffset = () => Math.min(offsetOf('lead', STOP_AT) + 2000, ROUTE_LENGTH - 400);
 const ARRIVE_AT = Math.round(phoneAtT(ROUTE_LENGTH));
+
+const stopPlace = () => {
+  const off = stopPlaceOffset();
+  const co = main.coordinateAtOffset(off);
+  return { name: 'R&R Demo', coordinate: new GeoPoint(co.latitude, co.longitude), routeOffset: off };
+};
+async function waitForStopRequest(c) {
+  for (let i = 0; i < 60; i++) {
+    const e = c.cars.lead.events.find((x) => x.category === 'stopRequest');
+    if (e) return e;
+    await sleep(500);
+  }
+  throw new Error('no stop request arrived from phone 2');
+}
 
 const timeline = [
   { at: 0, text: () => `GO. Order: Aisha ${ahead('lead', 0)}, you (Faiz), Hafiz ${ahead('hafiz', 0)}; Daniel is still on his own road (dashed "joining")` },
@@ -171,18 +196,22 @@ const timeline = [
   { at: DROP.from + 60, text: () => 'EXPECTED ON PHONE: Hafiz row goes stale, "Last seen ..."', note: true },
   { at: DROP.to, text: () => 'Hafiz gets signal back, his position jumps to where he is now', run: async (c) => { await enableNetwork(c.cars.hafiz.db); } },
   { at: MERGE_TIME, text: () => `Daniel reaches the merge point and joins the convoy between you and Hafiz (dashed to solid; he ends up ${ahead('daniel', MERGE_TIME)})`, note: true },
-  { at: STOP_AT, text: () => `Hafiz requests a pit stop (fuel) and proposes "R&R Demo" ${km(stopPlaceOffset() - offsetOf('phone', STOP_AT))} ahead of you`,
-    run: async (c) => {
-      const r = await c.cars.hafiz.reportEvent('stopFuel', 'stopRequest', 'medium', null);
-      const off = stopPlaceOffset();
-      const co = main.coordinateAtOffset(off);
-      c.stop = r;
-      c.place = { name: 'R&R Demo', coordinate: new GeoPoint(co.latitude, co.longitude), routeOffset: off };
-      await c.cars.hafiz.vote(r.id, true, c.place);
-    } },
-  { at: 400, text: () => 'Aisha votes yes', run: async (c) => { await c.cars.lead.vote(c.stop.id, true); } },
-  { at: 410, text: () => 'Daniel votes yes', run: async (c) => { await c.cars.daniel.vote(c.stop.id, true); } },
-  { at: 425, text: () => 'Aisha (lead) pins "R&R Demo" as the stop; the phone can vote too', run: async (c) => { await c.cars.lead.pin(c.stop.id, c.place); } },
+  ...(o.twoPhones ? [
+    { at: STOP_AT, text: () => `phone 2 (Daniel) requests a fuel stop (Pit stop > Fuel in the app); Aisha will pin "R&R Demo" ${km(stopPlaceOffset() - offsetOf('daniel', STOP_AT))} ahead of him`,
+      run: async () => { fs.mkdirSync(syncDir, { recursive: true }); fs.writeFileSync(path.join(syncDir, 'stop'), 'go'); } },
+    { at: 400, text: () => 'Aisha votes yes (once Daniel\'s request has arrived)', run: async (c) => { c.stop = await waitForStopRequest(c); await c.cars.lead.vote(c.stop.id, true); } },
+    { at: 410, text: () => 'Hafiz votes yes', run: async (c) => { c.stop = c.stop ?? await waitForStopRequest(c); await c.cars.hafiz.vote(c.stop.id, true); } },
+  ] : [
+    { at: STOP_AT, text: () => `Hafiz requests a pit stop (fuel) and proposes "R&R Demo" ${km(stopPlaceOffset() - offsetOf('phone', STOP_AT))} ahead of you`,
+      run: async (c) => {
+        const r = await c.cars.hafiz.reportEvent('stopFuel', 'stopRequest', 'medium', null);
+        c.stop = r;
+        await c.cars.hafiz.vote(r.id, true, stopPlace());
+      } },
+    { at: 400, text: () => 'Aisha votes yes', run: async (c) => { await c.cars.lead.vote(c.stop.id, true); } },
+    { at: 410, text: () => 'Daniel votes yes', run: async (c) => { await c.cars.daniel.vote(c.stop.id, true); } },
+  ]),
+  { at: 425, text: () => 'Aisha (lead) pins "R&R Demo" as the stop; the phone can vote too', run: async (c) => { await c.cars.lead.pin(c.stop.id, stopPlace()); } },
   { at: 500, text: () => 'Aisha resolves the stop request, it disappears', run: async (c) => { await c.cars.lead.resolve(c.stop.id); } },
   { at: ARRIVE_AT, text: () => 'You reach the destination (arrival)', note: true },
   { at: DEMO_END, text: () => 'END of scripted demo' },
@@ -359,67 +388,110 @@ function generateCode() {
 // ---------------------------------------------------------------- simulator and app
 
 const simctl = (...args) => spawnSync('xcrun', ['simctl', ...args], { encoding: 'utf8' });
-let xc = null;
+const phones = []; // { udid, who, test, env, park, xc, speedKey }
 let feeder = null;
 let cars = null;
 
 async function cleanup() {
   clearInterval(feeder);
-  if (!o.noApp) simctl('location', o.udid, 'clear');
-  if (xc && xc.exitCode === null) xc.kill('SIGTERM');
+  if (!o.noApp) for (const p of phones) simctl('location', p.udid, 'clear');
+  for (const p of phones) if (p.xc && p.xc.exitCode === null) p.xc.kill('SIGTERM');
   if (cars) for (const c of Object.values(cars)) await c.close();
 }
 process.on('SIGINT', async () => { console.log('\ninterrupted'); await cleanup(); process.exit(130); });
 
+const xcAlive = () => phones.some((p) => p.xc && p.xc.exitCode === null);
+
 function startApp(code) {
   fs.mkdirSync(o.logs, { recursive: true });
-  const line = simctl('list', 'devices').stdout.split('\n').find((l) => l.includes(o.udid));
-  if (!line) { console.error(`simulator ${o.udid} not found`); process.exit(1); }
-  if (!line.includes('(Booted)')) { log('booting simulator'); simctl('boot', o.udid); simctl('bootstatus', o.udid, '-b'); }
-  simctl('privacy', o.udid, 'grant', 'location-always', 'dev.aqlan.ikut');
-  const s = main.coordinateAtOffset(PHONE.start);
-  simctl('location', o.udid, 'set', `${s.latitude.toFixed(6)},${s.longitude.toFixed(6)}`);
+  fs.rmSync(syncDir, { recursive: true, force: true });
+  fs.mkdirSync(syncDir, { recursive: true });
+  const hold = String(Math.round(DEMO_END / o.speed + 240));
+  const s1 = main.coordinateAtOffset(PHONE.start);
+  const s2 = danielOwn.coordinateAtOffset(0);
+  phones.push({ udid: o.udid, who: 'phone 1 (Faiz)', test: 'JoinAsSecondMemberUITests', park: s1,
+    env: { TEST_RUNNER_IKUT_JOIN_CODE: code, TEST_RUNNER_IKUT_JOIN_NAME: o.name, TEST_RUNNER_IKUT_HOLD_SECONDS: hold } });
+  if (o.twoPhones) {
+    phones.push({ udid: o.udid2, who: 'phone 2 (Daniel)', test: 'DemoSecondPhoneUITests', park: s2,
+      env: { TEST_RUNNER_IKUT_JOIN_CODE: code, TEST_RUNNER_IKUT_JOIN_NAME: 'Daniel', TEST_RUNNER_IKUT_CAR_NAME: 'Daniel’s City',
+        TEST_RUNNER_IKUT_STOP_MARKER: path.join(syncDir, 'stop'), TEST_RUNNER_IKUT_HOLD_SECONDS: hold } });
+  }
+  for (const p of phones) {
+    const line = simctl('list', 'devices').stdout.split('\n').find((l) => l.includes(p.udid));
+    if (!line) { console.error(`simulator ${p.udid} not found`); process.exit(1); }
+    if (!line.includes('(Booted)')) { log(`booting simulator ${p.udid}`); simctl('boot', p.udid); simctl('bootstatus', p.udid, '-b'); }
+    simctl('privacy', p.udid, 'grant', 'location-always', 'dev.aqlan.ikut');
+    simctl('location', p.udid, 'set', `${p.park.latitude.toFixed(6)},${p.park.longitude.toFixed(6)}`);
+  }
 
   const ios = path.join(repo, 'ios');
-  const args = ['test', '-project', path.join(ios, 'ikut.xcodeproj'), '-scheme', 'ikut', '-destination', `platform=iOS Simulator,id=${o.udid}`,
-    '-derivedDataPath', o.derivedData, '-clonedSourcePackagesDirPath', path.join(o.derivedData, 'SourcePackages'),
-    '-only-testing:ikutUITests/JoinAsSecondMemberUITests'];
-  if (o.skipBuild) args[0] = 'test-without-building';
-  const xcLog = fs.createWriteStream(path.join(o.logs, 'demo-xcodebuild.log'));
-  xc = spawn('xcodebuild', args, {
-    env: { ...process.env, TEST_RUNNER_IKUT_JOIN_CODE: code, TEST_RUNNER_IKUT_JOIN_NAME: o.name, TEST_RUNNER_IKUT_HOLD_SECONDS: String(Math.round(DEMO_END / o.speed + 240)) },
+  const common = ['-project', path.join(ios, 'ikut.xcodeproj'), '-scheme', 'ikut',
+    '-derivedDataPath', o.derivedData, '-clonedSourcePackagesDirPath', path.join(o.derivedData, 'SourcePackages')];
+  if (!o.skipBuild) {
+    log('building (build-for-testing)');
+    const r = spawnSync('xcodebuild', ['build-for-testing', ...common, '-destination', 'generic/platform=iOS Simulator'], { encoding: 'utf8', maxBuffer: 1 << 28 });
+    fs.writeFileSync(path.join(o.logs, 'demo-build.log'), (r.stdout ?? '') + (r.stderr ?? ''));
+    if (r.status !== 0) throw new Error(`build failed, see ${path.join(o.logs, 'demo-build.log')}`);
+  }
+  phones.forEach((p, i) => {
+    const args = ['test-without-building', ...common, '-destination', `platform=iOS Simulator,id=${p.udid}`, `-only-testing:ikutUITests/${p.test}`,
+      '-resultBundlePath', path.join(o.logs, `demo-phone${i + 1}-${Date.now()}.xcresult`)];
+    const xcLog = fs.createWriteStream(path.join(o.logs, `demo-xcodebuild-phone${i + 1}.log`));
+    p.xc = spawn('xcodebuild', args, { env: { ...process.env, ...p.env } });
+    let buf = '';
+    const on = (d) => {
+      xcLog.write(d);
+      buf += d.toString();
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const l = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (/Test Case .*(passed|failed)|error:|\*\* TEST|Timed out|XCTAssert/.test(l)) console.log(`  xc ${i + 1} | ${l}`);
+      }
+    };
+    p.xc.stdout.on('data', on);
+    p.xc.stderr.on('data', on);
+    log(`${p.who}: ${p.test} started (log ${path.join(o.logs, `demo-xcodebuild-phone${i + 1}.log`)})`);
   });
-  let buf = '';
-  const on = (d) => {
-    xcLog.write(d);
-    buf += d.toString();
-    let nl;
-    while ((nl = buf.indexOf('\n')) >= 0) {
-      const l = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      if (/Test Case .*(passed|failed)|error:|\*\* TEST|Timed out|XCTAssert/.test(l)) console.log(`  xc | ${l}`);
-    }
-  };
-  xc.stdout.on('data', on);
-  xc.stderr.on('data', on);
-  log(`xcodebuild ${args[0]} started (log ${path.join(o.logs, 'demo-xcodebuild.log')}); the phone joins as "${o.name}" and stays on the map`);
 }
 
 /** `simctl location start` drifts, so restart it every 20 s from where the phone should be (see qa/README.md). */
+function playback(udid, pts, mps) {
+  if (pts.length < 2) return;
+  const loc = spawn('xcrun', ['simctl', 'location', udid, 'start', `--speed=${mps.toFixed(2)}`, '--interval=1', '-']);
+  loc.stdin.end(`${pts.map((p) => `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`).join('\n')}\n`);
+  loc.stderr.on('data', (d) => console.log(`  loc! ${d}`));
+}
+function mainPoints(from) {
+  const pts = [main.coordinateAtOffset(from)];
+  for (let off = from + 80; off < ROUTE_LENGTH; off += 80) pts.push(main.coordinateAtOffset(off));
+  pts.push(main.coordinateAtOffset(ROUTE_LENGTH));
+  return pts;
+}
 function startPhoneDrive(goWall) {
-  const mps = PHONE.speed * o.speed;
+  const tNow = () => ((Date.now() - goWall) / 1000) * o.speed;
   const feed = () => {
-    const T = ((Date.now() - goWall) / 1000) * o.speed;
+    const T = tNow();
     const from = offsetOf('phone', T);
-    const pts = [];
-    for (let off = from; off < ROUTE_LENGTH; off += 80) pts.push(main.coordinateAtOffset(off));
-    pts.push(main.coordinateAtOffset(ROUTE_LENGTH));
-    if (pts.length < 2 || from >= ROUTE_LENGTH - 1) return;
-    const loc = spawn('xcrun', ['simctl', 'location', o.udid, 'start', `--speed=${mps.toFixed(2)}`, '--interval=1', '-']);
-    loc.stdin.end(`${pts.map((p) => `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`).join('\n')}\n`);
-    loc.stderr.on('data', (d) => console.log(`  loc! ${d}`));
+    if (from < ROUTE_LENGTH - 1) playback(o.udid, mainPoints(from), PHONE.speed * o.speed);
+    if (o.twoPhones) {
+      const d = danielAt(T);
+      if (T < DEPART) {
+        // Not yet on the move: keep re-sending the park fix (the app drops stale ones), then start at departure.
+        const p = danielOwn.coordinateAtOffset(0);
+        simctl('location', o.udid2, 'set', `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`);
+        setTimeout(feed, Math.max(500, Math.min(5000, ((DEPART - T) / o.speed) * 1000)));
+      } else if (d.main === null) {
+        // Still on his own road: own geometry to the merge point, then on along the trip route.
+        const pts = [danielOwn.coordinateAtOffset(d.own)];
+        for (let off = d.own + 80; off < danielMerge.otherOffset; off += 80) pts.push(danielOwn.coordinateAtOffset(off));
+        playback(o.udid2, [...pts, ...mainPoints(danielMerge.mainOffset)], OWN_SPEED * o.speed);
+      } else if (d.main < ROUTE_LENGTH - 1) {
+        playback(o.udid2, mainPoints(d.main), 25.5 * o.speed);
+      }
+    }
   };
-  log(`simctl location playback at ${mps.toFixed(1)} m/s (${PHONE.kmh} km/h), resynced every 20 s`);
+  log(`simctl location playback (phone 1 at ${(PHONE.speed * o.speed).toFixed(1)} m/s${o.twoPhones ? '; phone 2 on its own road, then the trip route' : ''}), resynced every 20 s`);
   feed();
   feeder = setInterval(feed, 20_000);
 }
@@ -428,14 +500,14 @@ function startPhoneDrive(goWall) {
 
 async function runMain() {
   setLogLevel('error');
-  console.log(`ikut live demo, project ${PROJECT_ID}, emulators on ${o.host}${o.noApp ? ', NO APP' : `, simulator ${o.udid}`}, clock ${o.speed}x`);
+  console.log(`ikut live demo, project ${PROJECT_ID}, emulators on ${o.host}${o.noApp ? ', NO APP' : `, simulator${o.twoPhones ? 's' : ''} ${o.udid}${o.twoPhones ? ' + ' + o.udid2 : ''}`}, clock ${o.speed}x`);
   printPlan();
   console.log('');
-  cars = { lead: new Car('lead'), hafiz: new Car('hafiz'), daniel: new Car('daniel') };
+  cars = { lead: new Car('lead'), hafiz: new Car('hafiz'), ...(o.twoPhones ? {} : { daniel: new Car('daniel') }) };
   const code = generateCode();
   await cars.lead.connect();
   await cars.lead.createTrip(code);
-  for (const c of [cars.hafiz, cars.daniel]) { await c.connect(); await c.join(code); }
+  for (const c of Object.values(cars).filter((x) => x !== cars.lead)) { await c.connect(); await c.join(code); }
   for (const c of Object.values(cars)) { c.tripId = cars.lead.tripId; }
   console.log(`\nTRIP CODE: ${code}\n`);
   for (const [who, c] of Object.entries(cars)) {
@@ -455,25 +527,25 @@ async function runMain() {
     startApp(code);
     const known = new Set(Object.values(cars).map((c) => c.carId));
     const deadline = Date.now() + o.waitTimeout * 1000;
-    let phoneCar = null;
     log('waiting for the phone to join and start tracking...');
     // The app drops fixes older than 15 s and the simulator doesn't repeat an unchanged location, so the one
     // set before the build is stale by the time tracking starts. Re-send it, nudged, until the phone reports.
-    const park = main.coordinateAtOffset(PHONE.start);
     let tick = 0;
-    while (!phoneCar) {
-      if (Date.now() > deadline) throw new Error('the phone did not start tracking in time');
-      if (xc.exitCode !== null) throw new Error(`xcodebuild exited ${xc.exitCode} before the phone started tracking, see ${path.join(o.logs, 'demo-xcodebuild.log')}`);
+    const seen = () => phoneCars.size >= phones.length;
+    const phoneCars = new Map();
+    while (!seen()) {
+      if (Date.now() > deadline) throw new Error(`only ${phoneCars.size} of ${phones.length} phones started tracking in time`);
+      for (const p of phones) if (p.xc.exitCode !== null && !phoneCars.size) throw new Error(`${p.who}'s xcodebuild exited ${p.xc.exitCode} before tracking started, see ${o.logs}`);
       await sleep(1000);
       hold();
       if (++tick % 5 === 0) {
         const nudge = (tick / 5) % 2 ? 0.000005 : 0;
-        simctl('location', o.udid, 'set', `${(park.latitude + nudge).toFixed(6)},${park.longitude.toFixed(6)}`);
+        for (const p of phones) simctl('location', p.udid, 'set', `${(p.park.latitude + nudge).toFixed(6)},${p.park.longitude.toFixed(6)}`);
       }
       const snap = await getDocs(collection(cars.lead.db, `trips/${cars.lead.tripId}/positions`));
-      phoneCar = snap.docs.map((d) => d.id).find((id) => !known.has(id)) ?? null;
+      for (const d of snap.docs) if (!known.has(d.id) && !phoneCars.has(d.id)) { phoneCars.set(d.id, true); log(`a phone is tracking (car ${d.id}), ${phoneCars.size} of ${phones.length}`); }
     }
-    log('the phone is tracking and sitting on the map; starting in 6 s');
+    log('all phones are tracking and sitting on the map; starting in 6 s');
     for (let i = 0; i < 6; i++) { await sleep(1000); hold(); }
   } else {
     for (let i = 0; i < 3; i++) { await sleep(1000); hold(); }
@@ -507,10 +579,10 @@ async function runMain() {
     await updateDoc(doc(cars.lead.db, `trips/${cars.lead.tripId}`), { status: 'ended', endedAt: serverTimestamp() });
     log('trip ended');
   }
-  if (!o.noApp && xc && xc.exitCode === null) console.log('The app stays open on the map until the UI test hold runs out (about 4 min) or Ctrl-C.');
+  if (!o.noApp && xcAlive()) console.log('The apps stay open on the map until the UI test hold runs out (about 4 min) or Ctrl-C.');
   await sleep(1500);
-  if (!o.noApp && xc && xc.exitCode === null) {
-    await new Promise((r) => { xc.on('exit', r); process.once('SIGINT', r); });
+  if (!o.noApp && xcAlive()) {
+    await Promise.race(phones.map((p) => new Promise((r) => { p.xc.on('exit', r); process.once('SIGINT', r); })));
   }
   await cleanup();
   process.exit(0);
