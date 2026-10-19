@@ -135,7 +135,9 @@ final class ConvoyScenarioUITests: XCTestCase {
     // MARK: Joining
 
     private func joinAndOpenMap(code: String, name: String) throws {
-        let joinButton = app.buttons["Join with Code or QR"]
+        // Welcome on a first run, Home ("Join Trip") once a previous run got past it.
+        let joinButton = app.buttons
+            .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: 20), "Welcome screen didn't show")
         joinButton.tap()
 
@@ -152,7 +154,7 @@ final class ConvoyScenarioUITests: XCTestCase {
         codeField.tap()
         codeField.typeText(code)
 
-        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'New Car'")).firstMatch
+        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'A new car'")).firstMatch
         XCTAssertTrue(newCar.waitForExistence(timeout: 20), "Trip preview didn't load (is the code right and the emulator up?)")
 
         let joinNameField = app.textFields["Your name"]

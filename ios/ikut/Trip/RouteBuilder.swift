@@ -6,6 +6,8 @@ struct DestinationResult: Sendable, Equatable, Identifiable {
     var name: String
     var subtitle: String
     var coordinate: CLLocationCoordinate2D
+    /// `MKPointOfInterestCategory` raw value; nil for addresses, towns and other non-POI results.
+    var category: String? = nil
 
     var id: String { "\(name)|\(coordinate.latitude)|\(coordinate.longitude)" }
 
@@ -58,7 +60,8 @@ enum RouteBuilder {
             return DestinationResult(
                 name: name,
                 subtitle: item.placemark.title ?? "",
-                coordinate: item.placemark.coordinate
+                coordinate: item.placemark.coordinate,
+                category: item.pointOfInterestCategory?.rawValue
             )
         }
     }
@@ -89,6 +92,28 @@ enum RouteBuilder {
             name: route.name,
             polyline: Polyline.encode(coordinates(of: route.polyline))
         )
+    }
+
+    /// Town or city name for a coordinate ("Kuala Lumpur"); nil when the lookup fails.
+    @MainActor
+    static func placeName(at coordinate: CLLocationCoordinate2D) async -> String? {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
+        return placemark?.locality ?? placemark?.subAdministrativeArea ?? placemark?.name
+    }
+
+    /// Driving distance, time and road name between two points, without the polyline.
+    @MainActor
+    static func drive(
+        from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D
+    ) async throws -> (distance: Double, travelTime: Double, name: String) {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = .automobile
+        let response = try await MKDirections(request: request).calculate()
+        guard let route = response.routes.first else { throw RouteError.noRoute }
+        return (route.distance, route.expectedTravelTime, route.name)
     }
 
     private static func isLocationError(_ error: NSError) -> Bool {

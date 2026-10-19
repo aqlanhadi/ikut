@@ -24,8 +24,9 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
         app.launch()
 
-        // Welcome is the first screen whether or not a previous run left the simulator signed in.
-        let joinButton = app.buttons["Join with Code or QR"]
+        // Welcome on a first run, Home ("Join Trip") once a previous run got past it.
+        let joinButton = app.buttons
+            .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: 15))
         joinButton.tap()
 
@@ -44,7 +45,7 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         codeField.tap()
         codeField.typeText(code)
 
-        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'New Car'")).firstMatch
+        let newCar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'A new car'")).firstMatch
         XCTAssertTrue(newCar.waitForExistence(timeout: 20), "Trip preview didn't load")
 
         let joinNameField = app.textFields["Your name"]

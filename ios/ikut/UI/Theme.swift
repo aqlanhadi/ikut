@@ -44,6 +44,19 @@ struct PillButtonStyle: ButtonStyle {
     }
 }
 
+/// Card-colored capsule with accent text, 50 pt high: the second of two side-by-side pills.
+struct SecondaryPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Color.ikutAccent)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(Color.ikutCard, in: Capsule())
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .contentShape(Capsule())
+    }
+}
+
 /// Borderless accent text button, 50 pt high, for the secondary action under a pill.
 struct LinkPillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
