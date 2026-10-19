@@ -11,6 +11,8 @@ import SwiftUI
 struct TripMapView: View {
     let session: TripSession
     var onExit: () -> Void
+    /// The trip ended (organizer or server): the owner shows the recap.
+    var onEnded: () -> Void = {}
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
     private let liveServices: Bool
 
@@ -58,9 +60,10 @@ struct TripMapView: View {
         }
     }
 
-    init(session: TripSession, onExit: @escaping () -> Void = {}) {
+    init(session: TripSession, onExit: @escaping () -> Void = {}, onEnded: @escaping () -> Void = {}) {
         self.session = session
         self.onExit = onExit
+        self.onEnded = onEnded
         liveServices = true
         _model = State(initialValue: TripMapModel(session: session))
     }
@@ -135,7 +138,8 @@ struct TripMapView: View {
                 Text("Your phone stops sharing its location.")
             }
             .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
-                Button("End trip", role: .destructive) { run { try await session.endTrip(); onExit() } }
+                // Ending flips session.isEnded, which opens the recap (onEnded).
+                Button("End trip", role: .destructive) { run { try await session.endTrip() } }
             } message: {
                 Text("Everyone stops sharing their location. This can't be undone.")
             }
@@ -145,6 +149,7 @@ struct TripMapView: View {
             } message: {
                 Text("ikut can warn you about debris, breakdowns and stops ahead, even while the app is in the background.")
             }
+            .onChange(of: session.isEnded) { _, ended in if ended { onEnded() } }
             .onAppear(perform: appear)
             .onDisappear(perform: disappear)
             .task { await model.convoy.run() }

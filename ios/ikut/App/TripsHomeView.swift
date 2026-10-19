@@ -7,12 +7,14 @@ struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     var onNewTrip: () -> Void
     var onJoin: () -> Void
+    var onOpenTrip: (PastTrips.Entry) -> Void = { _ in }
 
     @State private var renaming = false
     @State private var newName = ""
     @State private var renameError: String?
     @State private var expanded = false
     @GestureState private var dragOffset: CGFloat = 0
+    @State private var past: [PastTrips.Entry] = []
 
     /// Where the map opens when location isn't available yet.
     private static let fallback = MKCoordinateRegion(
@@ -146,13 +148,51 @@ struct TripsHomeView: View {
     private var pastTrips: some View {
         VStack(alignment: .leading, spacing: 0) {
             CardHeader("Past trips")
-            // Trip history isn't stored per user yet; see planning notes.
-            Text("Trips you start or join will show here.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 58)
+            if past.isEmpty {
+                // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
+                Text("Trips you start or join will show here.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 58)
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(past.enumerated()), id: \.element.id) { index, entry in
+                        if index > 0 { RowDivider() }
+                        Button { onOpenTrip(entry) } label: { pastRow(entry) }
+                            .buttonStyle(.plain)
+                    }
+                }
                 .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
         }
+        .onAppear { past = PastTrips.all() }
+    }
+
+    private func pastRow(_ entry: PastTrips.Entry) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: entry.endedAt == nil ? "car.fill" : "flag.checkered")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(entry.endedAt == nil ? Color.ikutPositive : Color.ikutAccent, in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                Text(pastDetail(entry)).font(.footnote).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 58)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(entry.endedAt == nil ? "Opens the trip" : "Opens the recap")
+    }
+
+    private func pastDetail(_ entry: PastTrips.Entry) -> String {
+        guard let ended = entry.endedAt else { return "To \(entry.destination) · in progress" }
+        return "To \(entry.destination) · \(ended.formatted(date: .abbreviated, time: .omitted))"
     }
 
     @ViewBuilder

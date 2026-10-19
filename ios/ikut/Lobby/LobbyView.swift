@@ -6,6 +6,8 @@ import SwiftUI
 /// QR and share, and the live list of cars.
 struct LobbyView: View {
     let onExit: () -> Void
+    /// The trip ended (by the organizer or the server): show the recap.
+    var onEnded: (String) -> Void = { _ in }
     @Environment(LocationPermission.self) private var location
     @State private var model: LobbyModel
     @State private var session: TripSession
@@ -20,8 +22,9 @@ struct LobbyView: View {
     @State private var actionError: String?
     @State private var showMap = false
 
-    init(tripId: String, onExit: @escaping () -> Void) {
+    init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
+        self.onEnded = onEnded
         _model = State(initialValue: LobbyModel(tripId: tripId))
         _session = State(initialValue: TripSession(
             tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
@@ -90,12 +93,19 @@ struct LobbyView: View {
         }
         // The map shares this lobby's session; the lobby stays on the stack underneath it.
         .navigationDestination(isPresented: $showMap) {
-            TripMapView(session: session, onExit: onExit)
+            TripMapView(session: session, onExit: onExit, onEnded: { onEnded(model.tripId) })
         }
         .navigationDestination(isPresented: $showChangeDestination) {
             CreateTripView(changingTripId: model.trip?.id) { _ in showChangeDestination = false }
         }
         .navigationTitle("Trip Lobby")
+        .onChange(of: session.isEnded, initial: true) { _, ended in
+            if ended { onEnded(model.tripId) }
+        }
+        .onChange(of: model.trip, initial: true) { _, trip in
+            guard let trip else { return }
+            PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name, endedAt: trip.endedAt)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.trip?.route) {
             if let route = model.trip?.route { await routeInfo.load(route: route) }

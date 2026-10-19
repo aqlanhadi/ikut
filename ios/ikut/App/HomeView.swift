@@ -11,6 +11,7 @@ struct HomeView: View {
         case create
         case join(code: String?)
         case lobby(tripId: String)
+        case recap(tripId: String)
     }
 
     /// A code from an opened link, waiting for the Join screen (set by `IkutApp`).
@@ -33,7 +34,10 @@ struct HomeView: View {
                 if hasSeenWelcome {
                     TripsHomeView(
                         onNewTrip: { begin(.create) },
-                        onJoin: { begin(.join(code: nil)) }
+                        onJoin: { begin(.join(code: nil)) },
+                        onOpenTrip: { entry in
+                            path.append(entry.endedAt == nil ? .lobby(tripId: entry.id) : .recap(tripId: entry.id))
+                        }
                     )
                 } else {
                     WelcomeView(
@@ -66,7 +70,9 @@ struct HomeView: View {
                         path = [.lobby(tripId: tripId)]
                     }
                 case .lobby(let tripId):
-                    LobbyView(tripId: tripId, onExit: { path = [] })
+                    LobbyView(tripId: tripId, onExit: { path = [] }, onEnded: { path = [.recap(tripId: $0)] })
+                case .recap(let tripId):
+                    RecapView(tripId: tripId, onDone: { path = [] })
                 }
             }
             .sheet(isPresented: $showName) {
