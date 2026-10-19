@@ -179,6 +179,52 @@ struct ConvoyTests {
         #expect(ConvoyFormat.convoySummary(driving: 2, joinerName: "Wyna's X70", joinIn: nil, spread: nil).joining == "Wyna joining")
     }
 
+    @Test func convoySummaryNamesMyJoiningCarYou() {
+        let mine = ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: 18 * 60, spread: nil, joinerIsMe: true)
+        #expect(mine.joining == "You join in 18 min")
+        #expect(ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: 75 * 60, spread: nil, joinerIsMe: true).joining
+            == "You join in 1 h 15 min")
+        #expect(ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: nil, spread: nil, joinerIsMe: true).joining
+            == "You\u{2019}re joining")
+        // Someone else's car keeps its name.
+        #expect(ConvoyFormat.convoySummary(
+            driving: 3, joinerName: "Daniel\u{2019}s Myvi", joinIn: 18 * 60, spread: nil, joinerIsMe: false).joining
+            == "Daniel joins in 18 min")
+    }
+
+    @Test func convoyMotion() {
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: true, frontSpeed: 0) == .everyoneArrived)
+        #expect(ConvoyFormat.motion(mineArrived: true, everyoneArrived: false, frontSpeed: 20) == .arrived)
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: false, frontSpeed: 20) == .moving)
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: false, frontSpeed: 3) == .stopped)
+        #expect(ConvoyFormat.motion(mineArrived: false, everyoneArrived: false, frontSpeed: nil) == .waiting)
+        #expect(ConvoyFormat.Motion.everyoneArrived.text == "Everyone\u{2019}s arrived")
+        #expect(ConvoyFormat.Motion.arrived.text == "Arrived")
+        #expect(ConvoyFormat.Motion.moving.text == "On the move")
+        #expect(ConvoyFormat.Motion.stopped.text == "Stopped")
+        #expect(ConvoyFormat.Motion.waiting.text == "Waiting")
+        #expect(ConvoyFormat.Motion.moving.isPositive && !ConvoyFormat.Motion.stopped.isPositive)
+    }
+
+    @Test func tripPillSubtitle() {
+        func line(_ motion: ConvoyFormat.Motion?, ended: Bool = false, paused: Bool = false, sharing: Bool = true,
+                  code: String = "K7M 2QX", withCode: Bool = true) -> String {
+            ConvoyFormat.tripPillParts(
+                motion: motion, ended: ended, paused: paused, sharing: sharing, code: code, withCode: withCode)
+            .joined(separator: " · ")
+        }
+        #expect(line(.moving) == "On the move · Sharing location · Code K7M 2QX")
+        #expect(line(.moving, withCode: false) == "On the move · Sharing location")
+        #expect(line(.arrived, sharing: false) == "Arrived · Not sharing location · Code K7M 2QX")
+        #expect(line(.stopped, paused: true) == "Stopped · Sharing paused · Code K7M 2QX")
+        #expect(line(.everyoneArrived, code: "") == "Everyone\u{2019}s arrived · Sharing location")
+        #expect(line(.everyoneArrived, ended: true) == "Trip ended · Code K7M 2QX")
+        #expect(line(nil) == "Sharing location · Code K7M 2QX")
+    }
+
     // MARK: Joining
 
     private func joiningFixture() -> (cars: [Car], merges: [String: Double], main: RouteLine) {

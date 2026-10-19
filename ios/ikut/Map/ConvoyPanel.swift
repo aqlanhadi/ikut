@@ -65,11 +65,8 @@ struct ConvoyPanel: View {
         return length
     }
 
-    /// One size for both ends so a long town name doesn't leave the other end looking bigger.
-    private var endSize: CGFloat {
-        let longest = max(originShort?.count ?? 0, destinationShort.count)
-        return longest > 9 ? 22 : 30
-    }
+    /// One fixed size for both ends whatever their length; a long name truncates rather than shrinks.
+    private let endSize: CGFloat = 30
 
     /// Display names: "KL" for Kuala Lumpur and other well-known short forms, else the full name.
     private var originShort: String? { originName.map(ConvoyFormat.placeShortName) }
@@ -81,21 +78,6 @@ struct ConvoyPanel: View {
     }
 
     private var mineArrived: Bool { convoy.snapshot.hasArrived(model.myCarId) }
-
-    /// "Everyone's arrived" / "Arrived" once the cars (or mine) are in; else "On the move" while the
-    /// front car is driving, "Stopped" once it isn't, "Waiting" with no cars.
-    private var motion: (text: String, color: Color, dot: Color) {
-        if let arrived = ConvoyFormat.arrivalStatus(
-            mineArrived: mineArrived, everyoneArrived: convoy.snapshot.everyoneArrived) {
-            return (arrived, Color.ikutPositive, .green)
-        }
-        guard let front = convoy.snapshot.etaReference else {
-            return ("Waiting", Color.ikutWarning, .orange)
-        }
-        return front.speed > 3
-            ? ("On the move", Color.ikutPositive, .green)
-            : ("Stopped", Color.ikutWarning, .orange)
-    }
 
     // MARK: Pieces
 
@@ -118,7 +100,6 @@ struct ConvoyPanel: View {
     }
 
     private var header: some View {
-        let motion = motion
         let destination = convoy.destinationName ?? ""
         let arrive = frontArrival.map { ConvoyFormat.clock($0) }
         return HStack(alignment: .top, spacing: 8) {
@@ -127,7 +108,7 @@ struct ConvoyPanel: View {
                 Text(originShort ?? "Start")
                     .font(.system(size: endSize, weight: .bold, design: .rounded))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .truncationMode(.tail)
                 if let departed = model.departedAt {
                     Text("Left \(ConvoyFormat.clock(departed))")
                         .font(.footnote)
@@ -136,16 +117,12 @@ struct ConvoyPanel: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            StatusPill(text: motion.text, color: motion.color, dot: motion.dot,
-                       background: AnyShapeStyle(motion.dot.opacity(0.14)))
-                .fixedSize()
-                .padding(.top, 14)
             VStack(alignment: .trailing, spacing: 0) {
                 StatCaption("To")
                 Text(destinationShort)
                     .font(.system(size: endSize, weight: .bold, design: .rounded))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .truncationMode(.tail)
                 if let arrive, !mineArrived {
                     Text("Arrive \(Text(arrive).foregroundStyle(Color.ikutPositive).fontWeight(.semibold))")
                         .font(.footnote)
@@ -158,16 +135,16 @@ struct ConvoyPanel: View {
         .padding(.horizontal, 4)
         .padding(.top, 4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(headerLabel(destination: destination, arrive: arrive, motion: motion.text))
+        .accessibilityLabel(headerLabel(destination: destination, arrive: arrive))
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("convoy.header")
     }
 
-    /// Starts with "3 in Convoy" (UI tests read it), then the route, motion and arrival.
-    private func headerLabel(destination: String, arrive: String?, motion: String) -> String {
+    /// Starts with "3 in Convoy" (UI tests read it), then the route and arrival. The convoy's motion
+    /// is in the trip pill at the top of the map.
+    private func headerLabel(destination: String, arrive: String?) -> String {
         var parts = [convoy.title]
         if let originName { parts.append("from \(originName) to \(destination)") } else { parts.append("to \(destination)") }
-        parts.append(motion)
         if let arrive { parts.append("arrive \(arrive)") }
         return parts.joined(separator: ", ")
     }
@@ -214,10 +191,13 @@ struct ConvoyPanel: View {
     /// Collapsed only (MapCollapsed.dc.html): overlapping car dots (dashed for joining cars), then
     /// "3 cars driving · Hafiz joins in 18 min · 6.4 km spread" and a chevron. Tapping expands.
     private var summary: some View {
-        let joiner = convoy.joining.first(where: { $0.timeToMerge != nil }) ?? convoy.joining.first
+        // My own joining car first ("You join in 18 min"), else the first with a merge time.
+        let joiner = convoy.joining.first(where: { $0.id == model.myCarId })
+            ?? convoy.joining.first(where: { $0.timeToMerge != nil }) ?? convoy.joining.first
         let parts = ConvoyFormat.convoySummary(
             driving: convoy.convoy.count, joinerName: joiner?.car.name, joinIn: joiner?.timeToMerge,
-            spread: convoy.convoy.count > 1 ? convoy.snapshot.spread : nil)
+            spread: convoy.convoy.count > 1 ? convoy.snapshot.spread : nil,
+            joinerIsMe: joiner != nil && joiner?.id == model.myCarId)
         let warn = model.separationWarning != nil
         var text = Text(parts.driving).fontWeight(.semibold)
         if let joining = parts.joining { text = text + Text(" · \(joining)") }

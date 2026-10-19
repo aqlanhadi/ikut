@@ -117,16 +117,74 @@ enum ConvoyFormat {
 
     /// The collapsed panel's summary parts: "3 cars driving", "Hafiz joins in 18 min",
     /// "6.4 km spread". The joiner is named by the first word of the car name, without "'s".
+    /// When the joiner is my own car it reads in the second person: "You join in 18 min", "You're joining".
     static func convoySummary(
-        driving: Int, joinerName: String?, joinIn: TimeInterval?, spread: Double?
+        driving: Int, joinerName: String?, joinIn: TimeInterval?, spread: Double?, joinerIsMe: Bool = false
     ) -> (driving: String, joining: String?, spread: String?) {
         let drivingText = driving == 1 ? "1 car driving" : "\(driving) cars driving"
         var joining: String?
-        if let joinerName, !joinerName.isEmpty {
+        if joinerIsMe {
+            joining = joinIn.map { "You join in \(duration($0))" } ?? "You\u{2019}re joining"
+        } else if let joinerName, !joinerName.isEmpty {
             var owner = joinerName.split(separator: " ").first.map(String.init) ?? joinerName
             for suffix in ["\u{2019}s", "'s"] where owner.hasSuffix(suffix) { owner = String(owner.dropLast(2)) }
             joining = joinIn.map { "\(owner) joins in \(duration($0))" } ?? "\(owner) joining"
         }
         return (drivingText, joining, spread.map { "\(distance($0)) spread" })
+    }
+
+    // MARK: Trip pill
+
+    /// The convoy's motion, shown first in the trip pill at the top of the map.
+    enum Motion: Equatable {
+        case everyoneArrived, arrived, moving, stopped, waiting
+
+        var text: String {
+            switch self {
+            case .everyoneArrived: "Everyone\u{2019}s arrived"
+            case .arrived: ConvoyFormat.arrived
+            case .moving: "On the move"
+            case .stopped: "Stopped"
+            case .waiting: "Waiting"
+            }
+        }
+
+        /// Green once moving or in; amber while stopped or waiting.
+        var isPositive: Bool {
+            switch self {
+            case .everyoneArrived, .arrived, .moving: true
+            case .stopped, .waiting: false
+            }
+        }
+    }
+
+    /// "Everyone's arrived" / "Arrived" once the cars (or mine) are in; else "On the move" while the
+    /// front car goes faster than 3 m/s, "Stopped" once it doesn't, "Waiting" with no cars.
+    static func motion(mineArrived: Bool, everyoneArrived: Bool, frontSpeed: Double?) -> Motion {
+        if everyoneArrived { return .everyoneArrived }
+        if mineArrived { return .arrived }
+        guard let frontSpeed else { return .waiting }
+        return frontSpeed > 3 ? .moving : .stopped
+    }
+
+    /// The trip pill's own sharing state: "Trip ended", "Sharing paused", "Sharing location" or
+    /// "Not sharing location".
+    static func sharingStatus(ended: Bool, paused: Bool, sharing: Bool) -> String {
+        if ended { return "Trip ended" }
+        if paused { return "Sharing paused" }
+        return sharing ? "Sharing location" : "Not sharing location"
+    }
+
+    /// The trip pill's subtitle parts, joined with " · ": the convoy's motion (left out once the trip
+    /// ended), the sharing state, then the join code when `withCode` and known:
+    /// "On the move · Sharing location · Code K7M 2QX".
+    static func tripPillParts(
+        motion: Motion?, ended: Bool, paused: Bool, sharing: Bool, code: String, withCode: Bool = true
+    ) -> [String] {
+        var parts: [String] = []
+        if !ended, let motion { parts.append(motion.text) }
+        parts.append(sharingStatus(ended: ended, paused: paused, sharing: sharing))
+        if withCode, !code.isEmpty { parts.append("Code \(code)") }
+        return parts
     }
 }

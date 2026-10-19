@@ -99,7 +99,7 @@ struct TripMapView: View {
                 // under the banner's close button.
                 if !stopCardOpen {
                     MapModeControl(mode: $model.mode)
-                        .padding(.top, bannerShowing ? 156 : 76)
+                        .padding(.top, bannerShowing ? 164 : 84)
                         .padding(.trailing, 12)
                         .animation(.snappy, value: bannerShowing)
                 }
@@ -335,17 +335,22 @@ struct TripMapView: View {
     private var tripPill: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(model.isEnded ? Color.gray : (model.isTracker ? MapPalette.live : Color.orange))
+                .fill(pillDot)
                 .frame(width: 10, height: 10)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(model.tripName.isEmpty ? "Trip" : model.tripName)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                Text(pillSubtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                // With the code when it fits, else without; the last resort truncates.
+                ViewThatFits(in: .horizontal) {
+                    pillSubtitle(withCode: true)
+                    pillSubtitle(withCode: false)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .accessibilityIdentifier("trip.pill.status")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
@@ -367,17 +372,47 @@ struct TripMapView: View {
             .disabled(isWorking)
             .accessibilityLabel("Trip menu")
         }
+        // Map.dc.html: 6 pt top and bottom, 16 pt before the dot, 4 pt after the 44 pt menu button,
+        // so the pill is 56 pt tall in every state.
         .padding(.leading, 16)
         .padding(.trailing, 4)
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
+        .frame(minHeight: 56)
         .background(.regularMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
     }
 
-    private var pillSubtitle: String {
-        var parts = [model.isEnded ? "Trip ended" : (model.isTracker ? "Sharing location" : "Not sharing location")]
-        if !model.tripCode.isEmpty { parts.append("Code \(model.tripCode)") }
-        return parts.joined(separator: " · ")
+    /// The convoy's motion ("On the move", "Arrived", ...), shown first in the pill.
+    private var motion: ConvoyFormat.Motion {
+        let snapshot = model.convoy.snapshot
+        return ConvoyFormat.motion(
+            mineArrived: snapshot.hasArrived(model.myCarId), everyoneArrived: snapshot.everyoneArrived,
+            frontSpeed: snapshot.etaReference?.speed)
+    }
+
+    /// Gray once ended, amber while paused or not sharing, else live green.
+    private var pillDot: Color {
+        if model.isEnded { return .gray }
+        return model.isTracker && !session.isPaused ? MapPalette.live : .orange
+    }
+
+    /// "On the move · Sharing location · Code K7M 2QX", the motion in green (or amber when stopped).
+    private func pillSubtitle(withCode: Bool) -> Text {
+        let parts = ConvoyFormat.tripPillParts(
+            motion: motion, ended: model.isEnded, paused: session.isPaused, sharing: model.isTracker,
+            code: model.tripCode, withCode: withCode)
+        let motionText = model.isEnded ? nil : motion.text
+        var text = Text("")
+        for (i, part) in parts.enumerated() {
+            if i > 0 { text = text + Text(" · ") }
+            if i == 0, part == motionText {
+                text = text + Text(part).fontWeight(.semibold)
+                    .foregroundStyle(motion.isPositive ? Color.ikutPositive : Color.ikutWarning)
+            } else {
+                text = text + Text(part)
+            }
+        }
+        return text
     }
 
     // MARK: Stops
@@ -407,7 +442,7 @@ struct TripMapView: View {
     /// The card's voter list scrolls to fit.
     private var maxBottomHeight: CGFloat? {
         guard mapHeight > 0 else { return nil }
-        return mapHeight - (bannerShowing ? 150 : 66)
+        return mapHeight - (bannerShowing ? 158 : 74)
     }
 
     private var stopContext: StopContext? {
