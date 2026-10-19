@@ -65,6 +65,9 @@ final class JoinAsSecondMemberUITests: XCTestCase {
 
         // Start Trip pushes the live map on the lobby's session.
         startTrip.tap()
+        // The Always-location explainer covers the map when only While Using is granted.
+        let notNow = app.buttons["Not now"]
+        if notNow.waitForExistence(timeout: 5) { notNow.tap() }
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         XCTAssertTrue(app.buttons["Trip menu"].exists)
 

@@ -376,7 +376,7 @@ function startApp(code) {
   const line = simctl('list', 'devices').stdout.split('\n').find((l) => l.includes(o.udid));
   if (!line) { console.error(`simulator ${o.udid} not found`); process.exit(1); }
   if (!line.includes('(Booted)')) { log('booting simulator'); simctl('boot', o.udid); simctl('bootstatus', o.udid, '-b'); }
-  simctl('privacy', o.udid, 'grant', 'location', 'dev.aqlan.ikut');
+  simctl('privacy', o.udid, 'grant', 'location-always', 'dev.aqlan.ikut');
   const s = main.coordinateAtOffset(PHONE.start);
   simctl('location', o.udid, 'set', `${s.latitude.toFixed(6)},${s.longitude.toFixed(6)}`);
 
@@ -457,11 +457,19 @@ async function runMain() {
     const deadline = Date.now() + o.waitTimeout * 1000;
     let phoneCar = null;
     log('waiting for the phone to join and start tracking...');
+    // The app drops fixes older than 15 s and the simulator doesn't repeat an unchanged location, so the one
+    // set before the build is stale by the time tracking starts. Re-send it, nudged, until the phone reports.
+    const park = main.coordinateAtOffset(PHONE.start);
+    let tick = 0;
     while (!phoneCar) {
       if (Date.now() > deadline) throw new Error('the phone did not start tracking in time');
       if (xc.exitCode !== null) throw new Error(`xcodebuild exited ${xc.exitCode} before the phone started tracking, see ${path.join(o.logs, 'demo-xcodebuild.log')}`);
       await sleep(1000);
       hold();
+      if (++tick % 5 === 0) {
+        const nudge = (tick / 5) % 2 ? 0.000005 : 0;
+        simctl('location', o.udid, 'set', `${(park.latitude + nudge).toFixed(6)},${park.longitude.toFixed(6)}`);
+      }
       const snap = await getDocs(collection(cars.lead.db, `trips/${cars.lead.tripId}/positions`));
       phoneCar = snap.docs.map((d) => d.id).find((id) => !known.has(id)) ?? null;
     }
