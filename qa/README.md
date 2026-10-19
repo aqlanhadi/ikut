@@ -8,7 +8,7 @@ start them first (`cd firebase && firebase emulators:start`). Node 20+.
 cd qa && npm install
 node convoy-sim.mjs                  # 4 simulated cars, real time, prints TRIP CODE: XXXXXX, PASS/FAIL per check
 node convoy-sim.mjs --speed 2        # 2x (the signal-drop check needs <= 2.5x, see below)
-node run-ui.mjs --speed 1            # everything, with the app on simulator 88B5ECF1 as the fifth car
+node run-ui.mjs --speed 1            # everything, with the app on simulator C0A40D2A (iPhone 17) as the fifth car
 ```
 
 `run-ui.mjs` boots the simulator, grants location, starts `convoy-sim.mjs --wait-app`, runs
