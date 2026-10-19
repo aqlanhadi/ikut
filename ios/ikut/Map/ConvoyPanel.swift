@@ -146,15 +146,10 @@ struct ConvoyPanel: View {
             }
             .disabled(!canReport)
             Button(action: onStop) {
-                Label {
-                    Text("Stop")
-                } icon: {
-                    // minus.octagon.fill is missing on iOS 27; a plain red octagon reads as a stop sign.
-                    Image(systemName: "octagon.fill")
-                        .foregroundStyle(.red)
-                }
+                // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
+                Label("Pit stop", systemImage: "mappin.and.ellipse")
                 .font(.headline)
-                .frame(width: 130, height: 50)
+                .frame(width: 146, height: 50)
                 .foregroundStyle(.primary)
                 .background(Color(.systemGray5).opacity(0.7), in: Capsule())
             }
