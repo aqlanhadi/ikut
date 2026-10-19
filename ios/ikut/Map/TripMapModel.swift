@@ -131,7 +131,7 @@ final class TripMapModel {
         var routeChanged = false
         if let trip {
             tripName = trip.name
-            departedAt = trip.createdAt
+            departedAt = trip.startedAt ?? trip.createdAt
             tripCode = Self.formatCode(trip.code)
             convoy.destinationName = trip.destination.name
             if trip.route != mainRouteString {

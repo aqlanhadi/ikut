@@ -226,7 +226,7 @@ struct LobbyView: View {
             VStack(spacing: 2) {
                 Label("Trip in progress", systemImage: "car.fill")
                     .font(.footnote.weight(.semibold))
-                if let since = LobbyLogic.onTheRoadLine(startedAt: model.trip?.startedAt) {
+                if let since = LobbyLogic.onTheRoadLine(startedAt: model.trip?.startedAt ?? model.trip?.createdAt) {
                     Text(since).font(.caption)
                 }
             }
@@ -276,7 +276,10 @@ struct LobbyView: View {
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if !session.isEnded {
+                    if isStarted {
+                        StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
+                            .padding(10)
+                    } else if !session.isEnded {
                         StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
                             .padding(10)
                     }
