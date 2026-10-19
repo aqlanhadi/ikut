@@ -1,8 +1,8 @@
 import MapKit
 import SwiftUI
 
-/// Home after the welcome screen, as in Home.dc.html: a map of where you are under a floating
-/// glass sheet with New Trip, Join Trip and past trips.
+/// Home after the welcome screen, as in Home.dc.html: a map of where you are and the routes of
+/// your past trips, under a floating glass sheet with New Trip, Join Trip and past trips.
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     var onNewTrip: () -> Void
@@ -15,6 +15,27 @@ struct TripsHomeView: View {
     @State private var expanded = false
     @GestureState private var dragOffset: CGFloat = 0
     @State private var past: [PastTrips.Entry] = []
+    /// Routes of the newest ended trips, drawn on the map (newest first).
+    @State private var routes: [PastTripRoute] = []
+    @State private var camera: MapCameraPosition
+    @State private var mapHeight: CGFloat = 874
+
+    init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
+         onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }) {
+        self.onNewTrip = onNewTrip
+        self.onJoin = onJoin
+        self.onOpenTrip = onOpenTrip
+        // Open on the cached past routes when there are any: a later switch away from
+        // `.userLocation` can lose to the first location fix.
+        let cache = PastTripsMapService.cachedRoutes()
+        let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
+        if let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: Double(Self.compactHeight / 874)) {
+            _camera = State(initialValue: .region(region))
+            _routes = State(initialValue: cached)
+        } else {
+            _camera = State(initialValue: .userLocation(fallback: .region(Self.fallback)))
+        }
+    }
 
     /// Where the map opens when location isn't available yet.
     private static let fallback = MKCoordinateRegion(
@@ -23,14 +44,10 @@ struct TripsHomeView: View {
 
     var body: some View {
         ZStack {
-            Map(initialPosition: .userLocation(fallback: .region(Self.fallback))) {
-                UserAnnotation()
-            }
-            .mapControlVisibility(.hidden)
-            .ignoresSafeArea()
-            .accessibilityHidden(true)
+            map
             sheet
         }
+        .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { await loadRoutes() }
         .overlay(alignment: .topTrailing) { profileButton }
         .alert("Your name", isPresented: $renaming) {
             TextField("Your name", text: $newName)
@@ -44,6 +61,90 @@ struct TripsHomeView: View {
             Button("OK") { renameError = nil }
         } message: {
             Text(renameError ?? "")
+        }
+    }
+
+    // MARK: Map
+
+    /// Where you are, plus the routes of your past trips. The newest is drawn in the accent with
+    /// its name; older ones are fainter. Tapping a destination opens that trip's recap.
+    private var map: some View {
+        Map(position: $camera) {
+            UserAnnotation()
+            // Oldest first so the newest draws on top.
+            ForEach(Array(routes.enumerated().reversed()), id: \.element.id) { index, route in
+                routeContent(route, latest: index == 0)
+            }
+        }
+        .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .mapControlVisibility(.hidden)
+        .ignoresSafeArea()
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { mapHeight = $0 }
+    }
+
+    @MapContentBuilder
+    private func routeContent(_ route: PastTripRoute, latest: Bool) -> some MapContent {
+        let line = route.coordinates
+        if line.count > 1 {
+            MapPolyline(coordinates: line)
+                .stroke(.white.opacity(latest ? 0.9 : 0.6),
+                        style: StrokeStyle(lineWidth: latest ? 9 : 6, lineCap: .round, lineJoin: .round))
+            MapPolyline(coordinates: line)
+                .stroke(Color.ikutAccent.opacity(latest ? 1 : 0.45),
+                        style: StrokeStyle(lineWidth: latest ? 5 : 3, lineCap: .round, lineJoin: .round))
+        }
+        if let start = route.start {
+            Annotation("", coordinate: start, anchor: .center) {
+                Circle().fill(.white).frame(width: latest ? 12 : 9, height: latest ? 12 : 9)
+                    .overlay(Circle().stroke(Color.ikutAccent.opacity(latest ? 1 : 0.6), lineWidth: latest ? 3 : 2))
+                    .accessibilityHidden(true)
+            }
+            .annotationTitles(.hidden)
+        }
+        Annotation(displayName(route), coordinate: route.destination, anchor: .center) {
+            Button { open(route) } label: {
+                Image(systemName: "flag.checkered")
+                    .font(.system(size: latest ? 13 : 10, weight: .bold))
+                    .foregroundStyle(latest ? .white : Color.ikutAccent)
+                    .frame(width: latest ? 30 : 22, height: latest ? 30 : 22)
+                    .background(latest ? Color.ikutAccent : Color.white, in: Circle())
+                    .overlay(Circle().stroke(latest ? Color.white : Color.ikutAccent.opacity(0.6), lineWidth: 2))
+                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(displayName(route)), to \(route.destinationName)")
+            .accessibilityHint("Opens the recap")
+        }
+        .annotationTitles(latest ? .automatic : .hidden)
+    }
+
+    /// The name Home lists for the trip (it may have been renamed since the route was cached).
+    private func displayName(_ route: PastTripRoute) -> String {
+        past.first(where: { $0.id == route.id })?.name ?? route.name
+    }
+
+    private func open(_ route: PastTripRoute) {
+        if let entry = past.first(where: { $0.id == route.id }) { onOpenTrip(entry) }
+    }
+
+    private func loadRoutes() async {
+        let drawn = PastTripsMapLogic.tripsToDraw(past)
+        guard !drawn.isEmpty else { routes = []; return }
+        let loaded = await PastTripsMapService.load(drawn)
+        guard !Task.isCancelled, loaded != routes else { return }
+        show(loaded, animated: true)
+    }
+
+    private func show(_ list: [PastTripRoute], animated: Bool) {
+        routes = list
+        let obscured = Double(Self.compactHeight / max(mapHeight, 1))
+        guard let region = PastTripsMapLogic.region(fitting: list, bottomObscured: obscured) else { return }
+        if animated {
+            withAnimation(.smooth(duration: 0.8)) { camera = .region(region) }
+        } else {
+            camera = .region(region)
         }
     }
 
