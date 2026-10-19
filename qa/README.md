@@ -21,6 +21,20 @@ To join by hand instead: `node convoy-sim.mjs --wait-app`, join with the printed
 feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
 `node convoy-sim.mjs --help` lists the other flags.
 
+## Drive one trip by hand
+
+`node drive-trip.mjs [CODE]` plays a trip's main route on the simulator (the newest active trip in the emulators if no code
+is given), so you can create a trip in the app, tap Start Trip and watch yourself drive to the destination. `--kmh 100`,
+`--speed 20` (time multiplier), `--from 30` (start 30 km along). Set the simulator's location first
+(`xcrun simctl location C0A40D2A-0607-4B95-A1BE-F8C9190D81C1 set 3.139,101.687`), since Where to? builds the route from it.
+
+On a real iPhone: `node drive-trip.mjs CODE --gpx trip.gpx` writes a timed GPX. Run the app from Xcode on the phone, then
+Debug > Simulate Location > Add GPX File to Workspace... and pick it. For a production trip, pass the route with
+`--route <encoded polyline>` instead of a code.
+
+`ConvoyScenarioUITests`' sibling `CreateTripUITests` walks name, New Trip, Where to?, lobby and Start Trip;
+`TEST_RUNNER_IKUT_HOLD_SECONDS=420` leaves it on the map for a drive.
+
 ## Layout
 
 | Path | What |

@@ -13,6 +13,7 @@
 		0D7C547A2B5851076B5FD784 /* RequestStopSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7602D2F826A4365ED79B1EB8 /* RequestStopSheet.swift */; };
 		0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */; };
 		10D7571EF4F2BC7E905F5A3A /* AlertCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AEFFFA195297151E2DEE401 /* AlertCenter.swift */; };
+		11CA80C194C3B109415910D3 /* CreateTripUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */; };
 		13AB18A30D92618B0F633AF8 /* PositionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B0DDAF1194DD5CA4B0A112 /* PositionBuilder.swift */; };
 		16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2392E5A1D08103853E77C151 /* ServerWriteTests.swift */; };
 		16C46AF24C556E0808E837F4 /* Polyline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89911FBE6E40CB98D46C337F /* Polyline.swift */; };
@@ -240,6 +241,7 @@
 		E047C4D86365E2C469F00DA8 /* ikut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ikut.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E0CBCC67DC1C481AA5F5CA5A /* ReportToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportToastView.swift; sourceTree = "<group>"; };
 		E0D7B5FA67D691851818F691 /* ConvoyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyTests.swift; sourceTree = "<group>"; };
+		E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripUITests.swift; sourceTree = "<group>"; };
 		E5E2C4D6FFA56CAD6008809D /* TrackingTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTypes.swift; sourceTree = "<group>"; };
 		E8576506422AFD08E8778B82 /* LobbyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyTests.swift; sourceTree = "<group>"; };
 		EBDD23345E4B5753BEC3866D /* JoinService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinService.swift; sourceTree = "<group>"; };
@@ -384,6 +386,7 @@
 			isa = PBXGroup;
 			children = (
 				6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */,
+				E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */,
 				7E2539E4B214F18444DA0A00 /* JoinAsSecondMemberUITests.swift */,
 			);
 			path = ikutUITests;
@@ -804,6 +807,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A5D7587052DDAC3FD53CC733 /* ConvoyScenarioUITests.swift in Sources */,
+				11CA80C194C3B109415910D3 /* CreateTripUITests.swift in Sources */,
 				DC9B81DCD81642680E58F12B /* JoinAsSecondMemberUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
