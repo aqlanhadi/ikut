@@ -33,6 +33,7 @@
 		35F976285A6C1473665E4CE0 /* ConvoyOrdering.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56C3DA55D52C315FF1422E4 /* ConvoyOrdering.swift */; };
 		36C740A771C8B0FDCACDCEDA /* LocationPermissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A65171C412E1666014BC2347 /* LocationPermissionTests.swift */; };
 		3948F54C6AB6FC2E960961D3 /* TrackingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFE7C740DA188C9EC84A837 /* TrackingService.swift */; };
+		3A951901201FF3600B2A11E5 /* ApproachAlertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63901D96ED7A8D4DFE51434 /* ApproachAlertView.swift */; };
 		3AE7CB9FD6B10610505C93EE /* TripEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17EB484B1F7FD361B7EB9E11 /* TripEvent.swift */; };
 		41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */; };
 		441D6445951053C29F1E89A0 /* ReportToastModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B897B8297B6CD8B5B2ED04 /* ReportToastModel.swift */; };
@@ -233,6 +234,7 @@
 		CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameEntryView.swift; sourceTree = "<group>"; };
 		D0D7948AC8E4880C3065A836 /* MapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTests.swift; sourceTree = "<group>"; };
 		D34759F3D28A64C5908B2C7D /* AuthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTests.swift; sourceTree = "<group>"; };
+		D63901D96ED7A8D4DFE51434 /* ApproachAlertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachAlertView.swift; sourceTree = "<group>"; };
 		DBB0A694CC1459C9224678CC /* ConvoyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyModel.swift; sourceTree = "<group>"; };
 		DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardLogic.swift; sourceTree = "<group>"; };
 		E047C4D86365E2C469F00DA8 /* ikut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ikut.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -440,6 +442,7 @@
 				8C4E3792B5AD023C85CD5AA0 /* AlertPolicy.swift */,
 				B6117F5F8B2493D250C4083B /* AlertSettings.swift */,
 				650E26FDD008B015443CC328 /* AlertWording.swift */,
+				D63901D96ED7A8D4DFE51434 /* ApproachAlertView.swift */,
 				573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */,
 				C963869E69413A0E655BFED4 /* SpeechQueue.swift */,
 			);
@@ -716,6 +719,7 @@
 				DDFB1D5C15A1D5FEC996A11C /* AlertSettings.swift in Sources */,
 				B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */,
 				EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */,
+				3A951901201FF3600B2A11E5 /* ApproachAlertView.swift in Sources */,
 				B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */,
 				0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */,
 				B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */,

@@ -31,6 +31,10 @@ struct TripMapView: View {
     @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
+    /// The hazard approach alert being followed: full screen, then a pill until it's passed.
+    @State private var approach: TripAlert?
+    @State private var showApproach = false
+    @State private var passedText: String?
     @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
     @Environment(\.dismiss) private var dismiss
 
@@ -89,6 +93,7 @@ struct TripMapView: View {
                     stopCard
                     ConvoyPanel(
                         model: model, expanded: panelBinding, canReport: model.myCarId != nil,
+                        nextStop: stopState?.place,
                         onReport: openReport, onStop: { stopSheet = .request })
                         .layoutPriority(1)
                 }
@@ -137,6 +142,13 @@ struct TripMapView: View {
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
+            .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
+            .task(id: approach?.id) { await watchApproach() }
+            .fullScreenCover(isPresented: $showApproach) {
+                if let approach {
+                    ApproachAlertView(alert: approach, model: model) { showApproach = false }
+                }
+            }
     }
 
     // MARK: Map
@@ -213,8 +225,45 @@ struct TripMapView: View {
     private var bannerHiding: Set<EventCategory> { stopState == nil ? [] : [.stopRequest] }
 
     private var bannerShowing: Bool {
+        if approach != nil || passedText != nil { return true }
         guard let alert = alerts.current else { return false }
         return !bannerHiding.contains(alert.category)
+    }
+
+    /// A hazard approach alert (one with a distance) takes the full screen; others stay banners.
+    private func followApproachIfNeeded() {
+        guard let alert = alerts.current, alert.category == .hazard, alert.distance != nil,
+              alert.id != approach?.id else { return }
+        approach = alert
+        passedText = nil
+        showApproach = true
+    }
+
+    /// Keeps the pill until the hazard is behind, then says so briefly. Gives up after a few
+    /// minutes when the distance can't be worked out (e.g. this car hasn't merged).
+    private func watchApproach() async {
+        guard let alert = approach else { return }
+        let started = Date()
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            let distance = model.approachDistance(eventId: alert.eventId)
+            if let distance, distance <= 0 {
+                let label = model.hazards.markers.first { $0.id == alert.eventId }?.label.lowercased() ?? "hazard"
+                withAnimation(.snappy) {
+                    approach = nil
+                    showApproach = false
+                    passedText = "Passed the \(label)"
+                }
+                try? await Task.sleep(for: .seconds(3))
+                withAnimation(.snappy) { passedText = nil }
+                return
+            }
+            if distance == nil, Date().timeIntervalSince(started) > 180 {
+                withAnimation(.snappy) { approach = nil }
+                return
+            }
+        }
     }
 
     private var topStack: some View {
@@ -230,7 +279,20 @@ struct TripMapView: View {
                 })
             }
             // The stop card says the same thing, so its own banner would only crowd the top.
-            AlertBannerView(center: alerts, hiding: bannerHiding)
+            if let approach, !showApproach {
+                ApproachPill(alert: approach, model: model) { showApproach = true }
+            }
+            AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
+            if let passedText {
+                Label(passedText, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color(white: 0.11).opacity(0.96), in: Capsule())
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }

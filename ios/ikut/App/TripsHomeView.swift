@@ -112,6 +112,7 @@ struct TripsHomeView: View {
                     .background(.regularMaterial, in: Circle())
                     .shadow(color: .black.opacity(0.08), radius: 7, y: 4)
             }
+            .tint(.primary)
             .accessibilityLabel("Profile, \(name)")
             .padding(.horizontal, 16)
             .padding(.top, 8)

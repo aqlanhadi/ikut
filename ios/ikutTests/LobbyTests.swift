@@ -48,6 +48,19 @@ struct LobbyTests {
         #expect(image.size.width > 0)
         #expect(image.size.width == image.size.height)
     }
+
+    @Test func catchUpLineNamesCarsWithoutATracker() {
+        let tracked = LobbyCar(car: car("a", "Aqlan's Myvi", tracker: "u1"), members: [member("u1", "Aqlan", car: "a")])
+        let daniel = LobbyCar(car: car("d", "Daniel's City"), members: [member("u4", "Daniel", car: "d")])
+        let siti = LobbyCar(car: car("s", "Siti's Axia"), members: [member("u5", "Siti", car: "s")])
+        let empty = LobbyCar(car: car("e", "Spare car"), members: [])
+
+        #expect(LobbyLogic.catchUpLine([tracked]) == nil)
+        #expect(LobbyLogic.catchUpLine([tracked, daniel]) == "Daniel can catch up on the road")
+        #expect(LobbyLogic.catchUpLine([daniel, siti]) == "Daniel and Siti can catch up on the road")
+        #expect(LobbyLogic.catchUpLine([empty]) == "Spare car can catch up on the road")
+        #expect(LobbyLogic.catchUpLine([daniel, siti, empty]) == "3 cars can catch up on the road")
+    }
 }
 
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
@@ -87,4 +100,5 @@ struct LobbyEmulatorTests {
         #expect(grouped[0].members.map(\.displayName) == ["Aqlan"])
         #expect(grouped[0].hasTracker)
     }
+
 }

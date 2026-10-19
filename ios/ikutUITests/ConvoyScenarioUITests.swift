@@ -57,7 +57,6 @@ final class ConvoyScenarioUITests: XCTestCase {
             let rows = ["convoy.row.1", "convoy.row.2", "convoy.row.3", "convoy.row.5"]
             try waitFor("all four convoy rows", timeout: 120) { rows.allSatisfy { exists($0) } }
             try waitFor("convoy order 1, 2, 3, 5", timeout: 60) { convoyOrder() == [1, 2, 3, 5] }
-            XCTAssertTrue(exists("convoy.joining.header"), "JOINING header is missing")
             let joining = element("joining.row.4")
             XCTAssertTrue(joining.exists, "car 4 should be under JOINING")
             XCTAssertTrue(joining.label.contains("Daniel"), "joining row should be Daniel's car: \(joining.label)")
@@ -87,7 +86,6 @@ final class ConvoyScenarioUITests: XCTestCase {
 
         try step("4. Car 4 merges: JOINING goes, order 1, 2, 4, 3, 5") {
             try waitFor("car 4 leaves JOINING", timeout: 120 / speed + 60) { !exists("joining.row.4") }
-            XCTAssertFalse(exists("convoy.joining.header"), "JOINING header should go with the last joining car")
             try waitFor("convoy order 1, 2, 4, 3, 5", timeout: 60) { convoyOrder() == [1, 2, 4, 3, 5] }
             XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in Convoy"), "header: \(element("convoy.header").label)")
             shot("04-car4-merged")

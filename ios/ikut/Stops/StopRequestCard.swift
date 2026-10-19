@@ -15,6 +15,7 @@ struct StopRequestCard: View {
         VStack(alignment: .leading, spacing: 14) {
             header.fixedSize(horizontal: false, vertical: true)
             placeCard.fixedSize(horizontal: false, vertical: true)
+            tally
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     votes
@@ -88,6 +89,24 @@ struct StopRequestCard: View {
         guard state.shownPlace != nil else { return "The lead car pins where to stop" }
         let who = state.place != nil ? "pinned by the lead car" : "proposed by Car \(state.requesterNumber.map(String.init) ?? "?")"
         return [state.etaText, who].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// "VOTES", a bar filled by the cars that agreed, then "3 of 4 agreed".
+    private var tally: some View {
+        let agreed = state.rows.filter { $0.status == .agreed }.count
+        let text = "\(agreed) of \(state.rows.count) agreed"
+        return HStack(spacing: 10) {
+            StatCaption("Votes")
+            ProgressView(value: Double(agreed), total: Double(max(state.rows.count, 1)))
+                .tint(.green)
+            Text(text)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.ikutPositive)
+        }
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Votes: \(text)")
     }
 
     private var votes: some View {

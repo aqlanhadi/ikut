@@ -54,6 +54,14 @@ struct TripServiceTests {
     @Test func defaultTripName() {
         #expect(TripService.defaultTripName(for: "Aqlan") == "Aqlan's trip")
         #expect(TripService.defaultTripName(for: nil) == "My trip")
+        #expect(TripService.defaultTripName(destination: "Ipoh") == "Trip to Ipoh")
+    }
+
+    @Test func shortDuration() {
+        #expect(RouteFormat.shortDuration(8_700) == "2h 25m")
+        #expect(RouteFormat.shortDuration(7_230) == "2h 01m")
+        #expect(RouteFormat.shortDuration(2_700) == "45m")
+        #expect(RouteFormat.shortDuration(10) == "1m")
     }
 
     @Test func tripDocumentMatchesRules() {
