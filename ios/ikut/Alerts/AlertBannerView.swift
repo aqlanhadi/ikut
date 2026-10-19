@@ -10,13 +10,24 @@ struct AlertBannerView: View {
     /// One alert shown elsewhere (the approach alert and its pill).
     var hidingAlertId: String?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var shown: TripAlert? {
+        guard let alert = center.current, !hiding.contains(alert.category), alert.id != hidingAlertId else { return nil }
+        return alert
+    }
+
     var body: some View {
-        Group {
-            if let alert = center.current, !hiding.contains(alert.category), alert.id != hidingAlertId {
+        // Zero-height container: always in the hierarchy so the insertion/removal transition runs,
+        // and it adds no stack spacing while empty.
+        ZStack(alignment: .top) {
+            if let alert = shown {
                 banner(alert)
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.snappy, value: center.current)
+        .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.82), value: shown)
     }
 
     private func banner(_ alert: TripAlert) -> some View {
@@ -28,8 +39,8 @@ struct AlertBannerView: View {
                 .background(tint(alert.severity), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(alert.title).font(.body.weight(.semibold))
-                Text(alert.body).font(.subheadline).foregroundStyle(.white.opacity(0.7))
+                Text(alert.title).font(.body.weight(.semibold)).lineLimit(1)
+                Text(alert.body).font(.subheadline).foregroundStyle(.white.opacity(0.7)).lineLimit(2)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -44,8 +55,7 @@ struct AlertBannerView: View {
         .padding(.vertical, 8)
         .background(Color(white: 0.11).opacity(0.96), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
-        .padding(.horizontal, 16)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)
     }
