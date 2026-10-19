@@ -401,7 +401,7 @@ struct TripMapView: View {
     @ViewBuilder
     private var stopCard: some View {
         if let state = stopState, let context = stopContext {
-            StopRequestCard(
+            StopRequestOverlay(
                 state: state,
                 actions: StopService.actions(
                     context: context, state: state,

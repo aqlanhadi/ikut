@@ -5,6 +5,8 @@ import SwiftUI
 struct StopRequestCard: View {
     let state: StopRequestState
     let actions: StopRequestActions
+    /// Folds the card into its chip; nil hides the control.
+    var onMinimize: (() -> Void)? = nil
 
     /// The voter list (and pin choices) is as tall as its rows, and gives way when the card is
     /// squeezed into less room by its parent, then scrolls; the header and the buttons stay put,
@@ -16,9 +18,9 @@ struct StopRequestCard: View {
             header.fixedSize(horizontal: false, vertical: true)
             placeCard.fixedSize(horizontal: false, vertical: true)
             tally
+            votes
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    votes
                     if state.canPin && state.place == nil { pinSection }
                 }
                 .background(
@@ -26,7 +28,7 @@ struct StopRequestCard: View {
                         Color.clear.onChange(of: proxy.size.height, initial: true) { _, height in listHeight = height }
                     })
             }
-            .frame(minHeight: min(listHeight ?? 88, 88), maxHeight: listHeight)
+            .frame(minHeight: min(listHeight ?? 0, 88), maxHeight: listHeight)
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
             buttons.fixedSize(horizontal: false, vertical: true)
@@ -41,6 +43,12 @@ struct StopRequestCard: View {
             shape.fill(Color(.systemBackground).opacity(0.94))
         }
         .accessibilityElement(children: .contain)
+        .gesture(
+            DragGesture(minimumDistance: 20).onEnded { value in
+                if value.translation.height > 60, abs(value.translation.width) < value.translation.height {
+                    onMinimize?()
+                }
+            })
     }
 
     private var header: some View {
@@ -59,6 +67,22 @@ struct StopRequestCard: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+        .overlay(alignment: .topTrailing) {
+            if let onMinimize {
+                Button(action: onMinimize) {
+                    Image(systemName: "chevron.down")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color(.tertiarySystemFill), in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .offset(x: 6, y: -6)
+                .accessibilityLabel("Minimize stop request")
+            }
+        }
     }
 
     private var placeCard: some View {
@@ -109,21 +133,47 @@ struct StopRequestCard: View {
         .accessibilityLabel("Votes: \(text)")
     }
 
+    /// A car per vote: its badge, a check when it agreed (dimmed with a clock while waiting), and its short name.
     private var votes: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(state.rows.enumerated()), id: \.element.id) { index, row in
-                if index > 0 { Divider() }
-                HStack(spacing: 12) {
-                    CarBadge(number: row.number, colorHex: row.colorHex, size: 26)
-                    Text(row.name).font(.body).lineLimit(1)
-                    Spacer(minLength: 4)
-                    Text(Self.statusText(row.status)).font(.subheadline).foregroundStyle(Self.statusColor(row.status))
-                }
-                .frame(minHeight: 44)
-                .accessibilityElement(children: .combine)
+        ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: 6) {
+                ForEach(state.rows) { row in voter(row) }
             }
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
         }
-        .padding(.horizontal, 4)
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+    }
+
+    private func voter(_ row: StopRequestState.Row) -> some View {
+        let agreed = row.status == .agreed
+        return VStack(spacing: 5) {
+            CarBadge(number: row.number, colorHex: row.colorHex, size: 40)
+                .opacity(agreed ? 1 : 0.4)
+                .padding(3)
+                .overlay {
+                    Circle().strokeBorder(
+                        agreed ? Color.ikutPositive : Color.secondary.opacity(0.35),
+                        style: StrokeStyle(lineWidth: 2, dash: agreed ? [] : [4, 3]))
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: Self.statusSymbol(row.status))
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(Self.statusColor(row.status), in: Circle())
+                        .overlay(Circle().strokeBorder(Color(.systemBackground), lineWidth: 2))
+                        .offset(x: 3, y: 3)
+                }
+            Text(StopLogic.shortName(row))
+                .font(.caption.weight(row.isMine ? .bold : .medium))
+                .foregroundStyle(agreed ? Color.primary : Color.secondary)
+                .lineLimit(1)
+        }
+        .frame(width: 58)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(StopLogic.voterAccessibilityLabel(row))
     }
 
     /// Lead car and organizer: pin the proposal or one of the suggestions.
@@ -194,10 +244,18 @@ struct StopRequestCard: View {
         }
     }
 
+    static func statusSymbol(_ status: StopRequestState.VoteStatus) -> String {
+        switch status {
+        case .agreed: "checkmark"
+        case .waiting: "clock.fill"
+        case .suggested: "arrow.triangle.branch"
+        }
+    }
+
     static func statusColor(_ status: StopRequestState.VoteStatus) -> Color {
         switch status {
         case .agreed: Color(red: 0.12, green: 0.48, blue: 0.21)
-        case .waiting: .secondary
+        case .waiting: Color(.systemGray)
         case .suggested: Color(red: 0.71, green: 0.28, blue: 0.03)
         }
     }
@@ -209,6 +267,69 @@ struct StopRequestCard: View {
         case .stopToilet: "toilet.fill"
         default: "cup.and.saucer.fill"
         }
+    }
+}
+
+/// The stop card, or the chip it folds into ("Fuel stop · R&R Tapah · 3/4"). Keeps its own
+/// open/folded state, following `StopLogic.nextCardMemory`.
+struct StopRequestOverlay: View {
+    let state: StopRequestState
+    let actions: StopRequestActions
+
+    @State private var memory: StopCardMemory?
+
+    private var collapsed: Bool { (memory ?? StopLogic.nextCardMemory(nil, state: state)).collapsed }
+
+    var body: some View {
+        Group {
+            if collapsed {
+                chip.transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                StopRequestCard(state: state, actions: actions, onMinimize: { setCollapsed(true) })
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: collapsed)
+        .onChange(of: state, initial: true) { _, new in
+            memory = StopLogic.nextCardMemory(memory, state: new)
+        }
+    }
+
+    private func setCollapsed(_ value: Bool) {
+        var m = memory ?? StopLogic.nextCardMemory(nil, state: state)
+        m.collapsed = value
+        memory = m
+    }
+
+    private var chip: some View {
+        Button { setCollapsed(false) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: StopRequestCard.symbol(for: state.type))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Color.accentColor, in: Circle())
+                Text(StopLogic.chipText(state))
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.up")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 8).padding(.trailing, 16).padding(.vertical, 8)
+            .frame(minHeight: 46)
+            .background {
+                Capsule().fill(.regularMaterial)
+                Capsule().fill(Color(.systemBackground).opacity(0.94))
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(StopLogic.chipText(state))
+        .accessibilityHint("Opens the stop request")
+        .accessibilityIdentifier("stopChip")
+        .gesture(DragGesture(minimumDistance: 20).onEnded { if $0.translation.height < -30 { setCollapsed(false) } })
     }
 }
 
@@ -227,7 +348,7 @@ struct StopRequestCard: View {
                 eventId: "e", type: .stopFuel, requesterCarId: "2", requesterNumber: 2, requesterName: "Wyna",
                 askedAt: Date().addingTimeInterval(-60), rows: rows, place: place, proposal: nil, alternatives: [],
                 viewerAgrees: false, canPin: false, canResolve: true, viewerOffset: 0, isResolved: false),
-            actions: .none)
+            actions: .none, onMinimize: {})
             .padding(8)
     }
 }

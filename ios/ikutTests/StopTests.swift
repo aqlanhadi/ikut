@@ -178,6 +178,46 @@ struct StopLogicTests {
         #expect(StopLogic.activeStop(in: [old, new, done, hazard], now: now)?.id == "new")
         #expect(StopLogic.activeStop(in: [done, hazard], now: now) == nil)
     }
+
+    // The card folding into a chip.
+
+    @Test func newRequestOpensForOthersButNotTheRequester() throws {
+        #expect(StopLogic.nextCardMemory(nil, state: try tally(stop())).collapsed == false)
+        #expect(StopLogic.nextCardMemory(nil, state: try tally(stop(), me: "c2", user: "u2")).collapsed)
+    }
+
+    @Test func agreeingCollapsesAndThenTheViewersChoiceStands() throws {
+        let open = StopLogic.nextCardMemory(nil, state: try tally(stop()))
+        let agreed = try tally(stop(), votes: [vote("c1", agree: true)])
+        var m = StopLogic.nextCardMemory(open, state: agreed)
+        #expect(m.collapsed)
+        m.collapsed = false  // reopened by a tap
+        m = StopLogic.nextCardMemory(m, state: agreed)
+        #expect(m.collapsed == false)
+        m.collapsed = true  // minimized before voting
+        let waiting = StopLogic.nextCardMemory(StopCardMemory(key: m.key, viewerAgreed: false, collapsed: true), state: try tally(stop()))
+        #expect(waiting.collapsed)
+    }
+
+    @Test func pinningOrANewRequestReopensOnce() throws {
+        let folded = StopLogic.nextCardMemory(nil, state: try tally(stop(), me: "c2", user: "u2"))
+        var m = StopLogic.nextCardMemory(folded, state: try tally(stop(place: place(pinned: "u1")), me: "c2", user: "u2"))
+        #expect(m.collapsed == false)
+        m.collapsed = true
+        m = StopLogic.nextCardMemory(m, state: try tally(stop(place: place(pinned: "u1")), me: "c2", user: "u2"))
+        #expect(m.collapsed)
+        var other = stop(); other.id = "stop2"
+        #expect(StopLogic.nextCardMemory(m, state: try tally(other)).collapsed == false)
+    }
+
+    @Test func shortNamesLabelsAndChip() throws {
+        let state = try tally(stop(place: place("R&R Demo", pinned: "u1")), votes: [vote("c1", agree: true), vote("c3", agree: true)])
+        #expect(state.rows.map(StopLogic.shortName) == ["Me", "Wyna", "Hafiz", "Daniel"])
+        #expect(StopLogic.voterAccessibilityLabel(state.rows[2]) == "Hafiz’s Hilux, agreed")
+        #expect(StopLogic.voterAccessibilityLabel(state.rows[3]) == "Daniel’s City, waiting")
+        #expect(StopLogic.voterAccessibilityLabel(state.rows[0]) == "Aqlan’s Myvi, you, agreed")
+        #expect(StopLogic.chipText(state) == "Fuel stop · R&R Demo · 3/4")
+    }
 }
 
 // MARK: Suggestions

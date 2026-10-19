@@ -183,3 +183,71 @@ enum StopLogic {
             viewerOffset: viewerOffset, isResolved: event.expiresAt.map { $0 <= now } ?? false)
     }
 }
+
+/// Whether the stop card is open or folded into a chip, and what it last saw.
+struct StopCardMemory: Equatable, Sendable {
+    /// The request plus the pinned place: a change re-opens the card once.
+    var key: String
+    var viewerAgreed: Bool
+    var collapsed: Bool
+}
+
+extension StopLogic {
+    /// "stop1|R&R Tapah": changes with a new request or a newly pinned place.
+    static func cardKey(_ state: StopRequestState) -> String {
+        "\(state.eventId)|\(state.place?.name ?? "")"
+    }
+
+    /// The viewer's car asked for this stop.
+    static func viewerIsRequester(_ state: StopRequestState) -> Bool {
+        state.rows.contains { $0.isMine && $0.carId == state.requesterCarId }
+    }
+
+    /// Collapse rules. A new request opens, except the requester's own (or one already agreed to);
+    /// a newly pinned place re-opens it once; agreeing folds it; otherwise the viewer's choice stands.
+    static func nextCardMemory(_ memory: StopCardMemory?, state: StopRequestState) -> StopCardMemory {
+        let key = cardKey(state)
+        guard let memory, memory.key.hasPrefix(state.eventId + "|") else {
+            return StopCardMemory(
+                key: key, viewerAgreed: state.viewerAgrees,
+                collapsed: viewerIsRequester(state) || state.viewerAgrees)
+        }
+        var next = memory
+        next.key = key
+        next.viewerAgreed = state.viewerAgrees
+        if memory.key != key {
+            next.collapsed = false
+        } else if !memory.viewerAgreed && state.viewerAgrees {
+            next.collapsed = true
+        }
+        return next
+    }
+
+    /// "Me" for the viewer's car, else the owner's first name.
+    static func shortName(_ row: StopRequestState.Row) -> String {
+        row.isMine ? "Me" : ownerName(fromCarName: row.name)
+    }
+
+    /// "Aisha’s Myvi, agreed"; the viewer's car adds ", you".
+    static func voterAccessibilityLabel(_ row: StopRequestState.Row) -> String {
+        let name = row.name.replacingOccurrences(of: " (you)", with: "")
+        let status = switch row.status {
+        case .agreed: "agreed"
+        case .waiting: "waiting"
+        case .suggested: "suggested another stop"
+        }
+        return "\(row.isMine ? "\(name), you" : name), \(status)"
+    }
+
+    /// "Fuel stop · R&R Demo · 3/4" for the folded card.
+    static func chipText(_ state: StopRequestState) -> String {
+        let kind = switch state.type {
+        case .stopFuel: "Fuel stop"
+        case .stopFood: "Food stop"
+        case .stopToilet: "Toilet stop"
+        default: "Rest stop"
+        }
+        return [kind, state.shownPlace?.name, "\(state.agreedCount)/\(state.rows.count)"]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+}

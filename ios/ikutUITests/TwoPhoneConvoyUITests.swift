@@ -325,6 +325,11 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             try waitFor("stop card on A", timeout: 60) { agree.exists }
             shot("07-stop-card")
             agree.tap()
+            // Agreeing folds the card into its chip; a tap opens it again.
+            let chip = app.buttons["stopChip"]
+            try waitFor("A's card folded after agreeing", timeout: 20) { chip.exists && !agree.exists }
+            shot("07b-stop-chip")
+            chip.tap()
             try waitFor("A's agreement shown", timeout: 20) { button(beginningWith: "Agreed").exists }
             try waitMark("cars.voted", timeout: 120)
             try waitFor("votes from all four cars", timeout: 60) {
@@ -344,7 +349,9 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             let arrived = app.buttons["Everyone has arrived"]
             XCTAssertTrue(arrived.waitForExistence(timeout: 10), "lead has no Everyone has arrived")
             arrived.tap()
-            try waitFor("stop card gone on A", timeout: 60) { !button(beginningWith: "Agreed").exists && !agree.exists }
+            try waitFor("stop card gone on A", timeout: 60) {
+                !button(beginningWith: "Agreed").exists && !agree.exists && !app.buttons["stopChip"].exists
+            }
             try waitFor("convoy list back on A", timeout: 30) { convoyOrder().count == 4 }
             shot("10-stop-resolved")
             mark("a.resolved")
@@ -463,7 +470,8 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             shot("08-pit-stop-sheet")
             // It finds a place ahead (or none) and sends by itself after a 5 s countdown.
             try waitFor("request sent and the sheet closed", timeout: 90) { !app.staticTexts["Need gas"].exists }
-            try waitFor("B's own request card (requester agrees)", timeout: 30) { button(beginningWith: "Agreed").exists }
+            // The requester's own card starts folded into its chip.
+            try waitFor("B's own request chip", timeout: 30) { app.buttons["stopChip"].exists }
             shot("09-stop-requested")
             mark("b.stopRequested")
         }
@@ -477,7 +485,9 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             shot("10-stop-pinned")
             mark("b.sawPin")
             try waitMark("a.resolved", timeout: 120)
-            try waitFor("stop card gone on B", timeout: 60) { !button(beginningWith: "Agreed").exists }
+            try waitFor("stop card gone on B", timeout: 60) {
+                !button(beginningWith: "Agreed").exists && !app.buttons["stopChip"].exists
+            }
             shot("11-stop-resolved")
         }
 
