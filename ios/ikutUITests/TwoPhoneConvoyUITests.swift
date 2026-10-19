@@ -199,7 +199,7 @@ class TwoPhoneConvoyBase: XCTestCase {
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
         app.buttons["Join Trip"].tap()
-        XCTAssertTrue(app.buttons["Start Trip"].waitForExistence(timeout: 30), "Didn't reach the lobby")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch.waitForExistence(timeout: 30), "Didn't reach the lobby")
         let notNow = app.buttons["Not now"]
         if notNow.waitForExistence(timeout: 4) { notNow.tap() }
     }
@@ -214,7 +214,7 @@ class TwoPhoneConvoyBase: XCTestCase {
     }
 
     func openMap() throws {
-        app.buttons["Start Trip"].tap()
+        app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch.tap()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 30), "Didn't reach the map")
         if app.buttons["Not now"].waitForExistence(timeout: 3) { app.buttons["Not now"].tap() }
         // The whole convoy in view, so every car and hazard marker is on screen.

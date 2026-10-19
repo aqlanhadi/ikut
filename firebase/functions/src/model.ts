@@ -34,6 +34,8 @@ export interface Trip {
   status: TripStatus;
   createdAt: Timestamp;
   lastActivityAt?: Timestamp;
+  /** First Start Trip by any member; absent until the trip is underway. */
+  startedAt?: Timestamp;
   endedAt?: Timestamp;
 }
 

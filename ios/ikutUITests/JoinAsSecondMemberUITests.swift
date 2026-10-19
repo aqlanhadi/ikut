@@ -60,7 +60,7 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         }
 
         app.buttons["Join Trip"].tap()
-        let startTrip = app.buttons["Start Trip"]
+        let startTrip = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
         XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
 
         // Start Trip pushes the live map on the lobby's session.

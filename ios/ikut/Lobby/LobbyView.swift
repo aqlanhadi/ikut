@@ -21,6 +21,8 @@ struct LobbyView: View {
     @State private var isWorking = false
     @State private var actionError: String?
     @State private var showMap = false
+    /// This phone opened the map; covers the gap before the startedAt write comes back.
+    @State private var startedHere = false
 
     init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
@@ -33,6 +35,11 @@ struct LobbyView: View {
     private var isOrganizer: Bool {
         guard let trip = model.trip else { return false }
         return trip.organizerId == Auth.auth().currentUser?.uid
+    }
+
+    /// Started by anyone (trip doc / cars), or by this phone a moment ago.
+    private var isStarted: Bool {
+        !session.isEnded && (LobbyLogic.isStarted(trip: model.trip, cars: model.cars) || startedHere)
     }
 
     private var currentUserId: String? { Auth.auth().currentUser?.uid }
@@ -76,17 +83,24 @@ struct LobbyView: View {
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             let catchUp = LobbyLogic.catchUpLine(model.groupedCars)
-            Button { showMap = true } label: {
+            let started = isStarted
+            Button {
+                if !started {
+                    startedHere = true
+                    Task { await TripService.markStarted(tripId: model.tripId) }
+                }
+                showMap = true
+            } label: {
                 VStack(spacing: 0) {
-                    Text("Start Trip")
-                    if let catchUp {
+                    Text(started ? "Back to Map" : "Start Trip")
+                    if let catchUp, !started {
                         Text(catchUp).font(.caption).opacity(0.85)
                     }
                 }
             }
             .buttonStyle(PillButtonStyle())
-            .accessibilityLabel("Start Trip")
-            .accessibilityHint(catchUp ?? "")
+            .accessibilityLabel(started ? "Back to Map" : "Start Trip")
+            .accessibilityHint(started ? "" : (catchUp ?? ""))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.ikutScreen)
@@ -208,6 +222,19 @@ struct LobbyView: View {
             exitBanner("Trip ended", systemImage: "flag.checkered")
         } else if session.membershipLost && model.trip != nil {
             exitBanner("You're no longer in this trip", systemImage: "person.fill.xmark")
+        } else if isStarted {
+            VStack(spacing: 2) {
+                Label("Trip in progress", systemImage: "car.fill")
+                    .font(.footnote.weight(.semibold))
+                if let since = LobbyLogic.onTheRoadLine(startedAt: model.trip?.startedAt) {
+                    Text(since).font(.caption)
+                }
+            }
+            .foregroundStyle(Color.ikutPositive)
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(Color.ikutPositive.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
+            .padding(.bottom, 4)
+            .accessibilityElement(children: .combine)
         } else if session.isTracking && !session.isPaused {
             Label("Sharing location", systemImage: "location.fill")
                 .font(.footnote.weight(.semibold))

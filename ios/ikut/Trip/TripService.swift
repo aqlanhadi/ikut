@@ -116,6 +116,13 @@ extension TripService {
         }
     }
 
+    /// Any member (rules): records when the trip first started. Write-once; fails harmlessly if already set.
+    @MainActor
+    static func markStarted(tripId: String) async {
+        let ref = Firestore.firestore().collection(FirestorePaths.trips).document(tripId)
+        _ = try? await ServerWrite.commit({ try await ref.updateData(["startedAt": FieldValue.serverTimestamp()]) })
+    }
+
     /// Organizer only (rules): points the trip at a new destination and main route.
     @MainActor
     static func changeDestination(tripId: String, to destination: DestinationResult, route: BuiltRoute) async throws {

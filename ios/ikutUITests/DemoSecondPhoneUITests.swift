@@ -55,7 +55,7 @@ final class DemoSecondPhoneUITests: XCTestCase {
         if carField.waitForExistence(timeout: 5) { replaceText(in: carField, with: carName) }
 
         app.buttons["Join Trip"].tap()
-        let startTrip = app.buttons["Start Trip"]
+        let startTrip = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
         XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
         startTrip.tap()
         let notNow = app.buttons["Not now"]

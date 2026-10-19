@@ -41,4 +41,20 @@ enum LobbyLogic {
     static func shareText(code: String) -> String {
         "Join my convoy on ikut: code \(code) \(joinURL(code: code))"
     }
+
+    /// The trip is underway: someone already tapped Start Trip (`startedAt`), or, for trips from before
+    /// that was recorded, a car has already merged into the convoy. Never true once the trip has ended.
+    static func isStarted(trip: Trip?, cars: [Car]) -> Bool {
+        guard let trip, trip.status == .active else { return false }
+        return trip.startedAt != nil || cars.contains { $0.state == .convoy }
+    }
+
+    /// "On the road since 9:35 PM"; nil when the start time wasn't recorded.
+    static func onTheRoadLine(startedAt: Date?, locale: Locale = .current, timeZone: TimeZone = .current) -> String? {
+        guard let startedAt else { return nil }
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.locale = locale
+        style.timeZone = timeZone
+        return "On the road since \(startedAt.formatted(style))"
+    }
 }
