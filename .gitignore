@@ -33,3 +33,6 @@ database-debug.log*
 
 # Battery-watch recordings (qa/battery-watch.mjs)
 qa/battery/
+
+# Claude Code worktrees
+.claude/worktrees/
