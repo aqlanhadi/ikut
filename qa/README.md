@@ -171,3 +171,24 @@ A gap means no signal or a suspended app; the two look the same from here.
 `node prod-smoke.mjs` runs one short trip against the real Firebase project (from
 `ios/ikut/Resources/GoogleService-Info.plist`): anonymous sign-in, create, `previewTrip`, `joinTrip`,
 positions, end. It deletes its two anonymous users; the ended trip is purged by `purgeTripDataJob`.
+
+## Live demo
+
+`node demo.mjs` is a ten-minute, real-time (1x) show for a person watching the shared iPhone 17 simulator. The script
+creates a trip as a scripted organizer, prints the code, and joins the phone as "Faiz" through
+`JoinAsSecondMemberUITests` (which holds the map open via `TEST_RUNNER_IKUT_HOLD_SECONDS`). Cast: Aisha (lead), the
+phone, Hafiz (slowest) and Daniel (joining from his own road, merging between the phone and Hafiz). The route is a 16.3 km
+piece of `data/osrm-main.json` driven at 95 km/h, so no network is needed. Timeline (T = seconds after go): spread grows
+from the start; 90 debris reported ahead (phone alert at about 119); 150-270 Hafiz loses signal (stale "Last seen"
+from about 210); 330 Daniel merges; 390 Hafiz requests a pit stop, votes follow, 425 pinned, 500 resolved; 580 the
+phone arrives; 620 end.
+
+```sh
+node demo.mjs --dry-run          # print the timeline and check the geometry, no Firebase, no simulator
+node demo.mjs --no-app --seconds 30   # scripted cars only, against the emulators
+node demo.mjs --skip-build       # the real thing, reusing the build in --derived-data (/tmp/ikut-dd-q1)
+```
+
+Other options: `--udid`, `--name`, `--speed N` (dev only; the signal-drop staleness needs <= 2.5). The phone's location is
+driven with `simctl location start`, restarted every 20 s from where it should be. Not covered: the phone does not vote
+or request a stop (watch only), and the trip is left active unless `--end-trip`.

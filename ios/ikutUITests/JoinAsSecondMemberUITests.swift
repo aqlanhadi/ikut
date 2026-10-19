@@ -67,6 +67,11 @@ final class JoinAsSecondMemberUITests: XCTestCase {
         startTrip.tap()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         XCTAssertTrue(app.buttons["Trip menu"].exists)
+
+        // TEST_RUNNER_IKUT_HOLD_SECONDS keeps the map open, e.g. for `qa/demo.mjs`.
+        if let hold = env["IKUT_HOLD_SECONDS"].flatMap(Double.init) {
+            _ = XCTWaiter().wait(for: [XCTestExpectation(description: "hold on the map")], timeout: hold)
+        }
     }
 
     private func replaceText(in field: XCUIElement, with text: String) {
