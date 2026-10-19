@@ -3,7 +3,7 @@ import SwiftUI
 /// The floating glass panel at the bottom of the map (Map.dc.html): FROM and TO with the arrival
 /// time, a progress bar with every car and hazard on the route, spread / lead speed / next stop,
 /// one row per car (joining cars last, with dashed badges), then Report and Pit stop. Tap or drag
-/// the grabber to collapse it to FROM/TO and the buttons.
+/// the grabber to collapse it to FROM/TO, progress, a one-line summary and the buttons.
 ///
 /// A custom overlay rather than a `.sheet`: a sheet that is always up would stop the map from
 /// presenting the report sheet, and the mock's inset glass card is what this matches.
@@ -26,8 +26,11 @@ struct ConvoyPanel: View {
         VStack(spacing: 0) {
             grabber
             header
+            progress
+            if !expanded {
+                summary
+            }
             if expanded {
-                progress
                 stats
                 list
             }
@@ -64,9 +67,13 @@ struct ConvoyPanel: View {
 
     /// One size for both ends so a long town name doesn't leave the other end looking bigger.
     private var endSize: CGFloat {
-        let longest = max(originName?.count ?? 0, convoy.destinationName?.count ?? 0)
-        return longest > 9 ? 22 : 28
+        let longest = max(originShort?.count ?? 0, destinationShort.count)
+        return longest > 9 ? 22 : 30
     }
+
+    /// Display names: "KL" for Kuala Lumpur and other well-known short forms, else the full name.
+    private var originShort: String? { originName.map(ConvoyFormat.placeShortName) }
+    private var destinationShort: String { ConvoyFormat.placeShortName(convoy.destinationName ?? "") }
 
     private var frontArrival: Date? {
         guard let reference = convoy.snapshot.etaReference else { return nil }
@@ -110,10 +117,16 @@ struct ConvoyPanel: View {
         return HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 0) {
                 StatCaption("From")
-                Text(originName ?? "Start")
+                Text(originShort ?? "Start")
                     .font(.system(size: endSize, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                if let departed = model.departedAt {
+                    Text("Left \(ConvoyFormat.clock(departed))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             StatusPill(text: motion.text, color: motion.color, dot: motion.dot,
@@ -122,7 +135,7 @@ struct ConvoyPanel: View {
                 .padding(.top, 14)
             VStack(alignment: .trailing, spacing: 0) {
                 StatCaption("To")
-                Text(destination)
+                Text(destinationShort)
                     .font(.system(size: endSize, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -182,6 +195,58 @@ struct ConvoyPanel: View {
     private func toGo(remaining: Double) -> String {
         guard let arrival = frontArrival else { return "\(ConvoyFormat.distance(remaining)) to go" }
         return "\(ConvoyFormat.distance(remaining)) · \(ConvoyFormat.duration(arrival.timeIntervalSinceNow)) to go"
+    }
+
+    /// Collapsed only (MapCollapsed.dc.html): overlapping car dots (dashed for joining cars), then
+    /// "3 cars driving · Hafiz joins in 18 min · 6.4 km spread" and a chevron. Tapping expands.
+    private var summary: some View {
+        let joiner = convoy.joining.first(where: { $0.timeToMerge != nil }) ?? convoy.joining.first
+        let parts = ConvoyFormat.convoySummary(
+            driving: convoy.convoy.count, joinerName: joiner?.car.name, joinIn: joiner?.timeToMerge,
+            spread: convoy.convoy.count > 1 ? convoy.snapshot.spread : nil)
+        let warn = model.separationWarning != nil
+        var text = Text(parts.driving).fontWeight(.semibold)
+        if let joining = parts.joining { text = text + Text(" · \(joining)") }
+        if let spread = parts.spread {
+            text = text + Text(" · ") + Text(spread)
+                .foregroundStyle(warn ? MapPalette.warning : Color.primary)
+                .fontWeight(warn ? .semibold : .regular)
+        }
+        let fill = Color(.tertiarySystemFill)
+        return Button { expanded = true } label: {
+            HStack(spacing: 10) {
+                HStack(spacing: -5) {
+                    ForEach(convoy.convoy) { e in
+                        Circle().fill(Color(mapHex: e.car.color))
+                            .frame(width: 14, height: 14)
+                            .overlay(Circle().strokeBorder(Color(.systemBackground).opacity(0.8), lineWidth: 2))
+                    }
+                    ForEach(convoy.joining) { e in
+                        Circle().fill(Color.white)
+                            .overlay(Circle().strokeBorder(Color(mapHex: e.car.color),
+                                                           style: StrokeStyle(lineWidth: 2, dash: [2.5, 2])))
+                            .frame(width: 14, height: 14)
+                    }
+                }
+                .fixedSize()
+                text
+                    .font(.footnote)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.up")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(fill, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 10)
+        .accessibilityLabel([parts.driving, parts.joining, parts.spread].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityHint("Shows the convoy list")
+        .accessibilityIdentifier("convoy.summary")
     }
 
     private var stats: some View {
@@ -279,14 +344,15 @@ private struct ConvoyProgressBar: View {
         GeometryReader { proxy in
             let w = proxy.size.width
             ZStack(alignment: .leading) {
-                Capsule().fill(Color(.systemGray5)).frame(height: 4)
+                // systemGray5 vanished on the dark glass; secondary keeps a visible track in both modes.
+                Capsule().fill(Color.secondary.opacity(0.3)).frame(height: 4)
                 Capsule().fill(MapPalette.accent).frame(width: max(4, w * fraction), height: 4)
                 ForEach(Array(hazards.enumerated()), id: \.offset) { _, f in
                     Circle()
                         .fill(Color.yellow)
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .frame(width: 12, height: 12)
-                        .position(x: w * f, y: 15)
+                        .position(x: min(max(w * f, 6), w - 6), y: 15)
                 }
                 ForEach(Array(cars.enumerated()), id: \.offset) { _, car in
                     Circle()
@@ -294,7 +360,7 @@ private struct ConvoyProgressBar: View {
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .frame(width: 18, height: 18)
                         .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
-                        .position(x: w * car.0, y: 15)
+                        .position(x: min(max(w * car.0, 9), w - 9), y: 15)
                 }
             }
             .frame(height: 30)

@@ -67,4 +67,45 @@ enum ConvoyFormat {
     static func arriving(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
         "Arriving \(clock(date, locale: locale, timeZone: timeZone))"
     }
+
+    // MARK: Place short names
+
+    /// Well-known short forms of place names ("Kuala Lumpur" -> "KL"). There is no universal source
+    /// for these, so this is a small curated table, Malaysia first. Keys are lowercased.
+    static let placeShortForms: [String: String] = [
+        "kuala lumpur": "KL",
+        "petaling jaya": "PJ",
+        "johor bahru": "JB",
+        "kota kinabalu": "KK",
+        "kota bharu": "KB",
+        "new york": "NYC",
+        "new york city": "NYC",
+        "los angeles": "LA",
+        "san francisco": "SF",
+        "washington": "DC",
+        "washington, d.c.": "DC",
+        "washington d.c.": "DC",
+    ]
+
+    /// The display form of a place name: its well-known short form, else the name unchanged.
+    /// Display only; stored names are never changed.
+    static func placeShortName(_ name: String) -> String {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return placeShortForms[key] ?? name
+    }
+
+    /// The collapsed panel's summary parts: "3 cars driving", "Hafiz joins in 18 min",
+    /// "6.4 km spread". The joiner is named by the first word of the car name, without "'s".
+    static func convoySummary(
+        driving: Int, joinerName: String?, joinIn: TimeInterval?, spread: Double?
+    ) -> (driving: String, joining: String?, spread: String?) {
+        let drivingText = driving == 1 ? "1 car driving" : "\(driving) cars driving"
+        var joining: String?
+        if let joinerName, !joinerName.isEmpty {
+            var owner = joinerName.split(separator: " ").first.map(String.init) ?? joinerName
+            for suffix in ["\u{2019}s", "'s"] where owner.hasSuffix(suffix) { owner = String(owner.dropLast(2)) }
+            joining = joinIn.map { "\(owner) joins in \(duration($0))" } ?? "\(owner) joining"
+        }
+        return (drivingText, joining, spread.map { "\(distance($0)) spread" })
+    }
 }

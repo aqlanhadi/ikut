@@ -155,6 +155,30 @@ struct ConvoyTests {
         #expect(ConvoyFormat.lastSeen(age: 200_000) == "Last seen 2 d ago")
     }
 
+    @Test func placeShortNames() {
+        #expect(ConvoyFormat.placeShortName("Kuala Lumpur") == "KL")
+        #expect(ConvoyFormat.placeShortName(" kuala lumpur ") == "KL")
+        #expect(ConvoyFormat.placeShortName("Petaling Jaya") == "PJ")
+        #expect(ConvoyFormat.placeShortName("Johor Bahru") == "JB")
+        #expect(ConvoyFormat.placeShortName("Kota Kinabalu") == "KK")
+        #expect(ConvoyFormat.placeShortName("Kota Bharu") == "KB")
+        #expect(ConvoyFormat.placeShortName("San Francisco") == "SF")
+        #expect(ConvoyFormat.placeShortName("Ipoh") == "Ipoh")
+        #expect(ConvoyFormat.placeShortName("Seremban") == "Seremban")
+        #expect(ConvoyFormat.placeShortName("") == "")
+    }
+
+    @Test func convoySummaryText() {
+        let full = ConvoyFormat.convoySummary(driving: 3, joinerName: "Hafiz\u{2019}s Hilux", joinIn: 18 * 60, spread: 6400)
+        #expect(full.driving == "3 cars driving")
+        #expect(full.joining == "Hafiz joins in 18 min")
+        #expect(full.spread == "6.4 km spread")
+        let one = ConvoyFormat.convoySummary(driving: 1, joinerName: nil, joinIn: nil, spread: nil)
+        #expect(one.driving == "1 car driving")
+        #expect(one.joining == nil && one.spread == nil)
+        #expect(ConvoyFormat.convoySummary(driving: 2, joinerName: "Wyna's X70", joinIn: nil, spread: nil).joining == "Wyna joining")
+    }
+
     // MARK: Joining
 
     private func joiningFixture() -> (cars: [Car], merges: [String: Double], main: RouteLine) {
