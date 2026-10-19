@@ -84,6 +84,7 @@
 		AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
+		B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A209AB9671B47B22C20E451 /* ikut.icon */; };
 		B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */; };
 		B80DAA47953098D10019E756 /* DeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69797704602A7657261A60C /* DeepLink.swift */; };
 		B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E26FDD008B015443CC328 /* AlertWording.swift */; };
@@ -136,6 +137,7 @@
 
 /* Begin PBXFileReference section */
 		02B0DDAF1194DD5CA4B0A112 /* PositionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionBuilder.swift; sourceTree = "<group>"; };
+		0A209AB9671B47B22C20E451 /* ikut.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = ikut.icon; sourceTree = "<group>"; };
 		0B9750682AB19CEB7CFF2B6B /* AlertBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertBannerView.swift; sourceTree = "<group>"; };
 		10FFC0A7C9CC4F4FA9D59983 /* HazardRegionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardRegionMonitor.swift; sourceTree = "<group>"; };
 		13A75CB34F97F77AD0AFCEB3 /* LocationPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPermission.swift; sourceTree = "<group>"; };
@@ -454,6 +456,7 @@
 			children = (
 				A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */,
 				7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */,
+				0A209AB9671B47B22C20E451 /* ikut.icon */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -691,6 +694,7 @@
 			files = (
 				41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */,
 				6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */,
+				B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -857,7 +861,7 @@
 		3C813C18FC8B8D8DE8378F40 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = ikut;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = ikut/Info.plist;
@@ -1039,7 +1043,7 @@
 		C554BE8B89DC571B4D28DCBD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = ikut;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = ikut/Info.plist;
