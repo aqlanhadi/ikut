@@ -90,16 +90,13 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
   (the app asks MapKit; the sim never does).
 - Emulator data is not wiped; each run leaves an active trip behind (`--end-trip` ends it).
 
-## Bugs this found (not fixed here)
+## Bugs this found
 
-1. **Crash on opening the map as tracker** (`ios/ikut/Map/TripMapView.swift:369`, `ios/ikut/Hazards/HazardRegionMonitor.swift:240,244`).
-   `CLMonitor` names must be alphanumeric; `"ikut.hazards.<tripId>"` (and the default `"ikut.hazards"`) contain dots, so `CLMonitor(name)` throws
-   `NSInternalInconsistencyException: Monitor name is not valid` and the app aborts. Repro: join a trip as tracker, tap Start Trip. Expected: map. Actual: crash.
-2. **Stop button icon missing** (`ios/ikut/Map/ConvoyPanel.swift`, `Image(systemName: "minus.octagon.fill")`): the system logs
-   `No symbol named 'minus.octagon.fill' found in system symbol set` on the iOS 27 simulator and the Stop button shows no icon (see `screens/`).
-3. **Alert banner hidden behind the stop card** (`TripMapView.topStack` vs `stopCard`): with a stop request open, the approach banner is
-   partly covered by the card (see `06-approach-alert.png` from an earlier run). Layering/space issue.
-4. Observation: a GPS-only gap never makes a car stale (heartbeat re-writes the last position), see Things to know. Probably intended; worth a decision.
+1. **Crash on opening the map as tracker**: `CLMonitor` names with dots threw. Fixed in `0fd1e3a`.
+2. **Stop button icon missing** on iOS 27 (`minus.octagon.fill`): now `octagon.fill`.
+3. **Alert banner hidden behind the stop card**: fixed in `15f5cdc`.
+4. Open question: a GPS-only gap never makes a car stale (the heartbeat re-writes the last position),
+   see Things to know. Probably intended; worth a decision.
 
 ## Battery watch (real drives)
 

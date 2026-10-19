@@ -57,7 +57,7 @@ struct StopService: StopServing {
         if let suggestion { data["suggestion"] = Self.suggestionData(suggestion) }
         nonisolated(unsafe) let payload = data
         let ref = Firestore.firestore().document("\(Self.votes(tripId: tripId, eventId: eventId))/\(carId)")
-        try await Self.committed { try await ref.setData(payload) }
+        try await ServerWrite.commit { try await ref.setData(payload) }
     }
 
     /// Pins `place`. Lead car's tracker or organizer only; anyone else is rejected by the rules.
@@ -69,28 +69,17 @@ struct StopService: StopServing {
             ] as [String: Any]
         ]
         let ref = Firestore.firestore().document(FirestorePaths.event(tripId: tripId, eventId: eventId))
-        try await Self.committed { try await ref.updateData(data) }
+        try await ServerWrite.commit { try await ref.updateData(data) }
     }
 
     /// Ends the request (everyone arrived, or it was cancelled) by expiring it now.
     func resolve(tripId: String, eventId: String, now: Date = Date()) async throws {
         let ref = Firestore.firestore().document(FirestorePaths.event(tripId: tripId, eventId: eventId))
-        try await Self.committed { try await ref.updateData(["expiresAt": Timestamp(date: now)]) }
+        try await ServerWrite.commit { try await ref.updateData(["expiresAt": Timestamp(date: now)]) }
     }
 
     static func suggestionData(_ place: StopPlace) -> [String: Any] {
         ["name": place.name, "coordinate": place.coordinate, "routeOffset": place.routeOffset]
-    }
-
-    /// Runs `write`, returning once the server accepts it, throwing if it rejects, and returning
-    /// after `EventService.writeTimeout` with the write left queued (offline).
-    private static func committed(_ write: @escaping @Sendable () async throws -> Void) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { try await write() }
-            group.addTask { try await Task.sleep(for: EventService.writeTimeout) }
-            _ = try await group.next()
-            group.cancelAll()
-        }
     }
 
     // MARK: Actions for the card

@@ -57,6 +57,9 @@ enum TripService {
             state: .convoy, number: 1)
     }
 
+    /// Longer than `ServerWrite.defaultTimeout`: the first write also opens the connection.
+    static let createTimeout: Duration = .seconds(15)
+
     /// Creates the trip and the organizer's member doc in one batch, then the organizer's car.
     ///
     /// The car goes in a second write because the rules only let existing members create cars,
@@ -82,14 +85,20 @@ enum TripService {
             organizer: organizer, name: carName ?? Self.carName(for: organizer.displayName),
             color: carColor ?? palette[0])
 
-        let batch = db.batch()
+        nonisolated(unsafe) let batch = db.batch()
         try batch.setData(from: trip, forDocument: tripRef)
         try batch.setData(
             from: member, forDocument: tripRef.collection("members").document(organizer.id))
-        try await batch.commit()
+        // A trip the server hasn't seen can't be joined, so a queued create is a failure here.
+        guard try await ServerWrite.commit(within: createTimeout, { try await batch.commit() }) else {
+            throw ServerWrite.Offline()
+        }
 
         // Encode first: `setData(from:)` has no async overload, so awaiting it wouldn't wait for the server.
-        try await carRef.setData(Firestore.Encoder().encode(car))
+        nonisolated(unsafe) let carData = try Firestore.Encoder().encode(car)
+        guard try await ServerWrite.commit(within: createTimeout, { try await carRef.setData(carData) }) else {
+            throw ServerWrite.Offline()
+        }
         return (tripRef.documentID, carRef.documentID)
     }
 }

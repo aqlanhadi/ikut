@@ -148,12 +148,16 @@ final class TripSession {
     func leave() async throws {
         stopTrackingNow()
         isClosing = true
+        // Offline, the writes stay queued and the phone leaves anyway (ServerWrite).
         do {
             if car?.trackerUserId == userId, let carId = member?.carId ?? car?.id {
-                try await db.document(FirestorePaths.car(tripId: tripId, carId: carId))
-                    .updateData(["trackerUserId": FieldValue.delete(), "pausedAt": FieldValue.delete()])
+                let carRef = db.document(FirestorePaths.car(tripId: tripId, carId: carId))
+                try await ServerWrite.commit {
+                    try await carRef.updateData(["trackerUserId": FieldValue.delete(), "pausedAt": FieldValue.delete()])
+                }
             }
-            try await db.document(FirestorePaths.member(tripId: tripId, userId: userId)).delete()
+            let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
+            try await ServerWrite.commit { try await memberRef.delete() }
         } catch {
             isClosing = false
             reevaluate()
@@ -230,8 +234,10 @@ final class TripSession {
         stopTrackingNow()
         isClosing = true
         do {
-            try await db.document(FirestorePaths.trip(tripId))
-                .updateData(["status": TripStatus.ended.rawValue, "endedAt": FieldValue.serverTimestamp()])
+            let tripRef = db.document(FirestorePaths.trip(tripId))
+            try await ServerWrite.commit {
+                try await tripRef.updateData(["status": TripStatus.ended.rawValue, "endedAt": FieldValue.serverTimestamp()])
+            }
         } catch {
             isClosing = false
             reevaluate()

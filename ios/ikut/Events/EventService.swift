@@ -106,7 +106,7 @@ enum EventService {
     /// completion is optional, so errors would be lost. If the server hasn't answered within
     /// `writeTimeout` (offline), this returns and Firestore keeps the write queued.
     private static func write(_ event: TripEvent, to ref: DocumentReference) async throws {
-        let outcome = WriteOutcome()
+        let outcome = WriteOutcome<Void>()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 outcome.install(continuation)
@@ -151,34 +151,5 @@ enum EventService {
             nonisolated(unsafe) let handle = registration
             continuation.onTermination = { _ in handle.remove() }
         }
-    }
-}
-
-/// Resumes a continuation exactly once, from whichever of completion, timeout or cancellation comes first.
-private final class WriteOutcome: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Error>?
-    private var result: Result<Void, Error>?
-
-    func install(_ continuation: CheckedContinuation<Void, Error>) {
-        lock.lock()
-        if let result {
-            lock.unlock()
-            continuation.resume(with: result)
-        } else {
-            self.continuation = continuation
-            lock.unlock()
-        }
-    }
-
-    func finish(_ error: Error?) {
-        lock.lock()
-        guard result == nil else { lock.unlock(); return }
-        let outcome: Result<Void, Error> = error.map { .failure($0) } ?? .success(())
-        result = outcome
-        let pending = continuation
-        continuation = nil
-        lock.unlock()
-        pending?.resume(with: outcome)
     }
 }
