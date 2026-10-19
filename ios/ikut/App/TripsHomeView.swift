@@ -18,7 +18,7 @@ struct TripsHomeView: View {
     /// Routes of the newest ended trips, drawn on the map (newest first).
     @State private var routes: [PastTripRoute] = []
     @State private var camera: MapCameraPosition
-    @State private var mapHeight: CGFloat = 874
+    @State private var mapHeight: CGFloat = 0
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }) {
@@ -29,7 +29,8 @@ struct TripsHomeView: View {
         // `.userLocation` can lose to the first location fix.
         let cache = PastTripsMapService.cachedRoutes()
         let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
-        if let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: Double(Self.compactHeight / 874)) {
+        let insets = Self.obscured(mapHeight: 0)
+        if let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top) {
             _camera = State(initialValue: .region(region))
             _routes = State(initialValue: cached)
         } else {
@@ -79,7 +80,12 @@ struct TripsHomeView: View {
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { mapHeight = $0 }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+            guard height != mapHeight else { return }
+            mapHeight = height
+            // Refit for the real height while the camera is still ours.
+            if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
+        }
     }
 
     @MapContentBuilder
@@ -138,9 +144,18 @@ struct TripsHomeView: View {
     }
 
     private func show(_ list: [PastTripRoute], animated: Bool) {
+        let first = routes.isEmpty
         routes = list
-        let obscured = Double(Self.compactHeight / max(mapHeight, 1))
-        guard let region = PastTripsMapLogic.region(fitting: list, bottomObscured: obscured) else { return }
+        // Fly only between two fits of routes; the first fit jumps, as a long fly from the
+        // user's location is easily cut short by layout or a location fix.
+        fit(animated: animated && !first)
+    }
+
+    /// Points the camera at every drawn route, above the compact sheet.
+    private func fit(animated: Bool) {
+        let insets = Self.obscured(mapHeight: mapHeight)
+        guard let region = PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom,
+                                                    topObscured: insets.top) else { return }
         if animated {
             withAnimation(.smooth(duration: 0.8)) { camera = .region(region) }
         } else {
@@ -148,10 +163,22 @@ struct TripsHomeView: View {
         }
     }
 
+    /// Fractions of the map's height kept clear of routes: the status bar plus room for a flag at
+    /// the top, and the compact sheet at the bottom (the map runs under both). Before the map has a
+    /// height the typical phone height stands in, rather than dividing by zero (which pushed the
+    /// fit far south).
+    nonisolated static func obscured(mapHeight: CGFloat) -> (top: Double, bottom: Double) {
+        let height = mapHeight > Self.compactHeight + Self.topObscured ? mapHeight : 874
+        return (Double(Self.topObscured / height), Double(Self.compactHeight / height))
+    }
+
+    /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
+    nonisolated private static let topObscured: CGFloat = 110
+
     // MARK: Sheet
 
     /// Height of the sheet when collapsed: grabber, title, the two pills and the top of past trips.
-    private static let compactHeight: CGFloat = 300
+    nonisolated private static let compactHeight: CGFloat = 300
     /// Room left above the expanded sheet for the profile button.
     private static let topClearance: CGFloat = 64
 

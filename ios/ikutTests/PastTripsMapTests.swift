@@ -44,6 +44,41 @@ struct PastTripsMapTests {
         #expect(abs(top - 4) < 1e-9)
     }
 
+    /// Tapah → Ipoh, as on Home: the routes and flags must sit centred in the visible band between
+    /// the status bar and the sheet, and the region must stay close to the routes' own size.
+    @Test func fitKeepsRoutesInVisibleAreaAboveSheet() throws {
+        let a = route("a", [(4.0, 101.0), (4.3, 101.1)], dest: (4.6, 101.2))
+        let b = route("b", [(4.05, 101.05)], dest: (4.5, 101.15))
+        let minLat = 4.0, maxLat = 4.6
+        // Every height the map can report, including 0 before its first layout.
+        for height: CGFloat in [0, 1, 300, 672, 778, 874] {
+            let insets = TripsHomeView.obscured(mapHeight: height)
+            #expect(insets.bottom > 0 && insets.bottom < 0.5, "height \(height)")
+            #expect(insets.top > 0 && insets.top < 0.2, "height \(height)")
+            let r = try #require(PastTripsMapLogic.region(fitting: [a, b], bottomObscured: insets.bottom,
+                                                          topObscured: insets.top))
+            let mapTop = r.center.latitude + r.span.latitudeDelta / 2
+            let visibleTop = mapTop - r.span.latitudeDelta * insets.top
+            let visibleBottom = mapTop - r.span.latitudeDelta * (1 - insets.bottom)
+            #expect(visibleBottom < minLat && visibleTop > maxLat, "height \(height)")
+            // Centred in the visible band.
+            #expect(abs((visibleBottom + visibleTop) / 2 - (minLat + maxLat) / 2) < 1e-9)
+            // The centre moves south only by the sheet's share, never out of the routes' latitudes.
+            #expect(r.center.latitude >= minLat && r.center.latitude <= maxLat, "height \(height)")
+            // Modest margin: within 2.5x the routes' span (1.1 padding / ~50% visible band) once
+            // settled; 672 is a brief first layout with a smaller band.
+            let limit = height == 672 ? 3.0 : 2.5
+            #expect(r.span.latitudeDelta <= limit * (maxLat - minLat), "height \(height)")
+            #expect(r.span.longitudeDelta <= 2 * 0.2)
+        }
+    }
+
+    @Test func obscuredIsClampedSoTheFitNeverBalloons() throws {
+        let a = route("a", [(4.0, 101.0)], dest: (4.6, 101.2))
+        let r = try #require(PastTripsMapLogic.region(fitting: [a], padding: 1, bottomObscured: 300, topObscured: 1))
+        #expect(r.span.latitudeDelta <= 0.6 / 0.3 + 1e-9)
+    }
+
     @Test func thinKeepsEndsAndCaps() {
         let coords = (0..<1000).map { CLLocationCoordinate2D(latitude: Double($0) / 1000, longitude: 101) }
         let thin = PastTripsMapLogic.thin(coords, maxPoints: 50)

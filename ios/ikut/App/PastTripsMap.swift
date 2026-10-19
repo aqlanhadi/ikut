@@ -45,10 +45,10 @@ enum PastTripsMapLogic {
     }
 
     /// A region showing every route and destination with some margin, with the content centred in
-    /// the part of the map above a sheet covering `bottomObscured` (0...0.9) of its height.
-    /// Nil when there is nothing to show.
-    static func region(fitting routes: [PastTripRoute], padding: Double = 1.3, minSpan: Double = 0.05,
-                       bottomObscured: Double = 0) -> MKCoordinateRegion? {
+    /// the part of the map between `topObscured` and `bottomObscured` (fractions of its height, e.g.
+    /// the status bar and the sheet; together clamped to 0.7). Nil when there is nothing to show.
+    static func region(fitting routes: [PastTripRoute], padding: Double = 1.1, minSpan: Double = 0.05,
+                       bottomObscured: Double = 0, topObscured: Double = 0) -> MKCoordinateRegion? {
         let all = routes.flatMap { $0.coordinates + [$0.destination] }
             .filter { CLLocationCoordinate2DIsValid($0) }
         guard let first = all.first else { return nil }
@@ -58,12 +58,13 @@ enum PastTripsMapLogic {
             minLat = min(minLat, c.latitude); maxLat = max(maxLat, c.latitude)
             minLng = min(minLng, c.longitude); maxLng = max(maxLng, c.longitude)
         }
-        let obscured = min(max(bottomObscured, 0), 0.9)
+        var bottom = max(bottomObscured, 0), top = max(topObscured, 0)
+        if bottom + top > 0.7 { let scale = 0.7 / (bottom + top); bottom *= scale; top *= scale }
         let visibleLat = max((maxLat - minLat) * padding, minSpan)
-        let latDelta = min(visibleLat / (1 - obscured), 170)
+        let latDelta = min(visibleLat / (1 - bottom - top), 170)
         let lngDelta = min(max((maxLng - minLng) * padding, minSpan), 350)
-        // Move the map's centre south so the content sits in the visible top part.
-        let centerLat = (minLat + maxLat) / 2 - latDelta * obscured / 2
+        // Shift the map's centre so the content sits centred in the visible band.
+        let centerLat = (minLat + maxLat) / 2 + latDelta * (top - bottom) / 2
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: max(-85, min(85, centerLat)), longitude: (minLng + maxLng) / 2),
             span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lngDelta))
