@@ -26,6 +26,7 @@ struct TripMapView: View {
     @State private var stopState: StopRequestState?
     @State private var stopSheet: StopSheet?
     @State private var stopError: String?
+    @State private var stopCardMemory: StopCardMemory?
     @State private var confirmLeave = false
     @State private var confirmEnd = false
     @State private var isWorking = false
@@ -93,7 +94,7 @@ struct TripMapView: View {
             .overlay(alignment: .topTrailing) {
                 // The stop card takes over the screen, and the controls would only sit under it or
                 // under the banner's close button.
-                if stopState == nil {
+                if !stopCardOpen {
                     MapModeControl(mode: $model.mode)
                         .padding(.top, bannerShowing ? 156 : 76)
                         .padding(.trailing, 12)
@@ -376,9 +377,24 @@ struct TripMapView: View {
 
     // MARK: Stops
 
-    /// The convoy list folds away while a stop request is open, so the card has the room.
+    /// The convoy list folds away while the stop card is open, so the card has the room; opening the
+    /// list folds the card into its chip.
     private var panelBinding: Binding<Bool> {
-        Binding(get: { panelExpanded && stopState == nil }, set: { panelExpanded = $0 })
+        Binding(
+            get: { panelExpanded && !stopCardOpen },
+            set: { expanded in
+                panelExpanded = expanded
+                if expanded, stopCardOpen, let state = stopState {
+                    var m = StopLogic.nextCardMemory(stopCardMemory, state: state)
+                    m.collapsed = true
+                    stopCardMemory = m
+                }
+            })
+    }
+
+    private var stopCardOpen: Bool {
+        guard let state = stopState else { return false }
+        return !StopLogic.nextCardMemory(stopCardMemory, state: state).collapsed
     }
 
     /// The most the card and panel may take together: the map (already below the status bar) minus
@@ -402,7 +418,7 @@ struct TripMapView: View {
     private var stopCard: some View {
         if let state = stopState, let context = stopContext {
             StopRequestOverlay(
-                state: state,
+                state: state, memory: $stopCardMemory,
                 actions: StopService.actions(
                     context: context, state: state,
                     suggestAnother: { stopSheet = .suggest(state) },

@@ -15,6 +15,18 @@ struct StopRequestCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let onMinimize {
+                // A grabber: tap or swipe down to fold the card, for every viewer, voted or not.
+                Button(action: onMinimize) {
+                    Capsule().fill(Color.secondary.opacity(0.4)).frame(width: 36, height: 5)
+                        .frame(maxWidth: .infinity, minHeight: 16)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, -10)
+                .padding(.bottom, -8)
+                .accessibilityHidden(true)
+            }
             header.fixedSize(horizontal: false, vertical: true)
             placeCard.fixedSize(horizontal: false, vertical: true)
             tally
@@ -43,7 +55,7 @@ struct StopRequestCard: View {
             shape.fill(Color(.systemBackground).opacity(0.94))
         }
         .accessibilityElement(children: .contain)
-        .gesture(
+        .simultaneousGesture(
             DragGesture(minimumDistance: 20).onEnded { value in
                 if value.translation.height > 60, abs(value.translation.width) < value.translation.height {
                     onMinimize?()
@@ -274,9 +286,9 @@ struct StopRequestCard: View {
 /// open/folded state, following `StopLogic.nextCardMemory`.
 struct StopRequestOverlay: View {
     let state: StopRequestState
+    /// Owned by the map, so opening the convoy list can fold the card.
+    @Binding var memory: StopCardMemory?
     let actions: StopRequestActions
-
-    @State private var memory: StopCardMemory?
 
     private var collapsed: Bool { (memory ?? StopLogic.nextCardMemory(nil, state: state)).collapsed }
 
