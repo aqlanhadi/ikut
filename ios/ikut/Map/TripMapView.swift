@@ -31,6 +31,12 @@ struct TripMapView: View {
     @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
+    /// The banner stack's height, and the top of the bottom panel (with any card) against the
+    /// map's bottom edge, for `mapInsets`. The panel sits above the home indicator, so its own
+    /// height would leave that strip out.
+    @State private var topHeight: CGFloat = 0
+    @State private var panelMinY: CGFloat = 0
+    @State private var mapMaxY: CGFloat = 0
     /// The hazard approach alert being followed: full screen, then a pill until it's passed.
     @State private var approach: TripAlert?
     @State private var showApproach = false
@@ -75,9 +81,15 @@ struct TripMapView: View {
     var body: some View {
         map
             .ignoresSafeArea(edges: .bottom)
-            .overlay(alignment: .top) { topStack }
+            .overlay(alignment: .top) {
+                topStack.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
+            }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { mapMaxX = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapHeight = $0 }
+            // The map runs on under the home indicator, past the frame seen here.
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY + $0.safeAreaInsets.bottom } action: {
+                mapMaxY = $0
+            }
             .overlay(alignment: .topTrailing) {
                 // The stop card takes over the screen, and the controls would only sit under it or
                 // under the banner's close button.
@@ -97,6 +109,7 @@ struct TripMapView: View {
                         onReport: openReport, onStop: { stopSheet = .request })
                         .layoutPriority(1)
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { panelMinY = $0 }
                 .frame(maxHeight: maxBottomHeight, alignment: .bottom)
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -142,6 +155,8 @@ struct TripMapView: View {
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
+            // The panel folding or a banner coming and going moves the visible middle; recenter on it.
+            .onChange(of: mapInsets) { _, _ in move(to: model.cameraTarget, animated: true) }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
             .fullScreenCover(isPresented: $showApproach) {
@@ -191,11 +206,22 @@ struct TripMapView: View {
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+        // MapKit centers the camera, and fits regions, inside the safe area: keeping the banner and
+        // panel out of it puts my car in the middle of the map that can actually be seen.
+        .safeAreaPadding(.top, mapInsets.top)
+        .safeAreaPadding(.bottom, mapInsets.bottom)
         .onMapCameraChange { context in cameraHeading = context.camera.heading }
         // Any pan, pinch or rotate by the user hands the camera back to them.
         .onChange(of: camera.positionedByUser) { _, byUser in
             if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
         }
+    }
+
+    /// What the banner stack and the panel cover, as the map's extra safe area.
+    private var mapInsets: EdgeInsets {
+        let insets = MapObscuredInsets.insets(
+            mapHeight: mapHeight, top: topHeight, bottom: panelMinY > 0 ? mapMaxY - panelMinY : 0)
+        return EdgeInsets(top: insets.top, leading: 0, bottom: insets.bottom, trailing: 0)
     }
 
     private static func position(for target: CameraTarget?) -> MapCameraPosition? {

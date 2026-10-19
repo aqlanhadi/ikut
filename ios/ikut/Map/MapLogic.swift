@@ -145,13 +145,13 @@ enum CameraTarget: Equatable, Sendable {
 }
 
 enum MapCameraLogic {
-    /// Extra room around the cars as a fraction of their spread. The bottom is large because the
-    /// convoy panel covers the lower part of the screen.
+    /// Extra room around the cars as a fraction of their spread. Even on every side: the banner and
+    /// panel are kept out of the map's visible area by its safe-area padding (`MapObscuredInsets`).
     struct Padding: Equatable, Sendable {
         var top: Double
         var bottom: Double
         var side: Double
-        static let `default` = Padding(top: 0.3, bottom: 0.9, side: 0.5)
+        static let `default` = Padding(top: 0.3, bottom: 0.3, side: 0.3)
     }
 
     /// Smallest rectangle shown, in degrees (about 1.1 km), so one car or a tight group is not
@@ -159,12 +159,6 @@ enum MapCameraLogic {
     static let minimumSpan = 0.01
     /// Camera distance in follow mode, meters.
     static let followDistance = 2500.0
-    /// In follow mode the car sits in the upper part of the screen: the camera center is this
-    /// fraction of the distance south of it.
-    static let followLift = 0.18
-    /// Rough height over width of the map on a phone. A fit on a wide group would otherwise leave
-    /// spare height split evenly above and below, hiding the southern cars under the panel.
-    static let viewAspect = 3.0
 
     /// What the camera should show; nil in free mode, when the user is in charge.
     /// - `me`: my car's (or my device's) coordinate, nil if unknown. Follow falls back to the
@@ -180,7 +174,7 @@ enum MapCameraLogic {
             return nil
         case .follow:
             if let me {
-                return .follow(center: followCenter(me, distance: followDistance), distance: followDistance)
+                return .follow(center: me, distance: followDistance)
             }
             return fitTarget(fresh: fresh, all: all, fallback: fallback, padding: padding)
         case .fit:
@@ -192,23 +186,13 @@ enum MapCameraLogic {
         fresh: [MapCoordinate], all: [MapCoordinate], fallback: [MapCoordinate], padding: Padding
     ) -> CameraTarget? {
         let points = !fresh.isEmpty ? fresh : (!all.isEmpty ? all : fallback)
-        return fitRegion(points, padding: padding, aspect: viewAspect).map(CameraTarget.fit)
-    }
-
-    /// The camera center that puts `coordinate` above the middle of the screen.
-    static func followCenter(_ coordinate: MapCoordinate, distance: Double) -> MapCoordinate {
-        let metersPerDegree = 111_320.0
-        return MapCoordinate(
-            latitude: coordinate.latitude - distance * followLift / metersPerDegree,
-            longitude: coordinate.longitude)
+        return fitRegion(points, padding: padding).map(CameraTarget.fit)
     }
 
     /// Bounding box of `coordinates` grown by `padding`, never smaller than `minimumSpan`.
-    /// With an `aspect` (height over width) the rectangle is made at least that tall by extending
-    /// it southward, so the cars stay at the top. Nil for no coordinates.
+    /// Nil for no coordinates.
     static func fitRegion(
-        _ coordinates: [MapCoordinate], padding: Padding = .default, minimumSpan: Double = MapCameraLogic.minimumSpan,
-        aspect: Double = 0
+        _ coordinates: [MapCoordinate], padding: Padding = .default, minimumSpan: Double = MapCameraLogic.minimumSpan
     ) -> GeoRegion? {
         guard let first = coordinates.first else { return nil }
         var minLat = first.latitude, maxLat = first.latitude
@@ -223,10 +207,9 @@ enum MapCameraLogic {
         let midLon = (minLon + maxLon) / 2
         let dLat = max(maxLat - minLat, minimumSpan)
         let dLon = max(maxLon - minLon, minimumSpan)
-        var south = midLat - dLat / 2 - dLat * padding.bottom
+        let south = midLat - dLat / 2 - dLat * padding.bottom
         let north = midLat + dLat / 2 + dLat * padding.top
         let lonSpan = min(dLon * (1 + 2 * padding.side), 350)
-        south = min(south, north - lonSpan * aspect)
         return GeoRegion(
             center: MapCoordinate(latitude: (south + north) / 2, longitude: midLon),
             latitudeSpan: min(north - south, 170),
@@ -364,6 +347,28 @@ enum MapChipPlacement {
         // Flip only if the left side has room; otherwise stay where more of it is visible.
         let leftStart = markerX - gap - chipWidth
         return leftStart >= 8 || leftStart > containerWidth - reservedTrailing - rightEnd ? .leading : .trailing
+    }
+}
+
+// MARK: - Obscured edges
+
+/// How much of the map the trip banner (top) and the convoy panel (bottom) cover. The map gets
+/// these as safe-area padding, so MapKit centers the camera, and fits regions, in the part left
+/// visible between them.
+enum MapObscuredInsets {
+    /// The least map height left visible. When the stop card and panel take nearly the whole
+    /// screen, both insets shrink in proportion so the camera still has a strip to center on.
+    static let minimumVisible: CGFloat = 120
+
+    /// `top` is the height of the banner stack, `bottom` of the panel (and any card above it), both
+    /// measured from the map's own top and bottom edges. Zero until the map has a height.
+    static func insets(mapHeight: CGFloat, top: CGFloat, bottom: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+        let top = max(top, 0), bottom = max(bottom, 0)
+        guard mapHeight > 0 else { return (0, 0) }
+        let room = max(mapHeight - minimumVisible, 0)
+        guard top + bottom > room else { return (top, bottom) }
+        let scale = room / (top + bottom)
+        return (top * scale, bottom * scale)
     }
 }
 
