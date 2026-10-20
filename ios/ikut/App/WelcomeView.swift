@@ -31,7 +31,7 @@ struct WelcomeView: View {
                     .font(.system(size: 42, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 88, height: 88)
-                    .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.hero, style: .continuous))
                     .shadow(color: .black.opacity(0.14), radius: 9, y: 3)
                     .accessibilityHidden(true)
 
@@ -44,17 +44,17 @@ struct WelcomeView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.top, 8)
+                    .padding(.top, Spacing.s)
 
                 VStack(alignment: .leading, spacing: 28) {
                     ForEach(features) { feature in
-                        HStack(alignment: .top, spacing: 16) {
+                        HStack(alignment: .top, spacing: Spacing.l) {
                             Image(systemName: feature.symbol)
                                 .font(.system(size: 28, weight: .regular))
                                 .foregroundStyle(Color.ikutAccent)
                                 .frame(width: 36, height: 36)
                                 .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
                                 Text(feature.title).font(.subheadline.weight(.semibold))
                                 Text(feature.detail).font(.subheadline).foregroundStyle(.secondary)
                             }
@@ -68,17 +68,17 @@ struct WelcomeView: View {
             }
             .padding(.horizontal, 32)
             .padding(.top, 48)
-            .padding(.bottom, 16)
+            .padding(.bottom, Spacing.l)
         }
         .scrollBounceBehavior(.basedOnSize)
         .background(Color(.systemBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 6) {
+            VStack(spacing: Spacing.tight) {
                 Text("Joining needs no account, just a name.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.bottom, 14)
+                    .padding(.bottom, Spacing.cozy)
                 Button("Get Started", action: onGetStarted)
                     .buttonStyle(PillButtonStyle())
                 Button(action: onJoin) {
@@ -87,7 +87,7 @@ struct WelcomeView: View {
                 .buttonStyle(LinkPillButtonStyle())
             }
             .padding(.horizontal, 32)
-            .padding(.bottom, 12)
+            .padding(.bottom, Spacing.m)
             .background(Color(.systemBackground))
         }
     }

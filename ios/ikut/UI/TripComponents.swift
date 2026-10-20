@@ -20,7 +20,7 @@ struct RouteEnds: View {
     var size: CGFloat = 30
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.gap) {
             if let from {
                 Text(from)
                 Image(systemName: "arrow.right")
@@ -83,8 +83,8 @@ struct StatGrid: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(.vertical, 8)
-        .background(background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.vertical, Spacing.s)
+        .background(background, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
     }
 }
 
@@ -107,14 +107,14 @@ struct StatusPill: View {
         .labelStyle(PillLabelStyle())
         .font(.footnote.weight(.semibold))
         .foregroundStyle(color)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, Spacing.gap)
         .padding(.vertical, 5)
         .background(background, in: Capsule())
     }
 
     private struct PillLabelStyle: LabelStyle {
         func makeBody(configuration: Configuration) -> some View {
-            HStack(spacing: 6) {
+            HStack(spacing: Spacing.tight) {
                 configuration.icon
                 configuration.title
             }

@@ -47,8 +47,8 @@ enum Spacing {
     static let section: CGFloat = 18
     /// Space above Home's "Past trips" header and the join code boxes (canvas: 22).
     static let sectionLarge: CGFloat = 22
-    /// A sheet's outer vertical padding where the content is long (bottom) or has no grabber gap (top).
-    static let sheetInset: CGFloat = 20
+    /// A 20 pt block gap: below a long sheet, above a closing action group.
+    static let block: CGFloat = 20
 }
 
 /// Continuous corner radii from the design canvas.
@@ -69,6 +69,10 @@ enum Radius {
     static let card: CGFloat = 24
     /// Floating map panels (convoy panel, stop request card).
     static let panel: CGFloat = 38
+    /// The dark banner and the Recap map header card.
+    static let banner: CGFloat = 28
+    /// The Welcome app icon.
+    static let hero: CGFloat = 20
 }
 
 extension View {

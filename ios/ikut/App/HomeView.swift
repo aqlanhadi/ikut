@@ -52,7 +52,7 @@ struct HomeView: View {
                         Text(Backend.current.label)
                             .font(.caption2.monospaced())
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, Spacing.m)
                             .accessibilityHidden(true)
                         #endif
                     }

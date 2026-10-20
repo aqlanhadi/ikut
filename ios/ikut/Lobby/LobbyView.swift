@@ -77,7 +77,7 @@ struct LobbyView: View {
                             .padding(.top, Spacing.m)
                     }
                 } else if let message = model.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
                 } else {
                     ProgressView().padding(.top, 40)
                 }

@@ -176,7 +176,7 @@ struct RequestStopSheet: View {
                 }
                 .padding(.horizontal, Spacing.l)
                 .padding(.top, Spacing.m)
-                .padding(.bottom, Spacing.sheetInset)
+                .padding(.bottom, Spacing.block)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -194,7 +194,7 @@ struct RequestStopSheet: View {
             }
         }
         .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.sheetInset)
+        .padding(.top, Spacing.block)
         .padding(.bottom, Spacing.m)
         .frame(maxHeight: .infinity, alignment: .top)
         .presentationDetents([.medium])

@@ -38,7 +38,7 @@ struct ReportSheet: View {
             }
             .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.m)
-            .padding(.bottom, Spacing.sheetInset)
+            .padding(.bottom, Spacing.block)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
