@@ -43,8 +43,8 @@ node run-convoy2.mjs --skip-build    # reuse /tmp/ikut-dd-convoy2
 node run-convoy2.mjs --ask-location  # phone B starts without location permission and answers the system prompt
 ```
 
-Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 (`C0A40D2A`), phone B
-(car 2) a second simulator, `ikut-convoy-2` (FD0ACD10, iPhone 17 Pro; it must already exist, the script never creates one). The script boots
+Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 #1 (`C0A40D2A`), phone B
+(car 2) a second simulator, iPhone 17 #2 (`FD0ACD10`, an iPhone 17 Pro; it must already exist, the script never creates one). The script boots
 both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
 `ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
 time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
