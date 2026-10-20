@@ -60,7 +60,7 @@ final class ConvoyScenarioUITests: XCTestCase {
             let joining = element("joining.row.4")
             XCTAssertTrue(joining.exists, "car 4 should be under JOINING")
             XCTAssertTrue(joining.label.contains("Daniel"), "joining row should be Daniel's car: \(joining.label)")
-            XCTAssertTrue(element("convoy.row.5").label.contains(name), "row 5 should be this phone's car: \(element("convoy.row.5").label)")
+            XCTAssertTrue(element("convoy.row.5").label.hasPrefix("Me"), "row 5 should be this phone's car: \(element("convoy.row.5").label)")
             XCTAssertTrue(element("convoy.header").label.hasPrefix("4 in Convoy"), "header: \(element("convoy.header").label)")
             shot("01-before-drive")
         }

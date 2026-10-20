@@ -42,11 +42,12 @@ enum LobbyLogic {
         "Join my convoy on ikut: code \(code) \(joinURL(code: code))"
     }
 
-    /// The trip is underway: someone already tapped Start Trip (`startedAt`), or, for trips from before
-    /// that was recorded, a car has already merged into the convoy. Never true once the trip has ended.
-    static func isStarted(trip: Trip?, cars: [Car]) -> Bool {
+    /// The trip is underway: someone already tapped Start Trip (`startedAt`). A car already in the
+    /// convoy doesn't count: an organizer parked on the route is in it before anyone starts the trip.
+    /// Never true once the trip has ended.
+    static func isStarted(trip: Trip?) -> Bool {
         guard let trip, trip.status == .active else { return false }
-        return trip.startedAt != nil || cars.contains { $0.state == .convoy }
+        return trip.startedAt != nil
     }
 
     /// "On the road since 9:35 PM"; nil when the start time wasn't recorded.
