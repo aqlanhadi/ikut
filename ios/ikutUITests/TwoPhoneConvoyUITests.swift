@@ -414,7 +414,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             mark("b.map")
             try waitMark("go", timeout: 120)
             try waitFor("convoy order 1, 3, 2, 4", timeout: 120) { convoyOrder() == [1, 3, 2, 4] }
-            XCTAssertTrue(element("convoy.row.2").label.contains("Wyna"), "row 2: \(element("convoy.row.2").label)")
+            XCTAssertTrue(element("convoy.row.2").label.hasPrefix("Me"), "row 2 should be this phone's car: \(element("convoy.row.2").label)")
             shot("03-map-order")
             mark("b.order")
         }
@@ -424,7 +424,8 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             try waitFor("debris marker on B's map", timeout: 60) { hazardMarker("Debris").exists }
             shot("04-debris-marker")
             try waitFor("approach alert for the debris", timeout: 150, poll: 0.5) { approachShowing }
-            Thread.sleep(forTimeInterval: 0.5)
+            // Let the convoy list finish folding and the camera settle on the hazard.
+            Thread.sleep(forTimeInterval: 1.5)
             shot("05-approach-alert")
             let title = labelled("label CONTAINS %@", "Debris")
             XCTAssertTrue(title.exists, "the approach alert should name the debris")
