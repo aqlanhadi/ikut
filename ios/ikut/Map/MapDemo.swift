@@ -115,13 +115,24 @@ enum MapDemo {
         Backend.configure()
         let env = ProcessInfo.processInfo.environment
         let five = env["IKUT_MAP_DEMO_CARS"] == "5"
+        let gallery = env["IKUT_MAP_DEMO_BANNERS"] != nil
+        let model = model(fiveCars: five)
         return NavigationStack {
             TripMapView(
-                session: TripSession(tripId: "demo", userId: "u-c1"), model: model(fiveCars: five),
-                stopState: env["IKUT_MAP_DEMO_NO_STOP"] == nil ? stopRequest(fiveCars: five) : nil,
+                session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
+                stopState: env["IKUT_MAP_DEMO_NO_STOP"] == nil && !gallery ? stopRequest(fiveCars: five) : nil,
                 alerts: banner(env["IKUT_MAP_DEMO_ALERT"]))
+                .overlay(alignment: .top) {
+                    if gallery { BannerGallery(model: model).padding(.top, 72) }
+                }
         }
     }
+
+    /// The debris 3 km ahead as an approach alert.
+    static let debrisAlert = TripAlert(
+        id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
+        severity: .high, distance: 500, title: "Debris ahead in 500 meters",
+        body: "Debris reported by Wyna’s car", spoken: "")
 
     /// `IKUT_MAP_DEMO_ALERT=stop` or `debris` shows that banner at the top, to check it against the card.
     static func banner(_ kind: String?) -> AlertCenter {
@@ -133,10 +144,7 @@ enum MapDemo {
                 severity: .low, distance: nil, title: "Stop request", body: "Wyna’s car wants to stop for fuel",
                 spoken: ""))
         case "debris":
-            center.showForDemo(TripAlert(
-                id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
-                severity: .high, distance: 500, title: "Debris ahead in 500 meters",
-                body: "Debris reported by Wyna’s car", spoken: ""))
+            center.showForDemo(debrisAlert)
         default: break
         }
         return center
@@ -171,6 +179,28 @@ enum MapDemo {
         let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
         let degrees = atan2(y, x) * 180 / .pi
         return degrees < 0 ? degrees + 360 : degrees
+    }
+}
+
+/// `IKUT_MAP_DEMO_BANNERS=1`: every dark banner the map can show, stacked under the trip pill so
+/// they can be compared on one screen. The map's own top stack would only ever show some of them.
+private struct BannerGallery: View {
+    let model: TripMapModel
+    @State private var alerts = MapDemo.banner("debris")
+    @State private var toast: ReportToastModel = {
+        let toast = ReportToastModel()
+        toast.showForDemo(.reported(label: "debris", eventId: "demo-debris"))
+        return toast
+    }()
+
+    var body: some View {
+        VStack(spacing: 8) {
+            AlertBannerView(center: alerts)
+            ApproachPill(alert: MapDemo.debrisAlert, model: model) {}
+            PassedBanner(text: "Passed the debris")
+            ReportToastView(model: toast)
+        }
+        .padding(.horizontal, 12)
     }
 }
 

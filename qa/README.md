@@ -43,8 +43,8 @@ node run-convoy2.mjs --skip-build    # reuse /tmp/ikut-dd-convoy2
 node run-convoy2.mjs --ask-location  # phone B starts without location permission and answers the system prompt
 ```
 
-Two real app instances plus two scripted cars. Phone A (organizer, car 1) is iPhone 17 #1 (`C0A40D2A`), phone B
-(car 2) a second simulator, iPhone 17 #2 (`FD0ACD10`, formerly `ikut-convoy-2`; created on first use if missing). The script boots
+Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 (`C0A40D2A`), phone B
+(car 2) a second simulator, `ikut-convoy-2` (FD0ACD10, iPhone 17 Pro; it must already exist, the script never creates one). The script boots
 both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
 `ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
 time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
@@ -57,13 +57,13 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
 2. B joins with the code as a new car; the script joins cars 3 and 4; both lobbies read "4 of 4 ready"; numbers 1, 2, 3, 4.
 3. Both tap Start Trip. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
-4. A reports Debris from the Report sheet; B sees the marker and gets the full-screen approach alert. Car 3 then reports an
+4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.
 5. B taps Pit stop, Fuel; the request sends itself. A sees the card and agrees, cars 3 and 4 vote (car 3 suggests a place if
    B's phone found none), A pins it, B's card shows it pinned, A taps Everyone has arrived and both cards go.
 6. B goes back to the lobby and pauses sharing: A's row 2 reads "Paused", `pausedAt` is set; Resume clears both.
 7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
-   the map menu and lands on Home, B's lobby says "Trip ended", the trip doc is `ended`.
+   the map menu and lands on the recap, B's lobby says "Trip ended", the trip doc is `ended`.
 
 Screenshots: `qa/screens/convoy2/A-*.png`, `B-*.png`. Logs: `$TMPDIR/ikut-qa/convoy2-A.log`, `convoy2-B.log` (and the
 `.xcresult` bundles next to them). To watch, open Xcode > Window > Devices and Simulators (or the Simulator app with both

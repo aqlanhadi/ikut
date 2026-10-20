@@ -70,22 +70,16 @@ struct LobbyTests {
     }
 
     @Test func notStartedBeforeStartTrip() {
-        #expect(!LobbyLogic.isStarted(trip: trip(), cars: [car("c1", "One", lead: true, tracker: "u1")]))
-        #expect(!LobbyLogic.isStarted(trip: nil, cars: []))
+        #expect(!LobbyLogic.isStarted(trip: trip()))
+        #expect(!LobbyLogic.isStarted(trip: nil))
     }
 
     @Test func startedWhenStartedAtIsSet() {
-        #expect(LobbyLogic.isStarted(trip: trip(startedAt: Date()), cars: []))
-    }
-
-    @Test func startedWhenACarIsAlreadyInConvoy() {
-        var c = car("c1", "One")
-        c.state = .convoy
-        #expect(LobbyLogic.isStarted(trip: trip(), cars: [c]))
+        #expect(LobbyLogic.isStarted(trip: trip(startedAt: Date())))
     }
 
     @Test func endedTripIsNeverStarted() {
-        #expect(!LobbyLogic.isStarted(trip: trip(status: .ended, startedAt: Date()), cars: []))
+        #expect(!LobbyLogic.isStarted(trip: trip(status: .ended, startedAt: Date())))
     }
 
     @Test func onTheRoadLine() {
