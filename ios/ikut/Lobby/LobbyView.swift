@@ -64,29 +64,27 @@ struct LobbyView: View {
                 statusBanner
                 if session.isPaused && !session.isEnded && !session.membershipLost {
                     PausedBanner(session: session, onError: { actionError = $0 })
-                        .padding(.bottom, 4)
+                        .padding(.bottom, Spacing.xs)
                 }
                 if let trip = model.trip {
                     tripCard(trip)
                     inviteCard(trip.code)
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.m)
                     carsHeader
                     carsCard
                     if let actionError {
-                        Text(actionError)
-                            .font(.footnote).foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16).padding(.top, 12)
+                        InlineNote(actionError, tone: .alert)
+                            .padding(.top, Spacing.m)
                     }
                 } else if let message = model.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, 20)
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
                 } else {
                     ProgressView().padding(.top, 40)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 16)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.m)
+            .padding(.bottom, Spacing.l)
         }
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -109,9 +107,7 @@ struct LobbyView: View {
             .buttonStyle(PillButtonStyle())
             .accessibilityLabel(started ? "Back to Map" : "Start Trip")
             .accessibilityHint(started ? "" : (catchUp ?? ""))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.ikutScreen)
+            .ikutBottomBar()
         }
         // The map shares this lobby's session; the lobby stays on the stack underneath it.
         .navigationDestination(isPresented: $showMap) {
@@ -232,7 +228,7 @@ struct LobbyView: View {
         } else if session.membershipLost && model.trip != nil {
             exitBanner("You're no longer in this trip", systemImage: "person.fill.xmark")
         } else if isStarted {
-            VStack(spacing: 2) {
+            VStack(spacing: Spacing.xxs) {
                 Label("Trip in progress", systemImage: "car.fill")
                     .font(.footnote.weight(.semibold))
                 if let since = LobbyLogic.onTheRoadLine(startedAt: model.trip?.startedAt ?? model.trip?.createdAt) {
@@ -240,29 +236,29 @@ struct LobbyView: View {
                 }
             }
             .foregroundStyle(Color.ikutPositive)
-            .padding(.horizontal, 14).padding(.vertical, 6)
-            .background(Color.ikutPositive.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
-            .padding(.bottom, 4)
+            .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.tight)
+            .background(Color.ikutPositive.opacity(0.15), in: RoundedRectangle(cornerRadius: Radius.control))
+            .padding(.bottom, Spacing.xs)
             .accessibilityElement(children: .combine)
         } else if session.isTracking && !session.isPaused {
             Label("Sharing location", systemImage: "location.fill")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(Color.ikutPositive)
-                .padding(.horizontal, 12).padding(.vertical, 6)
+                .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.tight)
                 .background(Color.ikutPositive.opacity(0.15), in: Capsule())
-                .padding(.bottom, 4)
+                .padding(.bottom, Spacing.xs)
         }
     }
 
     private func exitBanner(_ title: String, systemImage: String) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.m) {
             Label(title, systemImage: systemImage).font(.headline)
             Button("Back to Home", action: onExit).buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
-        .padding(16)
+        .padding(Spacing.l)
         .ikutCard()
-        .padding(.bottom, 8)
+        .padding(.bottom, Spacing.s)
     }
 
     /// Route preview, name, FROM → TO and the distance, drive and road stats.
@@ -281,19 +277,19 @@ struct LobbyView: View {
                                 .background(.regularMaterial, in: Capsule())
                         }
                         .buttonStyle(.plain)
-                        .padding(10)
+                        .padding(Spacing.gap)
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if isStarted {
                         StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
-                            .padding(10)
+                            .padding(Spacing.gap)
                     } else if !session.isEnded {
                         StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
-                            .padding(10)
+                            .padding(Spacing.gap)
                     }
                 }
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Spacing.gap) {
                 Text(trip.name)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -305,12 +301,12 @@ struct LobbyView: View {
                     .init("Via", routeInfo.roadName.flatMap { $0.isEmpty ? nil : $0 }),
                 ], background: Color.ikutScreen)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 14)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.m)
+            .padding(.bottom, Spacing.cozy)
         }
         .ikutCard()
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 
     private var routePreview: some View {
@@ -339,7 +335,7 @@ struct LobbyView: View {
 
     private func inviteCard(_ code: String) -> some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 StatCaption("Join code")
                 Text(LobbyLogic.displayCode(code))
                     .font(.system(size: 30, weight: .bold, design: .monospaced))
@@ -353,19 +349,19 @@ struct LobbyView: View {
                     Label("Share invite", systemImage: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, Spacing.cozy)
                         .frame(minHeight: 36)
                         .background(Color.ikutAccent, in: Capsule())
                 }
-                .padding(.top, 6)
+                .padding(.top, Spacing.tight)
             }
-            .padding(16)
+            .padding(Spacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             DashedDivider()
-                .padding(.vertical, 12)
+                .padding(.vertical, Spacing.m)
 
-            VStack(spacing: 4) {
+            VStack(spacing: Spacing.xs) {
                 if let image = QRCode.image(for: LobbyLogic.joinURL(code: code)) {
                     Image(uiImage: image)
                         .interpolation(.none)
@@ -387,12 +383,8 @@ struct LobbyView: View {
     private var carsHeader: some View {
         let cars = model.groupedCars
         let ready = cars.filter(\.hasTracker).count
-        return HStack(spacing: 10) {
-            Text("CARS")
-                .accessibilityAddTraits(.isHeader)
-            if cars.isEmpty {
-                Spacer()
-            } else {
+        return CardHeader("Cars") {
+            if !cars.isEmpty {
                 HStack(spacing: 3) {
                     ForEach(cars) { car in
                         Capsule()
@@ -408,11 +400,6 @@ struct LobbyView: View {
                     .foregroundStyle(ready == cars.count ? Color.ikutPositive : Color.ikutWarning)
             }
         }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 16)
-        .padding(.top, 18)
-        .padding(.bottom, 6)
         .accessibilityElement(children: .combine)
     }
 
@@ -420,9 +407,7 @@ struct LobbyView: View {
         let cars = model.groupedCars
         return VStack(spacing: 0) {
             if cars.isEmpty {
-                Text("No cars yet")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 58)
+                EmptyRow("No cars yet")
             }
             ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { RowDivider() }
@@ -440,32 +425,32 @@ private struct CarRow: View {
     let currentUserId: String?
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             CarBadge(number: item.car.number ?? position, colorHex: item.car.color, size: 28)
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.tight) {
                     Text(item.car.name)
                     if item.car.isLead {
                         Text("Lead")
                             .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .padding(.horizontal, Spacing.tight).padding(.vertical, Spacing.xxs)
                             .background(.fill.secondary, in: Capsule())
                     }
                 }
                 Text(people)
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: Spacing.s)
             let color = item.hasTracker ? Color.ikutPositive : Color.ikutWarning
             Text(item.hasTracker ? "Tracking" : "Waiting")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(color)
-                .padding(.horizontal, 9)
+                .padding(.horizontal, Spacing.chipX)
                 .padding(.vertical, 3)
                 .background(color.opacity(0.14), in: Capsule())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.horizontal, Spacing.l)
+        .padding(.vertical, Spacing.tight)
         .frame(minHeight: 52)
         .accessibilityElement(children: .combine)
     }

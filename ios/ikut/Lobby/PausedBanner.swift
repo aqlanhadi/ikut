@@ -12,8 +12,8 @@ struct PausedBanner: View {
     @State private var error: String?
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 12) {
+        VStack(spacing: Spacing.tight) {
+            HStack(spacing: Spacing.m) {
                 Image(systemName: "pause.circle.fill")
                     .font(.title3)
                     .foregroundStyle(Color.ikutWarning)
@@ -27,7 +27,7 @@ struct PausedBanner: View {
                     Text("Resume")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.ikutAccent)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, Spacing.cozy)
                         .frame(minHeight: 36)
                         .background(Color.ikutAccent.opacity(0.10), in: Capsule())
                 }
@@ -38,8 +38,8 @@ struct PausedBanner: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(Color.ikutWarning.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
+        .background(Color.ikutWarning.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 

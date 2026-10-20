@@ -205,16 +205,16 @@ struct TripsHomeView: View {
 
                 ScrollView {
                     pastTrips
-                        .padding(.bottom, bottomInset + 16)
+                        .padding(.bottom, bottomInset + Spacing.l)
                 }
                 .scrollDisabled(!expanded)
                 .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.l)
             .frame(maxWidth: .infinity, alignment: .top)
             .frame(height: height, alignment: .top)
             .glassSheetBackground()
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Spacing.s)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .offset(y: bottomInset - 8)
         }
@@ -258,11 +258,11 @@ struct TripsHomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Trips")
                 .font(.largeTitle.bold())
-                .padding(.horizontal, 4)
-                .padding(.top, 6)
+                .padding(.horizontal, Spacing.xs)
+                .padding(.top, Spacing.tight)
                 .accessibilityAddTraits(.isHeader)
 
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.gap) {
                 Button(action: onNewTrip) {
                     Label("New Trip", systemImage: "plus")
                 }
@@ -272,20 +272,17 @@ struct TripsHomeView: View {
                 }
                 .buttonStyle(GlassPillButtonStyle())
             }
-            .padding(.top, 12)
+            .padding(.top, Spacing.m)
         }
     }
 
     private var pastTrips: some View {
         VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Past trips")
+            CardHeader("Past trips", top: Spacing.sectionLarge)
             if past.isEmpty {
                 // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
-                Text("Trips you start or join will show here.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 58)
-                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                EmptyRow("Trips you start or join will show here.")
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(past.enumerated()), id: \.element.id) { index, entry in
@@ -294,14 +291,14 @@ struct TripsHomeView: View {
                             .buttonStyle(.plain)
                     }
                 }
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
             }
         }
         .onAppear { past = PastTrips.all() }
     }
 
     private func pastRow(_ entry: PastTrips.Entry) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             Image(systemName: entry.endedAt == nil ? "car.fill" : "flag.checkered")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
@@ -311,10 +308,10 @@ struct TripsHomeView: View {
                 Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
                 Text(PastTrips.withPhrase(entry.others) ?? pastDetail(entry)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: Spacing.s)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.l)
         .frame(minHeight: 58)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -349,8 +346,8 @@ struct TripsHomeView: View {
             }
             .tint(.primary)
             .accessibilityLabel("Profile, \(name)")
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.s)
         }
     }
 
@@ -374,11 +371,11 @@ private extension View {
         // Clipped to the same shape: a ScrollView draws on under the safe area and past the rounded
         // corners, so past trips would show outside the glass.
         if #available(iOS 26, *) {
-            let shape = ConcentricRectangle(corners: .concentric(minimum: 38), isUniform: false)
+            let shape = ConcentricRectangle(corners: .concentric(minimum: .fixed(Radius.panel)), isUniform: false)
             clipShape(shape).glassEffect(.regular, in: shape)
         } else {
-            clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 38, style: .continuous))
+            clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
                 .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
         }
     }

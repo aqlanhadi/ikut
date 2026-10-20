@@ -25,12 +25,9 @@ struct NameEntryView: View {
                 Text("What should the convoy call you?")
                     .font(.title2.bold())
                     .accessibilityAddTraits(.isHeader)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.l)
 
-                Text("Your name")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .padding(.horizontal, 16).padding(.top, 22).padding(.bottom, 6)
+                CardHeader("Your name", top: Spacing.sectionLarge)
                     .accessibilityHidden(true)
                 TextField("Your name", text: $name)
                     .textContentType(.givenName)
@@ -38,7 +35,7 @@ struct NameEntryView: View {
                     .submitLabel(.continue)
                     .focused($focused)
                     .disabled(isWorking)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.l)
                     .frame(minHeight: 50)
                     .ikutCard()
                     .accessibilityLabel("Your name")
@@ -46,10 +43,8 @@ struct NameEntryView: View {
                     .onChange(of: name) { errorMessage = nil }
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 16).padding(.top, 8)
+                    InlineNote(errorMessage, tone: .alert)
+                        .padding(.top, Spacing.s)
                         .accessibilityLabel("Error: \(errorMessage)")
                 }
 
@@ -65,7 +60,7 @@ struct NameEntryView: View {
                 .buttonStyle(PillButtonStyle())
                 .disabled(!isValid || isWorking)
             }
-            .padding(16)
+            .padding(Spacing.l)
             .background(Color.ikutScreen)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
