@@ -98,7 +98,7 @@ final class TripMapModel {
         let db = db ?? Firestore.firestore()
         listener = db.collection(FirestorePaths.cars(tripId: session.tripId))
             .addSnapshotListener { [weak self] snapshot, _ in
-                guard let cars = snapshot?.documents.compactMap({ try? $0.data(as: Car.self) }) else { return }
+                guard let cars = snapshot?.decoded(Car.self) else { return }
                 Task { @MainActor in self?.setCars(cars) }
             }
     }

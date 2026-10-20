@@ -127,7 +127,7 @@ final class TripSession {
 
         positionsListener = db.collection(FirestorePaths.positions(tripId: tripId))
             .addSnapshotListener { [weak self] snapshot, error in
-                let positions = snapshot?.documents.compactMap { try? $0.data(as: Position.self) }
+                let positions = snapshot?.decoded(Position.self)
                 let message = error?.localizedDescription
                 Task { @MainActor in
                     guard let self else { return }

@@ -155,7 +155,7 @@ private final class StopHub: @unchecked Sendable {
         let db = Firestore.firestore()
         let eventsReg = db.collection(FirestorePaths.events(tripId: context.tripId)).addSnapshotListener { [self] snapshot, _ in
             guard let snapshot else { return }
-            let decoded = snapshot.documents.compactMap { try? $0.data(as: TripEvent.self) }
+            let decoded = snapshot.decoded(TripEvent.self)
             lock.lock()
             events = decoded
             lock.unlock()
@@ -164,7 +164,7 @@ private final class StopHub: @unchecked Sendable {
         }
         let carsReg = db.collection(FirestorePaths.cars(tripId: context.tripId)).addSnapshotListener { [self] snapshot, _ in
             guard let snapshot else { return }
-            let decoded = snapshot.documents.compactMap { try? $0.data(as: Car.self) }
+            let decoded = snapshot.decoded(Car.self)
             lock.lock()
             cars = decoded
             lock.unlock()
@@ -207,7 +207,7 @@ private final class StopHub: @unchecked Sendable {
         let reg = Firestore.firestore().collection(StopService.votes(tripId: context.tripId, eventId: eventId))
             .addSnapshotListener { [self] snapshot, _ in
                 guard let snapshot else { return }
-                let decoded = snapshot.documents.compactMap { try? $0.data(as: StopVote.self) }
+                let decoded = snapshot.decoded(StopVote.self)
                 lock.lock()
                 votes = decoded
                 lock.unlock()

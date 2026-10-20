@@ -7,15 +7,11 @@ import Observation
 enum RecapService {
     @MainActor static func fetch(tripId: String, db: Firestore = Firestore.firestore()) async throws -> RecapSnapshot {
         let trip = try await db.document(FirestorePaths.trip(tripId)).getDocument(as: Trip.self)
-        let cars = try await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments()
-            .documents.compactMap { try? $0.data(as: Car.self) }
-        let members = try await db.collection(FirestorePaths.members(tripId: tripId)).getDocuments()
-            .documents.compactMap { try? $0.data(as: Member.self) }
+        let cars = try await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments().decoded(Car.self)
+        let members = try await db.collection(FirestorePaths.members(tripId: tripId)).getDocuments().decoded(Member.self)
         // Positions and events may already be purged (7 days after the end); an empty list is fine.
-        let positions = (try? await db.collection(FirestorePaths.positions(tripId: tripId)).getDocuments()
-            .documents.compactMap { try? $0.data(as: Position.self) }) ?? []
-        let events = (try? await db.collection(FirestorePaths.events(tripId: tripId)).getDocuments()
-            .documents.compactMap { try? $0.data(as: TripEvent.self) }) ?? []
+        let positions = (try? await db.collection(FirestorePaths.positions(tripId: tripId)).getDocuments().decoded(Position.self)) ?? []
+        let events = (try? await db.collection(FirestorePaths.events(tripId: tripId)).getDocuments().decoded(TripEvent.self)) ?? []
 
         return RecapSnapshot(
             tripId: tripId, name: trip.name, destinationName: trip.destination.name,
