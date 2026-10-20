@@ -243,7 +243,7 @@ private final class StopHub: @unchecked Sendable {
     private func recordIfChanged(_ state: StopRequestState?) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        let changed = lastEmitted == nil || lastEmitted! != state
+        let changed = lastEmitted != .some(state)
         lastEmitted = .some(state)
         return changed
     }

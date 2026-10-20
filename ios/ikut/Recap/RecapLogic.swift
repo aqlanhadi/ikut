@@ -216,9 +216,13 @@ enum RecapLogic {
             if counts[e.carId] == nil { order.append(e.carId) }
             counts[e.carId, default: 0] += 1
         }
-        guard let best = order.max(by: { counts[$0]! < counts[$1]! || (counts[$0]! == counts[$1]! && order.firstIndex(of: $0)! < order.firstIndex(of: $1)!) })
-        else { return nil }
-        return (best, counts[best]!)
+        // Strictly greater only, so the earliest car keeps a tie.
+        var best: (carId: String, count: Int)?
+        for carId in order {
+            let count = counts[carId] ?? 0
+            if count > (best?.count ?? 0) { best = (carId, count) }
+        }
+        return best
     }
 
     static func awards(_ s: RecapSnapshot, arrivals: [RecapArrival]) -> [RecapAward] {
@@ -237,8 +241,8 @@ enum RecapLogic {
             let what = r.count == 1 ? "the only stop" : "\(r.count) stops"
             out.append(.init(kind: .stopCaller, title: "Pit Boss", detail: "\(carName(r.carId, in: s)) called \(what)", carId: r.carId))
         }
-        let merged = s.positions.filter { $0.convoyOffset != nil }
-        if merged.count > 1, let back = merged.min(by: { $0.convoyOffset! < $1.convoyOffset! }),
+        let merged = s.positions.compactMap { p in p.convoyOffset.map { (position: p, offset: $0) } }
+        if merged.count > 1, let back = merged.min(by: { $0.offset < $1.offset })?.position,
            s.cars.first(where: { $0.id == back.carId })?.isLead != true {
             out.append(.init(kind: .sweeper, title: "The Sweeper", detail: "\(carName(back.carId, in: s)) kept the back of the convoy", carId: back.carId))
         }
