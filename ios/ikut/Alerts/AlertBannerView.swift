@@ -7,7 +7,7 @@ struct AlertBannerView: View {
     /// Categories not to show right now, e.g. a stop request while its own card is up. The alert
     /// stays current in the center (and still times out); only the banner is held back.
     var hiding: Set<EventCategory> = []
-    /// One alert shown elsewhere (the approach alert and its pill).
+    /// One alert shown elsewhere (the approach pill).
     var hidingAlertId: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

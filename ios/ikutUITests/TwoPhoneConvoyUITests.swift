@@ -132,10 +132,9 @@ class TwoPhoneConvoyBase: XCTestCase {
         labelled("label BEGINSWITH %@", "Hazard: \(type)")
     }
 
-    /// The full-screen approach alert ("Back to Map") or its pill ("..., Open the alert").
+    /// The approach pill ("..., Show it on the map").
     var approachShowing: Bool {
-        app.buttons["Back to Map"].exists || labelled("label CONTAINS %@", "meters ahead").exists
-            || labelled("label CONTAINS %@", "Open the alert").exists
+        labelled("label CONTAINS %@", "Show it on the map").exists
     }
 
     /// Badge numbers of the convoy rows, front of the convoy first.
@@ -158,11 +157,6 @@ class TwoPhoneConvoyBase: XCTestCase {
         if notNow.exists { notNow.tap() }
     }
 
-    /// Closes the full-screen approach alert if it is up, so the map's buttons can be tapped.
-    func backToMapIfNeeded() {
-        let back = app.buttons["Back to Map"]
-        if back.exists { back.tap(); Thread.sleep(forTimeInterval: 0.5) }
-    }
 
     func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
@@ -382,7 +376,6 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             try waitMark("b.rejoined", timeout: 240)
             try waitFor("car 5 in A's list", timeout: 90) { element("convoy.row.5").exists }
             shot("14-b-rejoined")
-            backToMapIfNeeded()
             openTripMenuItem("Trip menu", "End trip")
             confirm("End trip")
             XCTAssertTrue(app.buttons["New Trip"].waitForExistence(timeout: 30), "A didn't return Home after ending")
@@ -440,28 +433,19 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
 
         try step("5. sees the scripted car's accident, and its approach alert") {
             try waitMark("cars.reported", timeout: 120)
-            backToMapIfNeeded()
-            try waitFor("accident marker on B's map", timeout: 60) {
-                backToMapIfNeeded()
-                return hazardMarker("Accident").exists
-            }
+            try waitFor("accident marker on B's map", timeout: 60) { hazardMarker("Accident").exists }
             shot("06-accident-marker")
             try waitFor("approach alert for the accident", timeout: 120, poll: 0.5) {
                 labelled("label CONTAINS %@", "Accident ahead").exists
-                    || (app.buttons["Back to Map"].exists && labelled("label CONTAINS %@", "Accident").exists)
             }
             shot("07-accident-alert")
-            // Let the full-screen alert go back to the map by itself, or close it.
-            Thread.sleep(forTimeInterval: 1)
-            backToMapIfNeeded()
             mark("b.sawAccident")
         }
 
         try step("6. asks for a fuel stop from the Pit stop sheet") {
             try waitMark("a.sawAccident", timeout: 120)
-            backToMapIfNeeded()
             let pitStop = app.buttons["Pit stop"]
-            try waitFor("Pit stop button", timeout: 20) { backToMapIfNeeded(); return pitStop.exists && pitStop.isHittable }
+            try waitFor("Pit stop button", timeout: 20) { pitStop.exists && pitStop.isHittable }
             pitStop.tap()
             let fuel = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Fuel'")).firstMatch
             XCTAssertTrue(fuel.waitForExistence(timeout: 10), "Pit stop sheet didn't open")
@@ -492,7 +476,6 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
         }
 
         try step("8. pauses sharing in the lobby, then resumes") {
-            backToMapIfNeeded()
             openTripMenuItem("Trip menu", "Back to lobby")
             XCTAssertTrue(app.buttons["Trip options"].waitForExistence(timeout: 15), "lobby has no Trip options")
             openTripMenuItem("Trip options", "Pause sharing")

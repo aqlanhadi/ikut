@@ -10,6 +10,8 @@ import SwiftUI
 struct HazardMapContent: View {
     let marker: HazardMarker
     var showsChip = true
+    /// Rings spread out from it while its approach alert is up.
+    var pinging = false
 
     private static let size: CGFloat = 32
 
@@ -21,6 +23,7 @@ struct HazardMapContent: View {
             .background(marker.tone.fill, in: Circle())
             .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
             .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+            .background { if pinging { HazardPing(color: marker.tone.fill) } }
             .overlay(alignment: .leading) {
                 if showsChip {
                     Text(marker.chipText)
@@ -40,6 +43,39 @@ struct HazardMapContent: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(marker.accessibilityLabel)
+    }
+}
+
+/// Two rings spreading out from the marker and fading, one after the other. With Reduce Motion,
+/// one ring that stays put.
+private struct HazardPing: View {
+    let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let period = 1.6
+
+    var body: some View {
+        if reduceMotion {
+            ring(phase: 0.3)
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+                let phase = context.date.timeIntervalSinceReferenceDate / Self.period
+                ZStack {
+                    ring(phase: phase.truncatingRemainder(dividingBy: 1))
+                    ring(phase: (phase + 0.5).truncatingRemainder(dividingBy: 1))
+                }
+            }
+        }
+    }
+
+    /// 0 at the marker's edge, 1 at three times its size and gone.
+    private func ring(phase: Double) -> some View {
+        Circle()
+            .fill(color.opacity(0.3))
+            .overlay(Circle().strokeBorder(color, lineWidth: 2))
+            .scaleEffect(1 + 2 * phase)
+            .opacity(1 - phase)
+            .accessibilityHidden(true)
     }
 }
 

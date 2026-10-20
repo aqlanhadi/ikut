@@ -257,6 +257,18 @@ struct MapCameraTests {
         #expect(MapCameraLogic.mode(afterUserGestureFrom: .follow) == .free)
         #expect(MapCameraLogic.mode(afterUserGestureFrom: .fit) == .free)
         #expect(MapCameraLogic.mode(afterUserGestureFrom: .free) == .free)
+        #expect(MapCameraLogic.mode(afterUserGestureFrom: .hazard(id: "h")) == .free)
+    }
+
+    @Test func hazardModeFramesMeAndTheHazard() throws {
+        let target = try #require(MapCameraLogic.target(
+            mode: .hazard(id: "h"), me: tapah, fresh: [bidor], all: [bidor], fallback: [], focus: bidor))
+        #expect(target == MapCameraLogic.fitRegion([bidor, tapah], padding: .focus).map(CameraTarget.fit))
+    }
+
+    @Test func hazardModeFollowsMeOnceTheHazardIsGone() {
+        let target = MapCameraLogic.target(mode: .hazard(id: "h"), me: tapah, fresh: [], all: [], fallback: [], focus: nil)
+        #expect(target == .follow(center: tapah, distance: MapCameraLogic.followDistance))
     }
 
     @Test func trackerFollowsItsCarOthersFollowTheirPhone() {
