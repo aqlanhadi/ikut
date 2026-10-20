@@ -309,10 +309,7 @@ struct TripsHomeView: View {
                 .background(entry.endedAt == nil ? Color.ikutPositive : Color.ikutAccent, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                if let with = PastTrips.withPhrase(entry.others) {
-                    Text(with).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Text(pastDetail(entry)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                Text(PastTrips.withPhrase(entry.others) ?? pastDetail(entry)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
