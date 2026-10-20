@@ -63,6 +63,7 @@
 		5E0572F32C4E89743D919B29 /* AuthEmulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */; };
 		5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881F14A69E038A11FD750DD0 /* Theme.swift */; };
 		61C105833954508E604F390C /* RecapLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E56E0C2FFCC41474FCCA759 /* RecapLogic.swift */; };
+		61D02EBF0CDB17DDAFA6BC46 /* ConvoyUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */; };
 		641F85230B678E4EEA77E442 /* StopLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3E80CE011C8490310C42F29 /* StopLogic.swift */; };
 		66086EF8F71F7F9414B5ED2F /* LiveSpeechEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */; };
 		66B1B1B98B60E2439AD59234 /* ConvoyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB0A694CC1459C9224678CC /* ConvoyModel.swift */; };
@@ -266,6 +267,7 @@
 		CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameEntryView.swift; sourceTree = "<group>"; };
 		D0D7948AC8E4880C3065A836 /* MapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTests.swift; sourceTree = "<group>"; };
 		D34759F3D28A64C5908B2C7D /* AuthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTests.swift; sourceTree = "<group>"; };
+		D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyUITestCase.swift; sourceTree = "<group>"; };
 		DBB0A694CC1459C9224678CC /* ConvoyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyModel.swift; sourceTree = "<group>"; };
 		DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardLogic.swift; sourceTree = "<group>"; };
 		E047C4D86365E2C469F00DA8 /* ikut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ikut.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -423,6 +425,14 @@
 			path = Map;
 			sourceTree = "<group>";
 		};
+		877A9AD1DD460ACAABC43AF4 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
 		9432B6EF8EFD3744D9183D32 /* ikutUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -431,6 +441,7 @@
 				99320F601C724896FA7271D4 /* DemoUITests.swift */,
 				12E15667CB100441C37373C1 /* MapAsks.swift */,
 				56D56ABF41D0A65788959592 /* TwoPhoneConvoyUITests.swift */,
+				877A9AD1DD460ACAABC43AF4 /* Support */,
 			);
 			path = ikutUITests;
 			sourceTree = "<group>";
@@ -876,6 +887,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A5D7587052DDAC3FD53CC733 /* ConvoyScenarioUITests.swift in Sources */,
+				61D02EBF0CDB17DDAFA6BC46 /* ConvoyUITestCase.swift in Sources */,
 				11CA80C194C3B109415910D3 /* CreateTripUITests.swift in Sources */,
 				26AF3954E35DCE138E2814DA /* DemoUITests.swift in Sources */,
 				22384C41D587D1B83AB40B9D /* MapAsks.swift in Sources */,
