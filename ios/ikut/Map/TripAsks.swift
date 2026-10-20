@@ -20,13 +20,32 @@ enum NotificationAccess: Equatable {
 }
 
 /// A question the trip map asks at trip start.
-enum TripAsk: Equatable {
+enum TripAsk: String, Equatable {
     /// Notifications not decided yet: leads to the system prompt.
     case roadAlerts
     /// Notifications turned off in Settings: leads to the Settings app.
     case roadAlertsOff
     /// An in-app choice (iOS has no permission for it).
     case keepScreenOn
+}
+
+/// What was already asked on one trip, kept as a single string ("tripId|roadAlerts,keepScreenOn") so leaving the
+/// map and coming back doesn't ask again.
+enum TripAskMemory {
+    static func asked(in stored: String, tripId: String) -> Set<TripAsk> {
+        let parts = stored.split(separator: "|", maxSplits: 1).map(String.init)
+        guard parts.count == 2, parts[0] == tripId else { return [] }
+        return Set(parts[1].split(separator: ",").compactMap { TripAsk(rawValue: String($0)) })
+    }
+
+    /// Answering "Get road alerts?" also covers "Road alerts are off": refusing the system prompt flips the
+    /// setting to denied, and a second ask right after would be nagging.
+    static func recording(_ kind: TripAsk, in stored: String, tripId: String) -> String {
+        var set = asked(in: stored, tripId: tripId)
+        set.insert(kind)
+        if kind == .roadAlerts { set.insert(.roadAlertsOff) }
+        return tripId + "|" + set.map(\.rawValue).sorted().joined(separator: ",")
+    }
 }
 
 /// Decides which ask comes next, so two never stack and the order is always road alerts, then screen.
@@ -38,7 +57,7 @@ enum TripAskPlanner {
         if explainerShowing { return nil }
         switch notifications {
         case .notDetermined where !asked.contains(.roadAlerts): return .roadAlerts
-        case .denied where !asked.contains(.roadAlertsOff): return .roadAlertsOff
+        case .denied where !asked.contains(.roadAlertsOff) && !asked.contains(.roadAlerts): return .roadAlertsOff
         default: break
         }
         if !keepAwakeAnswered && !asked.contains(.keepScreenOn) { return .keepScreenOn }

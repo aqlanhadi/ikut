@@ -27,7 +27,6 @@ struct TripMapView: View {
     @State private var showReport = false
     /// The ask on screen now; the next one waits for it to be answered (`TripAskPlanner`).
     @State private var ask: TripAsk?
-    @State private var askedThisTrip: Set<TripAsk> = []
     @State private var screenAwake = ScreenAwake()
     @State private var onScreen = false
     @Environment(\.scenePhase) private var scenePhase
@@ -56,8 +55,8 @@ struct TripMapView: View {
     /// Kept screen on while the map is up. `keepAwakeAnswered` is false until the first ask is answered.
     @AppStorage("ikut.map.keepAwake") private var keepAwake = false
     @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
-    /// The last trip the "Road alerts are off" ask was shown for, so reopening the map doesn't nag.
-    @AppStorage("ikut.map.alertsOffAskedTrip") private var alertsOffAskedTrip = ""
+    /// What was asked on the last trip (`TripAskMemory`), so leaving the map and coming back doesn't nag.
+    @AppStorage("ikut.map.askedTrip") private var askedTrip = ""
     @Environment(\.dismiss) private var dismiss
 
     /// What the stop sheet is showing.
@@ -189,6 +188,7 @@ struct TripMapView: View {
                 Text("So the map stays up while you drive. Uses more battery.")
             }
             .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk() }
+            .onChange(of: ask) { _, now in session.askShowing = now != nil }
             .onChange(of: keepAwake) { _, _ in updateAwake() }
             .onChange(of: scenePhase) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, _ in updateAwake() }
@@ -407,6 +407,7 @@ struct TripMapView: View {
                 Button("Back to lobby", systemImage: "chevron.backward") { dismiss() }
                 if liveServices {
                     Toggle("Keep screen on", systemImage: "sun.max", isOn: $keepAwake)
+                        .onChange(of: keepAwake) { _, _ in keepAwakeAnswered = true }
                 }
                 if canEnd {
                     Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
@@ -603,8 +604,7 @@ struct TripMapView: View {
 
     /// Records the answer, runs what it asks for, then shows whichever ask is next.
     private func answer(_ kind: TripAsk, then action: @escaping () async -> Void = {}) {
-        askedThisTrip.insert(kind)
-        if kind == .roadAlertsOff { alertsOffAskedTrip = session.tripId }
+        askedTrip = TripAskMemory.recording(kind, in: askedTrip, tripId: session.tripId)
         ask = nil
         Task {
             await action()
@@ -619,11 +619,11 @@ struct TripMapView: View {
         Task {
             let access = await NotificationAccess.current()
             guard ask == nil, onScreen else { return }
-            var asked = askedThisTrip
-            if alertsOffAskedTrip == session.tripId { asked.insert(.roadAlertsOff) }
-            ask = TripAskPlanner.next(
-                notifications: access, keepAwakeAnswered: keepAwakeAnswered, asked: asked,
+            let next = TripAskPlanner.next(
+                notifications: access, keepAwakeAnswered: keepAwakeAnswered,
+                asked: TripAskMemory.asked(in: askedTrip, tripId: session.tripId),
                 explainerShowing: session.alwaysExplainerShowing)
+            ask = next
         }
     }
 
@@ -637,6 +637,7 @@ struct TripMapView: View {
     private func disappear() {
         onScreen = false
         ask = nil
+        session.askShowing = false
         updateAwake()
         guard liveServices else { return }
         model.stop()

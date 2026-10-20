@@ -70,6 +70,9 @@ enum TripSessionLogic {
         action == .showAlwaysExplainer && !alreadyShown
     }
 
+    /// The Always sheet is on screen only while wanted and no map ask is up, so the two never stack.
+    static func explainerVisible(wanted: Bool, askShowing: Bool) -> Bool { wanted && !askShowing }
+
     @MainActor static func makeCarRouteService(tripId: String, carId: String, trip: Trip, car: Car) throws -> CarRouteControlling {
         try CarRouteService(
             tripId: tripId, carId: carId, mainRoute: trip.route,

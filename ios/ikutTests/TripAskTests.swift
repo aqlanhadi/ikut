@@ -42,7 +42,34 @@ struct TripAskTests {
 
     @Test func deniedAfterTheSystemPromptIsNotAskedAgainThisTrip() {
         // The system prompt was shown and refused: the status flips to denied, but road alerts was already asked.
-        #expect(next(.denied, asked: [.roadAlerts, .roadAlertsOff]) == .keepScreenOn)
+        #expect(next(.denied, asked: [.roadAlerts]) == .keepScreenOn)
+    }
+
+    @Test func refusingTheSystemPromptNeverLeadsToTheSettingsAsk() {
+        // What the app really stores after answering road alerts, then the status reading denied.
+        let stored = TripAskMemory.recording(.roadAlerts, in: "", tripId: "T1")
+        let asked = TripAskMemory.asked(in: stored, tripId: "T1")
+        #expect(next(.denied, asked: asked) == .keepScreenOn)
+    }
+
+    @Test func asksAreRememberedPerTrip() {
+        var stored = TripAskMemory.recording(.keepScreenOn, in: "", tripId: "T1")
+        #expect(TripAskMemory.asked(in: stored, tripId: "T1") == [.keepScreenOn])
+        #expect(TripAskMemory.asked(in: stored, tripId: "T2").isEmpty)
+        stored = TripAskMemory.recording(.roadAlertsOff, in: stored, tripId: "T1")
+        #expect(TripAskMemory.asked(in: stored, tripId: "T1") == [.keepScreenOn, .roadAlertsOff])
+        stored = TripAskMemory.recording(.keepScreenOn, in: stored, tripId: "T2")
+        #expect(TripAskMemory.asked(in: stored, tripId: "T1").isEmpty)
+        // Coming back to the map: nothing left to ask for T2 once the screen ask is remembered.
+        #expect(next(.allowed, asked: TripAskMemory.asked(in: stored, tripId: "T2")) == nil)
+    }
+
+    @Test func theSheetWaitsWhileAnAskIsUp() {
+        #expect(!TripSessionLogic.explainerVisible(wanted: true, askShowing: true))
+        #expect(TripSessionLogic.explainerVisible(wanted: true, askShowing: false))
+        #expect(!TripSessionLogic.explainerVisible(wanted: false, askShowing: false))
+        // While the sheet is wanted, the planner holds every ask, so the two never take turns wrongly.
+        #expect(next(.notDetermined, explainer: true) == nil)
     }
 
     @Test func screenHeldOnlyOnScreenForARunningTripInFront() {

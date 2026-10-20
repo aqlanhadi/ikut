@@ -15,7 +15,6 @@ struct LobbyView: View {
     @State private var renaming = false
     @State private var renameText = ""
     @State private var showChangeDestination = false
-    @State private var showAlwaysExplainer = false
     @State private var confirmLeave = false
     @State private var confirmEnd = false
     @State private var isWorking = false
@@ -195,12 +194,14 @@ struct LobbyView: View {
             guard tracking else { return }
             let action = LocationAccess.nextAction(
                 status: location.status, accuracy: location.accuracy, context: .goingToBackground)
-            if session.consumeAlwaysExplainer(action: action) { showAlwaysExplainer = true }
+            if session.consumeAlwaysExplainer(action: action) { session.alwaysExplainerShowing = true }
         }
-        .onChange(of: showAlwaysExplainer) { _, showing in session.alwaysExplainerShowing = showing }
-        .sheet(isPresented: $showAlwaysExplainer) {
+        .sheet(isPresented: Binding(
+            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing) },
+            set: { if !$0 { session.alwaysExplainerShowing = false } }
+        )) {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.
-            AlwaysLocationExplainerView(permission: location) { _ in showAlwaysExplainer = false }
+            AlwaysLocationExplainerView(permission: location) { _ in session.alwaysExplainerShowing = false }
         }
         .confirmationDialog("Leave this trip?", isPresented: $confirmLeave, titleVisibility: .visible) {
             Button("Leave trip", role: .destructive) { run { try await session.leave(); onExit() } }
