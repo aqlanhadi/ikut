@@ -21,7 +21,8 @@ struct TripMapView: View {
     @State private var toast = ReportToastModel()
     @State private var camera: MapCameraPosition = .automatic
     @State private var cameraHeading = 0.0
-    @State private var panelExpanded = true
+    /// The convoy list starts folded on every arrival at the map; the driver opens it when they want it.
+    @State private var panelExpanded = false
     @State private var reportContext: ReportContext?
     @State private var showReport = false
     @State private var askAboutAlerts = false

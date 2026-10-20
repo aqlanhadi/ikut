@@ -211,6 +211,10 @@ class TwoPhoneConvoyBase: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch.tap()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 30), "Didn't reach the map")
         if app.buttons["Not now"].waitForExistence(timeout: 3) { app.buttons["Not now"].tap() }
+        // The convoy sheet opens collapsed; open it for the steps that read the rows.
+        let expand = app.buttons["Expand convoy list"]
+        XCTAssertTrue(expand.waitForExistence(timeout: 5), "The convoy sheet should open collapsed")
+        expand.tap()
         // The whole convoy in view, so every car and hazard marker is on screen.
         let fit = app.buttons["Fit whole convoy"]
         if fit.waitForExistence(timeout: 5) { fit.tap() }

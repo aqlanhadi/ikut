@@ -175,6 +175,10 @@ final class ConvoyScenarioUITests: XCTestCase {
         startTrip.tap()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         if notNow.waitForExistence(timeout: 2) { notNow.tap() }
+        // The convoy sheet opens collapsed; open it to read the rows.
+        let expand = app.buttons["Expand convoy list"]
+        XCTAssertTrue(expand.waitForExistence(timeout: 5), "The convoy sheet should open collapsed")
+        expand.tap()
     }
 
     private func replaceText(in field: XCUIElement, with text: String) {
