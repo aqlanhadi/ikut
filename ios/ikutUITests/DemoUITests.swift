@@ -137,7 +137,6 @@ class DemoBase: TwoPhoneConvoyBase {
     }
 
     func reportDebris() {
-        backToMapIfNeeded()
         guard app.buttons["Report"].exists else { note("Report button", false, core: true); return }
         app.buttons["Report"].tap()
         let debris = app.buttons["Debris"]
@@ -232,11 +231,10 @@ final class DemoOrganizerUITests: DemoBase {
 
     /// --end-trip, and always against production: the organizer ends the trip from the Trip menu.
     func endTrip() {
-        backToMapIfNeeded()
         guard app.buttons["Trip menu"].exists else { note("Trip menu to end the trip", false, core: true); return }
         openTripMenuItem("Trip menu", "End trip")
         confirm("End trip")
-        soft("the trip ended and phone 1 is back Home", timeout: 30, core: true) { app.buttons["New Trip"].exists }
+        soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share Recap"].exists }
     }
 
     /// The organizer sees the stop card: Agree to Stop, then pin the place ("Pin R&R Demo", else "Pin this stop").
@@ -340,17 +338,16 @@ final class DemoOwnCarUITests: DemoBase {
     func watchDebris() {
         soft("debris marker on phone 2", timeout: 60) { hazardMarker("Debris").exists }
         soft("approach alert for the debris", timeout: 150) { approachShowing }
-        Thread.sleep(forTimeInterval: 0.5)
+        // The convoy list folds and the camera settles on the hazard before the shot.
+        Thread.sleep(forTimeInterval: 1.5)
         shot("approach-alert")
         Thread.sleep(forTimeInterval: 3)
-        backToMapIfNeeded()
     }
 
     /// Pit stop > Fuel; the request sheet finds a place ahead (or none) and sends by itself after a short countdown.
     func requestFuelStop() {
-        backToMapIfNeeded()
         let pitStop = app.buttons["Pit stop"]
-        guard soft("Pit stop button", timeout: 20, core: true, { backToMapIfNeeded(); return pitStop.exists && pitStop.isHittable }) else { return }
+        guard soft("Pit stop button", timeout: 20, core: true, { pitStop.exists && pitStop.isHittable }) else { return }
         pitStop.tap()
         let fuel = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Fuel'")).firstMatch
         guard fuel.waitForExistence(timeout: 10) else { note("Pit stop sheet opened", false, core: true); return }
