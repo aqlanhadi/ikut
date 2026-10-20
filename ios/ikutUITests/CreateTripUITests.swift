@@ -36,7 +36,11 @@ final class CreateTripUITests: ConvoyUITestCase {
         }
         add(XCTAttachment(screenshot: app.screenshot()))
 
+        // Tracking starts in the lobby; the "Not now" sheet (screen off) may cover Start Trip, and the map asks its own.
+        let notNow = app.buttons["Not now"]
+        if notNow.waitForExistence(timeout: 6) { notNow.tap() }
         startTrip.tap()
+        app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         add(XCTAttachment(screenshot: app.screenshot()))
 

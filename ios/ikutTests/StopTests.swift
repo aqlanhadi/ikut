@@ -354,7 +354,9 @@ struct StopEmulatorTests {
     private let route = RouteLine((0...60).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.009) })
 
     private func makeTrip() async throws -> (tripId: String, carId: String, uid: String, code: String) {
-        let trip = try await EmulatorTrip.make(name: "Stops")
+        let trip = try await EmulatorTrip.make(
+            name: "Stops",
+            destination: DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 3, longitude: 101.5)))
         return (trip.tripId, trip.carId, trip.uid, try await trip.code())
     }
 

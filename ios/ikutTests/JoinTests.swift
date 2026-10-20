@@ -172,8 +172,7 @@ struct JoinEmulatorTests {
     }
 
     @Test func previewThenJoinWithNewCar() async throws {
-        let ids = try await EmulatorTrip.make(name: "Join test", carName: "Aqlan's Myvi", carColor: TripService.palette[0])
-        let orgUid = ids.uid
+        let ids = try await EmulatorTrip.make(name: "Join test", destination: Fixtures.ipoh, carName: "Aqlan's Myvi", carColor: TripService.palette[0])
         let code = try await ids.code()
 
         // A different user previews and joins.

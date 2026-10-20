@@ -464,7 +464,7 @@ struct AlertEmulatorTests {
     /// Aqlan reports debris; Daniel joins afterwards and his `AlertCenter`, fed by the real
     /// `EventService.listen`, announces it by Aqlan's name. Aqlan's own client would not.
     @Test func otherUsersEventReachesCenter() async throws {
-        let trip = try await EmulatorTrip.make(name: "Alerts")
+        let trip = try await EmulatorTrip.make(name: "Alerts", destination: Fixtures.ipoh)
         let code = try await trip.code()
         try await EventService.report(
             type: .debris, tripId: trip.tripId, carId: trip.carId, authorId: trip.uid,

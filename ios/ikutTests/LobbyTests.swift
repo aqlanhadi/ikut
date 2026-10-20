@@ -100,7 +100,7 @@ struct LobbyEmulatorTests {
 
     @Test func modelReceivesCarAndMember() async throws {
         let ids = try await EmulatorTrip.make(
-            name: "Lobby test", route: Fixtures.longRoute, carName: "Aqlan's Myvi", carColor: TripService.palette[0])
+            name: "Lobby test", carName: "Aqlan's Myvi", carColor: TripService.palette[0])
 
         let model = LobbyModel(tripId: ids.tripId)
         model.start()

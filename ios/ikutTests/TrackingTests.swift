@@ -252,7 +252,7 @@ struct TrackingEmulatorTests {
     }
 
     private func makeTrip() async throws -> EmulatorTrip {
-        try await EmulatorTrip.make(name: "Tracking", route: Fixtures.longRoute)
+        try await EmulatorTrip.make(name: "Tracking")
     }
 
     private func makePosition() -> Position {

@@ -15,6 +15,8 @@ enum Fixtures {
     static let kotaBharu = DestinationResult(
         name: "Kota Bharu", subtitle: "Kelantan", coordinate: .init(latitude: 6.1254, longitude: 102.2381))
 
+    static let ipoh = DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 4.6, longitude: 101.1))
+
     /// A two-point route; enough for anything that only needs a valid polyline.
     static let shortRoute = BuiltRoute(distance: 1_000, travelTime: 600, name: "E1", polyline: "_p~iF~ps|U")
     /// The same two points plus a third (a real, longer drive).
