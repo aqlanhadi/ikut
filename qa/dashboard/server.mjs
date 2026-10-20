@@ -127,6 +127,17 @@ async function readJson(req) {
 }
 const isRunning = () => run?.status === 'running';
 
+// Any web page the browser has open could POST to localhost: only JSON from a page served by this server gets through
+// (a cross-site form or text/plain post is a "simple" request and would not be stopped by the browser).
+const trusted = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
+function allowedPost(req) {
+  if (!String(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) return false;
+  if (!trusted.has(String(req.headers.host ?? '').toLowerCase())) return false;
+  const origin = req.headers.origin;
+  if (origin === undefined) return true; // not a browser page (curl)
+  try { return trusted.has(new URL(origin).host.toLowerCase()); } catch { return false; }
+}
+
 await discover();
 
 createServer(async (req, res) => {
@@ -145,6 +156,7 @@ createServer(async (req, res) => {
       req.on('close', () => clients.delete(res));
       return;
     }
+    if (req.method === 'POST' && !allowedPost(req)) return send(res, 403, { error: 'Only the demos page itself may do that.' });
     if (req.method === 'POST' && p === '/api/start') {
       const body = await readJson(req);
       if (!['emulators', 'production'].includes(body.backend ?? 'emulators')) return send(res, 400, { error: 'Backend must be emulators or production.' });

@@ -229,8 +229,11 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
    `--derived-data`, default `/tmp/ikut-dd-q4`). It refuses when another demo, UI test or location playback uses either
    simulator and says which. Then it fresh-installs the app on iPhone 17 #1 and #2, grants location-always, parks both at
    the start and opens the app.
-2. **Create a trip on phone 1.** The playground finds it (newest active trip created after Prepare), Daniel and Hafiz
-   join with its code, and the page shows the code, big: **join on phone 2 with it.**
+2. **Create a trip on phone 1.** New trips since Prepare are listed with their code, destination, number of cars and how far the
+   first car is from the start; press **Use this trip** (or type phone 1's code). Daniel and Hafiz join nothing before that. It
+   picks by itself only when there is exactly one new trip, with one car, reporting within 300 m of the start (convoy-sim and
+   UI tests make trips too). The page shows the code, big: **join on phone 2 with it.** When phone 1 ends the trip the page says
+   "The trip has ended" and the generated cars stop.
 3. **Place and play.** Per car: where it starts (km along the route), speed (0-200 km/h), Play/Pause; Play all / Pause all.
    A paused car moves right away when placed. Defaults: phone 1 at 3.0 km, phone 2 at 2.2, Daniel 1.4, Hafiz 0.6,
    all 90 km/h, paused. Phones are driven with `simctl location start` from the car's current offset (restarted on every
@@ -238,14 +241,14 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
    location, the app drops fixes older than 15 s).
 4. **Generated cars** (Daniel, Hafiz) publish every second through the app's PositionBuilder/PositionPublisher
    (heartbeats while paused). Toggles: *Agrees to stops* (agrees within about 5 s to an open stop request it did not make),
-   *Suggests a place* (its agree vote carries a place 4 km ahead of the lead, the `stopStory` shape), *Drop signal*
+   *Suggests a place* (switches Agrees on too; its agree vote carries a place 4 km ahead of the lead, the `stopStory` shape), *Drop signal*
    (`disableNetwork`, which is what makes a car stale; "Give signal back" re-enables it). *Starts off the route* gives the car
    its own straight road from a side point (default 2 km away) to a merge point at the km you type: it shows as joining
    (no `convoyOffset`) and becomes `convoy` at the merge, as car 4 does in `convoy-sim.mjs`.
 5. The card shows, per car, the position the app/Firestore really has and its age (read as the emulator's owner over REST),
    so a phone that is not following is flagged; plus the trip's events with votes, suggestions, pins and resolved state.
 
-Close the playground (SIGTERM) stops the players, clears both simulators' locations and closes the generated cars. The trip is
+Close the playground (SIGTERM) stops the players, clears the locations of the simulators it started and closes the generated cars. The trip is
 left as it is; end it from phone 1's menu. Emulators only (`--backend production` is refused).
 
 Not covered: events reported by the generated cars (only votes and suggestions), background tracking, push, off-route

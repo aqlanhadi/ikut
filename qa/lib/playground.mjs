@@ -18,6 +18,46 @@ export function parseStart(text) {
 
 export const clampKmh = (v) => Math.min(MAX_KMH, Math.max(0, Number.isFinite(Number(v)) ? Number(v) : 0));
 
+/** A mistake in a command that can be told to the person in plain words. */
+export class UserError extends Error {}
+
+/** A finite number in [lo, hi] (numbers or numeric strings only), else a UserError saying what is wrong. */
+export function numberIn(v, lo, hi, what) {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  if (!Number.isFinite(n) || n < lo || n > hi) throw new UserError(`${what} should be a number from ${lo} to ${hi}.`);
+  return n;
+}
+
+/** The start of a prepare command: the literal "default", or "lat,lng" text. Nothing else (no objects). */
+export function startFrom(v) {
+  if (v === undefined || v === null || v === 'default') return 'default';
+  if (typeof v !== 'string') throw new UserError('Start should look like 3.45,101.40 (latitude, longitude).');
+  const p = parseStart(v);
+  if (!p) throw new UserError('Start should look like 3.45,101.40 (latitude, longitude).');
+  return p;
+}
+
+/** The build folder: under /tmp, plain name, never starting with "-" (xcodebuild would read it as an option). */
+export function validDerivedData(v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v !== 'string' || !/^\/(tmp|private\/tmp)\/[\w][\w.-]*$/.test(v)) throw new UserError('The build folder should be a folder directly under /tmp, like /tmp/ikut-dd-q4.');
+  return v;
+}
+
+/** Within this many meters of the route's end a phone is parked (simctl location start needs two waypoints). */
+export const PARK_NEAR_END = 80;
+export const shouldPark = (offset, length) => length - offset < PARK_NEAR_END;
+
+/**
+ * Which new trip to offer. `candidates`: [{ tripId, cars (count), firstCarDistance (m from the start, or null when it has no
+ * position yet) }]. Auto-pick only when there is exactly one, with one car, whose first car reports near the start.
+ */
+export function autoPick(candidates, nearMeters = 300) {
+  if (candidates.length !== 1) return null;
+  const c = candidates[0];
+  return c.cars === 1 && c.firstCarDistance !== null && c.firstCarDistance <= nearMeters ? c : null;
+}
+
 /** One step of driving: meters along the route after `dt` seconds at `kmh`. Stops at the end. */
 export function advanceOffset(offset, kmh, dt, length) {
   return Math.min(length, Math.max(0, offset + (kmh / 3.6) * dt));
@@ -61,6 +101,7 @@ export function offRouteCoords(route, mergeOffset, sideMeters, { runUp = 1500, t
 export function feedPoints(route, offset, { step = 80, ahead = 25_000 } = {}) {
   const pts = [route.coordinateAtOffset(offset)];
   for (let off = offset + step; off < Math.min(route.length, offset + ahead); off += step) pts.push(route.coordinateAtOffset(off));
+  if (pts.length < 2 && offset < route.length) pts.push(route.coordinateAtOffset(route.length)); // simctl needs two waypoints
   return pts;
 }
 

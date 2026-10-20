@@ -20,10 +20,11 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { GeoPoint, collection, deleteField, doc, getDocs, setLogLevel, updateDoc } from 'firebase/firestore';
 import { START, Car, PROJECT_ID, emit, firebaseConfig, parseArgs, repo, sleep, standInRoute } from './lib/demo-common.mjs';
-import { CarRouteLogic, Polyline, RouteLine, bearing } from './lib/route.mjs';
+import { CarRouteLogic, Polyline, RouteLine, bearing, haversine } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
-  advanceOffset, ageSeconds, clampKmh, decodeDoc, feedPoints, nudged, offRouteCoords, parseStart, pendingVotes, suggestionAhead,
+  UserError, advanceOffset, ageSeconds, autoPick, decodeDoc, feedPoints, nudged, numberIn, offRouteCoords, pendingVotes, shouldPark, startFrom,
+  suggestionAhead, validDerivedData,
 } from './lib/playground.mjs';
 
 // --no-sim (developing the script itself): no builds and no simctl calls at all, for trying the cars without simulators.
@@ -81,7 +82,10 @@ const S = {
   phase: 'setup', detail: 'Pick where everyone starts, then prepare the phones.', problem: null,
   start: { latitude: START.latitude, longitude: START.longitude, label: 'The E1 start used by the demos' },
   code: null, tripId: null, destination: null, route: null, organizerId: null,
+  candidates: [], ended: false,
 };
+const failedTrips = new Set(); // trips the generated cars could not join: not offered again by themselves
+const touched = new Set(); // simulators this run has put something on: only those are cleared when it closes
 /** Everyone in the playground, by key. */
 const cars = Object.fromEntries(KEYS.map((k) => [k, {
   key: k, kind: GENERATED[k] ? 'generated' : 'phone', label: GENERATED[k]?.displayName ?? (k === 'phone1' ? 'Phone 1' : 'Phone 2'),
@@ -102,11 +106,15 @@ const locStr = (c) => `${c.latitude.toFixed(6)},${c.longitude.toFixed(6)}`;
 
 /** Who is using a simulator right now (other demos, UI tests, location playback). Empty when it is free. */
 function inUse() {
-  const ps = spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).stdout.split('\n');
+  const ps = spawnSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' }).stdout.split('\n');
+  const parents = new Map();
+  for (const line of ps) { const m = /^\s*(\d+)\s+(\d+)\s/.exec(line); if (m) parents.set(Number(m[1]), Number(m[2])); }
+  const mine = new Set([process.pid]); // this process and the ones that started it (an agent's `zsh -c '... node demo-playground.mjs'`)
+  for (let p = parents.get(process.pid); p && !mine.has(p); p = parents.get(p)) mine.add(p);
   const found = [];
   for (const line of ps) {
-    const m = /^\s*(\d+)\s+(.*)$/.exec(line);
-    if (!m || Number(m[1]) === process.pid) continue;
+    const m = /^\s*(\d+)\s+\d+\s+(.*)$/.exec(line);
+    if (!m || mine.has(Number(m[1]))) continue;
     const cmd = m[2];
     if (/--describe|--dry-run/.test(cmd) || /^(ps|grep)\b/.test(cmd)) continue;
     let who = null;
@@ -131,6 +139,7 @@ function prepareSimulator(p, app) {
   const r = simctl('install', p.udid, app);
   if (r.status !== 0) throw new Error(`could not install the app on ${p.label}: ${r.stderr.trim()}`);
   simctl('privacy', p.udid, 'grant', 'location-always', BUNDLE);
+  touched.add(p.udid);
   simctl('location', p.udid, 'set', locStr(S.start));
   const l = simctl('launch', p.udid, BUNDLE);
   if (l.status !== 0) throw new Error(`could not open the app on ${p.label}: ${l.stderr.trim()}`);
@@ -144,7 +153,8 @@ function feedPhone(c) {
   if (!S.route || !p) return;
   stopPlayer(c);
   const at = S.route.coordinateAtOffset(c.offset);
-  if (!c.playing || c.speed <= 0 || c.offset >= S.route.length - 1) { simctlAsync('location', p.udid, 'set', locStr(at)); return; }
+  touched.add(p.udid);
+  if (!c.playing || c.speed <= 0 || shouldPark(c.offset, S.route.length)) { simctlAsync('location', p.udid, 'set', locStr(at)); return; }
   if (NO_SIM) return;
   const loc = spawn('xcrun', ['simctl', 'location', p.udid, 'start', `--speed=${(c.speed / 3.6).toFixed(2)}`, '--interval=1', '-']);
   loc.stdin.end(`${feedPoints(S.route, c.offset).map(locStr).join('\n')}\n`);
@@ -161,18 +171,31 @@ async function restList(p) {
   if (!r.ok) return [];
   return ((await r.json()).documents ?? []).map(decodeDoc);
 }
-async function findNewTrip(sinceMs) {
+async function activeTrips() {
   const res = await fetch(`${REST}:runQuery`, {
     method: 'POST', headers,
     body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'trips' }], where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'active' } } } } }),
   });
   if (!res.ok) throw new Error(`the Firestore emulator answered ${res.status}`);
-  const trips = (await res.json()).filter((r) => r.document).map((r) => decodeDoc(r.document))
-    .filter((t) => (t.createdAt ?? 0) >= sinceMs && t.route && t.code).sort((a, b) => b.createdAt - a.createdAt);
-  return trips[0] ?? null;
+  return (await res.json()).filter((r) => r.document).map((r) => decodeDoc(r.document)).filter((t) => t.route && t.code);
+}
+/** New active trips since Prepare, newest first, with what tells a phone-made trip from a script's: its cars and where the first one is. */
+async function scanTrips() {
+  const fresh = (await activeTrips()).filter((t) => (t.createdAt ?? 0) >= S.readyAt && !failedTrips.has(t.id)).sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+  return Promise.all(fresh.map(async (t) => {
+    const [carDocs, positions] = await Promise.all([restList(`trips/${t.id}/cars`), restList(`trips/${t.id}/positions`)]);
+    const first = [...carDocs].sort((x, y) => (x.number ?? 99) - (y.number ?? 99))[0];
+    const pos = first && positions.find((p) => p.id === first.id)?.location;
+    return { tripId: t.id, code: t.code, destination: t.destination?.name ?? '?', cars: carDocs.length, firstCarDistance: pos ? Math.round(haversine(pos, S.start)) : null, trip: t };
+  }));
+}
+async function tripEnded() {
+  const r = await fetch(`${REST}/trips/${S.tripId}`, { headers });
+  return r.ok && decodeDoc(await r.json()).status !== 'active';
 }
 async function pollRest() {
-  if (!S.tripId) return;
+  if (!S.tripId || S.ended) return;
+  if (S.phase === 'ready' && await tripEnded()) return endPlayground();
   const base = `trips/${S.tripId}`;
   const [positions, carDocs, events] = await Promise.all([restList(`${base}/positions`), restList(`${base}/cars`), restList(`${base}/events`)]);
   const votes = new Map();
@@ -196,9 +219,9 @@ const fixFor = (c) => {
 
 async function placeGenerated(c, { km, offRoute, sideMeters }) {
   const carRef = () => doc(c.car.db, `trips/${S.tripId}/cars/${c.carId}`);
-  const merge = Math.min(routeLen(), Math.max(0, km * 1000));
+  const merge = Math.min(routeLen(), km * 1000);
   if (offRoute) {
-    c.sideMeters = sideMeters ?? c.sideMeters;
+    c.sideMeters = sideMeters;
     const plan = CarRouteLogic.makePlan(offRouteCoords(S.route, Math.max(merge, 1600), c.sideMeters), S.route);
     c.own = new RouteLine(Polyline.decode(plan.route));
     c.ownOffset = 0;
@@ -239,6 +262,7 @@ async function merged(c) {
 async function setupGenerated(c) {
   const spec = GENERATED[c.key];
   c.car = new Car({ key: c.key, ...spec }, o, say);
+  if (process.env.IKUT_PLAYGROUND_FAIL_JOIN === c.key) throw new Error('forced join failure (IKUT_PLAYGROUND_FAIL_JOIN, for trying the retry path)');
   await c.car.connect();
   await c.car.join(S.code);
   c.carId = c.car.carId;
@@ -271,27 +295,35 @@ async function behave(c) {
 let tickNo = 0;
 async function tick() {
   tickNo += 1;
-  if (S.route) {
+  if (S.route && !S.ended) {
     for (const c of Object.values(cars)) {
-      if (c.playing) {
-        if (c.joining) c.ownOffset = advanceOffset(c.ownOffset, c.speed, 1, c.own.length);
-        else c.offset = advanceOffset(c.offset, c.speed, 1, routeLen());
-      }
-      if (c.kind === 'generated' && c.car?.publisher) {
-        if (c.joining) {
-          const m = S.route.mergeOffset(c.own, CarRouteLogic.mergeTolerance);
-          if (m && c.ownOffset >= m.otherOffset) await merged(c);
-        }
-        c.car.onFix(fixFor(c), 0.8);
-        c.car.publisher.tick();
-        await behave(c);
-      } else if (c.kind === 'phone' && !c.playing && tickNo % 5 === 0) {
-        const p = phone(c);
-        simctlAsync('location', p.udid, 'set', locStr(nudged(S.route.coordinateAtOffset(c.offset), c.nudges++))); // a parked simulator needs a changed fix
-      }
+      try {
+        await tickCar(c);
+      } catch (e) { if (!c.failing) say(`${c.label}: ${e.message}`); c.failing = true; continue; }
+      c.failing = false;
     }
   }
   emitState();
+}
+
+async function tickCar(c) {
+  if (S.ended) return;
+  if (c.playing) {
+    if (c.joining) c.ownOffset = advanceOffset(c.ownOffset, c.speed, 1, c.own.length);
+    else c.offset = advanceOffset(c.offset, c.speed, 1, routeLen());
+  }
+  if (c.kind === 'generated' && c.car?.publisher) {
+    if (c.joining) {
+      const m = S.route.mergeOffset(c.own, CarRouteLogic.mergeTolerance);
+      if (m && c.ownOffset >= m.otherOffset) await merged(c);
+    }
+    c.car.onFix(fixFor(c), 0.8);
+    c.car.publisher.tick();
+    await behave(c);
+  } else if (c.kind === 'phone' && !c.playing && tickNo % 5 === 0) {
+    const p = phone(c);
+    simctlAsync('location', p.udid, 'set', locStr(nudged(S.route.coordinateAtOffset(c.offset), c.nudges++))); // a parked simulator needs a changed fix
+  }
 }
 
 function carState(c) {
@@ -327,7 +359,7 @@ function eventsState() {
 function emitState() {
   emit({
     type: 'state', phase: S.phase, detail: S.detail, problem: S.problem, start: S.start, code: S.code, tripId: S.tripId,
-    destination: S.destination, routeLength: routeLen() || null, defaults: DEFAULTS,
+    destination: S.destination, routeLength: routeLen() || null, defaults: DEFAULTS, candidates: S.phase === 'waiting' ? S.candidates : [],
     cars: KEYS.map((k) => carState(cars[k])), events: S.tripId ? eventsState() : [],
   });
 }
@@ -338,13 +370,10 @@ let preparing = false;
 async function prepare({ start, skipBuild, derivedData }) {
   if (S.phase !== 'setup' || preparing) { S.problem = 'The phones are already prepared.'; return; }
   S.problem = null;
-  let point = null;
-  if (!start || start === 'default') point = { latitude: START.latitude, longitude: START.longitude, label: 'The E1 start used by the demos' };
-  else {
-    const parsed = typeof start === 'string' ? parseStart(start) : start;
-    if (!parsed) { S.problem = 'Start should look like 3.45,101.40 (latitude, longitude).'; return; }
-    point = { ...parsed, label: `${parsed.latitude.toFixed(5)}, ${parsed.longitude.toFixed(5)}` };
-  }
+  const from = startFrom(start);
+  const dd = validDerivedData(derivedData) || o.derivedData;
+  const point = from === 'default' ? { latitude: START.latitude, longitude: START.longitude, label: 'The E1 start used by the demos' }
+    : { ...from, label: `${from.latitude.toFixed(5)}, ${from.longitude.toFixed(5)}` };
   const busy = NO_SIM ? [] : inUse();
   if (busy.length) {
     S.problem = `The simulators are busy: ${[...new Set(busy.map((b) => `${b.who} on ${b.udids.map((u) => phones.find((p) => p.udid === u)?.label).join(' and ')}`))].join('; ')}. Stop that first.`;
@@ -354,7 +383,6 @@ async function prepare({ start, skipBuild, derivedData }) {
   preparing = true;
   S.start = point;
   try {
-    const dd = derivedData || o.derivedData;
     if (NO_SIM) say('--no-sim: no build, no simulators');
     else if (!skipBuild && !o.skipBuild) {
       S.phase = 'preparing'; S.detail = 'Building the app (a few minutes the first time).';
@@ -381,56 +409,102 @@ async function prepare({ start, skipBuild, derivedData }) {
 }
 
 let finding = false;
+/** While waiting: list the new trips for the page, and take one by itself only when it is surely the one phone 1 made. */
 async function waitForTrip() {
   if (S.phase !== 'waiting' || finding) return;
   finding = true;
   try {
-    const trip = await findNewTrip(S.readyAt);
-    if (!trip) return;
-    S.phase = 'joining'; S.detail = 'Daniel and Hafiz are joining.';
-    S.code = trip.code; S.tripId = trip.id; S.organizerId = trip.organizerId ?? null;
+    const found = await scanTrips();
+    S.candidates = found.map(({ trip, ...c }) => c);
+    const pick = autoPick(S.candidates);
+    if (pick) await attachTrip(found.find((f) => f.tripId === pick.tripId).trip);
+  } catch (e) { say(`looking for the trip: ${e.message}`); } finally { finding = false; }
+}
+
+/** Daniel and Hafiz join this trip: nothing is joined before this. */
+async function attachTrip(trip) {
+  if (S.phase !== 'waiting') return;
+  S.phase = 'joining'; S.detail = 'Daniel and Hafiz are joining.'; S.problem = null;
+  S.code = trip.code; S.tripId = trip.id; S.organizerId = trip.organizerId ?? null;
+  try {
     S.route = new RouteLine(Polyline.decode(trip.route));
     S.destination = trip.destination?.name ?? '?';
-    say(`trip ${trip.code} (${trip.id}), ${(routeLen() / 1000).toFixed(1)} km to ${S.destination}`);
+    say(`using trip ${trip.code} (${trip.id}), ${(routeLen() / 1000).toFixed(1)} km to ${S.destination}`);
     emit({ type: 'code', code: trip.code });
     for (const k of ['daniel', 'hafiz']) { cars[k].offset = Math.min(cars[k].offset, routeLen()); await setupGenerated(cars[k]); }
     for (const k of ['phone1', 'phone2']) simctl('location', phone(cars[k]).udid, 'set', locStr(S.route.coordinateAtOffset(cars[k].offset)));
     S.phase = 'ready'; S.detail = 'Join on phone 2 with the code, then press Play.';
     emit({ type: 'phase', phase: 'running', detail: 'the playground is ready' });
-    timers.push(setInterval(() => { for (const k of ['phone1', 'phone2']) if (cars[k].playing) feedPhone(cars[k]); }, 20_000));
   } catch (e) {
-    S.phase = 'waiting'; S.detail = 'Create a trip on phone 1.'; S.problem = e.message; say(`trip: ${e.message}`);
-    S.tripId = null; S.code = null;
-  } finally { finding = false; }
+    say(`joining trip ${trip.code}: ${e.message}`);
+    failedTrips.add(trip.id); // not offered again by itself
+    for (const k of ['daniel', 'hafiz']) { await cars[k].car?.close().catch(() => {}); cars[k].car = null; cars[k].carId = null; }
+    S.phase = 'waiting'; S.detail = 'Create a trip on phone 1, or type its code.';
+    S.problem = `Daniel and Hafiz could not join trip ${trip.code}. Pick it again, or use another trip.`;
+    S.tripId = null; S.code = null; S.route = null; S.destination = null;
+  }
+}
+
+/** The trip is over (phone 1 ended it): the generated cars' writes would be rejected, so stop them. */
+async function endPlayground() {
+  if (S.ended) return;
+  S.ended = true; S.phase = 'ended'; S.detail = 'The trip has ended.';
+  say('the trip has ended; stopping the generated cars');
+  for (const c of Object.values(cars)) { c.playing = false; stopPlayer(c); }
+  for (const k of ['daniel', 'hafiz']) await cars[k].car?.close().catch(() => {});
+  emit({ type: 'phase', phase: 'ended', detail: 'the trip has ended' });
 }
 
 // ---------------------------------------------------------------- commands
 
 async function command(m) {
+  if (!m || typeof m !== 'object') throw new UserError('That command was not understood.');
   const c = cars[m.car];
-  const need = () => { if (!c) throw new Error(`no car ${m.car}`); };
+  const need = () => { if (!Object.hasOwn(cars, m.car)) throw new UserError(`${String(m.car).slice(0, 20)} isn't a car on the playground.`); };
   switch (m.cmd) {
     case 'prepare': return prepare(m);
+    case 'useTrip': {
+      if (S.phase !== 'waiting') throw new UserError('Prepare the phones first.');
+      let trip = null;
+      if (typeof m.code === 'string' && m.code.trim()) {
+        const code = m.code.replace(/\s+/g, '').toUpperCase();
+        if (!/^[A-Z0-9]{4,8}$/.test(code)) throw new UserError('A trip code is 4 to 8 letters and numbers.');
+        trip = (await activeTrips()).find((t) => t.code === code);
+        if (!trip) throw new UserError(`There is no active trip with the code ${code}.`);
+      } else {
+        trip = (await scanTrips()).find((t) => t.tripId === m.tripId)?.trip;
+        if (!trip) throw new UserError('That trip is not on the list any more.');
+      }
+      failedTrips.delete(trip.id);
+      return attachTrip(trip);
+    }
     case 'place': {
       need();
-      if (!S.route) return;
-      if (c.kind === 'phone') { c.offset = Math.min(routeLen(), Math.max(0, m.km * 1000)); feedPhone(c); say(`${c.label} placed at ${(c.offset / 1000).toFixed(1)} km`); }
-      else if (c.car) await placeGenerated(c, m);
+      const km = numberIn(m.km, 0, 1000, 'Km');
+      const side = m.offRoute && c.kind === 'generated' ? numberIn(m.sideMeters ?? c.sideMeters, 200, 20000, 'The side road distance') : null;
+      if (!S.route || S.ended) return;
+      if (c.kind === 'phone') { c.offset = Math.min(routeLen(), km * 1000); feedPhone(c); say(`${c.label} placed at ${(c.offset / 1000).toFixed(1)} km`); }
+      else if (c.car) await placeGenerated(c, { km, offRoute: Boolean(m.offRoute), sideMeters: side });
       return;
     }
-    case 'speed': need(); c.speed = clampKmh(m.kmh); if (c.kind === 'phone') feedPhone(c); say(`${c.label} speed ${c.speed} km/h`); return;
+    case 'speed': need(); c.speed = numberIn(m.kmh, 0, 200, 'Speed'); if (c.kind === 'phone') feedPhone(c); say(`${c.label} speed ${c.speed} km/h`); return;
     case 'play': need(); c.playing = Boolean(m.playing); if (c.kind === 'phone') feedPhone(c); else publishNow(c); say(`${c.label} ${c.playing ? 'plays' : 'pauses'}`); return;
     case 'playAll':
       for (const k of KEYS) { cars[k].playing = Boolean(m.playing); if (cars[k].kind === 'phone') feedPhone(cars[k]); }
       say(m.playing ? 'all cars play' : 'all cars pause'); return;
-    case 'behaviour': need(); if (c.kind !== 'generated') return; for (const f of ['agree', 'suggest']) if (typeof m[f] === 'boolean') c[f] = m[f]; say(`${c.label}: agrees ${c.agree}, suggests a place ${c.suggest}`); return;
+    case 'behaviour':
+      need();
+      if (c.kind !== 'generated') return;
+      if (typeof m.agree === 'boolean') { c.agree = m.agree; if (!m.agree) c.suggest = false; } // a suggestion goes with the agree vote
+      if (typeof m.suggest === 'boolean') { c.suggest = m.suggest; if (m.suggest) c.agree = true; }
+      say(`${c.label}: agrees ${c.agree}, suggests a place ${c.suggest}`); return;
     case 'drop':
       need();
       if (c.kind !== 'generated' || !c.car) return;
       if (m.offline && !c.offline) { c.offline = true; await c.car.goOffline(); say(`${c.label} loses signal`); }
       else if (!m.offline && c.offline) { c.offline = false; await c.car.goOnline(); say(`${c.label} has signal again`); }
       return;
-    default: throw new Error(`unknown command ${m.cmd}`);
+    default: throw new UserError(`${String(m.cmd).slice(0, 20)} is not something the playground can do.`);
   }
 }
 
@@ -445,11 +519,15 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   if (!line.startsWith('CMD ')) return;
   let m;
   try { m = JSON.parse(line.slice(4)); } catch { say(`bad command: ${line}`); return; }
-  command(m).catch((e) => { S.problem = e.message; say(`command ${m.cmd}: ${e.message}`); });
+  command(m).catch((e) => {
+    S.problem = e instanceof UserError ? `That didn't work: ${e.message}` : "That didn't work. The details are in the log.";
+    say(`command ${m?.cmd}: ${e.message}`);
+  });
 });
 
 timers.push(setInterval(() => { tick().catch((e) => say(`tick: ${e.message}`)); }, 1000));
 timers.push(setInterval(() => { waitForTrip(); pollRest().catch(() => {}); }, 1500));
+timers.push(setInterval(() => { for (const k of ['phone1', 'phone2']) if (cars[k].playing && !S.ended) feedPhone(cars[k]); }, 20_000)); // resync the players
 
 let leaving = false;
 async function leave(sig) {
@@ -458,7 +536,7 @@ async function leave(sig) {
   say(`${sig}: closing; the trip is left as it is (end it on phone 1)`);
   timers.forEach(clearInterval);
   for (const c of Object.values(cars)) { stopPlayer(c); }
-  for (const p of phones) simctl('location', p.udid, 'clear');
+  for (const p of phones) if (touched.has(p.udid)) simctl('location', p.udid, 'clear'); // only what this run started
   for (const c of Object.values(cars)) await c.car?.close().catch(() => {});
   emit({ type: 'phase', phase: 'ended', detail: 'playground closed' });
   process.exit(0);

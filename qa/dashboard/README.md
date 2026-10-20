@@ -28,3 +28,6 @@ The card walks through setup (start picker, Prepare phones, Skip the build), wai
 (trip code, route strip, one row per car, Play all / Pause all, what was reported). Production is never offered:
 the playground refuses `--backend production`. See `qa/README.md`, "Playground".
 Developing the script without simulators: `IKUT_PLAYGROUND_NO_SIM=1 node qa/dashboard/server.mjs --port 4324`.
+
+POSTs (`/api/start`, `/api/stop`, `/api/command`) need `Content-Type: application/json` and a Host (and Origin, when a browser sends one) of
+`127.0.0.1` or `localhost` on the server's own port; anything else gets a 403. With curl add `-H 'content-type: application/json'`.

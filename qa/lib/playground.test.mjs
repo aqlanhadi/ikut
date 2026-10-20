@@ -4,7 +4,7 @@ import { RouteLine, CarRouteLogic, haversine } from './route.mjs';
 import { loadRoutes } from '../generate-gpx.mjs';
 import {
   advanceOffset, clampKmh, decodeDoc, destinationPoint, feedPoints, isOpenStop, nudged, offRouteCoords, parseStart,
-  pendingVotes, suggestionAhead, ageSeconds,
+  pendingVotes, suggestionAhead, ageSeconds, UserError, numberIn, startFrom, validDerivedData, shouldPark, autoPick,
 } from './playground.mjs';
 
 const route = new RouteLine(loadRoutes().mainCoords);
@@ -52,7 +52,10 @@ test('a simulator feed starts at the car and goes ahead in 80 m steps', () => {
   const pts = feedPoints(route, 3000);
   assert.deepEqual(pts[0], route.coordinateAtOffset(3000));
   assert.ok(Math.abs(haversine(pts[1], pts[2]) - 80) < 3);
-  assert.ok(feedPoints(route, route.length - 10).length === 1);
+  assert.equal(feedPoints(route, route.length - 10).length, 2, 'two waypoints near the end');
+  assert.equal(feedPoints(route, route.length).length, 1);
+  assert.ok(shouldPark(route.length - 79, route.length));
+  assert.ok(!shouldPark(route.length - 81, route.length));
 });
 
 test('a parked nudge alternates', () => {
@@ -101,4 +104,34 @@ test('Firestore REST documents decode', () => {
   assert.deepEqual(d.location, { latitude: 3.1, longitude: 101.2 });
   assert.equal(ageSeconds(d.createdAt, d.createdAt + 12_400), 12);
   assert.equal(ageSeconds(undefined, 5), null);
+});
+
+test('numbers in a command must be finite and in range', () => {
+  assert.equal(numberIn('2.5', 0, 10, 'Km'), 2.5);
+  for (const bad of [NaN, Infinity, 'abc', '', null, undefined, {}, -1, 11]) assert.throws(() => numberIn(bad, 0, 10, 'Km'), UserError);
+});
+
+test('start is "default" or "lat,lng" text, never an object', () => {
+  assert.equal(startFrom(undefined), 'default');
+  assert.equal(startFrom('default'), 'default');
+  assert.deepEqual(startFrom('3.1,101.2'), { latitude: 3.1, longitude: 101.2 });
+  assert.throws(() => startFrom({ latitude: NaN, longitude: 5 }), UserError);
+  assert.throws(() => startFrom('nowhere'), UserError);
+});
+
+test('the build folder is a plain name under /tmp', () => {
+  assert.equal(validDerivedData(undefined), null);
+  assert.equal(validDerivedData('/tmp/ikut-dd-q4'), '/tmp/ikut-dd-q4');
+  assert.equal(validDerivedData('/private/tmp/dd.1'), '/private/tmp/dd.1');
+  for (const bad of ['-derivedDataPath', '/tmp/-x', '/tmp/a/b', '/etc/passwd', '/tmp/../etc', 'tmp/x', 5, {}]) assert.throws(() => validDerivedData(bad), UserError);
+});
+
+test('a trip is picked by itself only when it is the only one, has one car, and that car is at the start', () => {
+  const one = { tripId: 'a', cars: 1, firstCarDistance: 40 };
+  assert.equal(autoPick([one]), one);
+  assert.equal(autoPick([]), null);
+  assert.equal(autoPick([one, { ...one, tripId: 'b' }]), null);
+  assert.equal(autoPick([{ ...one, cars: 4 }]), null, 'a trip that already has several cars');
+  assert.equal(autoPick([{ ...one, firstCarDistance: null }]), null, 'no position yet');
+  assert.equal(autoPick([{ ...one, firstCarDistance: 5000 }]), null, 'the first car is somewhere else');
 });
