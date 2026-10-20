@@ -199,34 +199,17 @@ struct ApproachPill: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let distance = max(0, model.approachDistance(eventId: alert.eventId, now: context.date) ?? alert.distance ?? 0)
             Button(action: onOpen) {
-                HStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.body.weight(.bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 36, height: 36)
-                        .background(Color.yellow, in: Circle())
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(alert.title).font(.body.weight(.semibold))
-                        if let seconds = model.secondsToCover(distance) {
-                            Text("In about \(Int(seconds.rounded())) s")
-                                .font(.footnote)
-                                .monospacedDigit()
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                DarkBanner(
+                    title: alert.title,
+                    subtitle: model.secondsToCover(distance).map { "In about \(Int($0.rounded())) s" },
+                    symbol: "exclamationmark.triangle.fill", circle: .yellow
+                ) {
                     Text(ConvoyFormat.distance(distance))
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(Color.yellow)
+                        .padding(.trailing, 6)
                 }
-                .foregroundStyle(.white)
-                .padding(.leading, 10)
-                .padding(.trailing, 16)
-                .padding(.vertical, 8)
-                .background(Color(white: 0.11).opacity(0.96), in: Capsule())
-                .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(alert.title), \(ConvoyFormat.distance(distance)). Open the alert")
@@ -240,12 +223,7 @@ struct PassedBanner: View {
     let text: String
 
     var body: some View {
-        Label(text, systemImage: "checkmark.circle.fill")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color(white: 0.11).opacity(0.96), in: Capsule())
+        DarkBanner(title: text, symbol: "checkmark", circle: .green)
             .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityAddTraits(.updatesFrequently)
     }

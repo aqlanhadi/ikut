@@ -89,6 +89,7 @@
 		95EC198723C3BA9E48C96F02 /* ConvoyFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EB8DC03DE6CE40C04670411 /* ConvoyFormat.swift */; };
 		9689C8A9A022A712C8B9C13E /* ConvoyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4310BE369727B65548BADA52 /* ConvoyPanel.swift */; };
 		9785EEBC824C5B168FFD8B25 /* JoinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55CC3926DEEA6AE07A394182 /* JoinTests.swift */; };
+		97C45A59D5F4F8212DA99CE7 /* DarkBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */; };
 		9B4CB838014CB0BD376988F7 /* Position.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE6A468C2B522F5226FFC78 /* Position.swift */; };
 		9EDC48B733121D1A6E0056D6 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0803549353B1CD91367C85 /* LobbyView.swift */; };
 		A5D7587052DDAC3FD53CC733 /* ConvoyScenarioUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */; };
@@ -220,6 +221,7 @@
 		7E2539E4B214F18444DA0A00 /* JoinAsSecondMemberUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinAsSecondMemberUITests.swift; sourceTree = "<group>"; };
 		7F504AF6A067112D2A409082 /* ETARefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ETARefresh.swift; sourceTree = "<group>"; };
 		81A21A541DABA60F6378B1D9 /* PastTripsMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastTripsMapTests.swift; sourceTree = "<group>"; };
+		826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkBanner.swift; sourceTree = "<group>"; };
 		85031A857FFEE9A7F7CEE986 /* StopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopService.swift; sourceTree = "<group>"; };
 		881F14A69E038A11FD750DD0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		89911FBE6E40CB98D46C337F /* Polyline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polyline.swift; sourceTree = "<group>"; };
@@ -470,6 +472,7 @@
 				B6117F5F8B2493D250C4083B /* AlertSettings.swift */,
 				650E26FDD008B015443CC328 /* AlertWording.swift */,
 				D63901D96ED7A8D4DFE51434 /* ApproachAlertView.swift */,
+				826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */,
 				573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */,
 				C963869E69413A0E655BFED4 /* SpeechQueue.swift */,
 			);
@@ -776,6 +779,7 @@
 				9689C8A9A022A712C8B9C13E /* ConvoyPanel.swift in Sources */,
 				D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */,
 				A73AAE0FC74B7C166FC40A05 /* CreateTripView.swift in Sources */,
+				97C45A59D5F4F8212DA99CE7 /* DarkBanner.swift in Sources */,
 				B80DAA47953098D10019E756 /* DeepLink.swift in Sources */,
 				3330160BFEC9320835D6C0C9 /* DisplayName.swift in Sources */,
 				9390CA75D748EB1F49145BB4 /* DocumentID+Sendable.swift in Sources */,
