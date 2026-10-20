@@ -73,7 +73,7 @@ class DemoBase: TwoPhoneConvoyBase {
 
     /// Waits for the lobby, dismissing the "Keep sharing while the screen is off" sheet (Not now) that covers it.
     func waitForLobby(timeout: TimeInterval) -> Bool {
-        let start = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
+        let start = lobbyActionButton
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
@@ -85,7 +85,7 @@ class DemoBase: TwoPhoneConvoyBase {
 
     /// Lobby to the map (no "Fit whole convoy": the map keeps following the car).
     func openDemoMap() {
-        let start = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
+        let start = lobbyActionButton
         // Start Trip turns into Back to Map once the trip is on the road: tap until the map shows.
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline, !app.buttons["Report"].exists {
@@ -100,20 +100,7 @@ class DemoBase: TwoPhoneConvoyBase {
 
     /// Joins `code` from Home. `ridingIn`: the car tile to pick as a passenger; otherwise a new car named `carName`.
     func joinDemo(code: String, name: String, ridingIn tile: String? = nil, carName: String? = nil) throws {
-        let joinButton = app.buttons.matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
-        XCTAssertTrue(joinButton.waitForExistence(timeout: 30), "Home didn't show Join Trip")
-        joinButton.tap()
-        let sheetName = app.textFields["Your name"]
-        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
-            sheetName.tap()
-            sheetName.typeText(name)
-            app.buttons["Continue"].tap()
-        }
-        app.tap() // lets the interruption monitor handle a permission prompt
-        let codeField = app.textFields["Trip code"]
-        XCTAssertTrue(codeField.waitForExistence(timeout: 15), "Join screen didn't show the code field")
-        codeField.tap()
-        codeField.typeText(code)
+        openJoinForm(code: code, name: name)
 
         let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", tile ?? "A new car")).firstMatch
         if !choice.waitForExistence(timeout: 30) { shot("FAILED-no-tile") }
@@ -177,18 +164,7 @@ final class DemoOrganizerUITests: DemoBase {
         try startDemo(as: "A")
 
         try step("1. creates the trip (name, New Trip, Where to? Ipoh, lobby)") {
-            let getStarted = app.buttons["Get Started"]
-            if getStarted.waitForExistence(timeout: 5) { getStarted.tap() }
-            let newTrip = app.buttons["New Trip"]
-            XCTAssertTrue(newTrip.waitForExistence(timeout: 20), "Home didn't show New Trip")
-            newTrip.tap()
-            let sheetName = app.textFields["Your name"]
-            if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
-                sheetName.tap()
-                sheetName.typeText(demoName)
-                app.buttons["Continue"].tap()
-            }
-            app.tap()
+            startNewTrip(as: demoName)
             let search = app.textFields["Destination"]
             // A first-run sign-in can fail once ("Network error ..." under the name field); Continue tries again.
             for _ in 0..<12 where !search.exists {
@@ -208,10 +184,7 @@ final class DemoOrganizerUITests: DemoBase {
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
                 throw WaitFailure()
             }
-            let codeLabel = labelled("label BEGINSWITH %@", "Join code ")
-            XCTAssertTrue(codeLabel.waitForExistence(timeout: 15), "Lobby shows no join code")
-            let code = codeLabel.label.replacingOccurrences(of: "Join code ", with: "").replacingOccurrences(of: " ", with: "")
-            XCTAssertEqual(code.count, 6, "code: \(code)")
+            let code = readJoinCode()
             shot("lobby-created")
             mark("a.code", code)
         }

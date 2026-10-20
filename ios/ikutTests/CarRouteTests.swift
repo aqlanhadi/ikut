@@ -386,7 +386,7 @@ struct CarRouteServiceTests {
 }
 
 /// Runs against the local emulators; see TripServiceEmulatorTests.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct CarRouteEmulatorTests {
     init() throws {
@@ -395,15 +395,10 @@ struct CarRouteEmulatorTests {
     }
 
     @Test func trackerWritesRouteMergeOffsetAndState() async throws {
-        let organizer = AuthModel()
-        try await organizer.signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
         let main = makeMainCoords()
-        let ids = try await TripService.createTrip(
-            name: "Route test \(UUID().uuidString.prefix(8))",
-            destination: DestinationResult(name: "End", subtitle: "", coordinate: main.last!),
+        let ids = try await EmulatorTrip.make(
+            name: "Route test", destination: DestinationResult(name: "End", subtitle: "", coordinate: main.last!),
             route: BuiltRoute(distance: 100_000, travelTime: 3_600, name: "", polyline: Polyline.encode(main)),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"),
             carName: "Aqlan's Myvi", carColor: TripService.palette[0])
         let carPath = FirestorePaths.car(tripId: ids.tripId, carId: ids.carId)
 
@@ -415,7 +410,7 @@ struct CarRouteEmulatorTests {
         #expect(car.state == .joining)
         #expect(car.route == plan.route)
         #expect(car.mergeOffset == plan.mergeOffset)
-        #expect(car.trackerUserId == uid)
+        #expect(car.trackerUserId == ids.uid)
 
         // The merge write and the on-main write (which deletes route) are accepted too.
         let own = try #require(service.routeLine)

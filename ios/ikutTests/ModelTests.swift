@@ -6,7 +6,7 @@ import Testing
 struct ModelTests {
     private let encoder = Firestore.Encoder()
     private let point = GeoPoint(latitude: 3.139, longitude: 101.687)
-    private let date = Date(timeIntervalSince1970: 1_800_000_000)
+    private let date = Fixtures.t0
 
     /// `@DocumentID` can only be decoded with a document reference, which needs a (never contacted) Firestore instance.
     private func decode<T: Decodable>(_ type: T.Type, from data: [String: Any]) throws -> T {

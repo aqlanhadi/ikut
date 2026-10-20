@@ -5,37 +5,17 @@ import XCTest
 /// `TEST_RUNNER_IKUT_DESTINATION` picks the search text (default Ipoh); `TEST_RUNNER_IKUT_HOLD_SECONDS`
 /// stays on the map that long at the end.
 @MainActor
-final class CreateTripUITests: XCTestCase {
+final class CreateTripUITests: ConvoyUITestCase {
     func testCreateAndStartTrip() throws {
         let env = ProcessInfo.processInfo.environment
         let destination = env["IKUT_DESTINATION"] ?? "Ipoh"
 
-        let app = XCUIApplication()
-        addUIInterruptionMonitor(withDescription: "Location") { alert in
-            for label in ["Allow While Using App", "Allow Once", "Allow"] where alert.buttons[label].exists {
-                alert.buttons[label].tap()
-                return true
-            }
-            return false
-        }
+        app = XCUIApplication()
+        allowPermissionPrompts()
         app.launch()
 
-        // Welcome on a first run, Home once a previous run got past it.
-        let getStarted = app.buttons["Get Started"]
-        if getStarted.waitForExistence(timeout: 5) { getStarted.tap() }
-        let newTrip = app.buttons["New Trip"]
-        XCTAssertTrue(newTrip.waitForExistence(timeout: 15), "Home didn't show New Trip")
-        newTrip.tap()
-
-        // Signed out: the name sheet comes first.
-        let sheetName = app.textFields["Your name"]
-        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
-            sheetName.tap()
-            sheetName.typeText("Organizer")
-            app.buttons["Continue"].tap()
-        }
-
-        app.tap()  // Lets the interruption monitor handle a location prompt.
+        // Welcome on a first run, Home once a previous run got past it; the name sheet comes first when signed out.
+        startNewTrip(as: "Organizer", homeTimeout: 15)
 
         let search = app.textFields["Destination"]
         XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
@@ -56,7 +36,11 @@ final class CreateTripUITests: XCTestCase {
         }
         add(XCTAttachment(screenshot: app.screenshot()))
 
+        // Tracking starts in the lobby; the "Not now" sheet (screen off) may cover Start Trip, and the map asks its own.
+        let notNow = app.buttons["Not now"]
+        if notNow.waitForExistence(timeout: 6) { notNow.tap() }
         startTrip.tap()
+        app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         add(XCTAttachment(screenshot: app.screenshot()))
 

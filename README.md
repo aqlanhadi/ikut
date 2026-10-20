@@ -63,6 +63,10 @@ xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-06
 TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1'
 ```
 
+Shared test code lives in `ios/ikutTests/Support/` (`Fixtures.swift`: the clock, `Trip.fixture`, `waitUntil`, `EmulatorTrip.make` and the
+`.emulator` suite trait; `Fakes.swift`: the tracking and car-route fakes) and `ios/ikutUITests/Support/ConvoyUITestCase.swift` (waits,
+screenshots, name sheet, New Trip and join flows). Add to those before copying a helper into a second test file.
+
 A simulator can stand in for a second person. This UI test signs in and joins an existing
 trip with a new car (it's skipped unless a code is given):
 

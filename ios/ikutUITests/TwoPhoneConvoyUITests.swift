@@ -15,15 +15,11 @@ import XCTest
 ///   pins and resolves it; B pauses and resumes sharing (A sees "Paused"), leaves (A sees the car go),
 ///   rejoins as a new car, A ends the trip and B's lobby says "Trip ended".
 @MainActor
-class TwoPhoneConvoyBase: XCTestCase {
-    var app: XCUIApplication!
+class TwoPhoneConvoyBase: ConvoyUITestCase {
     var sync = ""
-    var screens = ""
     var who = "?"
 
-    override func setUp() {
-        continueAfterFailure = false
-    }
+    override var shotPrefix: String { "\(who)-" }
 
     /// Reads the environment and launches the app. Throws XCTSkip outside `run-convoy2.mjs`.
     func launch(as who: String) throws {
@@ -38,13 +34,7 @@ class TwoPhoneConvoyBase: XCTestCase {
 
         app = XCUIApplication()
         if env["IKUT_USE_PRODUCTION"] == "1" { app.launchEnvironment["IKUT_USE_PRODUCTION"] = "1" } // Backend.swift
-        addUIInterruptionMonitor(withDescription: "Permissions") { alert in
-            for label in ["Allow While Using App", "Allow Once", "Allow", "Don’t Allow"] where alert.buttons[label].exists {
-                alert.buttons[label].tap()
-                return true
-            }
-            return false
-        }
+        allowPermissionPrompts(["Allow While Using App", "Allow Once", "Allow", "Don’t Allow"])
         app.launch()
     }
 
@@ -79,7 +69,7 @@ class TwoPhoneConvoyBase: XCTestCase {
 
     // MARK: Steps and checks
 
-    func step(_ name: String, _ body: () throws -> Void) throws {
+    override func step(_ name: String, _ body: () throws -> Void) throws {
         print("QA STEP: \(who) \(name)")
         do {
             try body()
@@ -91,43 +81,7 @@ class TwoPhoneConvoyBase: XCTestCase {
         }
     }
 
-    func waitFor(_ what: String, timeout: TimeInterval, poll: TimeInterval = 1, _ condition: () -> Bool) throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return }
-            Thread.sleep(forTimeInterval: poll)
-        }
-        if condition() { return }
-        shot("FAILED-\(what.replacingOccurrences(of: " ", with: "-"))")
-        XCTFail("Timed out after \(Int(timeout)) s waiting for: \(what). Convoy order: \(convoyOrder())")
-        throw WaitFailure()
-    }
-
-    struct WaitFailure: Error {}
-
-    func shot(_ name: String) {
-        let screenshot = XCUIScreen.main.screenshot()
-        let file = "\(who)-\(name).png"
-        try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: screens).appendingPathComponent(file))
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = file
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
-
     // MARK: Queries
-
-    func element(_ identifier: String) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-    }
-
-    func labelled(_ format: String, _ value: String) -> XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: format, value)).firstMatch
-    }
-
-    func button(beginningWith prefix: String) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
-    }
 
     func hazardMarker(_ type: String) -> XCUIElement {
         labelled("label BEGINSWITH %@", "Hazard: \(type)")
@@ -138,65 +92,11 @@ class TwoPhoneConvoyBase: XCTestCase {
         labelled("label CONTAINS %@", "Show it on the map").exists
     }
 
-    /// Badge numbers of the convoy rows, front of the convoy first.
-    func convoyOrder() -> [Int] {
-        guard app != nil else { return [] }
-        let prefix = "convoy.row."
-        let rows = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).allElementsBoundByIndex
-        var seen = Set<Int>()
-        return rows.sorted { $0.frame.minY < $1.frame.minY }.compactMap { row -> Int? in
-            guard let n = Int(row.identifier.dropFirst(prefix.count)), seen.insert(n).inserted else { return nil }
-            return n
-        }
-    }
-
     // MARK: Shared flows
 
     func dismissNotNow() {
         let notNow = app.buttons["Not now"]
         if notNow.exists { notNow.tap() }
-    }
-
-
-    func replaceText(in field: XCUIElement, with text: String) {
-        field.tap()
-        let current = field.value as? String ?? ""
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + text)
-    }
-
-    /// Home (or Welcome) to the lobby of `code`, as a new car named "<name>'s car".
-    func join(code: String, name: String) throws {
-        let joinButton = app.buttons
-            .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
-        XCTAssertTrue(joinButton.waitForExistence(timeout: 30), "Home didn't show Join Trip")
-        joinButton.tap()
-
-        let sheetName = app.textFields["Your name"]
-        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
-            sheetName.tap()
-            sheetName.typeText(name)
-            app.buttons["Continue"].tap()
-        }
-        app.tap() // lets the interruption monitor handle a permission prompt
-
-        let codeField = app.textFields["Trip code"]
-        XCTAssertTrue(codeField.waitForExistence(timeout: 15), "Join screen didn't show the code field")
-        codeField.tap()
-        codeField.typeText(code)
-
-        let newCar = button(beginningWith: "A new car")
-        XCTAssertTrue(newCar.waitForExistence(timeout: 30), "Trip preview didn't load for \(code)")
-        let joinNameField = app.textFields["Your name"]
-        if joinNameField.exists, (joinNameField.value as? String) != name { replaceText(in: joinNameField, with: name) }
-        newCar.tap()
-        let carName = app.textFields["Car name"]
-        if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
-
-        app.buttons["Join Trip"].tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch.waitForExistence(timeout: 30), "Didn't reach the lobby")
-        let notNow = app.buttons["Not now"]
-        if notNow.waitForExistence(timeout: 4) { notNow.tap() }
     }
 
     /// Lobby: 4 cars, all tracking, with the expected names.
@@ -209,7 +109,7 @@ class TwoPhoneConvoyBase: XCTestCase {
     }
 
     func openMap() throws {
-        app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch.tap()
+        lobbyActionButton.tap()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 30), "Didn't reach the map")
         app.dismissMapAsks(first: 3)
         // The convoy sheet opens collapsed; open it for the steps that read the rows.
@@ -244,18 +144,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
         let long: TimeInterval = 300
 
         try step("1. creates the trip (name, New Trip, Where to?, lobby)") {
-            let getStarted = app.buttons["Get Started"]
-            if getStarted.waitForExistence(timeout: 5) { getStarted.tap() }
-            let newTrip = app.buttons["New Trip"]
-            XCTAssertTrue(newTrip.waitForExistence(timeout: 20), "Home didn't show New Trip")
-            newTrip.tap()
-            let sheetName = app.textFields["Your name"]
-            if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
-                sheetName.tap()
-                sheetName.typeText("Aisha")
-                app.buttons["Continue"].tap()
-            }
-            app.tap()
+            startNewTrip(as: "Aisha")
             let search = app.textFields["Destination"]
             XCTAssertTrue(search.waitForExistence(timeout: 20), "Didn't reach Where to?")
             search.tap()
@@ -270,10 +159,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             }
             let notNow = app.buttons["Not now"]
             if notNow.waitForExistence(timeout: 4) { notNow.tap() }
-            let codeLabel = labelled("label BEGINSWITH %@", "Join code ")
-            XCTAssertTrue(codeLabel.waitForExistence(timeout: 15), "Lobby shows no join code")
-            let code = codeLabel.label.replacingOccurrences(of: "Join code ", with: "").replacingOccurrences(of: " ", with: "")
-            XCTAssertEqual(code.count, 6, "code: \(code)")
+            let code = readJoinCode()
             shot("01-lobby-created")
             mark("a.code", code)
         }

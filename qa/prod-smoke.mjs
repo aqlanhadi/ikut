@@ -6,8 +6,7 @@
 //
 // Mirrors TripService.createTrip, JoinService (previewTrip/joinTrip) and TripSession.endTrip.
 
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { productionFirebaseConfig } from './lib/firebase-config.mjs';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, signInAnonymously, deleteUser } from 'firebase/auth';
 import {
@@ -15,9 +14,7 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
-const plist = fileURLToPath(new URL('../ios/ikut/Resources/GoogleService-Info.plist', import.meta.url));
-const read = (key) => execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, plist], { encoding: 'utf8' }).trim();
-const config = { apiKey: read('API_KEY'), projectId: read('PROJECT_ID'), appId: read('GOOGLE_APP_ID') };
+const config = productionFirebaseConfig();
 const REGION = 'asia-southeast1';
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // TripService.codeAlphabet
 

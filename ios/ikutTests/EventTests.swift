@@ -9,7 +9,7 @@ struct EventTests {
     /// Roughly 1.1 km per 0.01 deg of longitude near the equator; a straight east-west route.
     private let coords = (0...10).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.01) }
     private var route: RouteLine { RouteLine(coords) }
-    private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    private let t0 = Fixtures.t0
 
     private func event(_ type: EventType, at date: Date? = nil, expires: Date?? = nil) -> TripEvent {
         var e = TripEvent(
@@ -91,7 +91,7 @@ struct EventTests {
 
 /// Runs against the local Auth and Firestore emulators. Start them first, then:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct EventServiceEmulatorTests {
     init() throws {
@@ -100,16 +100,8 @@ struct EventServiceEmulatorTests {
     }
 
     private func makeTrip() async throws -> (uid: String, tripId: String, carId: String) {
-        let auth = AuthModel()
-        try await auth.signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Events", destination: DestinationResult(
-                name: "Kota Bharu", subtitle: "Kelantan",
-                coordinate: .init(latitude: 6.1254, longitude: 102.2381)),
-            route: BuiltRoute(distance: 1_000, travelTime: 600, name: "E1", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"))
-        return (uid, ids.tripId, ids.carId)
+        let trip = try await EmulatorTrip.make(name: "Events")
+        return (trip.uid, trip.tripId, trip.carId)
     }
 
     private func load(_ tripId: String, _ eventId: String) async throws -> TripEvent {

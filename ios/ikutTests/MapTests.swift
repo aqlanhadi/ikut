@@ -7,7 +7,7 @@ import Testing
 
 // MARK: - Fixtures
 
-private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+private let t0 = Fixtures.t0
 
 private func car(
     _ id: String, name: String = "Aqlan’s Myvi", number: Int? = 1, lead: Bool = false,
@@ -419,10 +419,9 @@ struct MapReportSnapshotTests {
 @MainActor
 struct TripMapModelTests {
     private func trip() -> Trip {
-        Trip(
-            id: "t", name: "Balik kampung", code: "K7M2QX", organizerId: "u", route: Polyline.encode(mainRoute.coordinates),
-            destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 0.1, longitude: 100)),
-            status: .active, createdAt: nil, lastActivityAt: nil, endedAt: nil)
+        .fixture(
+            route: Polyline.encode(mainRoute.coordinates),
+            destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 0.1, longitude: 100)))
     }
 
     private func fixedModel() -> TripMapModel {
@@ -486,7 +485,7 @@ struct TripMapModelTests {
 }
 
 /// Runs against the local emulators; see TripServiceTests.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct TripMapEmulatorTests {
     init() throws {
@@ -495,14 +494,8 @@ struct TripMapEmulatorTests {
     }
 
     @Test func twoCarsWithPositionsShowUpAsTwoMarkers() async throws {
-        try await AuthModel().signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Map", destination: DestinationResult(
-                name: "Kota Bharu", subtitle: "Kelantan",
-                coordinate: .init(latitude: 6.1254, longitude: 102.2381)),
-            route: BuiltRoute(distance: 205_400, travelTime: 8_700, name: "E1", polyline: "_p~iF~ps|U_ulLnnqC"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"))
+        let ids = try await EmulatorTrip.make(name: "Map", route: Fixtures.longRoute)
+        let uid = ids.uid
 
         let db = Firestore.firestore()
         let second = Car(
@@ -529,10 +522,9 @@ struct TripMapEmulatorTests {
         try await writer.write(first, tripId: ids.tripId, carId: ids.carId)
         try await writer.write(other, tripId: ids.tripId, carId: secondRef.documentID)
 
-        for _ in 0..<100 {
+        await waitUntil(.seconds(10)) {
             model.sync()
-            if model.markers.count == 2 { break }
-            try await Task.sleep(for: .milliseconds(100))
+            return model.markers.count == 2
         }
         #expect(model.markers.count == 2)
         #expect(Set(model.markers.map(\.id)) == [ids.carId, secondRef.documentID])

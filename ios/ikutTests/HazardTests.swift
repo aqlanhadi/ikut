@@ -9,7 +9,7 @@ import Testing
 /// 0.01 deg). A joining route comes up from the south at longitude 101.03 (2.2 km), then follows the
 /// main route east, so it merges at about main offset 3,336 m.
 private enum Fixture {
-    static let now = Date(timeIntervalSince1970: 1_800_000_000)
+    static let now = Fixtures.t0
     static let main = RouteLine((0...10).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.01) })
     static let joining = RouteLine(
         [CLLocationCoordinate2D(latitude: 2.98, longitude: 101.03)]
@@ -555,10 +555,9 @@ struct HazardWiringTests {
     private typealias F = Fixture
 
     private func trip() -> Trip {
-        Trip(
-            id: "t", name: "Balik kampung", code: "K7M2QX", organizerId: "u", route: Polyline.encode(F.main.coordinates),
-            destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 3, longitude: 101.1)),
-            status: .active, createdAt: nil, lastActivityAt: nil, endedAt: nil)
+        .fixture(
+            route: Polyline.encode(F.main.coordinates),
+            destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 3, longitude: 101.1)))
     }
 
     /// An event that is current in real time (the model reads the real clock).
@@ -669,7 +668,7 @@ struct HazardWiringTests {
 
 /// Runs against the local Auth and Firestore emulators:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct HazardEmulatorTests {
     init() throws {
@@ -678,15 +677,8 @@ struct HazardEmulatorTests {
     }
 
     @Test func reportedEventAppearsInHazardLogic() async throws {
-        let auth = AuthModel()
-        try await auth.signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Hazards", destination: DestinationResult(
-                name: "Kota Bharu", subtitle: "Kelantan",
-                coordinate: .init(latitude: 6.1254, longitude: 102.2381)),
-            route: BuiltRoute(distance: 1_000, travelTime: 600, name: "E1", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"))
+        let ids = try await EmulatorTrip.make(name: "Hazards")
+        let uid = ids.uid
         let route = Fixture.main
         let spot = Fixture.main(at: 5_000)
         let eventId = try await EventService.report(

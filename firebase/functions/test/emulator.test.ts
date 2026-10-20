@@ -24,14 +24,15 @@ async function newUser(): Promise<{ uid: string; token: string }> {
 }
 
 interface CallResult { status: number; body: any }
-async function call(data: unknown, token?: string): Promise<CallResult> {
-  const res = await fetch(`http://127.0.0.1:5001/${PROJECT}/asia-southeast1/joinTrip`, {
+async function callFn(fn: string, data: unknown, token?: string): Promise<CallResult> {
+  const res = await fetch(`http://127.0.0.1:5001/${PROJECT}/asia-southeast1/${fn}`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({ data }),
   });
   return { status: res.status, body: await res.json() };
 }
+const call = (data: unknown, token?: string) => callFn("joinTrip", data, token);
 
 let codeCounter = 0;
 function freshCode(): string {
@@ -275,15 +276,6 @@ describe("joinTrip (emulator)", () => {
     assert.equal(ok.status, 200);
   });
 });
-
-async function callFn(fn: string, data: unknown, token?: string): Promise<CallResult> {
-  const res = await fetch(`http://127.0.0.1:5001/${PROJECT}/asia-southeast1/${fn}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ data }),
-  });
-  return { status: res.status, body: await res.json() };
-}
 
 describe("previewTrip (emulator)", () => {
   let user: { uid: string; token: string };

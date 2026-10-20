@@ -94,7 +94,7 @@ struct TripServiceTests {
 
 /// Runs against the local Auth and Firestore emulators. Start them first, then:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct TripServiceEmulatorTests {
     init() throws {

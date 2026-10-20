@@ -8,7 +8,7 @@
 // Keeps the Mac awake with caffeinate while it runs. Reads the real Firebase project
 // (ios/ikut/Resources/GoogleService-Info.plist), like prod-smoke.mjs.
 
-import { execFileSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -16,6 +16,7 @@ import { initializeApp } from 'firebase/app';
 import { deleteUser, getAuth, signInAnonymously } from 'firebase/auth';
 import { deleteDoc, doc, initializeFirestore, onSnapshot, terminate } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { productionFirebaseConfig } from './lib/firebase-config.mjs';
 import { GAP_SECONDS, formatSummary, summarize } from './lib/battery.mjs';
 
 const { values: opts, positionals } = parseArgs({
@@ -28,9 +29,7 @@ if (!code) {
   process.exit(2);
 }
 
-const plist = fileURLToPath(new URL('../ios/ikut/Resources/GoogleService-Info.plist', import.meta.url));
-const read = (key) => execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, plist], { encoding: 'utf8' }).trim();
-const config = { apiKey: read('API_KEY'), projectId: read('PROJECT_ID'), appId: read('GOOGLE_APP_ID') };
+const config = productionFirebaseConfig();
 
 // Stops the Mac idle-sleeping until this process exits. Closing the lid on battery still sleeps it.
 spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();

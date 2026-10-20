@@ -83,6 +83,7 @@ its suite finishes; the script takes the suite's result and kills it after 60 s.
 | `convoy-sim.mjs` | The scenario driver. |
 | `lib/route.mjs`, `lib/tracking.mjs` | JS ports of the Swift logic, each function annotated with its source file. |
 | `lib/scenario.mjs` | The script: cars, speeds, gap, timeline. |
+| `lib/shell.mjs`, `lib/firebase-config.mjs` | `run`/`simctl`/`sleep`/`makeSay` for the scripts that drive simulators; the production client config read from the app's plist. |
 | `run-ui.mjs` | One-command orchestrator with the app in the loop. |
 | `run-convoy2.mjs` | Two simulators (organizer and joiner) plus two scripted cars, see Two-phone convoy. |
 

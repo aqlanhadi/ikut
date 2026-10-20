@@ -64,9 +64,7 @@ struct LobbyTests {
     }
 
     private func trip(status: TripStatus = .active, startedAt: Date? = nil) -> Trip {
-        Trip(id: "t", name: "Trip", code: "ABC123", organizerId: "u1", route: "",
-             destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 4.6, longitude: 101.1)),
-             status: status, startedAt: startedAt)
+        .fixture(name: "Trip", code: "ABC123", organizerId: "u1", status: status, startedAt: startedAt)
     }
 
     @Test func notStartedBeforeStartTrip() {
@@ -92,7 +90,7 @@ struct LobbyTests {
     }
 }
 
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct LobbyEmulatorTests {
     init() throws {
@@ -101,26 +99,14 @@ struct LobbyEmulatorTests {
     }
 
     @Test func modelReceivesCarAndMember() async throws {
-        let auth = AuthModel()
-        try await auth.signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Lobby test",
-            destination: DestinationResult(
-                name: "Kota Bharu", subtitle: "Kelantan",
-                coordinate: .init(latitude: 6.1254, longitude: 102.2381)),
-            route: BuiltRoute(distance: 205_400, travelTime: 8_700, name: "E1", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"),
-            carName: "Aqlan's Myvi", carColor: TripService.palette[0])
+        let ids = try await EmulatorTrip.make(
+            name: "Lobby test", carName: "Aqlan's Myvi", carColor: TripService.palette[0])
 
         let model = LobbyModel(tripId: ids.tripId)
         model.start()
         defer { model.stop() }
 
-        for _ in 0..<100 {
-            if model.trip != nil, !model.cars.isEmpty, !model.members.isEmpty { break }
-            try await Task.sleep(for: .milliseconds(100))
-        }
+        await waitUntil(.seconds(10)) { model.trip != nil && !model.cars.isEmpty && !model.members.isEmpty }
         #expect(model.trip?.name == "Lobby test")
         let grouped = model.groupedCars
         #expect(grouped.count == 1)

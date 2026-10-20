@@ -12,12 +12,13 @@
 //    xcrun simctl location start, at the GPX's speed times --speed
 // 5. waits for both to finish and prints their verdicts. Exit code 0 only if the sim checks and the UI test passed.
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readGpx } from './lib/gpx.mjs';
+import { makeSay, run, simctl } from './lib/shell.mjs';
 import { haversine } from './lib/route.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -48,10 +49,8 @@ for (let i = 2; i < process.argv.length; i++) {
 fs.mkdirSync(o.logs, { recursive: true });
 fs.mkdirSync(o.screens, { recursive: true });
 
-const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', ...opts });
-const simctl = (...args) => run('xcrun', ['simctl', ...args]);
-const say = (...a) => console.log(`[run-ui ${((Date.now() - t0) / 1000).toFixed(0).padStart(4)}s]`, ...a);
 const t0 = Date.now();
+const say = makeSay('run-ui', t0);
 
 // ---- simulator
 const list = simctl('list', 'devices').stdout;

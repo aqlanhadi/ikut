@@ -20,7 +20,7 @@
 // Reuse: lib/route.mjs, lib/tracking.mjs, the 20 s simctl location resync of run-ui.mjs, the REST read and
 // marker handshake of run-convoy2.mjs.
 
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -34,13 +34,15 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './route.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher } from './tracking.mjs';
+import { productionFirebaseConfig } from './firebase-config.mjs';
+import { simctl, sleep } from './shell.mjs';
 import { loadRoutes } from '../generate-gpx.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repo = path.dirname(path.dirname(here));
 export const PROJECT_ID = 'ikut-b1083';
 export const REGION = 'asia-southeast1';
-export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export { sleep };
 export const km = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 10) * 10} m`);
 /** One line for a program watching the run (the dashboard): `DEMO {json}`. */
 export const emit = (obj) => console.log(`DEMO ${JSON.stringify(obj)}`);
@@ -80,9 +82,7 @@ export function parseArgs(argv, usage = '') {
 /** Firebase client config: fake for the emulators, the app's own for production (as qa/prod-smoke.mjs does). */
 export function firebaseConfig(o, appId) {
   if (o.backend !== 'production') return { apiKey: 'qa-fake-key', projectId: PROJECT_ID, appId };
-  const plist = path.join(repo, 'ios', 'ikut', 'Resources', 'GoogleService-Info.plist');
-  const read = (key) => execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, plist], { encoding: 'utf8' }).trim();
-  return { apiKey: read('API_KEY'), projectId: read('PROJECT_ID'), appId: read('GOOGLE_APP_ID') };
+  return productionFirebaseConfig();
 }
 
 // ---------------------------------------------------------------- scripted cars
@@ -266,7 +266,6 @@ export class World {
 
 // ---------------------------------------------------------------- simulators, xcodebuild
 
-const simctl = (...args) => spawnSync('xcrun', ['simctl', ...args], { encoding: 'utf8' });
 const locStr = (c) => `${c.latitude.toFixed(6)},${c.longitude.toFixed(6)}`;
 
 function prepareSimulator(udid, say) {

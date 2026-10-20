@@ -8,7 +8,7 @@ import Testing
 // MARK: Pure logic
 
 struct StopLogicTests {
-    private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    private let t0 = Fixtures.t0
 
     private func car(_ id: String, _ number: Int?, _ name: String, tracker: String? = nil, lead: Bool = false) -> Car {
         Car(
@@ -342,7 +342,7 @@ private struct FakeSearcher: PlaceSearching {
 
 /// Runs against the local Auth, Functions and Firestore emulators. Start them first, then:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct StopEmulatorTests {
     init() throws {
@@ -354,15 +354,10 @@ struct StopEmulatorTests {
     private let route = RouteLine((0...60).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.009) })
 
     private func makeTrip() async throws -> (tripId: String, carId: String, uid: String, code: String) {
-        try await AuthModel().signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Stops \(UUID().uuidString.prefix(8))",
-            destination: DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 3, longitude: 101.5)),
-            route: BuiltRoute(distance: 1000, travelTime: 60, name: "", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"))
-        let code = try await Firestore.firestore().document(FirestorePaths.trip(ids.tripId)).getDocument(as: Trip.self).code
-        return (ids.tripId, ids.carId, uid, code)
+        let trip = try await EmulatorTrip.make(
+            name: "Stops",
+            destination: DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 3, longitude: 101.5)))
+        return (trip.tripId, trip.carId, trip.uid, try await trip.code())
     }
 
     private func context(_ tripId: String, uid: String, carId: String, organizer: Bool) -> StopContext {
