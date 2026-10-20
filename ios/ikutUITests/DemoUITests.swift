@@ -347,7 +347,13 @@ final class DemoOwnCarUITests: DemoBase {
     /// Pit stop > Fuel; the request sheet finds a place ahead (or none) and sends by itself after a short countdown.
     func requestFuelStop() {
         let pitStop = app.buttons["Pit stop"]
-        guard soft("Pit stop button", timeout: 20, core: true, { pitStop.exists && pitStop.isHittable }) else { return }
+        guard soft("Pit stop button", timeout: 20, core: true, {
+            // The "Get road alerts?" question can still be up over the map.
+            if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
+            // The approach folds the convoy list (and Pit stop with it) until the hazard is passed: open it again.
+            if !(pitStop.exists && pitStop.isHittable), app.buttons["Expand convoy list"].exists { app.buttons["Expand convoy list"].tap(); Thread.sleep(forTimeInterval: 1) }
+            return pitStop.exists && pitStop.isHittable
+        }) else { return }
         pitStop.tap()
         let fuel = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Fuel'")).firstMatch
         guard fuel.waitForExistence(timeout: 10) else { note("Pit stop sheet opened", false, core: true); return }
