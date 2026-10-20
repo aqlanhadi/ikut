@@ -40,13 +40,6 @@ enum ConvoyFormat {
     /// A car that reached the destination.
     static let arrived = "Arrived"
 
-    /// The panel's status pill: "Everyone's arrived" once all cars are in, "Arrived" once mine is,
-    /// nil otherwise (the caller shows motion).
-    static func arrivalStatus(mineArrived: Bool, everyoneArrived: Bool) -> String? {
-        if everyoneArrived { return "Everyone\u{2019}s arrived" }
-        return mineArrived ? arrived : nil
-    }
-
     /// The "to go" line under the progress bar: "Arrived" once I'm in, else "63 km · 41 min to go",
     /// or just the distance without an ETA.
     static func toGo(remaining: Double, travelTime: TimeInterval?, arrived: Bool) -> String {
@@ -82,11 +75,6 @@ enum ConvoyFormat {
         let time = clock(date, locale: locale, timeZone: timeZone)
         guard let destination, !destination.isEmpty else { return "ETA \(time)" }
         return "ETA \(destination) \(time)"
-    }
-
-    /// "Arriving 4:35 PM".
-    static func arriving(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
-        "Arriving \(clock(date, locale: locale, timeZone: timeZone))"
     }
 
     // MARK: Place short names

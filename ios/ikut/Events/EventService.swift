@@ -145,7 +145,7 @@ enum EventService {
             let registration = Firestore.firestore().collection(FirestorePaths.events(tripId: tripId))
                 .addSnapshotListener { snapshot, _ in
                     guard let snapshot else { return }
-                    let events = snapshot.documents.compactMap { try? $0.data(as: TripEvent.self) }
+                    let events = snapshot.decoded(TripEvent.self)
                     continuation.yield(activeEvents(events, now: Date()))
                 }
             nonisolated(unsafe) let handle = registration

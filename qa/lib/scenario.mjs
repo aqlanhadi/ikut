@@ -12,11 +12,6 @@ export const TRIP = {
   destination: { name: 'Ipoh', latitude: 4.5975, longitude: 101.0901 },
 };
 
-// Main route: the E1 from just south of Bidor to Ipoh (OSRM snapshot in data/osrm-main.json).
-export const MAIN_ROUTE = {
-  from: { offsetAlongOldRoute: 12_000 }, // see generate-gpx.mjs --fetch
-};
-
 // Car 4 starts in Tapah town, off the highway, and joins via its own road and the Tapah ramp.
 export const CAR4_START = { latitude: 4.1990, longitude: 101.2560 };
 

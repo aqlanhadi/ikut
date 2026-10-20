@@ -93,6 +93,18 @@ struct RecapLogicTests {
         #expect(byKind[.sweeper] == "c2")
     }
 
+    @Test func awardTiesGoToTheCarWhoseFirstEventCameFirst() {
+        let r = RecapLogic.recap(snapshot(
+            positions: [pos("c1", near: true, offset: 9_000, at: 150), pos("c2", near: false, offset: 4_000, at: 151)],
+            events: [
+                event("h1", .debris, car: "c2", user: "u2", at: 10), event("h2", .pothole, car: "c1", user: "u1", at: 12),
+                event("s1", .stopFood, car: "c1", user: "u1", at: 20), event("s2", .stopFuel, car: "c2", user: "u2", at: 25),
+            ]))
+        let byKind = Dictionary(uniqueKeysWithValues: r.awards.map { ($0.kind, $0.carId) })
+        #expect(byKind[.reporter] == "c2")
+        #expect(byKind[.stopCaller] == "c1")
+    }
+
     @Test func degradesWithoutPositionsOrEvents() {
         let r = RecapLogic.recap(snapshot(), now: t0.addingTimeInterval(10_000 + 8 * 24 * 3600))
         #expect(r.arrivals.isEmpty)

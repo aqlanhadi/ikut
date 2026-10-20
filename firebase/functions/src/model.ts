@@ -1,5 +1,10 @@
 import type { GeoPoint, Timestamp } from "firebase-admin/firestore";
 
+/** What the idle and retention checks need from a Timestamp, so tests can pass plain stand-ins. */
+export interface TimestampLike {
+  toMillis(): number;
+}
+
 /** Firestore document shapes. Mirrors ios/ikut/Model. Routes are encoded polylines (precision 5). */
 
 export type TripStatus = "active" | "ended";
@@ -51,6 +56,8 @@ export interface Car {
   state: CarState;
   /** Badge number shown on the map and in lists; 1 is the organizer's car, then highest existing + 1. */
   number?: number;
+  /** When the tracker paused sharing; absent when sharing. */
+  pausedAt?: Timestamp;
 }
 
 /** trips/{tripId}/members/{userId} */
@@ -77,6 +84,16 @@ export interface Position {
   updatedAt: Timestamp;
 }
 
+/** A pinned stop on a stop request, or a proposal on a vote. */
+export interface StopPlace {
+  name: string;
+  coordinate: GeoPoint;
+  /** Meters along the main route. */
+  routeOffset: number;
+  /** Set on a pinned stop; absent on a proposal. */
+  pinnedBy?: string;
+}
+
 /** trips/{tripId}/events/{eventId} */
 export interface TripEvent {
   type: EventType;
@@ -92,6 +109,8 @@ export interface TripEvent {
   /** Absent means it lasts until resolved or cleared. */
   expiresAt?: Timestamp;
   message?: string;
+  /** The pinned stop; only ever set on stop requests. */
+  place?: StopPlace;
 }
 
 /** previewTrip callable result: what a non-member may see before joining. */

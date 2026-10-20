@@ -60,8 +60,9 @@ struct RouteLine: Sendable {
                 cumulative.append(cumulative[i] + len)
                 let c = cos((a.latitude + b.latitude) / 2 * .pi / 180)
                 cosLat.append(c)
-                bx.append(Self.wrapLongitude(b.longitude - a.longitude) * .pi / 180 * c * Self.earthRadius)
-                by.append((b.latitude - a.latitude) * .pi / 180 * Self.earthRadius)
+                let d = Self.localMeters(of: b, from: a, cosLat: c)
+                bx.append(d.x)
+                by.append(d.y)
             }
         }
         self.cumulative = cumulative
@@ -79,6 +80,15 @@ struct RouteLine: Sendable {
         let dLon = wrapLongitude(b.longitude - a.longitude) * .pi / 180
         let h = sin(dLat / 2) * sin(dLat / 2) + cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2)
         return 2 * earthRadius * asin(min(1, h.squareRoot()))
+    }
+
+    /// Meters east (x) and north (y) of `origin` on the flat plane used for projection; `cosLat` is the
+    /// cosine of the latitude the plane is scaled at.
+    static func localMeters(
+        of p: CLLocationCoordinate2D, from origin: CLLocationCoordinate2D, cosLat: Double
+    ) -> (x: Double, y: Double) {
+        (wrapLongitude(p.longitude - origin.longitude) * .pi / 180 * cosLat * earthRadius,
+         (p.latitude - origin.latitude) * .pi / 180 * earthRadius)
     }
 
     private static func wrapLongitude(_ d: Double) -> Double {
@@ -99,8 +109,7 @@ struct RouteLine: Sendable {
     private func evaluate(_ p: CLLocationCoordinate2D, segment i: Int) -> Candidate {
         let a = coordinates[i]
         let c = cosLat[i]
-        let px = Self.wrapLongitude(p.longitude - a.longitude) * .pi / 180 * c * Self.earthRadius
-        let py = (p.latitude - a.latitude) * .pi / 180 * Self.earthRadius
+        let (px, py) = Self.localMeters(of: p, from: a, cosLat: c)
         let len2 = bx[i] * bx[i] + by[i] * by[i]
         let raw = len2 > 0 ? (px * bx[i] + py * by[i]) / len2 : 0
         let t = min(1, max(0, raw))

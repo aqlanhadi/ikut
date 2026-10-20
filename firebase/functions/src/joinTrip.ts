@@ -1,4 +1,4 @@
-import { FieldValue, type Firestore, type Transaction } from "firebase-admin/firestore";
+import { FieldValue, type CollectionReference, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -8,6 +8,9 @@ export const MAX_MEMBERS = 20;
 export const MAX_CARS = 10;
 const NAME_MAX = 30;
 const COLOR_MAX = 20;
+
+/** What a wrong code and an ended trip both say. */
+export const NO_ACTIVE_TRIP = "No active trip with that code";
 
 export type CarChoice =
   | { kind: "existing"; carId: string }
@@ -26,12 +29,23 @@ export interface JoinResult {
   trackerTaken: boolean;
 }
 
-function invalid(message: string): never {
-  throw new HttpsError("invalid-argument", message);
+export function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
+/** True when someone other than `userId` rides in the car. Reads at most two member docs. */
+export async function hasOtherRider(
+  tx: Transaction,
+  membersCol: CollectionReference,
+  carId: string,
+  userId: string,
+): Promise<boolean> {
+  const riders = await tx.get(membersCol.where("carId", "==", carId).limit(2));
+  return riders.docs.some((d) => d.id !== userId);
+}
+
+function invalid(message: string): never {
+  throw new HttpsError("invalid-argument", message);
 }
 
 /** Uppercase and strip spaces/dashes; must then be 6 chars of A-Z0-9. */
@@ -99,7 +113,7 @@ export async function joinTripTransaction(
     const tripSnap = await tx.get(tripRef);
     const trip = tripSnap.data() as Trip | undefined;
     if (!tripSnap.exists || !trip || trip.status !== "active") {
-      throw new HttpsError("not-found", "No active trip with that code");
+      throw new HttpsError("not-found", NO_ACTIVE_TRIP);
     }
     const memberSnap = await tx.get(memberRef);
     const existing = memberSnap.exists ? (memberSnap.data() as Member) : null;
@@ -132,9 +146,7 @@ export async function joinTripTransaction(
       const oldSnap = await tx.get(ref);
       if (oldSnap.exists) {
         const oldCar = oldSnap.data() as Car;
-        const riders = await tx.get(membersCol.where("carId", "==", ref.id).limit(2));
-        const othersInside = riders.docs.some((d) => d.id !== uid);
-        if (!othersInside && !oldCar.isLead) {
+        if (!(await hasOtherRider(tx, membersCol, ref.id, uid)) && !oldCar.isLead) {
           oldCarRef = ref;
           deleteOldCar = true;
         } else if (oldCar.trackerUserId === uid) {
@@ -220,7 +232,7 @@ export async function findActiveTripId(db: Firestore, code: string): Promise<str
     .where("status", "==", "active")
     .limit(2)
     .get();
-  if (snap.empty) throw new HttpsError("not-found", "No active trip with that code");
+  if (snap.empty) throw new HttpsError("not-found", NO_ACTIVE_TRIP);
   if (snap.size > 1) {
     logger.error("joinTrip: multiple active trips share a code", { code, tripIds: snap.docs.map((d) => d.id) });
     throw new HttpsError("failed-precondition", "That code is ambiguous. Ask the organizer for a new trip.");

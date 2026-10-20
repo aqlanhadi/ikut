@@ -5,19 +5,16 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import type { Trip } from "./model.js";
+import type { TimestampLike, Trip } from "./model.js";
 
-const BATCH_SIZE = 500;
+/** Firestore allows 500 writes per batch. */
+export const BATCH_SIZE = 500;
 
 /** Location data of an ended trip is deleted this long after the trip ended. */
 export const POSITION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** An event is removed only once it has been past its expiresAt for this long. */
 export const EVENT_GRACE_MS = 60 * 60 * 1000;
-
-interface TimestampLike {
-  toMillis(): number;
-}
 
 /** True when an ended trip's positions and events are older than the retention window. */
 export function shouldPurgeTripData(

@@ -44,7 +44,7 @@ struct StopCandidate: Sendable, Equatable, Identifiable {
     /// "On route" or the extra drive "+4 min" (there and back at about 50 km/h).
     var costText: String {
         guard offRoute > StopSuggestions.onRouteTolerance else { return "On route" }
-        return "+\(max(1, Int((2 * offRoute / 13.9 / 60).rounded()))) min"
+        return "+\(max(1, Int((2 * offRoute / StopSuggestions.detourSpeed / 60).rounded()))) min"
     }
 }
 
@@ -77,6 +77,15 @@ enum StopSuggestions {
     static let nearestAhead: CLLocationDistance = 15_000
     static let farthestAhead: CLLocationDistance = 25_000
     static let searchRadius: CLLocationDistance = 12_000
+    /// Candidates closer than this ahead are too late to take, and none are kept beyond `maxAhead`.
+    static let minAhead: CLLocationDistance = 1_000
+    static let maxAhead: CLLocationDistance = 60_000
+    /// Same-named places closer than this to each other count as one.
+    static let duplicateDistance: CLLocationDistance = 200
+    /// Suggestions shown at most.
+    static let maxSuggestions = 5
+    /// Meters per second (50 km/h) assumed for the detour to an off-route stop.
+    static let detourSpeed: Double = 13.9
 
     /// Search text for the stop type: fuel is petrol stations, food is restaurants, rest and
     /// toilet are rest areas ("R&R" is what Malaysian highways call them).
@@ -95,10 +104,11 @@ enum StopSuggestions {
 
     /// Projects `places` onto `route` and keeps those between `fromOffset + minAhead` and the route's
     /// end that are within `maxOffRoute`. Sorted by distance along the route, nearest first, with
-    /// same-named places within 200 m of each other collapsed to one. Pure.
+    /// same-named places within `duplicateDistance` of each other collapsed to one. Pure.
     static func rank(
         _ places: [FoundPlace], route: RouteLine, fromOffset: CLLocationDistance,
-        minAhead: CLLocationDistance = 1_000, maxAhead: CLLocationDistance = 60_000, limit: Int = 5
+        minAhead: CLLocationDistance = StopSuggestions.minAhead, maxAhead: CLLocationDistance = StopSuggestions.maxAhead,
+        limit: Int = StopSuggestions.maxSuggestions
     ) -> [StopCandidate] {
         var seen: [StopCandidate] = []
         let projected: [StopCandidate] = places.compactMap { place in
@@ -112,7 +122,7 @@ enum StopSuggestions {
         .sorted { a, b in a.routeOffset != b.routeOffset ? a.routeOffset < b.routeOffset : a.offRoute < b.offRoute }
         for candidate in projected {
             let duplicate = seen.contains {
-                $0.name == candidate.name && RouteLine.haversine($0.coordinate, candidate.coordinate) < 200
+                $0.name == candidate.name && RouteLine.haversine($0.coordinate, candidate.coordinate) < duplicateDistance
             }
             if !duplicate { seen.append(candidate) }
         }

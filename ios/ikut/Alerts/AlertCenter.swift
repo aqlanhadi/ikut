@@ -138,10 +138,9 @@ final class AlertCenter {
     // MARK: Private
 
     private func handle(_ events: [TripEvent]) async {
-        guard policy != nil else { return }
-        let fresh = policy!.newEvents(from: events, now: now())
+        guard let fresh = policy?.newEvents(from: events, now: now()) else { return }
         for event in fresh { await announce(event: event) }
-        let pinned = policy!.newlyPinned(from: events, excluding: fresh)
+        let pinned = policy?.newlyPinned(from: events, excluding: fresh) ?? []
         for event in pinned { await announcePinned(event: event) }
     }
 

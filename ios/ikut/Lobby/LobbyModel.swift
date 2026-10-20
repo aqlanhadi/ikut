@@ -41,7 +41,7 @@ final class LobbyModel {
 
         listeners.append(
             db.collection(FirestorePaths.cars(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
-                let cars = snapshot?.documents.compactMap { try? $0.data(as: Car.self) }
+                let cars = snapshot?.decoded(Car.self)
                 let message = error?.localizedDescription
                 Task { @MainActor in
                     if let cars { self?.cars = cars }
@@ -51,7 +51,7 @@ final class LobbyModel {
 
         listeners.append(
             db.collection(FirestorePaths.members(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
-                let members = snapshot?.documents.compactMap { try? $0.data(as: Member.self) }
+                let members = snapshot?.decoded(Member.self)
                 let message = error?.localizedDescription
                 Task { @MainActor in
                     if let members { self?.members = members }

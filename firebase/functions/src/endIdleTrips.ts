@@ -10,19 +10,20 @@ import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { IDLE_MS, isIdle, tripActivityMillis } from "./idle.js";
 import type { Position, Trip, TripEvent } from "./model.js";
-
-const BATCH_SIZE = 500;
+import { BATCH_SIZE } from "./retention.js";
 
 async function latestUpdate<T>(snap: FirebaseFirestore.Query, field: string): Promise<T | null> {
   const res = await snap.orderBy(field, "desc").limit(1).get();
   return res.empty ? null : (res.docs[0]!.data() as T);
 }
 
+const endedFields = () => ({ status: "ended", endedAt: FieldValue.serverTimestamp() });
+
 /** Commit one batch. Each update is pinned to the snapshot we read, so a trip touched since is skipped. */
 async function endBatch(db: Firestore, docs: DocumentSnapshot[]): Promise<number> {
   const batch = db.batch();
   for (const d of docs) {
-    batch.update(d.ref, { status: "ended", endedAt: FieldValue.serverTimestamp() }, { lastUpdateTime: d.updateTime! });
+    batch.update(d.ref, endedFields(), { lastUpdateTime: d.updateTime! });
   }
   try {
     await batch.commit();
@@ -32,7 +33,7 @@ async function endBatch(db: Firestore, docs: DocumentSnapshot[]): Promise<number
     let ended = 0;
     for (const d of docs) {
       try {
-        await d.ref.update({ status: "ended", endedAt: FieldValue.serverTimestamp() }, { lastUpdateTime: d.updateTime! });
+        await d.ref.update(endedFields(), { lastUpdateTime: d.updateTime! });
         ended++;
       } catch (err) {
         logger.info("endIdleTrips: skipped trip that changed", { tripId: d.id, err: String(err) });

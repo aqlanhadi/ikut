@@ -305,7 +305,7 @@ function simplifyTolerance(points, tolerance) {
   if (points.length <= 2 || !(tolerance > 0)) return points;
   const lat0 = points[0].latitude;
   const c = Math.cos(lat0 * RAD);
-  const xy = points.map((p) => [(p.longitude - points[0].longitude) * RAD * c * EARTH_RADIUS, (p.latitude - lat0) * RAD * EARTH_RADIUS]);
+  const xy = points.map((p) => [wrapLongitude(p.longitude - points[0].longitude) * RAD * c * EARTH_RADIUS, (p.latitude - lat0) * RAD * EARTH_RADIUS]);
   const keep = new Array(points.length).fill(false);
   keep[0] = true;
   keep[points.length - 1] = true;

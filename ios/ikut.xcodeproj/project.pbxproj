@@ -126,6 +126,7 @@
 		E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */; };
 		E46CBF63774E7C17DCE1C12E /* StopSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90BD0D4E774669C179661397 /* StopSuggestions.swift */; };
 		E4EF98D0A5B5842B9FC8EA69 /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A479378058FCF0288AE028C1 /* Fakes.swift */; };
+		E54047B79F4DBB4FED8D948F /* FirestoreDecoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = C46CA4198406B579655640C1 /* FirestoreDecoding.swift */; };
 		E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */; };
 		E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */; };
 		EA34025E916A7D1EF7A5734B /* StopContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEB2E053516041BB6ABA3EB /* StopContext.swift */; };
@@ -259,6 +260,7 @@
 		BCE6A468C2B522F5226FFC78 /* Position.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Position.swift; sourceTree = "<group>"; };
 		C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreLocationSource.swift; sourceTree = "<group>"; };
 		C3E80CE011C8490310C42F29 /* StopLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLogic.swift; sourceTree = "<group>"; };
+		C46CA4198406B579655640C1 /* FirestoreDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDecoding.swift; sourceTree = "<group>"; };
 		C46D1C04BC5842435C33213A /* TripSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSession.swift; sourceTree = "<group>"; };
 		C963869E69413A0E655BFED4 /* SpeechQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueue.swift; sourceTree = "<group>"; };
 		CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportOption.swift; sourceTree = "<group>"; };
@@ -652,6 +654,7 @@
 			children = (
 				151766B65971D28EC0EDCE60 /* Car.swift */,
 				16FA1B25A7565ED6310E01DB /* DocumentID+Sendable.swift */,
+				C46CA4198406B579655640C1 /* FirestoreDecoding.swift */,
 				A26B2BCA0CDF418B0CA82119 /* FirestorePaths.swift */,
 				3EA475AFBE5E8DF067171FDC /* Member.swift */,
 				89911FBE6E40CB98D46C337F /* Polyline.swift */,
@@ -816,6 +819,7 @@
 				9390CA75D748EB1F49145BB4 /* DocumentID+Sendable.swift in Sources */,
 				56AD3DB484BF8EFED6033D2E /* ETARefresh.swift in Sources */,
 				3238E7CD833C608EF250940E /* EventService.swift in Sources */,
+				E54047B79F4DBB4FED8D948F /* FirestoreDecoding.swift in Sources */,
 				7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */,
 				514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */,
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
