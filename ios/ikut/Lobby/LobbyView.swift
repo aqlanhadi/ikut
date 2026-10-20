@@ -43,6 +43,14 @@ struct LobbyView: View {
     }
 
     private var currentUserId: String? { Auth.auth().currentUser?.uid }
+
+    /// Remembers this trip for Home's past list, with who else is in it once the members have loaded.
+    private func recordPastTrip() {
+        guard let trip = model.trip else { return }
+        let names = Dictionary(model.members.compactMap { m in m.id.map { ($0, m.displayName) } }, uniquingKeysWith: { a, _ in a })
+        PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name, endedAt: trip.endedAt,
+                         others: names.isEmpty ? nil : PastTrips.others(from: names, excluding: currentUserId))
+    }
     private var canLeave: Bool { !session.isEnded && !session.membershipLost }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
@@ -116,10 +124,8 @@ struct LobbyView: View {
         .onChange(of: session.isEnded, initial: true) { _, ended in
             if ended { onEnded(model.tripId) }
         }
-        .onChange(of: model.trip, initial: true) { _, trip in
-            guard let trip else { return }
-            PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name, endedAt: trip.endedAt)
-        }
+        .onChange(of: model.trip, initial: true) { _, _ in recordPastTrip() }
+        .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.trip?.route) {
             if let route = model.trip?.route { await routeInfo.load(route: route) }

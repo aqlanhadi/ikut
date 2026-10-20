@@ -86,12 +86,13 @@ final class RecapModel {
         apply(snapshot)
     }
 
-    func load() async {
+    func load(myUserId: String?) async {
         do {
             let fresh = try await RecapService.fetch(tripId: tripId)
             let merged = RecapLogic.merge(cached: RecapService.cached(tripId: tripId), fresh: fresh)
             RecapService.save(merged)
-            PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt)
+            PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt,
+                             others: PastTrips.others(from: merged.memberNames, excluding: myUserId))
             apply(merged)
             errorMessage = nil
         } catch {
@@ -118,6 +119,8 @@ enum PastTrips {
         var destination: String
         var endedAt: Date?
         var seenAt: Date
+        /// The other members' display names (nil for entries saved before this was kept, or not known yet).
+        var others: [String]?
     }
 
     private static let key = "ikut.pastTrips"
@@ -128,16 +131,36 @@ enum PastTrips {
         return list
     }
 
-    static func record(tripId: String, name: String, destination: String, endedAt: Date?, now: Date = Date(), defaults: UserDefaults = .standard) {
+    static func record(tripId: String, name: String, destination: String, endedAt: Date?, others: [String]? = nil, now: Date = Date(), defaults: UserDefaults = .standard) {
         var list = all(defaults: defaults)
-        list = upsert(list, Entry(id: tripId, name: name, destination: destination, endedAt: endedAt, seenAt: now))
+        list = upsert(list, Entry(id: tripId, name: name, destination: destination, endedAt: endedAt, seenAt: now, others: others))
         if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: key) }
     }
 
-    /// Replaces or inserts at the front; an ended trip stays ended; keeps at most `limit`.
+    /// Replaces or inserts at the front; an ended trip stays ended and known others are kept when the new record has none; keeps at most `limit`.
     static func upsert(_ list: [Entry], _ entry: Entry) -> [Entry] {
         var entry = entry
-        if let old = list.first(where: { $0.id == entry.id }), entry.endedAt == nil { entry.endedAt = old.endedAt }
+        if let old = list.first(where: { $0.id == entry.id }) {
+            if entry.endedAt == nil { entry.endedAt = old.endedAt }
+            if entry.others == nil { entry.others = old.others }
+        }
         return Array(([entry] + list.filter { $0.id != entry.id }).prefix(limit))
+    }
+
+    /// The other members' names (everyone in `names` except `userId`), for `Entry.others`.
+    static func others(from names: [String: String], excluding userId: String?) -> [String] {
+        names.filter { $0.key != userId }.map(\.value).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    /// "With Ali", "With Ali and Sara", "With Ali and 2 others": the first name alphabetically (ignoring case);
+    /// nil when nobody else is known.
+    static func withPhrase(_ names: [String]?) -> String? {
+        let sorted = (names ?? []).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        switch sorted.count {
+        case 0: return nil
+        case 1: return "With \(sorted[0])"
+        case 2: return "With \(sorted[0]) and \(sorted[1])"
+        default: return "With \(sorted[0]) and \(sorted.count - 1) others"
+        }
     }
 }

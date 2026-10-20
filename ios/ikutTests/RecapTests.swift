@@ -138,6 +138,37 @@ struct RecapLogicTests {
         #expect(list[0].name == "A2")
     }
 
+    @Test func withPhraseNamesWhoYouWentWith() {
+        #expect(PastTrips.withPhrase(nil) == nil)
+        #expect(PastTrips.withPhrase([]) == nil)
+        #expect(PastTrips.withPhrase(["Ali"]) == "With Ali")
+        #expect(PastTrips.withPhrase(["sara", "Ali"]) == "With Ali and sara")
+        #expect(PastTrips.withPhrase(["Wyna", "ali", "Sara"]) == "With ali and 2 others")
+        #expect(PastTrips.withPhrase(["E", "D", "C", "B", "A"]) == "With A and 4 others")
+    }
+
+    @Test func othersExcludesMeAndIsNilWhenUnknown() {
+        let names = ["me": "Aqlan", "u2": "Wyna", "u3": "Ali"]
+        #expect(PastTrips.others(from: names, excluding: "me") == ["Ali", "Wyna"])
+        #expect(PastTrips.others(from: ["me": "Aqlan"], excluding: "me") == [])
+        #expect(PastTrips.others(from: names, excluding: nil) == ["Ali", "Aqlan", "Wyna"])
+    }
+
+    @Test func pastTripsUpsertKeepsPreviousOthersWhenNil() {
+        let a = PastTrips.Entry(id: "a", name: "A", destination: "X", endedAt: t0, seenAt: t0, others: ["Ali"])
+        var list = PastTrips.upsert([], a)
+        list = PastTrips.upsert(list, .init(id: "a", name: "A", destination: "X", endedAt: nil, seenAt: t0, others: nil))
+        #expect(list[0].others == ["Ali"])
+        list = PastTrips.upsert(list, .init(id: "a", name: "A", destination: "X", endedAt: nil, seenAt: t0, others: ["Sara"]))
+        #expect(list[0].others == ["Sara"])
+    }
+
+    @Test func pastTripEntryDecodesOldJSONWithoutOthers() throws {
+        let json = #"[{"id":"a","name":"A","destination":"X","seenAt":0}]"#
+        let list = try JSONDecoder().decode([PastTrips.Entry].self, from: Data(json.utf8))
+        #expect(list[0].others == nil)
+    }
+
     @Test func hoursMinutesFormat() {
         #expect(RecapLogic.hoursMinutes(10_020) == "2:47")
         #expect(RecapLogic.hoursMinutes(59) == "0:01")
