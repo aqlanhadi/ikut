@@ -37,6 +37,7 @@ class TwoPhoneConvoyBase: XCTestCase {
         try? FileManager.default.createDirectory(atPath: screens, withIntermediateDirectories: true)
 
         app = XCUIApplication()
+        if env["IKUT_USE_PRODUCTION"] == "1" { app.launchEnvironment["IKUT_USE_PRODUCTION"] = "1" } // Backend.swift
         addUIInterruptionMonitor(withDescription: "Permissions") { alert in
             for label in ["Allow While Using App", "Allow Once", "Allow", "Don’t Allow"] where alert.buttons[label].exists {
                 alert.buttons[label].tap()
