@@ -39,6 +39,7 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
+import { makeSay, run, simctl, sleep } from './lib/shell.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.dirname(here);
@@ -80,10 +81,7 @@ const SCRIPTED = [
 ];
 
 const t0 = Date.now();
-const say = (...a) => console.log(`[convoy2 ${((Date.now() - t0) / 1000).toFixed(0).padStart(4)}s]`, ...a);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', ...opts });
-const simctl = (...args) => run('xcrun', ['simctl', ...args]);
+const say = makeSay('convoy2', t0);
 const results = [];
 function check(name, pass, detail = '') {
   results.push({ name, pass, detail });
