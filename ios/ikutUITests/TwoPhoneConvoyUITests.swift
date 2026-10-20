@@ -378,8 +378,9 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             shot("14-b-rejoined")
             openTripMenuItem("Trip menu", "End trip")
             confirm("End trip")
-            XCTAssertTrue(app.buttons["New Trip"].waitForExistence(timeout: 30), "A didn't return Home after ending")
-            shot("15-ended-home")
+            // Ending the trip opens its recap (ae9efbb), not Home.
+            try waitFor("recap after ending", timeout: 30) { labelled("label CONTAINS %@", "Share Recap").exists }
+            shot("15-ended-recap")
             mark("a.ended")
         }
         try waitMark("b.done", timeout: 120)
