@@ -41,6 +41,30 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
 .pass { color:var(--ok); font-weight:600; } .fail { color:var(--bad); font-weight:600; }
 .err { background:var(--badbg); color:var(--bad); padding:8px 12px; border-radius:8px; margin:8px 0; }
 pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; max-height:320px; overflow:auto; font-size:.8rem; white-space:pre-wrap; word-break:break-all; }
+
+.pg h2 { font-size:1.25rem; } .pg .lead { font-size:1.05rem; }
+.pg input[type=number], .pg input[type=text], .pg select { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+.pg input[type=number] { width:5.5em; } .pg input.wide { width:14em; }
+.pg .code { font-size:clamp(2.5rem, 12vw, 4rem); }
+.pg .steps { margin:6px 0 10px; padding-left:1.2em; } .pg .steps li { margin:2px 0; }
+.strip { position:relative; height:118px; margin:10px 8px 6px; }
+.strip .road { position:absolute; left:0; right:0; top:50px; height:6px; border-radius:3px; background:var(--line); }
+.strip .ends { position:absolute; top:104px; font-size:.8rem; color:var(--dim); } .strip .ends.r { right:0; }
+.strip .dot { position:absolute; top:40px; width:26px; height:26px; margin-left:-13px; border-radius:50%; color:#fff; font-weight:700; font-size:.85rem; display:flex; align-items:center; justify-content:center; border:2px solid var(--card); box-shadow:0 0 0 1px var(--dim); }
+.strip .dot.phone { box-shadow:0 0 0 3px var(--fg); } .strip .dot.joining { top:8px; border:2px dashed #fff; opacity:.85; }
+.strip .name { position:absolute; font-size:.75rem; white-space:nowrap; transform:translateX(-50%); }
+.strip .name.j { transform:none; margin-left:18px; }
+.cand { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; border-top:1px solid var(--line); padding:8px 0; }
+.strip .ev { position:absolute; top:58px; transform:translateX(-50%); font-size:.85rem; line-height:1; } .strip .ev.done { opacity:.35; }
+.strip .ev.haz { color:var(--warn); } .strip .ev.stp { color:var(--accent); }
+.carrow { border-top:1px solid var(--line); padding:10px 0; }
+.carrow .nm { display:inline-flex; align-items:center; gap:8px; min-width:11em; font-weight:600; }
+.carrow .sw { width:14px; height:14px; border-radius:50%; display:inline-block; }
+.carrow .grid { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-top:6px; }
+.carrow .sees { margin-top:4px; } .sees.warn { color:var(--warn); font-weight:600; } .sees.bad { color:var(--bad); font-weight:600; }
+.feed { list-style:none; margin:6px 0 0; padding:0; max-height:260px; overflow:auto; } .feed li { padding:5px 0; border-top:1px solid var(--line); }
+.tag { display:inline-block; font-size:.75rem; border-radius:999px; padding:1px 8px; background:var(--line); margin-left:4px; }
+.tag.joining { background:var(--warnbg); color:var(--warn); } .tag.convoy { background:var(--okbg); color:var(--ok); } .tag.off { background:var(--badbg); color:var(--bad); }
 .hidden { display:none; }
 </style>
 </head>
@@ -49,6 +73,8 @@ pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; pad
   <h1>ikut live demos</h1>
   <div id="notice" class="err hidden"></div>
 
+  <section id="pg" class="card pg"></section>
+  <h2 style="margin:18px 0 8px">Scripted demos</h2>
   <section id="runView" class="card hidden"></section>
 
   <div class="row" style="margin-bottom:12px">
@@ -98,7 +124,7 @@ function renderBackend() {
   $('#prodBanner').classList.toggle('hidden', backend !== 'production');
 }
 function renderList() {
-  $('#list').innerHTML = demos.map((d) => {
+  $('#list').innerHTML = demos.filter((d) => !d.interactive).map((d) => {
     const o = opts[d.file] ??= { skipBuild: false, endTrip: false };
     const emuDown = backend === 'emulators' && backends.emulators && !backends.emulators.up;
     const prod = backend === 'production';
@@ -121,7 +147,7 @@ function renderList() {
 }
 function renderRun() {
   const el = $('#runView');
-  if (!run) return el.classList.add('hidden');
+  if (!run || run.interactive) return el.classList.add('hidden');
   el.classList.remove('hidden');
   const d = derive(), t = elapsed(d), dur = run.durationSeconds || 0;
   const done = new Set();
@@ -153,14 +179,16 @@ function renderRun() {
   const lb = $('#logbox'); if (lb) lb.scrollTop = lb.scrollHeight;
   $('#runView details').ontoggle = (e) => { logOpen = e.target.open; };
 }
-const renderAll = () => { renderBackend(); renderList(); renderRun(); };
+const renderAll = () => { renderBackend(); renderList(); renderRun(); renderPg(); };
 
 // ---- actions
 async function post(path, body) {
-  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  let r;
+  try { r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); }
+  catch { $('#notice').classList.remove('hidden'); $('#notice').textContent = 'The dashboard could not be reached. Is it still running?'; return false; }
   const j = await r.json().catch(() => ({}));
   $('#notice').classList.toggle('hidden', r.ok);
-  if (!r.ok) $('#notice').textContent = j.error || 'Something went wrong.';
+  if (!r.ok) $('#notice').textContent = j.error || 'That did not work.';
   return r.ok;
 }
 async function loadDemos(refresh) {
@@ -184,15 +212,197 @@ document.addEventListener('change', (ev) => {
   const c = ev.target.closest('[data-o]'); if (c) opts[c.closest('[data-f]').dataset.f][c.dataset.o] = c.checked;
 });
 
+
+// ---- Playground
+const CARCOLOR = { phone1: '#0a6cff', phone2: '#d9480f', daniel: '#7C3AED', hafiz: '#0F766E' };
+const EVLABEL = { debris: 'Debris', accident: 'Accident', pothole: 'Pothole', animal: 'Animal on the road', stoppedVehicle: 'Stopped vehicle', roadworks: 'Roadworks', heavyRain: 'Heavy rain', trafficJam: 'Traffic jam',
+  stopRest: 'Rest stop', stopFuel: 'Fuel stop', stopFood: 'Food stop', stopToilet: 'Toilet stop', pullingOver: 'Pulling over', carTrouble: 'Car trouble', runningLate: 'Running late', message: 'Message' };
+let pg = null, pgForm = { startKind: 'default', startText: '', skipBuild: true, dd: '', code: '' }, carForm = {}, pendingPrepare = null;
+const pgRun = () => (run?.interactive ? run : null);
+const km1 = (m) => (typeof m === 'number' && Number.isFinite(m) ? (m / 1000).toFixed(1) + ' km' : '–');
+const secs = (s) => (s === null || s === undefined ? '' : s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`);
+async function cmd(body) { return post('/api/command', body); }
+function formFor(c) {
+  return carForm[c.key] ??= { km: (c.joining && c.mergeKm !== null ? c.mergeKm : (pg?.defaults?.[c.key] ?? 0) / 1000).toFixed(1), speed: String(c.speed ?? 90), off: c.joining, side: String(c.sideMeters ?? 2000) };
+}
+let stripWhole = false;
+function pgStrip(st) {
+  const L = st.routeLength;
+  const at = [...st.cars.filter((c) => c.joined || c.kind === 'generated').map((c) => c.offset), ...st.events.filter((e) => e.offset !== null).map((e) => e.offset)];
+  let lo = 0, hi = L;
+  if (!stripWhole && at.length) {
+    lo = Math.max(0, Math.min(...at) - 1500); hi = Math.min(L, Math.max(...at) + 2500);
+    if (hi - lo < 6000) { hi = Math.min(L, lo + 6000); lo = Math.max(0, hi - 6000); }
+  }
+  const pct = (m) => `${Math.max(0, Math.min(100, ((m - lo) / (hi - lo)) * 100))}%`;
+  const inView = (m) => m >= lo - 1 && m <= hi + 1;
+  const shown = st.cars.filter((c) => (c.joined || c.kind === 'generated') && inView(c.offset)).sort((a, b) => a.offset - b.offset);
+  const dots = shown.map((c, i) => {
+    const level = i % 3; // names go above or below the road, in three heights, so close cars do not hide each other
+    const above = level === 1;
+    const top = c.joining ? 12 : above ? 4 : level === 0 ? 74 : 92;
+    return `<span class="dot ${c.kind} ${c.joining ? 'joining' : ''}" style="left:${pct(c.offset)};background:${CARCOLOR[c.key]}" title="${esc(c.label)}">${c.number ?? ''}</span>`
+      + `<span class="name ${c.joining ? 'j' : ''}" style="left:${pct(c.offset)};top:${top}px;color:${CARCOLOR[c.key]}">${esc(c.label)}${c.joining ? ' (joining)' : ''}</span>`;
+  }).join('');
+  const evs = st.events.filter((e) => e.offset !== null && inView(e.offset)).map((e) => {
+    const stop = e.category === 'stopRequest';
+    const mark = e.pinned ? '■' : stop ? '●' : '▲';
+    return `<span class="ev ${stop ? 'stp' : 'haz'} ${e.resolved ? 'done' : ''}" style="left:${pct(e.offset)}" title="${esc(EVLABEL[e.type] || e.type)} at ${km1(e.offset)}">${mark}</span>`;
+  }).join('');
+  return `<div class="strip"><div class="road"></div>${dots}${evs}<span class="ends">${stripWhole ? 'Start' : km1(lo)}</span><span class="ends r">${stripWhole ? esc(st.destination) + ' · ' : ''}${km1(hi)}</span></div>
+    <div class="row small dim"><span>Numbers are the car numbers in the app. Ringed dots are the phones, dashed ones are still joining. ▲ hazard, ● stop request, ■ pinned stop.</span>
+    <button data-pg="zoom" class="small">${stripWhole ? 'Zoom in on the cars' : 'Show the whole route'}</button></div>`;
+}
+function pgCar(c, st) {
+  const f = formFor(c);
+  const gen = c.kind === 'generated';
+  let sees = '';
+  if (!c.joined) sees = `<div class="sees dim small">${gen ? 'Joining…' : 'Not joined yet. Join on phone 2 with the code.'}</div>`;
+  else if (!c.reported) sees = `<div class="sees warn small">The app has no position for this car yet.</div>`;
+  else {
+    const r = c.reported, stale = r.ageSeconds !== null && r.ageSeconds > 60; // the app calls a car stale after 60 s
+    const off = !c.joining && r.offset !== null && Math.abs(r.offset - c.offset) > 500;
+    sees = `<div class="sees small ${stale || off ? 'warn' : 'dim'}">The app has this car at ${km1(r.offset)}, ${esc(secs(r.ageSeconds))}${stale ? ' (stale: “Last seen” on the other phones)' : ''}${off ? `. It is not following: it should be at ${km1(c.offset)}.` : ''}</div>`;
+  }
+  const play = `<button data-pg="play" data-car="${c.key}" class="${c.playing ? '' : 'primary'}">${c.playing ? 'Pause' : 'Play'}</button>`;
+  return `<div class="carrow"><div class="row" style="justify-content:space-between">
+    <span class="nm"><span class="sw" style="background:${CARCOLOR[c.key]}"></span>${esc(c.label)}${c.name ? ` <span class="dim small" style="font-weight:400">${esc(c.name)}</span>` : ''}
+      ${gen ? '' : '<span class="tag">phone ' + (c.key === 'phone1' ? '1' : '2') + '</span>'}${c.joining ? '<span class="tag joining">joining</span>' : c.joined ? '<span class="tag convoy">in the convoy</span>' : ''}
+      ${c.offline ? '<span class="tag off">no signal</span>' : ''}</span>
+    <span>Now at <b>${km1(c.offset)}</b>${c.joining ? ` · merges at ${typeof c.mergeKm === 'number' ? c.mergeKm.toFixed(1) : '?'} km` : ''} ${play}</span></div>
+    <div class="grid">
+      <label>${gen && f.off ? 'Merges at' : 'Place at'} <input type="number" step="0.1" min="0" id="km-${c.key}" data-f="km" data-car="${c.key}" value="${esc(f.km)}"> km</label>
+      <label>Speed <input type="number" step="5" min="0" max="200" id="sp-${c.key}" data-f="speed" data-car="${c.key}" value="${esc(f.speed)}"> km/h</label>
+      ${gen ? `<label><input type="checkbox" data-f="off" data-car="${c.key}" ${f.off ? 'checked' : ''}> Starts off the route</label>
+        ${f.off ? `<label>Side road <input type="number" step="100" min="500" id="sd-${c.key}" data-f="side" data-car="${c.key}" value="${esc(f.side)}"> m away</label>` : ''}` : ''}
+    </div>
+    ${gen ? `<div class="grid"><label><input type="checkbox" data-b="agree" data-car="${c.key}" ${c.agree ? 'checked' : ''}> Agrees to stops</label>
+      <label><input type="checkbox" data-b="suggest" data-car="${c.key}" ${c.suggest ? 'checked' : ''}> Suggests a place too (when it agrees)</label>
+      <button data-pg="drop" data-car="${c.key}" class="${c.offline ? 'primary' : ''}">${c.offline ? 'Give signal back' : 'Drop signal'}</button></div>` : ''}
+    ${sees}</div>`;
+}
+function pgEvents(st) {
+  if (!st.events.length) return '<p class="dim small">Nothing reported yet. Tap Report or Pit stop on a phone.</p>';
+  return `<ul class="feed">${st.events.map((e) => {
+    const bits = [];
+    if (e.category === 'stopRequest') {
+      bits.push(`${e.agree} agree${e.disagree ? `, ${e.disagree} not now` : ''}`);
+      if (e.suggestions.length) bits.push(`suggested: ${e.suggestions.map(esc).join(', ')}`);
+      if (e.pinned) bits.push(`pinned: ${esc(e.pinned)}`);
+      if (e.resolved) bits.push('everyone has arrived');
+    } else if (e.resolved) bits.push('expired');
+    return `<li><b>${esc(EVLABEL[e.type] || e.type)}</b> by ${esc(e.by || 'someone')} at ${km1(e.offset)} <span class="dim">${esc(secs(e.ageSeconds))}</span>${bits.length ? `<div class="small dim">${bits.join(' · ')}</div>` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+function renderPg() {
+  try { drawPg(); } catch (e) { console.error(e); $('#pg').innerHTML = '<p class="err">The playground card could not be drawn. Reload the page.</p>'; }
+}
+function drawPg() {
+  const el = $('#pg');
+  if (el.contains(document.activeElement) && document.activeElement.dataset.dirty) return; // don't pull a field from under someone typing
+  const a = document.activeElement, keep = el.contains(a) && a.id ? { id: a.id, s: a.selectionStart, e: a.selectionEnd } : null;
+  const r = pgRun(), live = r && r.status === 'running', st = live ? pg : null;
+  const other = running() && !live;
+  let h = `<div class="row" style="justify-content:space-between"><div><h2>Playground</h2>
+    <p class="lead dim" style="margin:0">Try one event at a time on the real app. You tap the phones; this places the cars and plays the route.</p></div>
+    ${live ? `<button class="danger" data-pg="close" ${r.stopping ? 'disabled' : ''}>${r.stopping ? 'Closing…' : 'Close the playground'}</button>` : ''}</div>`;
+  if (!live || !st || st.phase === 'setup') {
+    const emuDown = backends.emulators && !backends.emulators.up;
+    h += `<div class="row" style="margin-top:10px"><label>Everyone starts at
+        <select id="startKind" data-pgf="startKind"><option value="default" ${pgForm.startKind === 'default' ? 'selected' : ''}>the E1 start used by the demos</option><option value="free" ${pgForm.startKind === 'free' ? 'selected' : ''}>somewhere else</option></select></label>
+      ${pgForm.startKind === 'free' ? `<input type="text" class="wide" id="startText" data-pgf="startText" placeholder="3.45, 101.40" value="${esc(pgForm.startText)}">` : ''}
+      <label><input type="checkbox" data-pgf="skipBuild" ${pgForm.skipBuild ? 'checked' : ''}> Skip the build</label>
+      <label class="small dim">Build folder <input type="text" class="wide" id="ddText" data-pgf="dd" placeholder="/tmp/ikut-dd-q4 (default)" value="${esc(pgForm.dd)}"></label>
+      <button class="primary" data-pg="prepare" ${other || pendingPrepare || (live && !st) ? 'disabled' : ''}>Prepare phones</button></div>
+      <p class="small dim">Puts a fresh copy of the app on iPhone 17 #1 and #2, switches on location, parks both at the start and opens the app. Emulators only.</p>
+      ${other ? '<div class="err small">A scripted demo is running. Stop it first.</div>' : ''}
+      ${emuDown ? `<div class="err small">${esc(backends.emulators.hint)}</div>` : ''}
+      ${st?.problem ? `<div class="err">${esc(st.problem)}</div>` : ''}
+      ${r && !live ? '<p class="small dim">The playground is closed. The trip is still there; end it from the menu on phone 1.</p>' : ''}`;
+  } else if (st.phase === 'preparing') {
+    h += `<p class="lead"><span class="pill building">Preparing</span> ${esc(st.detail)}</p>`;
+  } else if (st.phase === 'waiting') {
+    h += `<p class="lead"><span class="pill waiting">Ready</span> <b>Create a trip on phone 1.</b></p>
+      <ol class="steps"><li>On phone 1 tap New Trip and pick a destination (a long one, say Ipoh).</li><li>It shows up below. Press “Use this trip” (Daniel and Hafiz join nothing before that).</li></ol>
+      ${st.candidates?.length ? st.candidates.map((t) => `<div class="cand"><b>${esc(t.code)}</b> to ${esc(t.destination)}
+        <span class="dim small">${t.cars} car${t.cars === 1 ? '' : 's'}${t.firstCarDistance === null ? ', no position yet' : `, first car ${t.firstCarDistance < 1000 ? t.firstCarDistance + ' m' : km1(t.firstCarDistance)} from the start`}</span>
+        <button class="primary" data-pg="useTrip" data-trip="${esc(t.tripId)}">Use this trip</button></div>`).join('') : '<p class="dim small">No new trip yet.</p>'}
+      <div class="row" style="margin-top:8px"><label>Or type phone 1's trip code <input type="text" class="wide" id="codeText" data-pgf="code" placeholder="ABC123" value="${esc(pgForm.code)}"></label>
+        <button data-pg="useCode">Use this code</button></div>
+      ${st.problem ? `<div class="err">${esc(st.problem)}</div>` : ''}`;
+  } else if (st.phase === 'ended') {
+    h += `<p class="lead"><span class="pill failed">Over</span> <b>The trip has ended.</b> Daniel and Hafiz have stopped. Close the playground and start a new one for the next trip.</p>`;
+  } else {
+    const ready = st.phase === 'ready';
+    h += `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><span class="dim small">Trip code — join on phone 2 with this</span><div class="code">${esc(st.code)}</div>
+      <span class="dim">to ${esc(st.destination || '…')} · ${km1(st.routeLength)}${ready ? '' : ' · ' + esc(st.detail)}</span></div>
+      <div class="row"><button class="primary" data-pg="playAll" ${ready ? '' : 'disabled'}>Play all</button><button data-pg="pauseAll" ${ready ? '' : 'disabled'}>Pause all</button></div></div>`;
+    if (st.problem) h += `<div class="err">${esc(st.problem)}</div>`;
+    if (st.routeLength) h += pgStrip(st);
+    h += st.cars.map((c) => pgCar(c, st)).join('');
+    h += `<h2 style="margin-top:14px;font-size:1.05rem">What was reported</h2>${pgEvents(st)}`;
+  }
+  el.innerHTML = h;
+  if (keep) { const n = document.getElementById(keep.id); if (n) { n.focus(); try { n.setSelectionRange(keep.s, keep.e); } catch {} } }
+}
+async function startPlayground() {
+  const j = await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: 'demo-playground.mjs', backend: 'emulators' }) });
+  if (!j.ok) { $('#notice').classList.remove('hidden'); $('#notice').textContent = (await j.json().catch(() => ({}))).error || 'Could not open the playground.'; return false; }
+  return true;
+}
+function prepareBody() {
+  return { cmd: 'prepare', start: pgForm.startKind === 'free' ? pgForm.startText : 'default', skipBuild: pgForm.skipBuild, derivedData: pgForm.dd.trim() || undefined };
+}
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('button[data-pg]'); if (!b) return;
+  const k = b.dataset.car, c = pg?.cars?.find((x) => x.key === k), what = b.dataset.pg;
+  if (what === 'prepare') {
+    const body = prepareBody();
+    if (pgRun()?.status === 'running' && pg) return cmd(body);
+    pendingPrepare = body; renderPg();
+    if (!(pgRun()?.status === 'running') && !(await startPlayground())) { pendingPrepare = null; renderPg(); }
+  } else if (what === 'close') post('/api/stop');
+  else if (what === 'useTrip') cmd({ cmd: 'useTrip', tripId: b.dataset.trip });
+  else if (what === 'useCode') cmd({ cmd: 'useTrip', code: pgForm.code });
+  else if (what === 'playAll') cmd({ cmd: 'playAll', playing: true });
+  else if (what === 'pauseAll') cmd({ cmd: 'playAll', playing: false });
+  else if (what === 'play') cmd({ cmd: 'play', car: k, playing: !c.playing });
+  else if (what === 'drop') cmd({ cmd: 'drop', car: k, offline: !c.offline });
+});
+document.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (t.dataset.f) { carForm[t.dataset.car] ??= {}; carForm[t.dataset.car][t.dataset.f] = t.type === 'checkbox' ? t.checked : t.value; t.dataset.dirty = '1'; }
+  if (t.dataset.pgf && t.type === 'text') { pgForm[t.dataset.pgf] = t.value; t.dataset.dirty = '1'; }
+});
+document.addEventListener('change', (ev) => {
+  const t = ev.target; delete t.dataset.dirty;
+  if (t.dataset.pgf) { pgForm[t.dataset.pgf] = t.type === 'checkbox' ? t.checked : t.value; return renderPg(); }
+  if (t.dataset.b) return cmd({ cmd: 'behaviour', car: t.dataset.car, [t.dataset.b]: t.checked });
+  if (!t.dataset.f) return;
+  const k = t.dataset.car, f = carForm[k] ?? (carForm[k] = {});
+  if (t.dataset.f === 'speed') return cmd({ cmd: 'speed', car: k, kmh: Number(t.value) });
+  if (t.dataset.f === 'km' || t.dataset.f === 'side' || t.dataset.f === 'off') {
+    const gen = k === 'daniel' || k === 'hafiz';
+    cmd({ cmd: 'place', car: k, km: Number(f.km), offRoute: gen && Boolean(f.off), sideMeters: Number(f.side) });
+    if (t.dataset.f === 'off') renderPg();
+  }
+});
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('.pg input')) ev.target.blur(); });
+
 // ---- live updates
 function connect() {
   const es = new EventSource('/api/events');
   es.onmessage = (m) => {
     const msg = JSON.parse(m.data);
-    if (msg.k === 'snapshot') { run = msg.run; events = msg.events; log = msg.log; confirming = null; }
+    if (msg.k === 'snapshot') { run = msg.run; events = msg.events; log = msg.log; pg = msg.state; confirming = null; }
+    else if (msg.k === 'state') {
+      pg = msg.state;
+      if (pendingPrepare && pg.phase === 'setup') { const b = pendingPrepare; pendingPrepare = null; cmd(b); }
+      return renderPg();
+    }
     else if (msg.k === 'ev') events.push(msg.ev);
     else if (msg.k === 'log') { log.push(msg.line); if (log.length > 500) log.shift(); }
-    else if (msg.k === 'run') run = msg.run;
+    else if (msg.k === 'run') { run = msg.run; if (run && run.status !== 'running') pendingPrepare = null; }
     if (msg.k === 'ev' || msg.k === 'log') renderRun(); else renderAll();
   };
 }
