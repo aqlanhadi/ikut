@@ -335,7 +335,7 @@ function emitState() {
 // ---------------------------------------------------------------- phases
 
 let preparing = false;
-async function prepare({ start, skipBuild }) {
+async function prepare({ start, skipBuild, derivedData }) {
   if (S.phase !== 'setup' || preparing) { S.problem = 'The phones are already prepared.'; return; }
   S.problem = null;
   let point = null;
@@ -354,7 +354,7 @@ async function prepare({ start, skipBuild }) {
   preparing = true;
   S.start = point;
   try {
-    const dd = o.derivedData;
+    const dd = derivedData || o.derivedData;
     if (NO_SIM) say('--no-sim: no build, no simulators');
     else if (!skipBuild && !o.skipBuild) {
       S.phase = 'preparing'; S.detail = 'Building the app (a few minutes the first time).';

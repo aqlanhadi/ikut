@@ -213,7 +213,7 @@ document.addEventListener('change', (ev) => {
 const CARCOLOR = { phone1: '#0a6cff', phone2: '#d9480f', daniel: '#7C3AED', hafiz: '#0F766E' };
 const EVLABEL = { debris: 'Debris', accident: 'Accident', pothole: 'Pothole', animal: 'Animal on the road', stoppedVehicle: 'Stopped vehicle', roadworks: 'Roadworks', heavyRain: 'Heavy rain', trafficJam: 'Traffic jam',
   stopRest: 'Rest stop', stopFuel: 'Fuel stop', stopFood: 'Food stop', stopToilet: 'Toilet stop', pullingOver: 'Pulling over', carTrouble: 'Car trouble', runningLate: 'Running late', message: 'Message' };
-let pg = null, pgForm = { startKind: 'default', startText: '', skipBuild: true }, carForm = {}, pendingPrepare = null;
+let pg = null, pgForm = { startKind: 'default', startText: '', skipBuild: true, dd: '' }, carForm = {}, pendingPrepare = null;
 const pgRun = () => (run?.interactive ? run : null);
 const km1 = (m) => (m === null || m === undefined ? '–' : (m / 1000).toFixed(1) + ' km');
 const secs = (s) => (s === null || s === undefined ? '' : s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`);
@@ -305,6 +305,7 @@ function renderPg() {
         <select id="startKind" data-pgf="startKind"><option value="default" ${pgForm.startKind === 'default' ? 'selected' : ''}>the E1 start used by the demos</option><option value="free" ${pgForm.startKind === 'free' ? 'selected' : ''}>somewhere else</option></select></label>
       ${pgForm.startKind === 'free' ? `<input type="text" class="wide" id="startText" data-pgf="startText" placeholder="3.45, 101.40" value="${esc(pgForm.startText)}">` : ''}
       <label><input type="checkbox" data-pgf="skipBuild" ${pgForm.skipBuild ? 'checked' : ''}> Skip the build</label>
+      <label class="small dim">Build folder <input type="text" class="wide" id="ddText" data-pgf="dd" placeholder="/tmp/ikut-dd-q4 (default)" value="${esc(pgForm.dd)}"></label>
       <button class="primary" data-pg="prepare" ${other || pendingPrepare || (live && !st) ? 'disabled' : ''}>Prepare phones</button></div>
       <p class="small dim">Puts a fresh copy of the app on iPhone 17 #1 and #2, switches on location, parks both at the start and opens the app. Emulators only.</p>
       ${other ? '<div class="err small">A scripted demo is running. Stop it first.</div>' : ''}
@@ -336,7 +337,7 @@ async function startPlayground() {
   return true;
 }
 function prepareBody() {
-  return { cmd: 'prepare', start: pgForm.startKind === 'free' ? pgForm.startText : 'default', skipBuild: pgForm.skipBuild };
+  return { cmd: 'prepare', start: pgForm.startKind === 'free' ? pgForm.startText : 'default', skipBuild: pgForm.skipBuild, derivedData: pgForm.dd.trim() || undefined };
 }
 document.addEventListener('click', async (ev) => {
   const b = ev.target.closest('button[data-pg]'); if (!b) return;
