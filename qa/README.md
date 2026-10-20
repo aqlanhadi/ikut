@@ -198,3 +198,7 @@ Other options: `--udid`, `--udid2`, `--name`, `--speed N` (dev only; the signal-
 simulators get `location-always`, are parked on their start (re-sent every 5 s, nudged, until the app reports a position),
 and are driven with `simctl location start`, restarted every 20 s from where each should be. Not covered: phone 1 does not
 vote or request a stop (watch only), and the trip is left active unless `--end-trip`.
+
+## Dashboard
+
+`node qa/dashboard/server.mjs` opens http://localhost:4322: pick a live demo, press Play (emulators or production), watch its timeline, checks and log, and Stop it. Details in `qa/dashboard/README.md`.
