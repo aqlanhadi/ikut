@@ -13,7 +13,9 @@ struct TripsHomeView: View {
     @State private var newName = ""
     @State private var renameError: String?
     @State private var expanded = false
-    @GestureState private var dragOffset: CGFloat = 0
+    /// Springs back with the detent change when the drag ends, rather than snapping to the old
+    /// detent for a frame first.
+    @GestureState(resetTransaction: Transaction(animation: .snappy)) private var dragOffset: CGFloat = 0
     @State private var past: [PastTrips.Entry] = []
     /// Routes of the newest ended trips, drawn on the map (newest first).
     @State private var routes: [PastTripRoute] = []
@@ -228,7 +230,8 @@ struct TripsHomeView: View {
     }
 
     private func sheetDrag(compact: CGFloat, tall: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 8)
+        // Global: the header moves with the sheet, so a local translation would chase the finger and jitter.
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .updating($dragOffset) { value, state, _ in state = value.translation.height }
             .onEnded { value in
                 let base = expanded ? tall : compact
