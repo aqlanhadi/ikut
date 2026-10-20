@@ -22,7 +22,7 @@ const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? pro
 const PORT = Number(arg('--port') || process.env.PORT) || 4322;
 const DEMOS = arg('--demos') || process.env.DEMOS || QA;
 const LOG_LINES = 500;
-const KILL_AFTER_MS = 20_000;
+const KILL_AFTER_MS = 90_000; // a production demo waits up to 60 s for phone 1 to end the real trip
 
 // ---- discovery: `--demos` is a folder (files named demo*.mjs) or a path with a * in the file name
 const [demoDir, demoPattern] = DEMOS.includes('*')

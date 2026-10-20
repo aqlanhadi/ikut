@@ -60,7 +60,7 @@ const timeline = (d) => {
 
 process.exit(await runDemo({
   id: 'two-cars', summary: 'Phone 1 is the organizer and pins a stop; phone 2 is another car behind her that asks for the fuel stop.',
-  tag: 'demo2', title: 'the two-cars demo (phone 1 = Aisha, lead car and organizer; phone 2 = Faiz, his own car behind her)',
+  tag: 'demo2', title: 'Two-cars demo (phone 1 = Aisha, lead car and organizer; phone 2 = Faiz, his own car behind her)',
   cast, order: ['lead', 'faiz', 'daniel', 'hafiz'], endAt: END_AT,
   phones: [
     { id: 'a', label: 'phone 1 (Aisha)', role: 'Aisha, organizer, lead car', udid: o.udid, test: 'DemoOrganizerUITests', follows: 'lead', tracks: true, env: { TEST_RUNNER_IKUT_DEMO_NAME: 'Aisha' } },

@@ -7,7 +7,7 @@ A local page to list the live demos (`qa/demo*.mjs`), start one, stop it and wat
 - Each demo is asked for `--describe` (JSON) when the server starts; "Look for demos again" re-reads them.
   A script without `--describe` is still listed, so Play works.
 - Play runs `node <demo> [--skip-build] [--end-trip] --backend emulators|production` in `qa/`. One demo at a time
-  (the second start gets a 409). Stop sends SIGTERM, then SIGKILL after 20 s.
+  (the second start gets a 409). Stop sends SIGTERM, then SIGKILL after 90 s (a production run needs up to 60 s to end the real trip).
 - The Emulators / Production switch is remembered in the browser. Production shows a warning, reads "Play on
   production", asks "Are you sure?" first, and always ends the trip.
 - The run's events and last 500 log lines are kept in memory and replayed on reload.
