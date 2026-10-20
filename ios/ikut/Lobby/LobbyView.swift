@@ -51,7 +51,7 @@ struct LobbyView: View {
                          others: names.isEmpty ? nil : PastTrips.others(from: names, excluding: currentUserId))
     }
 
-    private var canLeave: Bool { session.canLeave }
+    private var canLeave: Bool { session.isLiveMember }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
     private var canEdit: Bool { isOrganizer && canLeave }

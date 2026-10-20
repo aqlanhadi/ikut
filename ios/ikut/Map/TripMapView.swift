@@ -544,7 +544,7 @@ struct TripMapView: View {
 
     // MARK: Leave and end
 
-    private var canLeave: Bool { session.canLeave }
+    private var canLeave: Bool { session.isLiveMember }
     private var canEnd: Bool { session.isOrganizer && !session.isEnded }
 
     private func run(_ action: @escaping () async throws -> Void) {

@@ -30,8 +30,8 @@ final class TripSession {
     var isPaused: Bool { TripSessionLogic.isPaused(pausedAt: pauseStart, now: clock()) }
     var isEnded: Bool { trip?.status == .ended }
     var isOrganizer: Bool { trip?.organizerId == userId && !userId.isEmpty }
-    /// The trip is still running and this user is still in it: leaving, pausing and editing make sense.
-    var canLeave: Bool { !isEnded && !membershipLost }
+    /// The trip is still running and this user is still in it: leaving, pausing and editing make sense (Lobby's canLeave, canEdit and canPause build on it).
+    var isLiveMember: Bool { !isEnded && !membershipLost }
 
     @ObservationIgnored private let tracker: TrackingControlling
     @ObservationIgnored private let injectedDB: Firestore?
