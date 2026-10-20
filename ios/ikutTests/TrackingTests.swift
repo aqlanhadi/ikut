@@ -5,65 +5,7 @@ import Foundation
 import Testing
 @testable import ikut
 
-// MARK: - Fakes
-
-@MainActor
-final class TestClock: TrackingClock {
-    private(set) var now: TimeInterval = 1_000
-    private var sleepers: [(deadline: TimeInterval, continuation: CheckedContinuation<Void, Error>)] = []
-
-    func sleep(until deadline: TimeInterval) async throws {
-        if deadline <= now { return }
-        try await withCheckedThrowingContinuation { sleepers.append((deadline, $0)) }
-    }
-
-    /// Moves time forward in one step, waking sleepers whose deadline has passed.
-    func advance(by seconds: TimeInterval) async {
-        now += seconds
-        let due = sleepers.filter { $0.deadline <= now }
-        sleepers.removeAll { $0.deadline <= now }
-        for s in due { s.continuation.resume() }
-        await settle()
-    }
-}
-
-/// Lets queued main-actor tasks run.
-@MainActor func settle() async {
-    for _ in 0..<30 { await Task.yield() }
-}
-
-@MainActor
-final class FakeWriter: PositionWriting {
-    private(set) var written: [Position] = []
-    /// When true, writes stay in flight until `completeAll()`.
-    var slow = false
-    private var pending: [CheckedContinuation<Void, Never>] = []
-
-    nonisolated func write(_ position: Position, tripId: String, carId: String) async throws {
-        await record(position)
-    }
-
-    private func record(_ p: Position) async {
-        written.append(p)
-        if slow { await withCheckedContinuation { pending.append($0) } }
-    }
-
-    func completeAll() async {
-        let p = pending
-        pending = []
-        for c in p { c.resume() }
-        await settle()
-    }
-}
-
-@MainActor
-final class FakeSource: LocationSource {
-    var onFix: (@Sendable (LocationFix) -> Void)?
-    private(set) var started = 0
-    private(set) var stopped = 0
-    func start(onFix: @escaping @Sendable (LocationFix) -> Void) { started += 1; self.onFix = onFix }
-    func stop() { stopped += 1; onFix = nil }
-}
+// MARK: - Fixtures
 
 private func fix(_ lat: Double = 0, _ lon: Double = 0, speed: Double = 20, course: Double = 90) -> LocationFix {
     LocationFix(latitude: lat, longitude: lon, speed: speed, course: course, timestamp: Date())
@@ -301,7 +243,7 @@ struct TrackingServiceTests {
 // MARK: - Emulator
 
 /// Runs against the local Auth and Firestore emulators; see TripServiceTests.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct TrackingEmulatorTests {
     init() throws {
@@ -309,17 +251,8 @@ struct TrackingEmulatorTests {
         try Auth.auth().signOut()
     }
 
-    private func makeTrip() async throws -> (tripId: String, carId: String, uid: String) {
-        let auth = AuthModel()
-        try await auth.signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Tracking", destination: DestinationResult(
-                name: "Kota Bharu", subtitle: "Kelantan",
-                coordinate: .init(latitude: 6.1254, longitude: 102.2381)),
-            route: BuiltRoute(distance: 205_400, travelTime: 8_700, name: "E1", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"))
-        return (ids.tripId, ids.carId, uid)
+    private func makeTrip() async throws -> EmulatorTrip {
+        try await EmulatorTrip.make(name: "Tracking", route: Fixtures.longRoute)
     }
 
     private func makePosition() -> Position {

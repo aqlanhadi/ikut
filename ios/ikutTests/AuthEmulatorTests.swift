@@ -5,7 +5,7 @@ import Testing
 
 /// Runs against the local Auth emulator. Start it first, then:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct AuthEmulatorTests {
     init() throws {
@@ -51,9 +51,7 @@ struct AuthEmulatorTests {
         _ = try await URLSession.shared.data(for: request)
 
         let model = AuthModel()
-        for _ in 0..<50 where Auth.auth().currentUser != nil {
-            try await Task.sleep(for: .milliseconds(100))
-        }
+        await waitUntil(.seconds(5)) { Auth.auth().currentUser == nil }
         #expect(Auth.auth().currentUser == nil)
         #expect(model.state == .signedOut)
     }

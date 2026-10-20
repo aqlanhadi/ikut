@@ -94,9 +94,7 @@ struct JoinModelTests {
         cars: [PreviewCar(id: "c1", name: "Myvi", color: TripService.palette[0], hasTracker: true)])
 
     private func settle(_ model: JoinModel) async {
-        for _ in 0..<50 where model.preview == nil {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
+        await waitUntil(.milliseconds(500)) { model.preview != nil }
     }
 
     @Test func previewLoadsOnlyWhenCodeIsComplete() async {
@@ -165,7 +163,7 @@ struct JoinModelTests {
 }
 
 /// Runs against the local emulators; see TripServiceEmulatorTests.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct JoinEmulatorTests {
     init() throws {
@@ -174,17 +172,9 @@ struct JoinEmulatorTests {
     }
 
     @Test func previewThenJoinWithNewCar() async throws {
-        let organizer = AuthModel()
-        try await organizer.signInAsGuest(name: "Aqlan")
-        let orgUid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Join test \(UUID().uuidString.prefix(8))",
-            destination: DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 4.6, longitude: 101.1)),
-            route: BuiltRoute(distance: 1000, travelTime: 60, name: "", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: orgUid, displayName: "Aqlan"),
-            carName: "Aqlan's Myvi", carColor: TripService.palette[0])
-        let code = try await Firestore.firestore().document(FirestorePaths.trip(ids.tripId))
-            .getDocument(as: Trip.self).code
+        let ids = try await EmulatorTrip.make(name: "Join test", carName: "Aqlan's Myvi", carColor: TripService.palette[0])
+        let orgUid = ids.uid
+        let code = try await ids.code()
 
         // A different user previews and joins.
         try Auth.auth().signOut()

@@ -35,17 +35,11 @@ private final class FakeReportService: ReportService, @unchecked Sendable {
 
 private let snapshot = ReportSnapshot(
     coordinate: .init(latitude: 3, longitude: 101), heading: 90, route: nil, previousOffset: 12,
-    capturedAt: Date(timeIntervalSince1970: 1_800_000_000))
+    capturedAt: Fixtures.t0)
 
 private let context = ReportContext(tripId: "trip", carId: "car", authorId: "me") { snapshot }
 
 private func debris() -> ReportOption { ReportOption.events[0] }
-
-@MainActor
-private func waitUntil(_ timeout: Duration = .seconds(3), _ condition: () -> Bool) async {
-    let deadline = ContinuousClock.now + timeout
-    while !condition(), ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
-}
 
 struct ReportOptionTests {
     @Test func eightEventsThenThreeStatusesInOrder() {
@@ -200,7 +194,7 @@ struct ReportToastModelTests {
 
 /// Runs against the local Auth and Firestore emulators. Start them first, then:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct ReportEmulatorTests {
     init() throws {
@@ -209,15 +203,8 @@ struct ReportEmulatorTests {
     }
 
     @Test func reportThroughRealServiceThenUndo() async throws {
-        let auth = AuthModel()
-        try await auth.signInAsGuest(name: "Aqlan")
-        let uid = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Report", destination: DestinationResult(
-                name: "Kota Bharu", subtitle: "Kelantan",
-                coordinate: .init(latitude: 6.1254, longitude: 102.2381)),
-            route: BuiltRoute(distance: 1_000, travelTime: 600, name: "E1", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: uid, displayName: "Aqlan"))
+        let ids = try await EmulatorTrip.make(name: "Report")
+        let uid = ids.uid
         let live = ReportContext(tripId: ids.tripId, carId: ids.carId, authorId: uid) {
             ReportSnapshot(
                 coordinate: .init(latitude: 3, longitude: 101), heading: 10, route: nil,

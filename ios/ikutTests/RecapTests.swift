@@ -4,7 +4,7 @@ import Testing
 @testable import ikut
 
 struct RecapLogicTests {
-    private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    private let t0 = Fixtures.t0
     private let dest = CLLocationCoordinate2D(latitude: 4.6, longitude: 101.09)
 
     private func snapshot(positions: [RecapPosition] = [], events: [RecapEvent] = [], ended: Double? = 10_000) -> RecapSnapshot {

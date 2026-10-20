@@ -59,7 +59,7 @@ private final class AlertFakeEngine: SpeechEngine {
     func stop() { stops += 1 }
 }
 
-private let alertT0 = Date(timeIntervalSince1970: 1_800_000_000)
+private let alertT0 = Fixtures.t0
 
 private func alertEvent(
     _ type: EventType, id: String, author: String = "ana", ago: TimeInterval = 0, message: String? = nil
@@ -69,12 +69,6 @@ private func alertEvent(
         authorId: author, carId: "c", createdAt: alertT0.addingTimeInterval(-ago), message: message)
     e.id = id
     return e
-}
-
-/// Polls until `condition` holds (the center processes events on a task).
-@MainActor
-private func alertUntil(_ condition: @MainActor () -> Bool) async {
-    for _ in 0..<300 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
 }
 
 // MARK: Policy
@@ -282,7 +276,7 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([alertEvent(.debris, id: "1", ago: 360)])
-        await alertUntil { rig.center.current != nil }
+        await waitUntil { rig.center.current != nil }
         #expect(rig.center.current?.body == "Debris reported by Aqlan’s car · 6 min ago")
         #expect(rig.notifier.posted.isEmpty)
         #expect(rig.speaker.spoken.map(\.text) == ["Debris reported by Aqlan’s car."])
@@ -295,7 +289,7 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([alertEvent(.debris, id: "1")])
-        await alertUntil { !rig.notifier.posted.isEmpty }
+        await waitUntil { !rig.notifier.posted.isEmpty }
         #expect(rig.notifier.posted.map(\.id) == ["1"])
         #expect(rig.notifier.posted.first?.tripId == "t")
         #expect(rig.center.current == nil)
@@ -308,7 +302,7 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([alertEvent(.debris, id: "1")])
-        await alertUntil { rig.center.current != nil }
+        await waitUntil { rig.center.current != nil }
         #expect(rig.speaker.spoken.isEmpty)
     }
 
@@ -319,7 +313,7 @@ struct AlertCenterTests {
             alertEvent(.debris, id: "old", ago: 600), alertEvent(.message, id: "msg", ago: 5),
             alertEvent(.accident, id: "recent", ago: 30),
         ])
-        await alertUntil { !rig.speaker.spoken.isEmpty }
+        await waitUntil { !rig.speaker.spoken.isEmpty }
         try? await Task.sleep(for: .milliseconds(50))
         #expect(rig.speaker.spoken.map(\.key) == ["recent"])
     }
@@ -331,7 +325,7 @@ struct AlertCenterTests {
         rig.source.emit([alertEvent(.debris, id: "mine", author: "me")])
         rig.source.emit([alertEvent(.debris, id: "1"), alertEvent(.debris, id: "mine", author: "me")])
         rig.source.emit([alertEvent(.debris, id: "1")])
-        await alertUntil { !rig.speaker.spoken.isEmpty }
+        await waitUntil { !rig.speaker.spoken.isEmpty }
         try? await Task.sleep(for: .milliseconds(50))
         #expect(rig.speaker.spoken.map(\.key) == ["1"])
     }
@@ -341,7 +335,7 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([alertEvent(.message, id: "low"), alertEvent(.debris, id: "high", ago: 10), alertEvent(.heavyRain, id: "mid")])
-        await alertUntil { rig.speaker.spoken.count == 3 }
+        await waitUntil { rig.speaker.spoken.count == 3 }
         #expect(rig.speaker.spoken.map(\.key) == ["high", "mid", "low"])
         #expect(rig.center.current?.id == "high")
     }
@@ -352,7 +346,7 @@ struct AlertCenterTests {
         rig.source.emit([])
         let e = alertEvent(.debris, id: "1", ago: 360)
         rig.source.emit([e])
-        await alertUntil { rig.speaker.spoken.count == 1 }
+        await waitUntil { rig.speaker.spoken.count == 1 }
         #expect(await rig.center.announce(event: e, distance: 500))
         #expect(!(await rig.center.announce(event: e, distance: 500)))
         #expect(!(await rig.center.announce(event: e)))
@@ -374,11 +368,11 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([alertEvent(.debris, id: "1")])
-        await alertUntil { rig.center.current != nil }
-        await alertUntil { rig.center.current == nil }
+        await waitUntil { rig.center.current != nil }
+        await waitUntil { rig.center.current == nil }
         #expect(rig.center.current == nil)
         rig.source.emit([alertEvent(.debris, id: "2")])
-        await alertUntil { rig.center.current != nil }
+        await waitUntil { rig.center.current != nil }
         rig.center.dismiss()
         #expect(rig.center.current == nil)
     }
@@ -388,7 +382,7 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([alertEvent(.debris, id: "1")])
-        await alertUntil { rig.center.current != nil }
+        await waitUntil { rig.center.current != nil }
         rig.center.stop()
         #expect(rig.center.current == nil)
         #expect(rig.speaker.stops >= 1)
@@ -406,9 +400,9 @@ struct AlertCenterTests {
         rig.source.emit([])
         let request = alertEvent(.stopFuel, id: "s1")
         rig.source.emit([request])
-        await alertUntil { rig.speaker.spoken.count == 1 }
+        await waitUntil { rig.speaker.spoken.count == 1 }
         rig.source.emit([pinned(request)])
-        await alertUntil { rig.speaker.spoken.count == 2 }
+        await waitUntil { rig.speaker.spoken.count == 2 }
         rig.source.emit([pinned(request)])
         rig.source.emit([pinned(request, "Elsewhere")])
         try? await Task.sleep(for: .milliseconds(50))
@@ -443,7 +437,7 @@ struct AlertCenterTests {
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         rig.source.emit([pinned(alertEvent(.stopFood, id: "s2"))])
-        await alertUntil { !rig.speaker.spoken.isEmpty }
+        await waitUntil { !rig.speaker.spoken.isEmpty }
         try? await Task.sleep(for: .milliseconds(50))
         #expect(rig.speaker.spoken.map(\.key) == ["s2"])
     }
@@ -459,7 +453,7 @@ struct AlertCenterTests {
 
 /// Runs against the local Auth and Firestore emulators. Start them first, then:
 /// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["IKUT_EMULATOR_TESTS"] == "1"), .serialized)
+@Suite(.emulator, .serialized)
 @MainActor
 struct AlertEmulatorTests {
     init() throws {
@@ -470,18 +464,10 @@ struct AlertEmulatorTests {
     /// Aqlan reports debris; Daniel joins afterwards and his `AlertCenter`, fed by the real
     /// `EventService.listen`, announces it by Aqlan's name. Aqlan's own client would not.
     @Test func otherUsersEventReachesCenter() async throws {
-        let organizer = AuthModel()
-        try await organizer.signInAsGuest(name: "Aqlan")
-        let aqlan = try #require(Auth.auth().currentUser?.uid)
-        let ids = try await TripService.createTrip(
-            name: "Alerts \(UUID().uuidString.prefix(8))",
-            destination: DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 4.6, longitude: 101.1)),
-            route: BuiltRoute(distance: 1000, travelTime: 60, name: "", polyline: "_p~iF~ps|U"),
-            organizer: TripOrganizer(id: aqlan, displayName: "Aqlan"))
-        let code = try await Firestore.firestore().document(FirestorePaths.trip(ids.tripId))
-            .getDocument(as: Trip.self).code
+        let trip = try await EmulatorTrip.make(name: "Alerts")
+        let code = try await trip.code()
         try await EventService.report(
-            type: .debris, tripId: ids.tripId, carId: ids.carId, authorId: aqlan,
+            type: .debris, tripId: trip.tripId, carId: trip.carId, authorId: trip.uid,
             location: .init(latitude: 3, longitude: 101), heading: 0, route: nil, previousOffset: nil)
 
         try Auth.auth().signOut()
@@ -494,8 +480,8 @@ struct AlertEmulatorTests {
         let speaker = AlertFakeSpeaker()
         let center = AlertCenter(
             notifier: AlertFakeNotifier(), speaker: speaker, isForeground: { true }, readAloud: { true })
-        center.start(tripId: ids.tripId, myUserId: daniel)
-        await alertUntil { center.current != nil }
+        center.start(tripId: trip.tripId, myUserId: daniel)
+        await waitUntil { center.current != nil }
         center.stop()
         #expect(center.current == nil)
         #expect(speaker.spoken.map(\.text) == ["Debris reported by Aqlan’s car."])

@@ -7,7 +7,7 @@ import Testing
 struct ConvoyTests {
     private static let r = RouteLine.earthRadius
     private static let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
-    private static let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private static let now = Fixtures.t0
     private static let gb = Locale(identifier: "en_GB")
     private static let utc = TimeZone(identifier: "UTC")!
 
@@ -353,7 +353,7 @@ struct ConvoyTests {
     }
 
     @Test func clockText() {
-        let d = Date(timeIntervalSince1970: 1_800_000_000) // 2027-01-15 08:00 UTC
+        let d = Fixtures.t0 // 2027-01-15 08:00 UTC
         #expect(ConvoyFormat.clock(d.addingTimeInterval(52 * 60 + 6 * 3600), locale: Self.gb, timeZone: Self.utc) == "14:52")
         #expect(ConvoyFormat.eta(d, destination: "Ipoh", locale: Self.gb, timeZone: Self.utc) == "ETA Ipoh 08:00")
         #expect(ConvoyFormat.eta(d, locale: Self.gb, timeZone: Self.utc) == "ETA 08:00")
