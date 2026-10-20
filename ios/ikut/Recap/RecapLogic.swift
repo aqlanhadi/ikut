@@ -320,7 +320,7 @@ enum RecapLogic {
         return m == 1 ? "1 min" : "\(m) min"
     }
 
-    nonisolated(unsafe) private static let clockFormatter: DateFormatter = {
+    private static let clockFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "H:mm"
         return f
