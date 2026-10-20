@@ -65,12 +65,14 @@ async function discover() {
 let run = null; // { demo, options, status, startedAt, exitCode, events, log, child }
 const clients = new Set();
 const publish = (msg) => { for (const res of clients) res.write(`data: ${JSON.stringify(msg)}\n\n`); };
-const meta = () => run && { file: run.demo.file, title: run.demo.title, durationSeconds: run.demo.durationSeconds, timeline: run.demo.timeline,
+const meta = () => run && { file: run.demo.file, title: run.demo.title, interactive: Boolean(run.demo.interactive), durationSeconds: run.demo.durationSeconds, timeline: run.demo.timeline,
   options: run.options, status: run.status, startedAt: run.startedAt, exitCode: run.exitCode, stopping: run.stopping };
-const snapshot = () => run ? { k: 'snapshot', run: meta(), events: run.events, log: run.log } : { k: 'snapshot', run: null, events: [], log: [] };
+const snapshot = () => run ? { k: 'snapshot', run: meta(), events: run.events, log: run.log, state: run.state } : { k: 'snapshot', run: null, events: [], log: [], state: null };
 
 function addEvent(ev) {
   ev.ts = Date.now();
+  // An interactive demo (the playground) sends its whole state every second: keep only the latest, not a history.
+  if (ev.type === 'state') { run.state = ev; return publish({ k: 'state', state: ev }); }
   run.events.push(ev);
   publish({ k: 'ev', ev });
 }
@@ -85,11 +87,12 @@ function addLine(line) {
 
 function start(demo, options) {
   const args = [join(demoDir, demo.file)];
-  if (options.skipBuild) args.push('--skip-build');
+  if (options.skipBuild && !demo.interactive) args.push('--skip-build'); // the playground takes it with its prepare command
   if (options.endTrip) args.push('--end-trip');
   args.push('--backend', options.backend);
-  const child = spawn('node', args, { cwd: QA, stdio: ['ignore', 'pipe', 'pipe'] });
-  const r = run = { demo, options, status: 'running', startedAt: Date.now(), exitCode: null, stopping: false, events: [], log: [], child };
+  const child = spawn('node', args, { cwd: QA, stdio: ['pipe', 'pipe', 'pipe'] });
+  const r = run = { demo, options, status: 'running', startedAt: Date.now(), exitCode: null, stopping: false, events: [], log: [], state: null, child };
+  child.stdin.on('error', () => {}); // a demo that never reads its input, or has left
   for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (l) => { if (run === r) addLine(l); });
   child.on('error', (e) => { if (run === r) addEvent({ type: 'error', message: `Could not start: ${e.message}` }); });
   child.on('close', (code, signal) => {
@@ -149,6 +152,13 @@ createServer(async (req, res) => {
       if (!demo) return send(res, 404, { error: 'No such demo.' });
       if (isRunning()) return send(res, 409, { error: 'A demo is already running. Stop it first.' });
       start(demo, { skipBuild: Boolean(body.skipBuild), endTrip: Boolean(body.endTrip), backend: body.backend ?? 'emulators' });
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && p === '/api/command') {
+      if (!isRunning()) return send(res, 409, { error: 'Nothing is running.' });
+      if (!run.demo.interactive) return send(res, 409, { error: 'This demo does not take commands.' });
+      const body = await readJson(req);
+      run.child.stdin.write(`CMD ${JSON.stringify(body)}\n`);
       return send(res, 200, { ok: true });
     }
     if (req.method === 'POST' && p === '/api/stop') {
