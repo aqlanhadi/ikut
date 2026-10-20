@@ -197,6 +197,7 @@ struct LobbyView: View {
                 status: location.status, accuracy: location.accuracy, context: .goingToBackground)
             if session.consumeAlwaysExplainer(action: action) { showAlwaysExplainer = true }
         }
+        .onChange(of: showAlwaysExplainer) { _, showing in session.alwaysExplainerShowing = showing }
         .sheet(isPresented: $showAlwaysExplainer) {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.
             AlwaysLocationExplainerView(permission: location) { _ in showAlwaysExplainer = false }

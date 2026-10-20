@@ -51,6 +51,8 @@ final class TripSession {
     /// Signature of the own route `TrackingService` was last started with.
     @ObservationIgnored private var trackedCarRoute: [Double]?
     @ObservationIgnored private var explainerShown = false
+    /// True while the lobby's Always-location sheet is up; the map holds its asks until it's gone.
+    var alwaysExplainerShowing = false
     /// Set the instant this user pauses, before the write lands; cleared on resume or losing tracker duty.
     private var localPausedAt: Date?
     @ObservationIgnored private let clock: () -> Date

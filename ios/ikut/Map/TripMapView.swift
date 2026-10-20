@@ -25,7 +25,12 @@ struct TripMapView: View {
     @State private var panelExpanded = false
     @State private var reportContext: ReportContext?
     @State private var showReport = false
-    @State private var askAboutAlerts = false
+    /// The ask on screen now; the next one waits for it to be answered (`TripAskPlanner`).
+    @State private var ask: TripAsk?
+    @State private var askedThisTrip: Set<TripAsk> = []
+    @State private var screenAwake = ScreenAwake()
+    @State private var onScreen = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var stopState: StopRequestState?
     @State private var stopSheet: StopSheet?
     @State private var stopError: String?
@@ -48,7 +53,11 @@ struct TripMapView: View {
     /// The approach folded the convoy list away; it opens again once the hazard is passed.
     @State private var unfoldAfterApproach = false
     @State private var passedText: String?
-    @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
+    /// Kept screen on while the map is up. `keepAwakeAnswered` is false until the first ask is answered.
+    @AppStorage("ikut.map.keepAwake") private var keepAwake = false
+    @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
+    /// The last trip the "Road alerts are off" ask was shown for, so reopening the map doesn't nag.
+    @AppStorage("ikut.map.alertsOffAskedTrip") private var alertsOffAskedTrip = ""
     @Environment(\.dismiss) private var dismiss
 
     /// What the stop sheet is showing.
@@ -147,12 +156,42 @@ struct TripMapView: View {
             } message: {
                 Text("Everyone stops sharing their location. This can't be undone.")
             }
-            .alert("Get road alerts?", isPresented: $askAboutAlerts) {
-                Button("Turn on") { Task { await alerts.requestPermission() } }
-                Button("Not now", role: .cancel) {}
+            .alert("Get road alerts?", isPresented: asking(.roadAlerts)) {
+                Button("Turn on") { answer(.roadAlerts) { _ = await alerts.requestPermission() } }
+                Button("Not now", role: .cancel) { answer(.roadAlerts) }
             } message: {
                 Text("ikut can warn you about debris, breakdowns and stops ahead, even while the app is in the background.")
             }
+            .alert("Road alerts are off", isPresented: asking(.roadAlertsOff)) {
+                Button("Open Settings") {
+                    answer(.roadAlertsOff) {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            await UIApplication.shared.open(url)
+                        }
+                    }
+                }
+                Button("Not now", role: .cancel) { answer(.roadAlertsOff) }
+            } message: {
+                Text("Turn them on in Settings to hear about debris, breakdowns and stops ahead.")
+            }
+            .alert("Keep the screen on?", isPresented: asking(.keepScreenOn)) {
+                Button("Keep it on") {
+                    keepAwake = true
+                    keepAwakeAnswered = true
+                    answer(.keepScreenOn)
+                }
+                Button("Not now", role: .cancel) {
+                    keepAwake = false
+                    keepAwakeAnswered = true
+                    answer(.keepScreenOn)
+                }
+            } message: {
+                Text("So the map stays up while you drive. Uses more battery.")
+            }
+            .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk() }
+            .onChange(of: keepAwake) { _, _ in updateAwake() }
+            .onChange(of: scenePhase) { _, _ in updateAwake() }
+            .onChange(of: session.isEnded) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, ended in if ended { onEnded() } }
             .onAppear(perform: appear)
             .onDisappear(perform: disappear)
@@ -366,6 +405,9 @@ struct TripMapView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
                 Button("Back to lobby", systemImage: "chevron.backward") { dismiss() }
+                if liveServices {
+                    Toggle("Keep screen on", systemImage: "sun.max", isOn: $keepAwake)
+                }
                 if canEnd {
                     Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
                 }
@@ -549,13 +591,53 @@ struct TripMapView: View {
         model.start()
         model.startHazardAlerts(announcer: alerts, userId: session.userId)
         alerts.start(tripId: session.tripId, myUserId: session.userId)
-        if !askedAboutAlerts {
-            askedAboutAlerts = true
-            askAboutAlerts = true
+        onScreen = true
+        updateAwake()
+        nextAsk()
+    }
+
+    /// Whether `kind` is the ask on screen; the alert closing by itself clears it (the buttons answer first).
+    private func asking(_ kind: TripAsk) -> Binding<Bool> {
+        Binding(get: { ask == kind }, set: { if !$0, ask == kind { ask = nil } })
+    }
+
+    /// Records the answer, runs what it asks for, then shows whichever ask is next.
+    private func answer(_ kind: TripAsk, then action: @escaping () async -> Void = {}) {
+        askedThisTrip.insert(kind)
+        if kind == .roadAlertsOff { alertsOffAskedTrip = session.tripId }
+        ask = nil
+        Task {
+            await action()
+            // A beat, so the next alert isn't presented while the last is still closing.
+            try? await Task.sleep(for: .milliseconds(600))
+            nextAsk()
         }
     }
 
+    private func nextAsk() {
+        guard liveServices, onScreen, ask == nil else { return }
+        Task {
+            let access = await NotificationAccess.current()
+            guard ask == nil, onScreen else { return }
+            var asked = askedThisTrip
+            if alertsOffAskedTrip == session.tripId { asked.insert(.roadAlertsOff) }
+            ask = TripAskPlanner.next(
+                notifications: access, keepAwakeAnswered: keepAwakeAnswered, asked: asked,
+                explainerShowing: session.alwaysExplainerShowing)
+        }
+    }
+
+    private func updateAwake() {
+        guard liveServices else { return }
+        screenAwake.update(
+            preference: keepAwake, onScreen: onScreen, tripRunning: !session.isEnded,
+            appActive: scenePhase == .active)
+    }
+
     private func disappear() {
+        onScreen = false
+        ask = nil
+        updateAwake()
         guard liveServices else { return }
         model.stop()
         alerts.stop()

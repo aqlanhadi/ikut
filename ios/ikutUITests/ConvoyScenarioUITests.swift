@@ -173,6 +173,7 @@ final class ConvoyScenarioUITests: XCTestCase {
         let notNow = app.buttons["Not now"]
         if notNow.waitForExistence(timeout: 6) { notNow.tap() }
         startTrip.tap()
+        app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
         if notNow.waitForExistence(timeout: 2) { notNow.tap() }
         // The convoy sheet opens collapsed; open it to read the rows.

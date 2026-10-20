@@ -58,8 +58,7 @@ final class DemoSecondPhoneUITests: XCTestCase {
         let startTrip = app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
         XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
         startTrip.tap()
-        let notNow = app.buttons["Not now"]
-        if notNow.waitForExistence(timeout: 5) { notNow.tap() }
+        app.dismissMapAsks()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
 
         // Stay on the map until the demo script writes the marker file, then request the stop from the UI.
