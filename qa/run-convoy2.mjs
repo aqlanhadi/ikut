@@ -4,7 +4,7 @@
 //   node run-convoy2.mjs                 # build, then run (about 8 minutes)
 //   node run-convoy2.mjs --skip-build    # reuse the build in --derived-data
 //
-// Phone A (organizer, car 1) is the shared iPhone 17 simulator, phone B (car 2) the `ikut-convoy-2` simulator.
+// Phone A (organizer, car 1) is the shared iPhone 17 #1 simulator, phone B (car 2) iPhone 17 #2.
 // Both run XCUITests at the same time (ConvoyOrganizerUITests / ConvoyJoinerUITests in
 // ios/ikutUITests/TwoPhoneConvoyUITests.swift). Cars 3 and 4 are Firebase clients in this process: they join
 // through the joinTrip callable, publish positions with the app's pipeline (lib/tracking.mjs), report an
@@ -46,8 +46,8 @@ const PROJECT_ID = 'ikut-b1083';
 const REGION = 'asia-southeast1';
 
 const o = {
-  aUdid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 (shared)
-  bUdid: 'FD0ACD10-F3C4-4797-8DB8-A6F554585CC1', // ikut-convoy-2 (iPhone 17 Pro), the second phone
+  aUdid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 #1 (shared)
+  bUdid: 'FD0ACD10-F3C4-4797-8DB8-A6F554585CC1', // iPhone 17 #2 (an iPhone 17 Pro), the second phone
   kmh: 90,
   derivedData: '/tmp/ikut-dd-convoy2',
   skipBuild: false,

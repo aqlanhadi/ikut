@@ -58,9 +58,9 @@ TTL does not cover positions, so the scheduled function remains the only thing t
 
 ```sh
 cd ios
-xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17'
+xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1'
 # Include the emulator integration tests (start the Auth emulator first):
-TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17'
+TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1'
 ```
 
 A simulator can stand in for a second person. This UI test signs in and joins an existing
@@ -68,7 +68,7 @@ trip with a new car (it's skipped unless a code is given):
 
 ```sh
 TEST_RUNNER_IKUT_JOIN_CODE=Y5REFN TEST_RUNNER_IKUT_JOIN_NAME=Wyna \
-  xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:ikutUITests
+  xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -only-testing:ikutUITests
 ```
 
 Multi-car simulated drives (4 scripted cars plus a real simulator as the fifth) are in [`qa/`](qa/README.md).

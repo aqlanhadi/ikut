@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Live demo for a human: about 10 minutes of real-time convoy driving to watch on the iPhone 17 simulator.
+// Live demo for a human: about 10 minutes of real-time convoy driving to watch on the iPhone 17 #1 simulator.
 //
 //   node demo.mjs                  # build + run: phone joins by UI test, then the demo plays at 1x
 //   node demo.mjs --skip-build     # reuse the build in --derived-data
-//   node demo.mjs --one-phone      # only the iPhone 17 (Faiz); Daniel is scripted again and Hafiz requests the stop
+//   node demo.mjs --one-phone      # only iPhone 17 #1 (Faiz); Daniel is scripted again and Hafiz requests the stop
 //   node demo.mjs --dry-run        # no Firebase, no simulator: print the timeline and sanity-check the geometry
 //   node demo.mjs --no-app [--seconds 30]   # scripted cars only against the emulators, no simulator
 //
-// Default is two phones (--one-phone for the old single-phone show): the iPhone 17 is Faiz (JoinAsSecondMemberUITests) and
-// `ikut-convoy-2` is Daniel (DemoSecondPhoneUITests): it joins as the new car "Daniel's City", starts on Daniel's own road,
+// Default is two phones (--one-phone for the old single-phone show): iPhone 17 #1 is Faiz (JoinAsSecondMemberUITests) and
+// iPhone 17 #2 is Daniel (DemoSecondPhoneUITests): it joins as the new car "Daniel's City", starts on Daniel's own road,
 // merges at the planned point, and at T+390 taps Pit stop > Fuel itself (the script writes a marker file the test waits for).
 // Wrap the run in qa's simlock helper for both simulators when other agents share them.
 //
@@ -47,7 +47,7 @@ const PROJECT_ID = 'ikut-b1083';
 const REGION = 'asia-southeast1';
 
 const o = {
-  udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // shared iPhone 17: never create or erase simulators
+  udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // shared iPhone 17 #1: never create or erase simulators
   udid2: 'FD0ACD10-F3C4-4797-8DB8-A6F554585CC1', twoPhones: true, name: 'Faiz', derivedData: '/tmp/ikut-dd-q1', skipBuild: false, host: '127.0.0.1', speed: 1,
   dryRun: false, noApp: false, seconds: null, waitTimeout: 900, endTrip: false,
   logs: path.join(os.tmpdir(), 'ikut-qa'),

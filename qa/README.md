@@ -8,7 +8,7 @@ start them first (`cd firebase && firebase emulators:start`). Node 20+.
 cd qa && npm install
 node convoy-sim.mjs                  # 4 simulated cars, real time, prints TRIP CODE: XXXXXX, PASS/FAIL per check
 node convoy-sim.mjs --speed 2        # 2x (the signal-drop check needs <= 2.5x, see below)
-node run-ui.mjs --speed 1            # everything, with the app on simulator C0A40D2A (iPhone 17) as the fifth car
+node run-ui.mjs --speed 1            # everything, with the app on simulator C0A40D2A (iPhone 17 #1) as the fifth car
 ```
 
 `run-ui.mjs` boots the simulator, grants location, starts `convoy-sim.mjs --wait-app`, runs
@@ -43,8 +43,8 @@ node run-convoy2.mjs --skip-build    # reuse /tmp/ikut-dd-convoy2
 node run-convoy2.mjs --ask-location  # phone B starts without location permission and answers the system prompt
 ```
 
-Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 (`C0A40D2A`), phone B
-(car 2) a second simulator, `ikut-convoy-2` (FD0ACD10, iPhone 17 Pro; it must already exist, the script never creates one). The script boots
+Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 #1 (`C0A40D2A`), phone B
+(car 2) a second simulator, iPhone 17 #2 (`FD0ACD10`, an iPhone 17 Pro; it must already exist, the script never creates one). The script boots
 both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
 `ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
 time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
@@ -174,8 +174,8 @@ positions, end. It deletes its two anonymous users; the ended trip is purged by 
 
 ## Live demo
 
-`node demo.mjs` is a ten-minute, real-time (1x) show for people watching two simulators: the shared iPhone 17 (Faiz,
-`JoinAsSecondMemberUITests`) and `ikut-convoy-2` (Daniel, `DemoSecondPhoneUITests`). The script creates a trip as a
+`node demo.mjs` is a ten-minute, real-time (1x) show for people watching two simulators: the shared iPhone 17 #1 (Faiz,
+`JoinAsSecondMemberUITests`) and iPhone 17 #2 (Daniel, `DemoSecondPhoneUITests`). The script creates a trip as a
 scripted organizer, prints the code, and joins both phones through UI tests that hold the map open
 (`TEST_RUNNER_IKUT_HOLD_SECONDS`). Cast: Aisha (lead, scripted), phone 1, Hafiz (slowest, scripted) and phone 2, which
 joins as the new car "Daniel's City" on Daniel's own road (`data/osrm-car4.json`) and merges between phone 1 and Hafiz.
@@ -189,7 +189,7 @@ clamped before the destination), 500 resolved; 580 phone 1 arrives; 620 end.
 node demo.mjs --dry-run          # print the timeline and check the geometry, no Firebase, no simulator
 node demo.mjs --no-app --seconds 30   # scripted cars only, against the emulators
 node demo.mjs --skip-build       # the real thing, reusing the build in --derived-data (/tmp/ikut-dd-q1)
-node demo.mjs --one-phone        # the old show: only the iPhone 17, scripted Daniel, Hafiz requests the stop
+node demo.mjs --one-phone        # the old show: only iPhone 17 #1, scripted Daniel, Hafiz requests the stop
 # both simulators shared with other agents: take the locks first
 simlock.sh C0A40D2A-0607-4B95-A1BE-F8C9190D81C1 simlock.sh FD0ACD10-F3C4-4797-8DB8-A6F554585CC1 node demo.mjs
 ```
