@@ -1,11 +1,7 @@
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { findActiveTripId, normalizeCode } from "./joinTrip.js";
+import { NO_ACTIVE_TRIP, findActiveTripId, isRecord, normalizeCode } from "./joinTrip.js";
 import type { Car, PreviewCar, PreviewTripResult, Trip } from "./model.js";
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 /** Read-only view of an active trip for someone who is not a member yet. No member ids or tracker uids. */
 export async function previewTripData(db: Firestore, tripId: string): Promise<PreviewTripResult> {
@@ -13,7 +9,7 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
   const [tripSnap, carsSnap] = await Promise.all([tripRef.get(), tripRef.collection("cars").get()]);
   const trip = tripSnap.data() as Trip | undefined;
   if (!tripSnap.exists || !trip || trip.status !== "active") {
-    throw new HttpsError("not-found", "No active trip with that code");
+    throw new HttpsError("not-found", NO_ACTIVE_TRIP);
   }
   const cars: PreviewCar[] = carsSnap.docs
     .map((d) => ({ id: d.id, data: d.data() as Car }))

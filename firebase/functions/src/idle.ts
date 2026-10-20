@@ -1,11 +1,7 @@
-import type { Position, Trip, TripEvent } from "./model.js";
+import type { Position, TimestampLike, Trip, TripEvent } from "./model.js";
 
 /** A trip with no activity for this long is ended. */
 export const IDLE_MS = 12 * 60 * 60 * 1000;
-
-interface TimestampLike {
-  toMillis(): number;
-}
 
 export type IdleTrip = Pick<Trip, "status"> & {
   createdAt: TimestampLike;

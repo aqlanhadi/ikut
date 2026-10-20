@@ -2,6 +2,7 @@ import { FieldValue, getFirestore, type Firestore, type Transaction } from "fire
 import { logger } from "firebase-functions/v2";
 import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 import type { Car, Member, Trip } from "./model.js";
+import { hasOtherRider } from "./joinTrip.js";
 
 export type CleanupOutcome =
   | { kind: "skipped"; reason: "trip-not-active" | "car-missing" | "lead-car" }
@@ -35,11 +36,8 @@ export async function cleanupAfterMemberLeft(
     if (!carSnap.exists) return { kind: "skipped", reason: "car-missing" };
     const car = carSnap.data() as Car;
 
-    // Only the first two riders are needed: the leaver's own doc is already gone, but skip it anyway.
-    const riders = await tx.get(membersCol.where("carId", "==", carRef.id).limit(2));
-    const othersInside = riders.docs.some((d) => d.id !== userId);
-
-    if (!othersInside && !car.isLead) {
+    // The leaver's own doc is already gone, but hasOtherRider skips it anyway.
+    if (!(await hasOtherRider(tx, membersCol, carRef.id, userId)) && !car.isLead) {
       tx.delete(carRef);
       tx.delete(tripRef.collection("positions").doc(carRef.id));
       return { kind: "deleted" };
