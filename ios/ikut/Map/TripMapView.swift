@@ -44,6 +44,8 @@ struct TripMapView: View {
     @State private var approach: TripAlert?
     /// The camera mode to go back to once the hazard is passed.
     @State private var modeBeforeApproach: MapMode = .follow
+    /// The approach folded the convoy list away; it opens again once the hazard is passed.
+    @State private var unfoldAfterApproach = false
     @State private var passedText: String?
     @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
     @Environment(\.dismiss) private var dismiss
@@ -268,15 +270,23 @@ struct TripMapView: View {
         focusHazard(alert.eventId)
     }
 
-    /// Frames my car and the hazard, remembering the mode to go back to.
+    /// Frames my car and the hazard, with the convoy list folded so they have the room; remembers
+    /// the mode and the list to go back to.
     private func focusHazard(_ eventId: String) {
         if case .hazard = model.mode {} else { modeBeforeApproach = model.mode }
         model.mode = .hazard(id: eventId)
+        if panelExpanded {
+            unfoldAfterApproach = true
+            panelExpanded = false
+        }
     }
 
-    /// Back to the mode from before the alert, unless the driver has picked another one since.
+    /// Back to the mode and the list from before the alert, unless the driver has picked another
+    /// mode since.
     private func endHazardFocus() {
         if case .hazard = model.mode { model.mode = modeBeforeApproach }
+        if unfoldAfterApproach { panelExpanded = true }
+        unfoldAfterApproach = false
     }
 
     /// Keeps the pill until the hazard is behind, then says so briefly. Gives up after a few
