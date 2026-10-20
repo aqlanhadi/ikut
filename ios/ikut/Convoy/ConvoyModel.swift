@@ -206,12 +206,6 @@ final class ConvoyModel {
         return eta.arrival.addingTimeInterval(behind)
     }
 
-    /// When a joining car reaches its merge point, from its speed and own-route distance.
-    func mergeArrival(forCar id: String, now: Date? = nil) -> Date? {
-        guard let entry = joining.first(where: { $0.id == id }), let t = entry.timeToMerge else { return nil }
-        return (now ?? clock()).addingTimeInterval(t)
-    }
-
     // MARK: Strings
 
     /// "3 in Convoy".
@@ -225,12 +219,6 @@ final class ConvoyModel {
             parts.append(ConvoyFormat.eta(date, destination: destinationName, locale: locale, timeZone: timeZone))
         }
         return parts.joined(separator: " · ")
-    }
-
-    /// "Arriving 4:35 PM" for the front, nil until known.
-    var arrivingText: String? {
-        guard let reference = snapshot.etaReference, let date = arrival(forCar: reference.id) else { return nil }
-        return ConvoyFormat.arriving(date, locale: locale, timeZone: timeZone)
     }
 
     var convoyRows: [ConvoyRowText] { convoyRows(myCarId: nil) }

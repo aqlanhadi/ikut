@@ -248,14 +248,6 @@ struct StopRequestCard: View {
         }
     }
 
-    static func statusText(_ status: StopRequestState.VoteStatus) -> String {
-        switch status {
-        case .agreed: "Agreed"
-        case .waiting: "Waiting"
-        case .suggested: "Suggested another"
-        }
-    }
-
     static func statusSymbol(_ status: StopRequestState.VoteStatus) -> String {
         switch status {
         case .agreed: "checkmark"

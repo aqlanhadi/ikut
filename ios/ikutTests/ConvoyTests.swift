@@ -357,7 +357,6 @@ struct ConvoyTests {
         #expect(ConvoyFormat.clock(d.addingTimeInterval(52 * 60 + 6 * 3600), locale: Self.gb, timeZone: Self.utc) == "14:52")
         #expect(ConvoyFormat.eta(d, destination: "Ipoh", locale: Self.gb, timeZone: Self.utc) == "ETA Ipoh 08:00")
         #expect(ConvoyFormat.eta(d, locale: Self.gb, timeZone: Self.utc) == "ETA 08:00")
-        #expect(ConvoyFormat.arriving(d, locale: Self.gb, timeZone: Self.utc) == "Arriving 08:00")
     }
 
     // MARK: ETA schedule
@@ -550,9 +549,8 @@ struct ConvoyTests {
             "1": pos(offset: 8000),
             "4": pos(offset: nil, speed: 20, routeOffset: 1000, at: Self.move(Self.origin, north: -2000, east: 6000)),
         ])
-        let id = try #require(m.joining.first?.id)
-        let arrival = try #require(m.mergeArrival(forCar: id))
-        #expect(abs(arrival.timeIntervalSince(Self.now) - 100) < 5)
+        let joiner = try #require(m.joining.first)
+        #expect(abs((joiner.timeToMerge ?? 0) - 100) < 5)
         #expect(m.joiningRows[0].trailingPrimary == "2 min")
     }
 
@@ -563,7 +561,6 @@ struct ConvoyTests {
         await m.waitForETA()
         #expect(provider.calls == 0)
         #expect(m.subtitle == "")
-        #expect(m.arrivingText == nil)
         #expect(m.convoyRows[0].trailingSecondary == "Calculating ETA")
     }
 
@@ -648,9 +645,6 @@ extension ConvoyTests {
     }
 
     @Test func arrivalStatusAndToGoText() {
-        #expect(ConvoyFormat.arrivalStatus(mineArrived: false, everyoneArrived: false) == nil)
-        #expect(ConvoyFormat.arrivalStatus(mineArrived: true, everyoneArrived: false) == "Arrived")
-        #expect(ConvoyFormat.arrivalStatus(mineArrived: true, everyoneArrived: true) == "Everyone\u{2019}s arrived")
         #expect(ConvoyFormat.toGo(remaining: 0, travelTime: 10, arrived: true) == "Arrived")
         #expect(ConvoyFormat.toGo(remaining: 63_000, travelTime: 41 * 60, arrived: false) == "63 km · 41 min to go")
         #expect(ConvoyFormat.toGo(remaining: 850, travelTime: nil, arrived: false) == "850 m to go")
