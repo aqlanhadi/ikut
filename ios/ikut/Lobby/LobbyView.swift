@@ -39,7 +39,7 @@ struct LobbyView: View {
 
     /// Started by anyone (trip doc / cars), or by this phone a moment ago.
     private var isStarted: Bool {
-        !session.isEnded && (LobbyLogic.isStarted(trip: model.trip, cars: model.cars) || startedHere)
+        !session.isEnded && (LobbyLogic.isStarted(trip: model.trip) || startedHere)
     }
 
     private var currentUserId: String? { Auth.auth().currentUser?.uid }
