@@ -30,6 +30,8 @@ final class TripSession {
     var isPaused: Bool { TripSessionLogic.isPaused(pausedAt: pauseStart, now: clock()) }
     var isEnded: Bool { trip?.status == .ended }
     var isOrganizer: Bool { trip?.organizerId == userId && !userId.isEmpty }
+    /// The trip is still running and this user is still in it: leaving, pausing and editing make sense.
+    var canLeave: Bool { !isEnded && !membershipLost }
 
     @ObservationIgnored private let tracker: TrackingControlling
     @ObservationIgnored private let injectedDB: Firestore?
@@ -132,9 +134,7 @@ final class TripSession {
                 Task { @MainActor in
                     guard let self else { return }
                     if let positions {
-                        self.positions = Dictionary(
-                            positions.compactMap { p in p.id.map { ($0, p) } },
-                            uniquingKeysWith: { _, new in new })
+                        self.positions = positions.keyedByID()
                     }
                     if let message { self.errorMessage = message }
                 }

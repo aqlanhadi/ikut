@@ -140,7 +140,7 @@ enum StopLogic {
         isOrganizer: Bool, viewerOffset: Double?, now: Date
     ) -> StopRequestState? {
         guard let eventId = event.id else { return nil }
-        let voteByCar = Dictionary(votes.compactMap { v in v.id.map { ($0, v) } }, uniquingKeysWith: { a, _ in a })
+        let voteByCar = votes.keyedByID()
         let voters = cars.filter { car in
             guard let id = car.id else { return false }
             return car.trackerUserId != nil || voteByCar[id] != nil || id == event.carId

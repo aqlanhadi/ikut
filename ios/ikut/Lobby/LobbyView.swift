@@ -46,17 +46,17 @@ struct LobbyView: View {
     /// Remembers this trip for Home's past list, with who else is in it once the members have loaded.
     private func recordPastTrip() {
         guard let trip = model.trip else { return }
-        let names = Dictionary(model.members.compactMap { m in m.id.map { ($0, m.displayName) } }, uniquingKeysWith: { a, _ in a })
+        let names = model.members.keyedByID { $0.displayName }
         PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name, endedAt: trip.endedAt,
                          others: names.isEmpty ? nil : PastTrips.others(from: names, excluding: currentUserId))
     }
 
-    private var canLeave: Bool { !session.isEnded && !session.membershipLost }
+    private var canLeave: Bool { session.canLeave }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
-    private var canEdit: Bool { isOrganizer && !session.isEnded && !session.membershipLost }
+    private var canEdit: Bool { isOrganizer && canLeave }
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
-    private var canPause: Bool { (session.isTracking || session.isPaused) && !session.isEnded && !session.membershipLost }
+    private var canPause: Bool { (session.isTracking || session.isPaused) && canLeave }
 
     var body: some View {
         ScrollView {

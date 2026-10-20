@@ -21,8 +21,8 @@ enum RecapService {
             cars: cars.compactMap { c in
                 c.id.map { RecapCar(id: $0, name: c.name, color: c.color, number: c.number, isLead: c.isLead) }
             },
-            memberNames: Dictionary(members.compactMap { m in m.id.map { ($0, m.displayName) } }, uniquingKeysWith: { a, _ in a }),
-            memberCars: Dictionary(members.compactMap { m in m.id.map { ($0, m.carId) } }, uniquingKeysWith: { a, _ in a }),
+            memberNames: members.keyedByID { $0.displayName },
+            memberCars: members.keyedByID { $0.carId },
             positions: positions.compactMap { p in
                 p.id.map {
                     RecapPosition(carId: $0, latitude: p.location.latitude, longitude: p.location.longitude,
