@@ -8,7 +8,7 @@ start them first (`cd firebase && firebase emulators:start`). Node 20+.
 cd qa && npm install
 node convoy-sim.mjs                  # 4 simulated cars, real time, prints TRIP CODE: XXXXXX, PASS/FAIL per check
 node convoy-sim.mjs --speed 2        # 2x (the signal-drop check needs <= 2.5x, see below)
-node run-ui.mjs --speed 1            # everything, with the app on simulator C0A40D2A (iPhone 17) as the fifth car
+node run-ui.mjs --speed 1            # everything, with the app on simulator C0A40D2A (iPhone 17 #1) as the fifth car
 ```
 
 `run-ui.mjs` boots the simulator, grants location, starts `convoy-sim.mjs --wait-app`, runs
@@ -43,8 +43,8 @@ node run-convoy2.mjs --skip-build    # reuse /tmp/ikut-dd-convoy2
 node run-convoy2.mjs --ask-location  # phone B starts without location permission and answers the system prompt
 ```
 
-Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 (`C0A40D2A`), phone B
-(car 2) a second simulator, `ikut-convoy-2` (iPhone 17 Pro, iOS 27.0, created on first use if missing). The script boots
+Two real app instances plus two scripted cars. Phone A (organizer, car 1) is iPhone 17 #1 (`C0A40D2A`), phone B
+(car 2) a second simulator, iPhone 17 #2 (`FD0ACD10`, formerly `ikut-convoy-2`; created on first use if missing). The script boots
 both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
 `ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
 time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
@@ -174,30 +174,50 @@ positions, end. It deletes its two anonymous users; the ended trip is purged by 
 
 ## Live demo
 
-`node demo.mjs` is a ten-minute, real-time (1x) show for people watching two simulators: the shared iPhone 17 (Faiz,
-`JoinAsSecondMemberUITests`) and `ikut-convoy-2` (Daniel, `DemoSecondPhoneUITests`). The script creates a trip as a
-scripted organizer, prints the code, and joins both phones through UI tests that hold the map open
-(`TEST_RUNNER_IKUT_HOLD_SECONDS`). Cast: Aisha (lead, scripted), phone 1, Hafiz (slowest, scripted) and phone 2, which
-joins as the new car "Daniel's City" on Daniel's own road (`data/osrm-car4.json`) and merges between phone 1 and Hafiz.
-The route is a 16.3 km piece of `data/osrm-main.json` driven at 95 km/h, so no network is needed. Timeline (T = seconds
-after go): spread grows from the start; 90 debris reported ahead (phone 1 alert at about 119); 127 Daniel starts driving;
-150-270 Hafiz loses signal (stale "Last seen" from about 210); 330 Daniel merges; 390 phone 2 taps Pit stop > Fuel (the
-script writes a marker file the test waits for), Aisha and Hafiz vote, 425 Aisha pins "R&R Demo" (2 km ahead of the lead,
-clamped before the destination), 500 resolved; 580 phone 1 arrives; 620 end.
+Two real-time (1x), 9-minute shows for people watching two simulators, **"iPhone 17 #1"** (`C0A40D2A`, phone 1) and
+**"iPhone 17 #2"** (`FD0ACD10`, phone 2). In both, **a phone is the organizer**: phone 1 is Aisha, driving the lead car
+(car 1). She creates the trip in the app ("Where to? Ipoh") from the start of a piece of the E1; the script reads that
+route back from Firestore (as a member, through the client SDK) and drives everyone along it at 95 km/h, so no network
+is needed besides MapKit's route. Scripted cars (Firebase clients) behind the lead: Daniel and Hafiz (slowest, loses
+signal). The shared code is `lib/demo-common.mjs` (Car, marker files, xcodebuild, simctl playback, timeline runner, the
+stop story); the phones are `ios/ikutUITests/DemoUITests.swift`.
 
 ```sh
-node demo.mjs --dry-run          # print the timeline and check the geometry, no Firebase, no simulator
-node demo.mjs --no-app --seconds 30   # scripted cars only, against the emulators
-node demo.mjs --skip-build       # the real thing, reusing the build in --derived-data (/tmp/ikut-dd-q1)
-node demo.mjs --one-phone        # the old show: only the iPhone 17, scripted Daniel, Hafiz requests the stop
-# both simulators shared with other agents: take the locks first
-simlock.sh C0A40D2A-0607-4B95-A1BE-F8C9190D81C1 simlock.sh FD0ACD10-F3C4-4797-8DB8-A6F554585CC1 node demo.mjs
+node demo.mjs                  # 1. the organizer demo: phone 2 = Faiz, a PASSENGER in Aisha's car
+node demo-two-cars.mjs         # 2. phone 2 = Faiz in his own car ("Faiz’s Axia") behind Aisha
+node demo.mjs --dry-run        # print the timeline and check the geometry (osrm-main.json stands in for the route)
+node demo.mjs --skip-build     # reuse the build in --derived-data (default /tmp/ikut-dd-q4)
+node demo.mjs --udid U1 --udid2 U2 --end-trip --host H
+node demo.mjs --backend production   # against the real Firebase project (see below)
 ```
 
-Other options: `--udid`, `--udid2`, `--name`, `--speed N` (dev only; the signal-drop staleness needs <= 2.5). Both
-simulators get `location-always`, are parked on their start (re-sent every 5 s, nudged, until the app reports a position),
-and are driven with `simctl location start`, restarted every 20 s from where each should be. Not covered: phone 1 does not
-vote or request a stop (watch only), and the trip is left active unless `--end-trip`.
+Timeline (T = seconds after go; the same shape in both, differences marked):
+
+| T | 1. organizer demo | 2. two-cars demo |
+| --- | --- | --- |
+| 0 | Aisha (phone 1) leads, Daniel and Hafiz behind; Faiz rides in her car (phone 2) | Faiz (phone 2) 800 m behind Aisha, ahead of Daniel and Hafiz |
+| 75 | Faiz (co-pilot) reports Debris from his Report sheet; the scripted cars behind log "approach alert" | Aisha reports Debris from phone 1; phone 2 behind gets the approach alert (about T+90) |
+| 150-270 | Hafiz loses signal; both phones show "Last seen" from about T+210; he comes back | same |
+| 300 | **Highlight.** Hafiz asks for a fuel stop and suggests "R&R Demo" (4 km ahead of the lead); Daniel agrees | **Highlight.** Faiz taps Pit stop > Fuel on phone 2 (the request sends itself); Hafiz suggests "R&R Demo", Daniel agrees |
+| about 320 | Phone 1: Aisha taps Agree to Stop, then Pin R&R Demo ("the lead car pins a stop for the convoy"); phone 2 shows it pinned | same; phone 2 shows "pinned by the lead car" |
+| about 400 | The pin has been on the map 75 s; Aisha taps Everyone has arrived and the card goes on both phones | same |
+| 560 | End; the maps stay open until then | same |
+
+Handshake: the phones' tests and the script take turns through marker files in `$TMPDIR/ikut-qa/<demo|demo2>-sync`
+(tests to script `a.code`, `b.lobby`, `a.map`, `b.map`, `a.pinned`, `b.sawPin`, `a.resolved`; script to tests `code`,
+`cars.joined`, `report.a`/`report.b`, `stop.b`, `agree`, `arrive`, `end`, `abort`). The tests hold the map until `end` and
+never fail the demo over cosmetic checks: those print `QA CHECK: NOTE`, a failed core step prints `QA CHECK: FAIL` and
+fails that test after the demo has played out. Ctrl-C / SIGTERM kill the xcodebuilds and clear the simulators' locations.
+The trip stays active afterwards unless `--end-trip` (the organizer phone ends it from its Trip menu).
+
+Machine-readable contract (for `qa/dashboard/`): `node <demo>.mjs --describe` prints one JSON object (id, title, summary,
+phones, cast, durationSeconds, timeline) and exits 0 without Firebase or simulators. During a run, besides the human
+output, lines prefixed `DEMO ` carry compact JSON: `phase` (building, joining, waiting, running, ended, failed), `backend`,
+`code`, `event` (each timeline entry as it fires), `check` (each phone's QA CHECK), `tick` (every 5 s) and `error`.
+
+`--backend production` runs the same show against the real Firebase project: the scripts take the client config from
+`ios/ikut/Resources/GoogleService-Info.plist` (no emulator calls) and the phones get `IKUT_USE_PRODUCTION=1` (no rebuild
+needed). The trip is always ended at the end (also on Ctrl-C/SIGTERM) and the scripted cars' anonymous users are deleted.
 
 ## Dashboard
 
