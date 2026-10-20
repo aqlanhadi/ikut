@@ -169,11 +169,10 @@ enum RouteSimplifier {
     /// from the simplified line. Iterative, so very long routes cannot overflow the stack.
     static func simplify(_ points: [CLLocationCoordinate2D], tolerance: CLLocationDistance) -> [CLLocationCoordinate2D] {
         guard points.count > 2, tolerance > 0 else { return points }
-        let lat0 = points[0].latitude
-        let c = cos(lat0 * .pi / 180)
-        let r = RouteLine.earthRadius
+        let c = cos(points[0].latitude * .pi / 180)
         let xy: [(Double, Double)] = points.map {
-            (($0.longitude - points[0].longitude) * .pi / 180 * c * r, ($0.latitude - lat0) * .pi / 180 * r)
+            let d = RouteLine.localMeters(of: $0, from: points[0], cosLat: c)
+            return (d.x, d.y)
         }
         var keep = [Bool](repeating: false, count: points.count)
         keep[0] = true
