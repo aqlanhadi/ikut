@@ -234,3 +234,19 @@ struct ApproachPill: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
+
+/// "Passed the debris", for a few seconds once the hazard being followed is behind.
+struct PassedBanner: View {
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: "checkmark.circle.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color(white: 0.11).opacity(0.96), in: Capsule())
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .accessibilityAddTraits(.updatesFrequently)
+    }
+}

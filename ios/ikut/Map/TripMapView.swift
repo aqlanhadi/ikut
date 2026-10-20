@@ -315,16 +315,7 @@ struct TripMapView: View {
                 ApproachPill(alert: approach, model: model) { showApproach = true }
             }
             AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
-            if let passedText {
-                Label(passedText, systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color(white: 0.11).opacity(0.96), in: Capsule())
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .accessibilityAddTraits(.updatesFrequently)
-            }
+            if let passedText { PassedBanner(text: passedText) }
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }

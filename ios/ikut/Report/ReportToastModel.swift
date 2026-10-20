@@ -91,6 +91,11 @@ final class ReportToastModel {
         state = .hidden
     }
 
+    #if DEBUG
+    /// Puts `state` on the toast with no report behind it and no timeout, for the map demo.
+    func showForDemo(_ state: State) { self.state = state }
+    #endif
+
     private func fail(_ message: String, generation mine: Int) {
         state = .failed(message: message)
         failureCount += 1
