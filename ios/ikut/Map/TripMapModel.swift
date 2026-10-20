@@ -194,10 +194,14 @@ final class TripMapModel {
         let markers = self.markers
         // Fit keeps the hazards in view too: the one ahead of the convoy is what the driver wants to see.
         let hazardPoints = hazards.markers.map { MapCoordinate(latitude: $0.latitude, longitude: $0.longitude) }
+        var focus: MapCoordinate?
+        if case .hazard(let id) = mode, let hazard = hazards.markers.first(where: { $0.id == id }) {
+            focus = MapCoordinate(latitude: hazard.latitude, longitude: hazard.longitude)
+        }
         return MapCameraLogic.target(
             mode: mode, me: myCoordinate,
             fresh: markers.filter { !$0.isStale }.map(\.coordinate) + hazardPoints,
-            all: markers.map(\.coordinate) + hazardPoints, fallback: fallbackPoints)
+            all: markers.map(\.coordinate) + hazardPoints, fallback: fallbackPoints, focus: focus)
     }
 
     var separationWarning: String? { SeparationWarning.text(convoy.snapshot.separatedGaps) }

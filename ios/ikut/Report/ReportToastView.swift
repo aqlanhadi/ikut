@@ -10,9 +10,14 @@ struct ReportToastView: View {
             case .hidden:
                 EmptyView()
             case .sending(let label):
-                row(symbol: nil, text: "Sending \(label)…", tint: .white) { EmptyView() }
+                DarkBanner(title: "Sending \(label)…", circle: .white.opacity(0.16)) {
+                    ProgressView().tint(.white)
+                } trailing: {
+                    EmptyView()
+                }
+                .modifier(Placement())
             case .reported(let label, _):
-                row(symbol: "checkmark.circle.fill", text: "Reported \(label)", tint: .green) {
+                DarkBanner(title: "Reported \(label)", symbol: "checkmark", circle: .green) {
                     Button("Undo") { Task { await model.undo() } }
                         .font(.body.weight(.semibold))
                         .padding(.horizontal, 16)
@@ -21,15 +26,16 @@ struct ReportToastView: View {
                         .foregroundStyle(.white)
                         .accessibilityHint("Removes the report")
                 }
+                .modifier(Placement())
             case .failed(let message):
-                row(symbol: "exclamationmark.triangle.fill", text: message, tint: .orange) {
+                DarkBanner(title: message, symbol: "exclamationmark.triangle.fill", circle: .orange) {
                     Button { model.dismiss() } label: {
                         Image(systemName: "xmark").font(.body.weight(.semibold))
                             .frame(width: 44, height: 44)
                     }
-                    .foregroundStyle(.white)
                     .accessibilityLabel("Dismiss")
                 }
+                .modifier(Placement())
             }
         }
         .animation(.snappy, value: model.state)
@@ -37,28 +43,12 @@ struct ReportToastView: View {
         .sensoryFeedback(.error, trigger: model.failureCount)
     }
 
-    private func row<Trailing: View>(
-        symbol: String?, text: String, tint: Color, @ViewBuilder trailing: () -> Trailing
-    ) -> some View {
-        HStack(spacing: 10) {
-            if let symbol {
-                Image(systemName: symbol).foregroundStyle(tint).font(.title3)
-            } else {
-                ProgressView().tint(.white)
-            }
-            Text(text)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            trailing()
+    /// How each state comes and goes; the host places and pads the toast.
+    private struct Placement: ViewModifier {
+        func body(content: Content) -> some View {
+            content
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .accessibilityElement(children: .contain)
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
-        .background(Color(white: 0.11).opacity(0.94), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: .black.opacity(0.2), radius: 12, y: 4)
-        .padding(.horizontal, 16)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-        .accessibilityElement(children: .contain)
     }
 }

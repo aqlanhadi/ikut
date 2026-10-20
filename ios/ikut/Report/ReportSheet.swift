@@ -190,7 +190,7 @@ private struct ReportPreviewHost: View {
     var body: some View {
         Color(.systemGroupedBackground)
             .ignoresSafeArea()
-            .overlay(alignment: .bottom) { ReportToastView(model: toast).padding(.bottom, 24) }
+            .overlay(alignment: .bottom) { ReportToastView(model: toast).padding(.horizontal, 16).padding(.bottom, 24) }
             .overlay { Button("Report") { showing = true }.buttonStyle(.borderedProminent) }
             .sheet(isPresented: $showing) {
                 ReportSheet(context: context, toast: toast) { _ in }

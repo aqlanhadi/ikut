@@ -47,8 +47,7 @@ const REGION = 'asia-southeast1';
 
 const o = {
   aUdid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 (shared)
-  bName: 'ikut-convoy-2',
-  bUdid: null,
+  bUdid: 'FD0ACD10-F3C4-4797-8DB8-A6F554585CC1', // ikut-convoy-2 (iPhone 17 Pro), the second phone
   kmh: 90,
   derivedData: '/tmp/ikut-dd-convoy2',
   skipBuild: false,
@@ -125,17 +124,7 @@ function abort(why) {
 function deviceLine(pred) {
   return simctl('list', 'devices').stdout.split('\n').find(pred);
 }
-if (!o.bUdid) {
-  const line = deviceLine((l) => l.includes(`${o.bName} (`));
-  if (!line) {
-    say(`creating simulator ${o.bName} (iPhone 17 Pro, iOS 27.0)`);
-    const r = simctl('create', o.bName, 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro', 'com.apple.CoreSimulator.SimRuntime.iOS-27-0');
-    if (r.status !== 0) { console.error(r.stderr); process.exit(1); }
-    o.bUdid = r.stdout.trim();
-  } else {
-    o.bUdid = /\(([0-9A-F-]{36})\)/.exec(line)[1];
-  }
-}
+// Never create or erase simulators here (CLAUDE.md): both phones must already exist (checked below).
 say(`phone A ${o.aUdid}, phone B ${o.bUdid}`);
 
 // Another test run on the shared simulator (the map-centring check uses /tmp/ikut-dd-map) would collide.

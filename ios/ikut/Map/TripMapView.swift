@@ -40,9 +40,12 @@ struct TripMapView: View {
     @State private var topHeight: CGFloat = 0
     @State private var panelMinY: CGFloat = 0
     @State private var mapMaxY: CGFloat = 0
-    /// The hazard approach alert being followed: full screen, then a pill until it's passed.
+    /// The hazard approach alert being followed: a pill, the hazard pinging and in view, until it's passed.
     @State private var approach: TripAlert?
-    @State private var showApproach = false
+    /// The camera mode to go back to once the hazard is passed.
+    @State private var modeBeforeApproach: MapMode = .follow
+    /// The approach folded the convoy list away; it opens again once the hazard is passed.
+    @State private var unfoldAfterApproach = false
     @State private var passedText: String?
     @AppStorage("ikut.map.askedAboutAlerts") private var askedAboutAlerts = false
     @Environment(\.dismiss) private var dismiss
@@ -165,11 +168,6 @@ struct TripMapView: View {
             .onChange(of: mapInsets) { _, _ in move(to: model.cameraTarget, animated: true) }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
-            .fullScreenCover(isPresented: $showApproach) {
-                if let approach {
-                    ApproachAlertView(alert: approach, model: model) { showApproach = false }
-                }
-            }
     }
 
     // MARK: Map
@@ -199,7 +197,7 @@ struct TripMapView: View {
             }
             ForEach(model.hazards.markers) { hazard in
                 Annotation(hazard.label, coordinate: hazard.coordinate, anchor: .center) {
-                    HazardMapContent(marker: hazard)
+                    HazardMapContent(marker: hazard, pinging: hazard.id == approach?.eventId)
                         .accessibilityIdentifier("hazard.marker")
                 }
                 .annotationTitles(.hidden)
@@ -262,13 +260,33 @@ struct TripMapView: View {
         return !bannerHiding.contains(alert.category)
     }
 
-    /// A hazard approach alert (one with a distance) takes the full screen; others stay banners.
+    /// A hazard approach alert (one with a distance) brings my car and the hazard into view, with
+    /// its pill on top; others stay banners.
     private func followApproachIfNeeded() {
         guard let alert = alerts.current, alert.category == .hazard, alert.distance != nil,
               alert.id != approach?.id else { return }
         approach = alert
         passedText = nil
-        showApproach = true
+        focusHazard(alert.eventId)
+    }
+
+    /// Frames my car and the hazard, with the convoy list folded so they have the room; remembers
+    /// the mode and the list to go back to.
+    private func focusHazard(_ eventId: String) {
+        if case .hazard = model.mode {} else { modeBeforeApproach = model.mode }
+        model.mode = .hazard(id: eventId)
+        if panelExpanded {
+            unfoldAfterApproach = true
+            panelExpanded = false
+        }
+    }
+
+    /// Back to the mode and the list from before the alert, unless the driver has picked another
+    /// mode since.
+    private func endHazardFocus() {
+        if case .hazard = model.mode { model.mode = modeBeforeApproach }
+        if unfoldAfterApproach { panelExpanded = true }
+        unfoldAfterApproach = false
     }
 
     /// Keeps the pill until the hazard is behind, then says so briefly. Gives up after a few
@@ -284,15 +302,16 @@ struct TripMapView: View {
                 let label = model.hazards.markers.first { $0.id == alert.eventId }?.label.lowercased() ?? "hazard"
                 withAnimation(.snappy) {
                     approach = nil
-                    showApproach = false
                     passedText = "Passed the \(label)"
                 }
+                endHazardFocus()
                 try? await Task.sleep(for: .seconds(3))
                 withAnimation(.snappy) { passedText = nil }
                 return
             }
             if distance == nil, Date().timeIntervalSince(started) > 180 {
                 withAnimation(.snappy) { approach = nil }
+                endHazardFocus()
                 return
             }
         }
@@ -311,20 +330,11 @@ struct TripMapView: View {
                 })
             }
             // The stop card says the same thing, so its own banner would only crowd the top.
-            if let approach, !showApproach {
-                ApproachPill(alert: approach, model: model) { showApproach = true }
+            if let approach {
+                ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) }
             }
             AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
-            if let passedText {
-                Label(passedText, systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color(white: 0.11).opacity(0.96), in: Capsule())
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .accessibilityAddTraits(.updatesFrequently)
-            }
+            if let passedText { PassedBanner(text: passedText) }
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }
@@ -526,6 +536,7 @@ struct TripMapView: View {
     }
 
     private func appear() {
+        followApproachIfNeeded()
         move(to: model.cameraTarget, animated: false)
         guard liveServices else { return }
         model.regionMonitorFactory = { [session] in

@@ -132,6 +132,8 @@ enum MapMode: Equatable, Sendable {
     case fit
     /// The user is panning; the camera is left alone.
     case free
+    /// Keep my car and the hazard ahead in view, while its approach alert is up.
+    case hazard(id: String)
 }
 
 /// A rectangle of the map, as center and spans in degrees.
@@ -154,6 +156,10 @@ enum MapCameraLogic {
         var bottom: Double
         var side: Double
         static let `default` = Padding(top: 0.3, bottom: 0.3, side: 0.3)
+        /// Hazard mode: two points only, so more room for my car's badge and chip and the ping. More
+        /// below: the strip left between the pill and the panel is short, and MapKit sits the
+        /// region a little low in it.
+        static let focus = Padding(top: 0.5, bottom: 1.0, side: 0.6)
     }
 
     /// Smallest rectangle shown, in degrees (about 1.1 km), so one car or a tight group is not
@@ -167,9 +173,10 @@ enum MapCameraLogic {
     ///   convoy rectangle then.
     /// - `fresh`: cars with a recent position; `all`: every marker, used when none is fresh.
     /// - `fallback`: the route's ends, used when there are no cars at all.
+    /// - `focus`: the hazard in hazard mode; nil when it's gone from the map, and the camera follows.
     static func target(
         mode: MapMode, me: MapCoordinate?, fresh: [MapCoordinate], all: [MapCoordinate],
-        fallback: [MapCoordinate], padding: Padding = .default
+        fallback: [MapCoordinate], focus: MapCoordinate? = nil, padding: Padding = .default
     ) -> CameraTarget? {
         switch mode {
         case .free:
@@ -181,6 +188,11 @@ enum MapCameraLogic {
             return fitTarget(fresh: fresh, all: all, fallback: fallback, padding: padding)
         case .fit:
             return fitTarget(fresh: fresh, all: all, fallback: fallback, padding: padding)
+        case .hazard:
+            guard let focus else {
+                return target(mode: .follow, me: me, fresh: fresh, all: all, fallback: fallback, padding: padding)
+            }
+            return fitRegion([focus] + [me].compactMap { $0 }, padding: .focus).map(CameraTarget.fit)
         }
     }
 

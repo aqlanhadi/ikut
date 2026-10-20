@@ -44,7 +44,7 @@ node run-convoy2.mjs --ask-location  # phone B starts without location permissio
 ```
 
 Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 (`C0A40D2A`), phone B
-(car 2) a second simulator, `ikut-convoy-2` (iPhone 17 Pro, iOS 27.0, created on first use if missing). The script boots
+(car 2) a second simulator, `ikut-convoy-2` (FD0ACD10, iPhone 17 Pro; it must already exist, the script never creates one). The script boots
 both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
 `ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
 time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
@@ -57,7 +57,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
 2. B joins with the code as a new car; the script joins cars 3 and 4; both lobbies read "4 of 4 ready"; numbers 1, 2, 3, 4.
 3. Both tap Start Trip. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
-4. A reports Debris from the Report sheet; B sees the marker and gets the full-screen approach alert. Car 3 then reports an
+4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.
 5. B taps Pit stop, Fuel; the request sends itself. A sees the card and agrees, cars 3 and 4 vote (car 3 suggests a place if
    B's phone found none), A pins it, B's card shows it pinned, A taps Everyone has arrived and both cards go.

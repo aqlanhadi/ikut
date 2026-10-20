@@ -7,7 +7,7 @@ struct AlertBannerView: View {
     /// Categories not to show right now, e.g. a stop request while its own card is up. The alert
     /// stays current in the center (and still times out); only the banner is held back.
     var hiding: Set<EventCategory> = []
-    /// One alert shown elsewhere (the approach alert and its pill).
+    /// One alert shown elsewhere (the approach pill).
     var hidingAlertId: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -31,31 +31,14 @@ struct AlertBannerView: View {
     }
 
     private func banner(_ alert: TripAlert) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol(alert.category))
-                .font(.title3.weight(.bold))
-                .foregroundStyle(.black)
-                .frame(width: 40, height: 40)
-                .background(tint(alert.severity), in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(alert.title).font(.body.weight(.semibold)).lineLimit(1)
-                Text(alert.body).font(.subheadline).foregroundStyle(.white.opacity(0.7)).lineLimit(2)
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        DarkBanner(
+            title: alert.title, subtitle: alert.body, symbol: symbol(alert.category), circle: tint(alert.severity)
+        ) {
             Button { center.dismiss() } label: {
                 Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
             }
-            .foregroundStyle(.white)
             .accessibilityLabel("Dismiss")
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 4)
-        .padding(.vertical, 8)
-        .background(Color(white: 0.11).opacity(0.96), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
-        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)
     }
