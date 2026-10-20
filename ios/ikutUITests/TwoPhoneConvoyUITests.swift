@@ -439,6 +439,8 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             try waitFor("approach alert for the accident", timeout: 120, poll: 0.5) {
                 labelled("label CONTAINS %@", "Accident ahead").exists
             }
+            // Let the convoy list finish folding (it may be re-opening after the debris).
+            Thread.sleep(forTimeInterval: 1.5)
             shot("07-accident-alert")
             mark("b.sawAccident")
         }
@@ -487,8 +489,9 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             let resume = app.buttons["Resume"]
             XCTAssertTrue(resume.waitForExistence(timeout: 5), "paused banner has no Resume")
             resume.tap()
+            // A started trip's lobby says "Trip in progress", not "Sharing location"; A checks the car is live.
             try waitFor("sharing again", timeout: 30) {
-                !labelled("label CONTAINS %@", "Sharing paused").exists && labelled("label CONTAINS %@", "Sharing location").exists
+                !labelled("label CONTAINS %@", "Sharing paused").exists && !app.buttons["Resume"].exists
             }
             shot("13-resumed")
             mark("b.resumed")
