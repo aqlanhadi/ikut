@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Runs the whole scenario with one real app in the loop:
 //
-//   node run-ui.mjs                      # real time, simulator C0A40D2A (iPhone 17)
+//   node run-ui.mjs                      # real time, simulator C0A40D2A (iPhone 17 #1)
 //   node run-ui.mjs --speed 2            # 2x (the signal-drop check needs <= 2.5x)
 //   node run-ui.mjs --skip-build         # reuse a build in --derived-data
 //
@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.dirname(here);
 
 const o = {
-  udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 (shared, see CLAUDE.md)
+  udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 #1 (shared, see CLAUDE.md)
   speed: 1,
   derivedData: '/tmp/ikut-dd-q1',
   skipBuild: false,
