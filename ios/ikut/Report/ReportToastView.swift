@@ -20,7 +20,7 @@ struct ReportToastView: View {
                 DarkBanner(title: "Reported \(label)", symbol: "checkmark", circle: .green) {
                     Button("Undo") { Task { await model.undo() } }
                         .font(.body.weight(.semibold))
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, Spacing.l)
                         .frame(minHeight: 44)
                         .background(.white.opacity(0.16), in: Capsule())
                         .foregroundStyle(.white)

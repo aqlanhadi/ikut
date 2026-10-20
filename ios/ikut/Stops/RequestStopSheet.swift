@@ -169,14 +169,14 @@ struct RequestStopSheet: View {
             oneTap
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: Spacing.cozy) {
                     header
                     content
                     sendButton
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 20)
+                .padding(.horizontal, Spacing.l)
+                .padding(.top, Spacing.m)
+                .padding(.bottom, Spacing.sheetInset)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -186,16 +186,16 @@ struct RequestStopSheet: View {
     // MARK: One tap (new request)
 
     private var oneTap: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.cozy) {
             if let reason = model.reason {
                 confirm(reason)
             } else {
                 tiles
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Spacing.l)
+        .padding(.top, Spacing.sheetInset)
+        .padding(.bottom, Spacing.m)
         .frame(maxHeight: .infinity, alignment: .top)
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
@@ -215,21 +215,14 @@ struct RequestStopSheet: View {
     }
 
     private var tiles: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Pit stop").font(.title2.bold())
-                    Text("One tap. We’ll find the next good place.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                closeButton
-            }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.cozy) {
+            SheetHeader(
+                title: "Pit stop", subtitle: "One tap. We’ll find the next good place.",
+                subtitleFont: .subheadline, onClose: { dismiss() })
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible(), spacing: Spacing.gap)], spacing: Spacing.gap) {
                 ForEach(StopReason.all) { reason in
                     Button { model.choose(reason) } label: {
-                        VStack(spacing: 8) {
+                        VStack(spacing: Spacing.s) {
                             Image(systemName: reason.symbol)
                                 .font(.system(size: 24, weight: .semibold))
                                 .foregroundStyle(.white)
@@ -238,8 +231,8 @@ struct RequestStopSheet: View {
                             Text(reason.label).font(.headline).foregroundStyle(.primary)
                         }
                         .frame(maxWidth: .infinity, minHeight: 112)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .ikutTile()
+                        .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -248,7 +241,7 @@ struct RequestStopSheet: View {
     }
 
     private func confirm(_ reason: StopReason) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.cozy) {
             HStack {
                 Text(Self.title(for: reason)).font(.title2.bold())
                 Spacer()
@@ -295,7 +288,7 @@ struct RequestStopSheet: View {
 
     @ViewBuilder
     private func chosenPlace(_ reason: StopReason) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             Image(systemName: reason.symbol)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.white)
@@ -320,8 +313,8 @@ struct RequestStopSheet: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(Spacing.m)
+        .ikutTile()
         .accessibilityElement(children: .combine)
     }
 
@@ -363,17 +356,6 @@ struct RequestStopSheet: View {
         .accessibilityHint("Sends by itself in a few seconds")
     }
 
-    private var closeButton: some View {
-        Button { dismiss() } label: {
-            Image(systemName: "xmark")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 44, height: 44)
-                .background(.quaternary, in: Circle())
-        }
-        .accessibilityLabel("Close")
-    }
-
     private func send() {
         sendAt = nil
         Task {
@@ -397,25 +379,12 @@ struct RequestStopSheet: View {
     // MARK: Suggest another place (existing request)
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.existing == nil ? "Ask for a stop" : "Suggest another stop").font(.title2.bold())
-                Text(model.existing == nil
-                    ? "The convoy votes, then the lead car pins it."
-                    : "Pick a place ahead. The lead car pins the final stop.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .background(.quaternary, in: Circle())
-            }
-            .accessibilityLabel("Close")
-        }
+        SheetHeader(
+            title: model.existing == nil ? "Ask for a stop" : "Suggest another stop",
+            subtitle: model.existing == nil
+                ? "The convoy votes, then the lead car pins it."
+                : "Pick a place ahead. The lead car pins the final stop.",
+            subtitleFont: .subheadline, onClose: { dismiss() })
     }
 
     @ViewBuilder private var content: some View {
@@ -424,11 +393,11 @@ struct RequestStopSheet: View {
         } else {
             switch model.search {
             case .idle, .loading:
-                HStack(spacing: 10) {
+                HStack(spacing: Spacing.gap) {
                     ProgressView()
                     Text("Looking for places ahead…").foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 18)
+                .padding(.vertical, Spacing.section)
                 .frame(maxWidth: .infinity)
             case .failed:
                 note(model.existing == nil
@@ -439,13 +408,8 @@ struct RequestStopSheet: View {
                     ? "No places found 15 to 25 km ahead. You can still ask; the lead car chooses where."
                     : "No places found ahead.")
             case .loaded:
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Ahead on the route")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 4)
-                        .accessibilityAddTraits(.isHeader)
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    CardHeader("Ahead on the route", inset: Spacing.xs, top: 0, bottom: 0)
                     ForEach(model.candidates) { candidate in candidateRow(candidate) }
                 }
             }
@@ -456,20 +420,16 @@ struct RequestStopSheet: View {
         Text(text)
             .font(.subheadline)
             .foregroundStyle(.secondary)
-            .padding(16)
+            .padding(Spacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .ikutTile()
     }
 
     private func candidateRow(_ candidate: StopCandidate) -> some View {
         let selected = model.picked == candidate.id
         return Button { model.picked = candidate.id } label: {
-            HStack(spacing: 12) {
-                Image(systemName: model.reason?.symbol ?? "mappin")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Color.orange, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            HStack(spacing: Spacing.m) {
+                IconTile(symbol: model.reason?.symbol ?? "mappin", color: .orange, size: 34, radius: Radius.iconLarge)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(candidate.name).font(.body.weight(.semibold)).lineLimit(1)
                     Text(candidate.whereText).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
@@ -477,18 +437,18 @@ struct RequestStopSheet: View {
                 Spacer(minLength: 4)
                 Text(candidate.costText).font(.footnote.weight(.semibold)).foregroundStyle(.green)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, Spacing.m)
+            .padding(.vertical, Spacing.gap)
             .frame(maxWidth: .infinity, minHeight: 56)
             .background(
                 selected ? Color.accentColor.opacity(0.12) : Color(.secondarySystemBackground),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: Radius.tile, style: .continuous)
                     .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(candidate.name), \(candidate.whereText), \(candidate.costText)")
@@ -496,7 +456,7 @@ struct RequestStopSheet: View {
     }
 
     private var sendButton: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s) {
             if case .failed(let message) = model.sending {
                 Text(message).font(.footnote).foregroundStyle(.red)
             }

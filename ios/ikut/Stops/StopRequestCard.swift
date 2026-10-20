@@ -14,7 +14,7 @@ struct StopRequestCard: View {
     @State private var listHeight: CGFloat?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.cozy) {
             if let onMinimize {
                 // A grabber: tap or swipe down to fold the card, for every viewer, voted or not.
                 Button(action: onMinimize) {
@@ -32,7 +32,7 @@ struct StopRequestCard: View {
             tally
             votes
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: Spacing.cozy) {
                     if state.canPin && state.place == nil { pinSection }
                 }
                 .background(
@@ -45,12 +45,12 @@ struct StopRequestCard: View {
             .scrollIndicators(.hidden)
             buttons.fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 18)
-        .padding(.bottom, 18)
+        .padding(.horizontal, Spacing.l)
+        .padding(.top, Spacing.section)
+        .padding(.bottom, Spacing.section)
         // The design's 94% white over a blur: thick enough that nothing behind the card reads through.
         .background {
-            let shape = RoundedRectangle(cornerRadius: 38, style: .continuous)
+            let shape = RoundedRectangle(cornerRadius: Radius.panel, style: .continuous)
             shape.fill(.regularMaterial)
             shape.fill(Color(.systemBackground).opacity(0.94))
         }
@@ -64,13 +64,13 @@ struct StopRequestCard: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             Image(systemName: Self.symbol(for: state.type))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 48, height: 48)
                 .background(Color.accentColor, in: Circle())
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(state.title).font(.title2.bold())
                 TimelineView(.periodic(from: .now, by: 30)) { timeline in
                     Text(state.subtitle(now: timeline.date)).font(.subheadline).foregroundStyle(.secondary)
@@ -98,21 +98,17 @@ struct StopRequestCard: View {
     }
 
     private var placeCard: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "mappin")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.red, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        HStack(spacing: Spacing.m) {
+            IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
             VStack(alignment: .leading, spacing: 1) {
                 Text(placeTitle).font(.body).lineLimit(2)
                 Text(placeDetail).font(.footnote).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, Spacing.cozy)
+        .padding(.vertical, Spacing.m)
+        .ikutTile()
         .accessibilityElement(children: .combine)
     }
 
@@ -131,7 +127,7 @@ struct StopRequestCard: View {
     private var tally: some View {
         let agreed = state.rows.filter { $0.status == .agreed }.count
         let text = "\(agreed) of \(state.rows.count) agreed"
-        return HStack(spacing: 10) {
+        return HStack(spacing: Spacing.gap) {
             StatCaption("Votes")
             ProgressView(value: Double(agreed), total: Double(max(state.rows.count, 1)))
                 .tint(.green)
@@ -140,7 +136,7 @@ struct StopRequestCard: View {
                 .monospacedDigit()
                 .foregroundStyle(Color.ikutPositive)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, Spacing.xs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Votes: \(text)")
     }
@@ -148,11 +144,11 @@ struct StopRequestCard: View {
     /// A car per vote: its badge, a check when it agreed (dimmed with a clock while waiting), and its short name.
     private var votes: some View {
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 6) {
+            HStack(alignment: .top, spacing: Spacing.tight) {
                 ForEach(state.rows) { row in voter(row) }
             }
-            .padding(.horizontal, 4)
-            .padding(.top, 4)
+            .padding(.horizontal, Spacing.xs)
+            .padding(.top, Spacing.xs)
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
@@ -190,7 +186,7 @@ struct StopRequestCard: View {
 
     /// Lead car and organizer: pin the proposal or one of the suggestions.
     @ViewBuilder private var pinSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s) {
             if let proposal = state.proposal {
                 pinButton("Pin this stop", subtitle: proposal.name, place: proposal, prominent: true)
             }
@@ -218,7 +214,7 @@ struct StopRequestCard: View {
     }
 
     private var buttons: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: Spacing.xs) {
             let agreed = state.viewerAgrees
             Button { actions.vote(!agreed) } label: {
                 Text(agreed ? (state.place != nil ? "Agreed · Pinned for Everyone" : "Agreed") : "Agree to Stop")
@@ -307,7 +303,7 @@ struct StopRequestOverlay: View {
 
     private var chip: some View {
         Button { setCollapsed(false) } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.gap) {
                 Image(systemName: StopRequestCard.symbol(for: state.type))
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.white)
@@ -321,7 +317,7 @@ struct StopRequestOverlay: View {
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.leading, 8).padding(.trailing, 16).padding(.vertical, 8)
+            .padding(.leading, Spacing.s).padding(.trailing, Spacing.l).padding(.vertical, Spacing.s)
             .frame(minHeight: 46)
             .background {
                 Capsule().fill(.regularMaterial)
@@ -353,6 +349,6 @@ struct StopRequestOverlay: View {
                 askedAt: Date().addingTimeInterval(-60), rows: rows, place: place, proposal: nil, alternatives: [],
                 viewerAgrees: false, canPin: false, canResolve: true, viewerOffset: 0, isResolved: false),
             actions: .none, onMinimize: {})
-            .padding(8)
+            .padding(Spacing.s)
     }
 }
