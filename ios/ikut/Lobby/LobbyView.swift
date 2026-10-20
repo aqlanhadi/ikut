@@ -51,6 +51,7 @@ struct LobbyView: View {
         PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name, endedAt: trip.endedAt,
                          others: names.isEmpty ? nil : PastTrips.others(from: names, excluding: currentUserId))
     }
+
     private var canLeave: Bool { !session.isEnded && !session.membershipLost }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.

@@ -92,7 +92,7 @@ final class RecapModel {
             let merged = RecapLogic.merge(cached: RecapService.cached(tripId: tripId), fresh: fresh)
             RecapService.save(merged)
             PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt,
-                             others: PastTrips.others(from: merged.memberNames, excluding: myUserId))
+                             others: merged.memberNames.isEmpty ? nil : PastTrips.others(from: merged.memberNames, excluding: myUserId))
             apply(merged)
             errorMessage = nil
         } catch {
