@@ -117,8 +117,8 @@ function inUse() {
     if (!m || mine.has(Number(m[1]))) continue;
     const cmd = m[2];
     if (/--describe|--dry-run/.test(cmd) || /^(ps|grep)\b/.test(cmd)) continue;
-    let who = null;
-    if (/\bnode\b.*\b(demo[\w-]*|run-ui|run-convoy2|drive-trip|convoy-sim)\.mjs/.test(cmd)) who = `${/([\w-]+)\.mjs/.exec(cmd)[1]} (running)`;
+    let who = null; // a demo counts only as the node process itself, not as a shell wrapper around it (`zsh -c 'node ...'`)
+    if (/^\S*node\s.*\b(demo[\w-]*|run-ui|run-convoy2|drive-trip|convoy-sim)\.mjs/.test(cmd)) who = `${/([\w-]+)\.mjs/.exec(cmd)[1]} (running)`;
     else if (/xcodebuild.*\btest(-without-building)?\b/.test(cmd) && !/build-for-testing/.test(cmd)) who = 'a UI test (xcodebuild)';
     else if (/simctl location/.test(cmd)) who = 'a simulator location playback';
     if (!who) continue;
