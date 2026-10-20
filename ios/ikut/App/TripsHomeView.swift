@@ -309,7 +309,10 @@ struct TripsHomeView: View {
                 .background(entry.endedAt == nil ? Color.ikutPositive : Color.ikutAccent, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                Text(pastDetail(entry)).font(.footnote).foregroundStyle(.secondary)
+                if let with = PastTrips.withPhrase(entry.others) {
+                    Text(with).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Text(pastDetail(entry)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
@@ -371,10 +374,14 @@ private extension View {
     /// before that.
     @ViewBuilder
     func glassSheetBackground() -> some View {
+        // Clipped to the same shape: a ScrollView draws on under the safe area and past the rounded
+        // corners, so past trips would show outside the glass.
         if #available(iOS 26, *) {
-            glassEffect(.regular, in: ConcentricRectangle(corners: .concentric(minimum: 38), isUniform: false))
+            let shape = ConcentricRectangle(corners: .concentric(minimum: 38), isUniform: false)
+            clipShape(shape).glassEffect(.regular, in: shape)
         } else {
-            background(.regularMaterial, in: RoundedRectangle(cornerRadius: 38, style: .continuous))
+            clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 38, style: .continuous))
                 .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
         }
     }

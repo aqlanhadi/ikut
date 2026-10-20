@@ -1,3 +1,4 @@
+import FirebaseAuth
 import MapKit
 import SwiftUI
 
@@ -42,7 +43,7 @@ struct RecapView: View {
         }
         .background(Color.ikutScreen)
         .toolbar(.hidden, for: .navigationBar)
-        .task { await model.load() }
+        .task { await model.load(myUserId: Auth.auth().currentUser?.uid) }
         .fullScreenCover(isPresented: $showMap) {
             if let recap = model.recap, let snapshot = model.snapshot {
                 RecapMapView(recap: recap, snapshot: snapshot) { showMap = false }
