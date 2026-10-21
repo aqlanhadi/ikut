@@ -140,3 +140,33 @@ struct DashedDivider: View {
         }
     }
 }
+
+#Preview {
+    VStack(spacing: Spacing.xl) {
+        VStack(spacing: Spacing.xs) {
+            StatCaption("Join code")
+            RouteEnds(from: "KL", to: "Ipoh")
+            RouteEnds(from: nil, to: "Ipoh", size: 22)
+        }
+        StatGrid([
+            .init("Distance", "205 km"),
+            .init("Drive", "2 h 10 min"),
+            .init("Via", nil),
+        ], background: Color(.secondarySystemBackground))
+        StatGrid([
+            .init("Spread", "8.2 km", color: .ikutWarning),
+            .init("Lead", "96 km/h"),
+            .init("Next stop", "Tapah"),
+        ], background: Color(.secondarySystemBackground), valueSize: 15)
+        HStack(spacing: Spacing.gap) {
+            StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
+            StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
+        }
+        HStack(spacing: Spacing.l) {
+            Text("Ticket")
+            DashedDivider().frame(height: 60)
+            Text("Stub")
+        }
+    }
+    .padding(Spacing.l)
+}

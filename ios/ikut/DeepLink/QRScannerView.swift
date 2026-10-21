@@ -78,3 +78,9 @@ private struct ScannerRepresentable: UIViewControllerRepresentable {
         }
     }
 }
+
+#Preview {
+    // No camera in the canvas or the simulator: this shows the sheet's chrome over a blank scanner.
+    Text("Join")
+        .sheet(isPresented: .constant(true)) { QRScannerView { _ in } }
+}

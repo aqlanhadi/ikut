@@ -57,3 +57,24 @@ extension DarkBanner where Icon == Image, Trailing == EmptyView {
         self.init(title: title, subtitle: subtitle, symbol: symbol, circle: circle) { EmptyView() }
     }
 }
+
+#Preview {
+    VStack(spacing: Spacing.m) {
+        DarkBanner(title: "Passed the debris", symbol: "checkmark", circle: .green)
+        DarkBanner(title: "Debris ahead in 500 meters", subtitle: "Reported by Wyna’s car · 4 min ago",
+                   symbol: "exclamationmark.triangle.fill", circle: .orange)
+        DarkBanner(
+            title: "Message from Wyna’s car",
+            subtitle: "We'll wait at the Tapah R&R, the one after the toll, near the surau. Take your time.",
+            symbol: "text.bubble.fill", circle: .white)
+        DarkBanner(title: "Heavy rain reported", symbol: "cloud.rain.fill", circle: .yellow) {
+            Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+        }
+        DarkBanner(title: "Sending debris…", circle: .white.opacity(0.16)) {
+            ProgressView().tint(.white)
+        } trailing: {
+            EmptyView()
+        }
+    }
+    .padding(Spacing.m)
+}

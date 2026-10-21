@@ -61,3 +61,14 @@ struct PassedBanner: View {
             .accessibilityAddTraits(.updatesFrequently)
     }
 }
+
+#if DEBUG
+#Preview {
+    // The demo's debris, 3 km ahead of my car.
+    VStack(spacing: Spacing.m) {
+        ApproachPill(alert: MapDemo.debrisAlert, model: MapDemo.model()) {}
+        PassedBanner(text: "Passed the debris")
+    }
+    .padding(Spacing.m)
+}
+#endif

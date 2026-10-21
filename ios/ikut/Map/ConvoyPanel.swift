@@ -477,3 +477,67 @@ struct JoiningRowView: View {
         .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
+
+#if DEBUG
+#Preview("Panel") {
+    @Previewable @State var expanded = true
+    ZStack(alignment: .bottom) {
+        Color(.systemGray4).ignoresSafeArea()
+        ConvoyPanel(model: MapDemo.model(), expanded: $expanded, canReport: true, onReport: {}, onStop: {})
+    }
+}
+
+#Preview("Panel collapsed") {
+    ZStack(alignment: .bottom) {
+        Color(.systemGray4).ignoresSafeArea()
+        ConvoyPanel(model: MapDemo.model(), expanded: .constant(false), canReport: false, onReport: {}, onStop: {})
+    }
+}
+#endif
+
+#Preview("Rows") {
+    func row(_ id: String, _ number: Int, _ color: String, _ name: String, subtitle: String, warning: Bool = false,
+             _ primary: String, _ secondary: String, stale: Bool = false, separated: Bool = false,
+             mine: Bool = false, arrived: Bool = false) -> ConvoyRowText {
+        ConvoyRowText(
+            id: id, number: number, name: name, color: color, subtitle: subtitle, subtitleIsWarning: warning,
+            trailingPrimary: primary, trailingSecondary: secondary, isStale: stale, isSeparated: separated,
+            isMine: mine, hasArrived: arrived)
+    }
+    let rows = [
+        row("c1", 1, "#2563EB", ConvoyFormat.me, subtitle: "Lead · " + ConvoyFormat.speed(metersPerSecond: 96 / 3.6),
+            "Lead", ConvoyFormat.eta(Date().addingTimeInterval(3_000)), mine: true),
+        row("c2", 2, "#D9480F", "Wyna’s X70", subtitle: ConvoyFormat.speed(metersPerSecond: 92 / 3.6),
+            ConvoyFormat.distance(1_800), ConvoyFormat.behind(70)),
+        row("c5", 5, "#BE185D", "Faiz’s car", subtitle: ConvoyFormat.speed(metersPerSecond: 90 / 3.6),
+            ConvoyFormat.distance(8_000), ConvoyFormat.behind(330), separated: true),
+        row("c4", 4, "#7C3AED", "Daniel’s City", subtitle: ConvoyFormat.lastSeen(age: 125), warning: true,
+            ConvoyFormat.distance(6_400), ConvoyFormat.behind(290), stale: true),
+        row("c6", 6, "#CA8A04", "Siti’s Bezza", subtitle: ConvoyFormat.paused,
+            ConvoyFormat.distance(2_600), ConvoyFormat.behind(110)),
+        row("c7", 7, "#0891B2", "Aisha’s Ativa", subtitle: ConvoyFormat.speed(metersPerSecond: 0),
+            ConvoyFormat.arrived, "", arrived: true),
+    ]
+    let joining = [
+        JoiningRowText(
+            id: "c3", number: 3, name: "Hafiz’s Hilux", color: "#0F766E",
+            subtitle: ConvoyFormat.speed(metersPerSecond: 84 / 3.6), subtitleIsWarning: false,
+            trailingPrimary: ConvoyFormat.duration(1_080), trailingSecondary: "to merge", isStale: false),
+        JoiningRowText(
+            id: "c8", number: 8, name: "Rina’s Persona", color: "#65A30D",
+            subtitle: ConvoyFormat.lastSeen(age: 300), subtitleIsWarning: true,
+            trailingPrimary: "--", trailingSecondary: "to merge", isStale: true),
+        JoiningRowText(
+            id: "c9", number: nil, name: ConvoyFormat.me, color: "#2563EB",
+            subtitle: "Waiting for location", subtitleIsWarning: false,
+            trailingPrimary: "--", trailingSecondary: "to merge", isStale: false),
+    ]
+    return ScrollView {
+        VStack(spacing: 0) {
+            ForEach(rows) { ConvoyRowView(row: $0) }
+            Divider().padding(.vertical, Spacing.s)
+            ForEach(joining) { JoiningRowView(row: $0) }
+        }
+        .padding(Spacing.l)
+    }
+}

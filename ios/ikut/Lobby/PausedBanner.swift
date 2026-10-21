@@ -68,3 +68,9 @@ enum PausedBannerText {
         return "Sharing paused · resumes automatically in \(minutes) min"
     }
 }
+
+#Preview {
+    Backend.configure()
+    return PausedBanner(session: TripSession(tripId: "demo", userId: "u-c1"))
+        .padding(Spacing.l)
+}

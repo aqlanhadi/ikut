@@ -372,3 +372,20 @@ extension RecapSnapshot {
     RecapView(model: RecapModel(snapshot: .demo(), originName: "Tanjung Malim"))
 }
 #endif
+
+#Preview("Event dots") {
+    let dots: [(RecapTimelineItem.Kind, String)] = [
+        (.trip, "flag.fill"), (.stop, "fuelpump.fill"), (.hazard, "exclamationmark.triangle.fill"),
+        (.hazard, "cloud.rain.fill"), (.car, "car.fill"), (.trip, "mappin.circle.fill"),
+    ]
+    VStack(spacing: Spacing.l) {
+        HStack(spacing: Spacing.m) {
+            ForEach(dots.indices, id: \.self) { RecapEventDot(kind: dots[$0].0, symbol: dots[$0].1, size: 28) }
+        }
+        HStack(spacing: Spacing.l) {
+            RecapEventDot(kind: .stop, symbol: "fuelpump.fill", size: 36)
+            RecapEventDot(kind: .stop, symbol: "fuelpump.fill", size: 36, selected: true)
+        }
+    }
+    .padding(Spacing.l)
+}
