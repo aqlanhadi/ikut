@@ -9,11 +9,11 @@ struct AlwaysLocationExplainerView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: Spacing.xl) {
                 illustration
                     .padding(.top, 32)
 
-                VStack(spacing: 12) {
+                VStack(spacing: Spacing.m) {
                     Text("Keep sharing while the screen is off or another app is open")
                         .font(.title2.bold())
                         .multilineTextAlignment(.center)
@@ -23,7 +23,7 @@ struct AlwaysLocationExplainerView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                VStack(spacing: 12) {
+                VStack(spacing: Spacing.m) {
                     Button {
                         isRequesting = true
                         Task {
@@ -43,8 +43,8 @@ struct AlwaysLocationExplainerView: View {
                         .disabled(isRequesting)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
+            .padding(.horizontal, Spacing.xl)
+            .padding(.bottom, Spacing.xl)
         }
         .presentationDetents([.large])
     }

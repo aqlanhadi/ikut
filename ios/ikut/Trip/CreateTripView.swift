@@ -99,18 +99,15 @@ struct CreateTripView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Where to?")
                     .font(.largeTitle.bold())
-                    .padding(.horizontal, 4)
-                    .padding(.top, 4)
+                    .padding(.horizontal, Spacing.xs)
+                    .padding(.top, Spacing.xs)
                     .accessibilityAddTraits(.isHeader)
 
-                fromToCard.padding(.top, 12)
+                fromToCard.padding(.top, Spacing.m)
 
                 if let message = model.errorMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
+                    InlineNote(message, tone: .alert)
+                        .padding(.top, Spacing.m)
                         .accessibilityLabel("Error: \(message)")
                 }
 
@@ -119,8 +116,8 @@ struct CreateTripView: View {
                     resultsCard
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .padding(.horizontal, Spacing.l)
+            .padding(.bottom, Spacing.l)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.ikutScreen)
@@ -135,7 +132,7 @@ struct CreateTripView: View {
     private var fromToCard: some View {
         @Bindable var model = model
         return VStack(spacing: 0) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.m) {
                 Circle()
                     .fill(Color.blue)
                     .frame(width: 12, height: 12)
@@ -148,13 +145,13 @@ struct CreateTripView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.l)
             .frame(minHeight: 50)
             .accessibilityElement(children: .combine)
 
             Divider().padding(.leading, 48)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.m) {
                 Image(systemName: "mappin")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.red)
@@ -185,8 +182,8 @@ struct CreateTripView: View {
                     .accessibilityLabel("Clear search")
                 }
             }
-            .padding(.leading, 16)
-            .padding(.trailing, 10)
+            .padding(.leading, Spacing.l)
+            .padding(.trailing, Spacing.gap)
             .frame(minHeight: 54)
         }
         .ikutCard()
@@ -203,8 +200,8 @@ struct CreateTripView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 18)
+                    .padding(.horizontal, Spacing.l)
+                    .padding(.vertical, Spacing.section)
             }
             ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
                 if index > 0 { RowDivider() }
@@ -217,7 +214,7 @@ struct CreateTripView: View {
     private func resultRow(_ result: DestinationResult) -> some View {
         let kind = PlaceKind(result)
         return Button { pick(result) } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.m) {
                 Image(systemName: kind.symbol)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
@@ -240,7 +237,7 @@ struct CreateTripView: View {
                         .foregroundStyle(.primary)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.l)
             .frame(minHeight: 58)
             .contentShape(Rectangle())
         }

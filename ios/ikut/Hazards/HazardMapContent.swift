@@ -31,13 +31,13 @@ struct HazardMapContent: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .fixedSize()
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, Spacing.s)
                         .padding(.vertical, 3)
                         .background(.regularMaterial, in: Capsule())
                         .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
                         // To the left of the circle, as in the mockup: a zero-width box at the circle's
                         // leading edge, with the chip hanging off its trailing side.
-                        .padding(.trailing, 8)
+                        .padding(.trailing, Spacing.s)
                         .frame(width: 0, alignment: .trailing)
                 }
             }

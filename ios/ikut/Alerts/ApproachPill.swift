@@ -41,7 +41,7 @@ struct ApproachPill: View {
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(Color.yellow)
-                        .padding(.trailing, 6)
+                        .padding(.trailing, Spacing.tight)
                 }
             }
             .buttonStyle(.plain)

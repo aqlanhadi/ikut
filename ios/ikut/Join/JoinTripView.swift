@@ -37,17 +37,17 @@ struct JoinTripView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let preview = model.preview {
                     ticket(preview)
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.m)
                 } else {
                     codeBoxes
-                        .padding(.top, 22)
+                        .padding(.top, Spacing.sectionLarge)
                     summaryLine
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
+                        .padding(.horizontal, Spacing.l)
+                        .padding(.top, Spacing.gap)
                 }
 
                 if let message = model.errorMessage {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Spacing.s) {
                         Text(message)
                             .font(.footnote)
                             .foregroundStyle(.red)
@@ -57,32 +57,28 @@ struct JoinTripView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
+                    .padding(.horizontal, Spacing.l)
+                    .padding(.top, Spacing.gap)
                 }
 
                 if model.preview != nil {
                     nameAndRoleCard
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.m)
                     CardHeader(role == .driver ? "Which car are you driving?" : "Which car are you riding in?")
                     carGrid
                     roleNote
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.m)
 
                     if model.trackerTakenResult != nil {
-                        Label(
+                        InlineNote(
                             "You're in. Someone else is already tracking that car, so your phone won't share its location.",
                             systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.top, Spacing.m)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .padding(.horizontal, Spacing.l)
+            .padding(.bottom, Spacing.l)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.ikutScreen)
@@ -90,8 +86,7 @@ struct JoinTripView: View {
             if let taken = model.trackerTakenResult {
                 Button("Continue") { onJoined(taken.tripId, taken.carId) }
                     .buttonStyle(PillButtonStyle())
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    .background(Color.ikutScreen)
+                    .ikutBottomBar()
             } else if model.preview != nil {
                 Button(action: join) {
                     if model.isJoining {
@@ -102,8 +97,7 @@ struct JoinTripView: View {
                 }
                 .buttonStyle(PillButtonStyle())
                 .disabled(!model.canJoin || auth.userID == nil)
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Color.ikutScreen)
+                .ikutBottomBar()
             }
         }
         .navigationTitle("Join Trip")
@@ -142,15 +136,15 @@ struct JoinTripView: View {
     private var codeBoxes: some View {
         let characters = Array(codeText)
         let length = TripService.codeLength
-        return HStack(spacing: 8) {
+        return HStack(spacing: Spacing.s) {
             ForEach(0..<length, id: \.self) { index in
                 let active = codeFocused && index == min(characters.count, length - 1)
                 Text(index < characters.count ? String(characters[index]) : "")
                     .font(.system(size: 26, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, minHeight: 56)
-                    .ikutCardShape(radius: 14)
+                    .ikutCard(radius: Radius.control)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
                             .strokeBorder(Color.ikutAccent, lineWidth: active ? 2 : 0)
                     }
             }
@@ -179,7 +173,7 @@ struct JoinTripView: View {
     @ViewBuilder
     private var summaryLine: some View {
         if model.isLoadingPreview {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s) {
                 ProgressView().controlSize(.small)
                 Text("Looking for your trip…")
             }
@@ -198,24 +192,24 @@ struct JoinTripView: View {
     /// The found trip as a ticket: name, "Code found", destination, then code and car count.
     private func ticket(_ preview: TripPreview) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack {
                     Text(preview.name)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
+                    Spacer(minLength: Spacing.s)
                     Label("Code found", systemImage: "checkmark")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Color.ikutPositive)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, Spacing.chipX)
+                        .padding(.vertical, Spacing.xs)
                         .background(Color.ikutPositive.opacity(0.14), in: Capsule())
                 }
                 RouteEnds(from: nil, to: preview.destinationName)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 12)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.cozy)
+            .padding(.bottom, Spacing.m)
 
             TicketTear()
 
@@ -244,9 +238,9 @@ struct JoinTripView: View {
                 .disabled(model.isJoining)
                 .accessibilityLabel("Change code")
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 14)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.gap)
+            .padding(.bottom, Spacing.cozy)
         }
         .ikutCard()
         // The code field stays in the view tree (hidden) so "Change" can clear it and type again.
@@ -257,8 +251,8 @@ struct JoinTripView: View {
 
     private var nameAndRoleCard: some View {
         @Bindable var model = model
-        return VStack(spacing: 6) {
-            HStack(spacing: 12) {
+        return VStack(spacing: Spacing.tight) {
+            HStack(spacing: Spacing.m) {
                 Text("Name")
                 TextField("Your name", text: $model.displayName)
                     .textContentType(.givenName)
@@ -268,7 +262,7 @@ struct JoinTripView: View {
                     .accessibilityLabel("Your name")
             }
             .frame(minHeight: 44)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.l)
 
             Picker("Your role", selection: $role) {
                 ForEach(Role.allCases) { role in
@@ -278,16 +272,16 @@ struct JoinTripView: View {
             .pickerStyle(.segmented)
             .controlSize(.large)
             .disabled(model.isJoining)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, Spacing.s)
+            .padding(.bottom, Spacing.s)
         }
         .ikutCard()
     }
 
     private var carGrid: some View {
         @Bindable var model = model
-        return VStack(spacing: 8) {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+        return VStack(spacing: Spacing.s) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.s), GridItem(.flexible(), spacing: Spacing.s)], spacing: Spacing.s) {
                 ForEach(Array(model.cars.enumerated()), id: \.element.id) { index, car in
                     carTile(
                         name: car.name,
@@ -305,7 +299,7 @@ struct JoinTripView: View {
                 TextField("Car name", text: $model.newCarName)
                     .textInputAutocapitalization(.words)
                     .disabled(model.isJoining)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.l)
                     .frame(minHeight: 46)
                     .ikutCard()
                     .accessibilityLabel("Car name")
@@ -319,7 +313,7 @@ struct JoinTripView: View {
         selected: Bool, action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.gap) {
                 badge
                 VStack(alignment: .leading, spacing: 0) {
                     Text(name)
@@ -331,11 +325,11 @@ struct JoinTripView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.m)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .ikutCardShape(radius: 18)
+            .ikutCard(radius: Radius.row)
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: Radius.row, style: .continuous)
                     .strokeBorder(Color.ikutAccent, lineWidth: selected ? 2 : 0)
             }
             .contentShape(Rectangle())
@@ -352,7 +346,7 @@ struct JoinTripView: View {
         @Bindable var model = model
         if role == .driver {
             Toggle(isOn: $model.tracker) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text("Share this car’s location")
                     Text(model.selectedCarHasTracker
                          ? "Someone is already tracking this car."
@@ -361,21 +355,17 @@ struct JoinTripView: View {
                 }
             }
             .tint(Color(.systemGreen))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.l)
+            .padding(.vertical, Spacing.m)
             .disabled(model.isJoining || model.selection == nil)
             .ikutCard()
         } else {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: model.selectedCarHasTracker ? "location.fill" : "location.slash.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(
-                        model.selectedCarHasTracker ? Color.green : Color.orange,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .top, spacing: Spacing.m) {
+                IconTile(
+                    symbol: model.selectedCarHasTracker ? "location.fill" : "location.slash.fill",
+                    color: model.selectedCarHasTracker ? Color.green : Color.orange,
+                    size: 30, font: .system(size: 15, weight: .semibold))
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text(model.selectedCarHasTracker
                          ? "\(selectedCarName) is already tracked"
                          : "No one is sharing \(selectedCarName)’s location yet")
@@ -384,8 +374,8 @@ struct JoinTripView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.l)
+            .padding(.vertical, Spacing.m)
             .ikutCard()
             .accessibilityElement(children: .combine)
         }
@@ -421,7 +411,7 @@ private struct TicketTear: View {
                         .stroke(Color(.systemGray5), style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.l)
             HStack {
                 Circle().fill(Color.ikutScreen).frame(width: 20, height: 20).offset(x: -10)
                 Spacer()
@@ -429,12 +419,6 @@ private struct TicketTear: View {
             }
         }
         .accessibilityHidden(true)
-    }
-}
-
-private extension View {
-    func ikutCardShape(radius: CGFloat) -> some View {
-        background(Color.ikutCard, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
     }
 }
 

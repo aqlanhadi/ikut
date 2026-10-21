@@ -38,8 +38,8 @@ struct RecapView: View {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(.horizontal, Spacing.l)
+            .padding(.bottom, Spacing.xl)
         }
         .background(Color.ikutScreen)
         .toolbar(.hidden, for: .navigationBar)
@@ -54,13 +54,7 @@ struct RecapView: View {
 
     private var topBar: some View {
         HStack {
-            Button(action: onDone) {
-                Image(systemName: "xmark").font(.system(size: 15, weight: .bold))
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .tint(.primary)
-            .accessibilityLabel("Close")
+            MapCloseButton(action: onDone)
             Spacer()
             if let recap = model.recap {
                 ShareLink(item: shareText(recap)) {
@@ -72,21 +66,21 @@ struct RecapView: View {
                 .accessibilityLabel("Share recap")
             }
         }
-        .padding(.top, 8)
+        .padding(.top, Spacing.s)
     }
 
     @ViewBuilder
     private func content(_ recap: Recap, _ snapshot: RecapSnapshot) -> some View {
         Text("Trip complete")
             .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ikutAccent)
-            .padding(.horizontal, 4).padding(.top, 14)
+            .padding(.horizontal, Spacing.xs).padding(.top, Spacing.cozy)
         Text(recap.title)
             .font(.largeTitle.bold())
-            .padding(.horizontal, 4).padding(.top, 2)
+            .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)
             .accessibilityAddTraits(.isHeader)
         Text(recap.subtitle)
             .font(.subheadline).foregroundStyle(.secondary)
-            .padding(.horizontal, 4).padding(.top, 2)
+            .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)
 
         VStack(spacing: 0) {
             Button { showMap = true } label: {
@@ -97,7 +91,7 @@ struct RecapView: View {
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 11).frame(height: 30)
                             .background(.regularMaterial, in: Capsule())
-                            .padding(8)
+                            .padding(Spacing.s)
                     }
             }
             .buttonStyle(.plain)
@@ -105,12 +99,12 @@ struct RecapView: View {
             statGrid(recap.stats)
         }
         .ikutCard()
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .padding(.top, 18)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .padding(.top, Spacing.section)
 
         if !recap.awards.isEmpty {
             sectionTitle("Road Trip Awards")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible())], spacing: Spacing.gap) {
                 ForEach(recap.awards, id: \.kind) { award(of: $0, snapshot) }
             }
         }
@@ -121,27 +115,26 @@ struct RecapView: View {
         }
         .pickerStyle(.segmented)
         timeline(recap.timeline.filter(matches))
-            .padding(.top, 12)
+            .padding(.top, Spacing.m)
 
         ForEach(recap.notes, id: \.self) { note in
-            Label(note, systemImage: "info.circle")
-                .font(.footnote).foregroundStyle(.secondary)
-                .padding(.horizontal, 4).padding(.top, 12)
+            InlineNote(note, systemImage: "info.circle", inset: Spacing.xs)
+                .padding(.top, Spacing.m)
         }
 
-        VStack(spacing: 4) {
+        VStack(spacing: Spacing.xs) {
             ShareLink(item: shareText(recap)) {
                 Label("Share Recap with Convoy", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(PillButtonStyle())
             Button("Done", action: onDone).buttonStyle(LinkPillButtonStyle())
         }
-        .padding(.top, 20)
+        .padding(.top, Spacing.block)
     }
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text).font(.title2.bold())
-            .padding(.horizontal, 4).padding(.top, 26).padding(.bottom, 8)
+            .padding(.horizontal, Spacing.xs).padding(.top, 26).padding(.bottom, Spacing.s)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -160,7 +153,7 @@ struct RecapView: View {
     }
 
     private func statTile(_ s: RecapStat) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
             Text(s.label).font(.footnote).foregroundStyle(.secondary)
             (Text(s.value).font(.system(size: 28, weight: .bold, design: .rounded))
                 + Text(s.unit.isEmpty ? "" : " \(s.unit)").font(.system(size: 17, weight: .semibold)).foregroundStyle(.secondary))
@@ -168,7 +161,7 @@ struct RecapView: View {
             Text(s.note.isEmpty ? " " : s.note).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16).padding(.vertical, 14)
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.cozy)
         .accessibilityElement(children: .combine)
     }
 
@@ -183,20 +176,20 @@ struct RecapView: View {
     private func award(of a: RecapAward, _ s: RecapSnapshot) -> some View {
         let style = Self.awardStyle[a.kind] ?? ("star.fill", .ikutAccent)
         let car = s.cars.first { $0.id == a.carId }
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: Spacing.gap) {
             HStack {
                 Image(systemName: style.symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
                     .frame(width: 40, height: 40).background(style.tint, in: Circle())
                 Spacer()
                 if let car { CarBadge(number: car.number, colorHex: car.color, size: 26) }
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(a.title).font(.headline)
                 Text(a.detail).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(Spacing.cozy)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .ikutCard()
         .accessibilityElement(children: .combine)
@@ -215,14 +208,14 @@ struct RecapView: View {
             if items.isEmpty {
                 Text(filter == .all ? "Nothing to show." : "None on this trip, or no longer stored.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, Spacing.m)
             }
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: Spacing.m) {
                     Text(RecapLogic.clock(item.time))
                         .font(.footnote.weight(.semibold)).foregroundStyle(.secondary).monospacedDigit()
                         .frame(width: 42, alignment: .leading).padding(.top, 5)
-                    VStack(spacing: 4) {
+                    VStack(spacing: Spacing.xs) {
                         RecapEventDot(kind: item.kind, symbol: item.symbol, size: 28)
                         if index < items.count - 1 {
                             Capsule().fill(Color(.systemGray5)).frame(width: 2).frame(minHeight: 12)
@@ -234,13 +227,13 @@ struct RecapView: View {
                             Text(item.detail).font(.footnote).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.top, 4).padding(.bottom, 16)
+                    .padding(.top, Spacing.xs).padding(.bottom, Spacing.l)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 4)
+        .padding(.horizontal, Spacing.l).padding(.top, Spacing.l).padding(.bottom, Spacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .ikutCard()
     }

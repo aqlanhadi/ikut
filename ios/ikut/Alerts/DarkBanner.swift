@@ -13,7 +13,7 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.gap) {
             icon
                 .font(.title3.weight(.bold))
                 .foregroundStyle(.black)
@@ -35,12 +35,12 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
         }
         .foregroundStyle(.white)
         // 14 on the right as on the canvas; a button there brings its own room.
-        .padding(.leading, 8)
-        .padding(.trailing, Trailing.self == EmptyView.self ? 14 : 8)
-        .padding(.vertical, 6)
+        .padding(.leading, Spacing.s)
+        .padding(.trailing, Trailing.self == EmptyView.self ? Spacing.cozy : Spacing.s)
+        .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
         // #1C1C1E, as on the design canvas.
-        .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
         .shadow(color: .black.opacity(0.22), radius: 10, y: 6)
     }
 }

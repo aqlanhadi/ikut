@@ -36,16 +36,16 @@ struct ConvoyPanel: View {
             }
             buttons
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 38, style: .continuous))
+        .padding(.horizontal, Spacing.l)
+        .padding(.top, Spacing.tight)
+        .padding(.bottom, Spacing.section)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
         // While the list collapses (e.g. a stop card slides in above), the outgoing rows would
         // otherwise draw outside the shrinking panel and over the card.
-        .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
         .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
+        .padding(.horizontal, Spacing.s)
+        .padding(.bottom, Spacing.s)
         .animation(.snappy, value: expanded)
         .task(id: originKey) {
             guard let start = model.mainRoute?.coordinates.first else { return }
@@ -102,7 +102,7 @@ struct ConvoyPanel: View {
     private var header: some View {
         let destination = convoy.destinationName ?? ""
         let arrive = frontArrival.map { ConvoyFormat.clock($0) }
-        return HStack(alignment: .top, spacing: 8) {
+        return HStack(alignment: .top, spacing: Spacing.s) {
             VStack(alignment: .leading, spacing: 0) {
                 StatCaption("From")
                 Text(originShort ?? "Start")
@@ -132,8 +132,8 @@ struct ConvoyPanel: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 4)
-        .padding(.top, 4)
+        .padding(.horizontal, Spacing.xs)
+        .padding(.top, Spacing.xs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(headerLabel(destination: destination, arrive: arrive))
         .accessibilityAddTraits(.isHeader)
@@ -161,8 +161,8 @@ struct ConvoyPanel: View {
                 },
                 hazards: model.hazards.markers.compactMap { $0.mainOffset.map { min(max($0 / length, 0), 1) } }
             )
-            .padding(.horizontal, 4)
-            .padding(.top, 10)
+            .padding(.horizontal, Spacing.xs)
+            .padding(.top, Spacing.gap)
             .accessibilityElement()
             .accessibilityLabel("Convoy progress: \(ConvoyFormat.distance(driven)) of \(ConvoyFormat.distance(length))")
 
@@ -174,7 +174,7 @@ struct ConvoyPanel: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
             .monospacedDigit()
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Spacing.xs)
         }
     }
 
@@ -208,7 +208,7 @@ struct ConvoyPanel: View {
         }
         let fill = Color(.tertiarySystemFill)
         return Button { expanded = true } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.gap) {
                 HStack(spacing: -5) {
                     ForEach(convoy.convoy) { e in
                         Circle().fill(Color(mapHex: e.car.color))
@@ -231,13 +231,13 @@ struct ConvoyPanel: View {
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, Spacing.cozy)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(fill, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .padding(.top, 10)
+        .padding(.top, Spacing.gap)
         .accessibilityLabel([parts.driving, parts.joining, parts.spread].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint("Shows the convoy list")
         .accessibilityIdentifier("convoy.summary")
@@ -251,7 +251,7 @@ struct ConvoyPanel: View {
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
             .init("Next stop", nextStop?.name ?? "None", color: nextStop == nil ? .secondary : nil),
         ], background: Color(.tertiarySystemFill), valueSize: 20)
-        .padding(.top, 14)
+        .padding(.top, Spacing.cozy)
     }
 
     private var list: some View {
@@ -266,7 +266,7 @@ struct ConvoyPanel: View {
         .frame(height: min(max(listHeight, 0), maxListHeight))
         .scrollBounceBehavior(.basedOnSize)
         .scrollIndicators(.hidden)
-        .padding(.top, 6)
+        .padding(.top, Spacing.tight)
     }
 
     private var content: some View {
@@ -297,14 +297,14 @@ struct ConvoyPanel: View {
             .font(.footnote.weight(.semibold))
             .foregroundStyle(MapPalette.warning)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(MapPalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.bottom, 6)
+            .padding(.horizontal, Spacing.m)
+            .padding(.vertical, Spacing.s)
+            .background(MapPalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .padding(.bottom, Spacing.tight)
     }
 
     private var buttons: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.gap) {
             Button(action: onReport) {
                 Label("Report", systemImage: "exclamationmark.triangle")
                     .font(.headline)
@@ -323,7 +323,7 @@ struct ConvoyPanel: View {
             }
         }
         .buttonStyle(.plain)
-        .padding(.top, 12)
+        .padding(.top, Spacing.m)
     }
 }
 
@@ -399,7 +399,7 @@ struct ConvoyRowView: View {
     var row: ConvoyRowText
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             RowBadge(number: row.number, colorHex: row.color)
             VStack(alignment: .leading, spacing: 0) {
                 if row.isMine {
@@ -416,7 +416,7 @@ struct ConvoyRowView: View {
                 Label(row.trailingPrimary, systemImage: "checkmark")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.ikutPositive)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, Spacing.gap)
                     .padding(.vertical, 5)
                     .background(Color.green.opacity(0.14), in: Capsule())
                     .accessibilityIdentifier("convoy.row.arrived")
@@ -433,7 +433,7 @@ struct ConvoyRowView: View {
             }
         }
         .frame(minHeight: 54)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, Spacing.xs)
         .opacity(row.isStale ? 0.6 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
@@ -446,8 +446,8 @@ private struct MeCapsule: View {
         Text(ConvoyFormat.me)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(MapPalette.accent)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 2)
+            .padding(.horizontal, Spacing.chipX)
+            .padding(.vertical, Spacing.xxs)
             .background(MapPalette.accent.opacity(0.14), in: Capsule())
     }
 }
@@ -456,7 +456,7 @@ struct JoiningRowView: View {
     var row: JoiningRowText
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             RowBadge(number: row.number, colorHex: row.color, dashed: true)
             VStack(alignment: .leading, spacing: 0) {
                 if row.name == ConvoyFormat.me { MeCapsule() } else { Text(row.name).font(.body).lineLimit(1) }
@@ -471,7 +471,7 @@ struct JoiningRowView: View {
             }
         }
         .frame(minHeight: 54)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, Spacing.xs)
         .opacity(row.isStale ? 0.6 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")

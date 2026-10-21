@@ -112,12 +112,12 @@ struct TripMapView: View {
                 if !stopCardOpen {
                     MapModeControl(mode: $model.mode)
                         .padding(.top, bannerShowing ? 164 : 84)
-                        .padding(.trailing, 12)
+                        .padding(.trailing, Spacing.m)
                         .animation(.snappy, value: bannerShowing)
                 }
             }
             .overlay(alignment: .bottom) {
-                VStack(spacing: 8) {
+                VStack(spacing: Spacing.s) {
                     stopCard
                     ConvoyPanel(
                         model: model, expanded: panelBinding, canReport: model.myCarId != nil,
@@ -358,7 +358,7 @@ struct TripMapView: View {
     }
 
     private var topStack: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s) {
             tripPill
             if session.isPaused {
                 PausedBanner(session: session, onError: { message in
@@ -378,12 +378,12 @@ struct TripMapView: View {
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 4)
+        .padding(.horizontal, Spacing.m)
+        .padding(.top, Spacing.xs)
     }
 
     private var tripPill: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.m) {
             Circle()
                 .fill(pillDot)
                 .frame(width: 10, height: 10)
@@ -428,9 +428,9 @@ struct TripMapView: View {
         }
         // Map.dc.html: 6 pt top and bottom, 16 pt before the dot, 4 pt after the 44 pt menu button,
         // so the pill is 56 pt tall in every state.
-        .padding(.leading, 16)
-        .padding(.trailing, 4)
-        .padding(.vertical, 6)
+        .padding(.leading, Spacing.l)
+        .padding(.trailing, Spacing.xs)
+        .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
         .background(.regularMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
@@ -517,7 +517,7 @@ struct TripMapView: View {
                     context: context, state: state,
                     suggestAnother: { stopSheet = .suggest(state) },
                     onError: { showStopError($0) }))
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Spacing.s)
             .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -527,7 +527,7 @@ struct TripMapView: View {
         Label(message, systemImage: "exclamationmark.triangle.fill")
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.white)
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.gap)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.red.opacity(0.9), in: Capsule())
             .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
@@ -685,11 +685,11 @@ struct MapModeControl: View {
     var body: some View {
         VStack(spacing: 0) {
             button(.follow, symbol: "location.fill", label: "Follow my car")
-            Divider().padding(.horizontal, 8)
+            Divider().padding(.horizontal, Spacing.s)
             button(.fit, symbol: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", label: "Fit whole convoy")
         }
         .frame(width: 44)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
         .sensoryFeedback(.selection, trigger: mode)
     }
@@ -769,8 +769,8 @@ struct MapMarkerView: View {
                     : marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
+                .padding(.horizontal, Spacing.chipX)
+                .padding(.vertical, Spacing.xs)
                 .background {
                     // My own label is the accent blue so "Me" stands out from the white chips.
                     if marker.isMine { Capsule().fill(MapPalette.accent) } else { Capsule().fill(.regularMaterial) }
@@ -838,13 +838,13 @@ struct MergePointView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.primary)
                     .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, Spacing.chipX)
+                    .padding(.vertical, Spacing.xs)
                     .background(.regularMaterial, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color(mapHex: colorHex), lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
-                    .padding(side == .trailing ? .leading : .trailing, 24)
+                    .padding(side == .trailing ? .leading : .trailing, Spacing.xl)
             }
     }
 }

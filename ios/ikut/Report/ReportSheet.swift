@@ -21,56 +21,38 @@ struct ReportSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Spacing.cozy) {
                 header
                 pinCard
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap) {
                     ForEach(ReportOption.events) { option in
                         eventButton(option)
                     }
                 }
-                Text("About your car")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .padding(.horizontal, 4)
-                    .accessibilityAddTraits(.isHeader)
-                HStack(spacing: 8) {
+                CardHeader("About your car", inset: Spacing.xs, top: 0, bottom: 0)
+                HStack(spacing: Spacing.s) {
                     ForEach(ReportOption.statuses) { option in
                         statusButton(option)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 20)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.m)
+            .padding(.bottom, Spacing.block)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("What's on the road?").font(.title2.bold())
-                Text("Pinned where you tapped Report, not where you send it. Cars behind you get an alert.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .background(.quaternary, in: Circle())
-            }
-            .accessibilityLabel("Close")
-        }
+        SheetHeader(
+            title: "What's on the road?",
+            subtitle: "Pinned where you tapped Report, not where you send it. Cars behind you get an alert.",
+            onClose: { dismiss() })
     }
 
     private var pinCard: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.gap) {
             Image(systemName: pinned == nil ? "location.slash.fill" : "mappin.circle.fill")
                 .font(.title3)
                 .foregroundStyle(pinned == nil ? Color.secondary : Color.red)
@@ -92,8 +74,8 @@ struct ReportSheet: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(Spacing.cozy)
+        .ikutTile()
         .accessibilityElement(children: .combine)
         .task(id: pinned == nil) {
             // No fix when the sheet opened: pin to the first one that arrives.
@@ -106,7 +88,7 @@ struct ReportSheet: View {
 
     private func eventButton(_ option: ReportOption) -> some View {
         Button { send(option) } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.m) {
                 Image(systemName: option.symbol)
                     .font(.title3)
                     .foregroundStyle(.white)
@@ -118,10 +100,10 @@ struct ReportSheet: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.m)
             .frame(maxWidth: .infinity, minHeight: 72)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .ikutTile()
+            .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(pinned == nil)
@@ -135,8 +117,8 @@ struct ReportSheet: View {
                 .minimumScaleFactor(0.8)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, minHeight: 60)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .ikutSurface(.quaternary, radius: Radius.tile)
+                .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(pinned == nil)
@@ -190,7 +172,7 @@ private struct ReportPreviewHost: View {
     var body: some View {
         Color(.systemGroupedBackground)
             .ignoresSafeArea()
-            .overlay(alignment: .bottom) { ReportToastView(model: toast).padding(.horizontal, 16).padding(.bottom, 24) }
+            .overlay(alignment: .bottom) { ReportToastView(model: toast).padding(.horizontal, Spacing.l).padding(.bottom, Spacing.xl) }
             .overlay { Button("Report") { showing = true }.buttonStyle(.borderedProminent) }
             .sheet(isPresented: $showing) {
                 ReportSheet(context: context, toast: toast) { _ in }
