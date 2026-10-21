@@ -154,10 +154,21 @@ service cloud.firestore {
         && v.routeOffset is number && v.routeOffset >= 0;
     }
 
-    // A stop request that has not been resolved (expiresAt unset or in the future).
+    // A stop request that has not been resolved: expiresAt unset or in the future, and not marked
+    // closed (an event from an old build has no status).
     function openStop(ev) {
       return ev.category == 'stopRequest'
+        && optionalOf(ev, 'status') != 'closed'
         && (optionalOf(ev, 'expiresAt') == null || ev.expiresAt > request.time);
+    }
+
+    // Closing a stop request: status closed, who closed it and why, and expiresAt (old builds read
+    // "no expiresAt" as open, so closing always sets it).
+    function closesStop(d, reasons) {
+      return d.status == 'closed'
+        && d.closedReason in reasons
+        && d.closedBy == request.auth.uid
+        && d.expiresAt is timestamp;
     }
 
     // ---------- rules ----------
@@ -308,11 +319,34 @@ service cloud.firestore {
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
               && (optionalOf(request.resource.data, 'expiresAt') == null
                   || request.resource.data.expiresAt is timestamp))
-            // Lead car or organizer pins the place of an open stop request.
+            // The author closes their own stop request as cancelled.
+            || (resource.data.authorId == request.auth.uid
+              && openStop(resource.data)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasAll(['status', 'closedReason', 'closedBy', 'expiresAt'])
+              && closesStop(request.resource.data, ['cancelled']))
+            // Lead car or organizer pins the place of an open stop request (old builds send only
+            // the place; new ones also set status pinned).
             || (isLeadOrOrganizer(tripId)
               && openStop(resource.data)
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['place'])
               && validPlace(request.resource.data.place))
+            || (isLeadOrOrganizer(tripId)
+              && openStop(resource.data)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['place', 'status'])
+              && request.resource.data.diff(resource.data).affectedKeys().hasAll(['place'])
+              && request.resource.data.get('status', null) == 'pinned'
+              && validPlace(request.resource.data.place))
+            // Lead car or organizer closes a stop request: everyone left, or nobody answered.
+            || (isLeadOrOrganizer(tripId)
+              && openStop(resource.data)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasAll(['status', 'closedReason', 'closedBy', 'expiresAt'])
+              && closesStop(request.resource.data, ['left', 'noAnswer']))
             // Lead car or organizer resolves (expires) a stop request.
             || (isLeadOrOrganizer(tripId)
               && resource.data.category == 'stopRequest'
@@ -333,10 +367,14 @@ service cloud.firestore {
             && tripActive(tripId)
             && get(memberPath(tripId, request.auth.uid)).data.carId == carId
             && openStop(get(/databases/$(database)/documents/trips/$(tripId)/events/$(eventId)).data)
-            && request.resource.data.keys().hasOnly(['userId', 'agree', 'at', 'suggestion'])
+            && request.resource.data.keys().hasOnly(['userId', 'agree', 'answer', 'at', 'suggestion'])
             && request.resource.data.keys().hasAll(['userId', 'agree', 'at'])
             && request.resource.data.userId == request.auth.uid
             && request.resource.data.agree is bool
+            // answer is optional (old builds send only agree) and always matches agree.
+            && (optionalOf(request.resource.data, 'answer') == null
+                || (request.resource.data.answer == 'yes' && request.resource.data.agree == true)
+                || (request.resource.data.answer == 'notNow' && request.resource.data.agree == false))
             && request.resource.data.at == request.time
             && (optionalOf(request.resource.data, 'suggestion') == null
                 || validSuggestion(request.resource.data.suggestion));

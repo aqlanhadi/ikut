@@ -483,4 +483,70 @@ describe('stop requests', () => {
       await assertFails(updateDoc(evRef('mem'), { expiresAt: ts() }));
     });
   });
+
+  // D20: request states, a real answer on the vote, and closing with a reason.
+  describe('request states and answers', () => {
+    const closed = (reason, uid, over = {}) => ({ status: 'closed', closedReason: reason, closedBy: uid, expiresAt: ts(), ...over });
+
+    it('a vote may carry answer yes with agree true', () =>
+      assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'yes' }))));
+    it('a vote may carry answer notNow with agree false', () =>
+      assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'notNow', agree: false }))));
+    it('answer yes with agree false fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'yes', agree: false }))));
+    it('answer notNow with agree true fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'notNow', agree: true }))));
+    it('an unknown answer fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'skip', agree: false }))));
+    it('an old-shape vote (agree only) still passes', () =>
+      assertSucceeds(setDoc(voteRef('mem', 'carA'), { userId: 'mem', agree: true, at: serverTimestamp() })));
+    it('an old-shape pin (place only) still passes', () => assertSucceeds(updateDoc(evRef('lead'), { place: place() })));
+    it('an old-shape resolve (expiresAt only) still passes for the author', () =>
+      assertSucceeds(updateDoc(evRef('mem'), { expiresAt: ts() })));
+
+    it('lead can pin with place and status pinned', () =>
+      assertSucceeds(updateDoc(evRef('lead'), { place: place(), status: 'pinned' })));
+    it('organizer can pin with place and status pinned', () =>
+      assertSucceeds(updateDoc(evRef('org'), { place: place({ pinnedBy: 'org' }), status: 'pinned' })));
+    it('a pin cannot set status closed', () =>
+      assertFails(updateDoc(evRef('lead'), { place: place(), status: 'closed' })));
+    it('status pinned without a place fails', () => assertFails(updateDoc(evRef('lead'), { status: 'pinned' })));
+    it('a non-lead member cannot pin with status', () =>
+      assertFails(updateDoc(evRef('other'), { place: place({ pinnedBy: 'other' }), status: 'pinned' })));
+    it('cannot pin a closed stop', async () => {
+      await updateDoc(evRef('lead'), closed('left', 'lead', { expiresAt: ts(-3_600_000) }));
+      await assertFails(updateDoc(evRef('lead'), { place: place(), status: 'pinned' }));
+    });
+
+    it('lead can close with left', () => assertSucceeds(updateDoc(evRef('lead'), closed('left', 'lead'))));
+    it('organizer can close with noAnswer', () => assertSucceeds(updateDoc(evRef('org'), closed('noAnswer', 'org'))));
+    it('lead cannot close as cancelled', () => assertFails(updateDoc(evRef('lead'), closed('cancelled', 'lead'))));
+    it('closing needs closedBy to be the caller', () => assertFails(updateDoc(evRef('lead'), closed('left', 'org'))));
+    it('closing without closedReason fails', () => {
+      const c = closed('left', 'lead');
+      delete c.closedReason;
+      return assertFails(updateDoc(evRef('lead'), c));
+    });
+    it('closing without expiresAt fails', () => {
+      const c = closed('left', 'lead');
+      delete c.expiresAt;
+      return assertFails(updateDoc(evRef('lead'), c));
+    });
+    it('an unknown closedReason fails', () => assertFails(updateDoc(evRef('lead'), closed('bored', 'lead'))));
+    it('a non-lead member cannot close with left', () => assertFails(updateDoc(evRef('other'), closed('left', 'other'))));
+    it('the author can close their own request as cancelled', () =>
+      assertSucceeds(updateDoc(evRef('mem'), closed('cancelled', 'mem'))));
+    it('the author cannot close as left or noAnswer', async () => {
+      await assertFails(updateDoc(evRef('mem'), closed('left', 'mem')));
+      await assertFails(updateDoc(evRef('mem'), closed('noAnswer', 'mem')));
+    });
+    it('the author cannot slip a place in with the close', () =>
+      assertFails(updateDoc(evRef('mem'), closed('cancelled', 'mem', { place: place({ pinnedBy: 'mem' }) }))));
+    it('cannot close an already closed stop', () => assertFails(updateDoc(evRef('lead', 'stopDone'), closed('left', 'lead'))));
+    it('cannot vote on a stop closed with a status', async () => {
+      await updateDoc(evRef('lead'), closed('left', 'lead', { expiresAt: ts(-3_600_000) }));
+      await assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'yes' })));
+    });
+  });
 });
+
