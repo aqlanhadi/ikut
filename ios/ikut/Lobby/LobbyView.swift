@@ -22,6 +22,8 @@ struct LobbyView: View {
     @State private var showMap = false
     /// This phone opened the map; covers the gap before the startedAt write comes back.
     @State private var startedHere = false
+    /// Shows `model` as given: nothing is loaded, started or remembered.
+    private var isSample = false
 
     init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
@@ -30,6 +32,16 @@ struct LobbyView: View {
         _session = State(initialValue: TripSession(
             tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
     }
+
+    #if DEBUG
+    /// A lobby on sample data, for previews.
+    init(sample model: LobbyModel) {
+        onExit = {}
+        _model = State(initialValue: model)
+        _session = State(initialValue: TripSession(tripId: model.tripId, userId: ""))
+        isSample = true
+    }
+    #endif
 
     private var isOrganizer: Bool {
         guard let trip = model.trip else { return false }
@@ -45,7 +57,7 @@ struct LobbyView: View {
 
     /// Remembers this trip for Home's past list, with who else is in it once the members have loaded.
     private func recordPastTrip() {
-        guard let trip = model.trip else { return }
+        guard !isSample, let trip = model.trip else { return }
         let names = model.members.keyedByID { $0.displayName }
         PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name, endedAt: trip.endedAt,
                          others: names.isEmpty ? nil : PastTrips.others(from: names, excluding: currentUserId))
@@ -180,6 +192,7 @@ struct LobbyView: View {
             }
         }
         .onAppear {
+            guard !isSample else { return }
             model.start()
             session.start()
         }
@@ -505,3 +518,21 @@ extension LobbyLogic {
         return parts.joined(separator: " · ")
     }
 }
+
+#if DEBUG
+#Preview("Gathering") {
+    Backend.configure()
+    return NavigationStack {
+        LobbyView(sample: .sample(started: false))
+    }
+    .environment(LocationPermission())
+}
+
+#Preview("On the move") {
+    Backend.configure()
+    return NavigationStack {
+        LobbyView(sample: .sample(started: true))
+    }
+    .environment(LocationPermission())
+}
+#endif

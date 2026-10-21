@@ -429,3 +429,38 @@ private struct TicketTear: View {
     }
     .environment(AuthModel())
 }
+
+/// Answers the join callables from fixed data: a ticket for any code, or `failure` when set.
+private struct PreviewJoinAPI: JoinAPI {
+    var failure: String?
+
+    func preview(code: String) async throws -> TripPreview {
+        if let failure { throw JoinError(message: failure) }
+        return TripPreview(tripId: "demo", name: "Balik kampung raya", destinationName: "Ipoh", cars: [
+            PreviewCar(id: "c1", name: "Aqlan’s Myvi", color: "#2563EB", hasTracker: true, number: 1),
+            PreviewCar(id: "c2", name: "Wyna’s X70", color: "#D9480F", hasTracker: true, number: 2),
+            PreviewCar(id: "c3", name: "Hafiz’s Hilux", color: "#0F766E", hasTracker: false, number: 3),
+        ])
+    }
+
+    func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
+        JoinResult(tripId: "demo", carId: "c3", trackerTaken: false)
+    }
+}
+
+#Preview("Ticket") {
+    Backend.configure()
+    return NavigationStack {
+        JoinTripView(model: JoinModel(displayName: "Daniel", initialCode: "K7M2QX", api: PreviewJoinAPI())) { _, _ in }
+    }
+    .environment(AuthModel())
+}
+
+#Preview("Code not found") {
+    Backend.configure()
+    let message = JoinService.message(code: .notFound, serverMessage: "")
+    return NavigationStack {
+        JoinTripView(model: JoinModel(displayName: "", initialCode: "K7M2QX", api: PreviewJoinAPI(failure: message))) { _, _ in }
+    }
+    .environment(AuthModel())
+}

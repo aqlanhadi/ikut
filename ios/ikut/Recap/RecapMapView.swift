@@ -84,3 +84,12 @@ struct RecapMapView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    let model = RecapModel(snapshot: .demo(), originName: "Tanjung Malim")
+    if let recap = model.recap, let snapshot = model.snapshot {
+        RecapMapView(recap: recap, snapshot: snapshot, onClose: {})
+    }
+}
+#endif

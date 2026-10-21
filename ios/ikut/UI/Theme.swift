@@ -295,3 +295,89 @@ struct IconTile: View {
             .accessibilityHidden(true)
     }
 }
+
+#Preview("Colors") {
+    let swatches: [(String, Color)] = [
+        ("ikutAccent", .ikutAccent), ("ikutPositive", .ikutPositive), ("ikutWarning", .ikutWarning),
+        ("ikutScreen", .ikutScreen), ("ikutCard", .ikutCard),
+    ]
+    VStack(spacing: Spacing.s) {
+        ForEach(swatches, id: \.0) { name, color in
+            HStack(spacing: Spacing.m) {
+                RoundedRectangle(cornerRadius: Radius.icon, style: .continuous)
+                    .fill(color)
+                    .overlay(RoundedRectangle(cornerRadius: Radius.icon, style: .continuous).strokeBorder(.quaternary))
+                    .frame(width: 44, height: 44)
+                Text(name).font(.body.monospaced())
+                Spacer()
+            }
+        }
+    }
+    .padding(Spacing.l)
+}
+
+#Preview("Buttons") {
+    VStack(spacing: Spacing.m) {
+        Button("Start Trip") {}.buttonStyle(PillButtonStyle())
+        Button("Start Trip") {}.buttonStyle(PillButtonStyle()).disabled(true)
+        HStack(spacing: Spacing.gap) {
+            Button("Share") {}.buttonStyle(PillButtonStyle())
+            Button("Done") {}.buttonStyle(SecondaryPillButtonStyle())
+        }
+        Button("Join a trip") {}.buttonStyle(LinkPillButtonStyle())
+    }
+    .padding(Spacing.l)
+    .frame(maxHeight: .infinity)
+    .background(Color.ikutScreen)
+}
+
+#Preview("Cards and notes") {
+    func row(_ text: String) -> some View {
+        Text(text).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(.horizontal, Spacing.l)
+    }
+    return ScrollView {
+        VStack(spacing: 0) {
+            CardHeader("Cars")
+            VStack(spacing: 0) {
+                row("Aqlan’s Myvi")
+                RowDivider()
+                row("Wyna’s X70")
+            }
+            .ikutCard()
+            InlineNote("Everyone in the trip sees this name.").padding(.top, Spacing.s)
+            CardHeader("Ready") {
+                ProgressView(value: 0.75).frame(width: 60)
+                Text("3 of 4 ready")
+            }
+            EmptyRow("No cars yet").ikutCard()
+            InlineNote("Couldn't reach the server.", systemImage: "exclamationmark.triangle.fill", tone: .alert)
+                .padding(.top, Spacing.s)
+            CardHeader("Tiles", inset: Spacing.xs)
+            Text("A tile on a sheet").frame(maxWidth: .infinity, minHeight: 80).ikutTile()
+        }
+        .padding(.horizontal, Spacing.screenMargin)
+    }
+    .background(Color.ikutScreen)
+}
+
+#Preview("Sheet header and close buttons") {
+    VStack(spacing: Spacing.xl) {
+        SheetHeader(title: "Report", subtitle: "The cars behind you get an alert.") {}
+        HStack(spacing: Spacing.xl) {
+            SheetCloseButton {}
+            MapCloseButton {}
+                .padding(Spacing.l)
+                .background(LinearGradient(colors: [.green, .blue], startPoint: .top, endPoint: .bottom))
+        }
+    }
+    .padding(Spacing.l)
+}
+
+#Preview("Icon tiles") {
+    HStack(spacing: Spacing.gap) {
+        IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
+        IconTile(symbol: "steeringwheel", color: .ikutAccent, size: 30)
+        IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.iconLarge)
+    }
+    .padding(Spacing.l)
+}

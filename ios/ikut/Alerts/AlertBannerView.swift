@@ -1,3 +1,4 @@
+import FirebaseFirestore
 import SwiftUI
 
 /// In-app banner for the current alert. Overlay it at the top of the map; it hides itself when
@@ -61,3 +62,35 @@ struct AlertBannerView: View {
         }
     }
 }
+
+#if DEBUG
+extension TripAlert {
+    /// The alert `AlertWording` writes for an event Wyna's car reported two minutes ago, for previews.
+    static func sample(_ type: EventType, distance: Double? = nil, message: String? = nil, now: Date = Date()) -> TripAlert {
+        var event = TripEvent(
+            type: type, location: GeoPoint(latitude: 4.2, longitude: 101.26), heading: 0, routeOffset: 0,
+            authorId: "u-c2", carId: "c2", createdAt: now.addingTimeInterval(-120), message: message)
+        event.id = "sample-\(type.rawValue)"
+        return AlertWording.alert(for: event, tripId: "demo", distance: distance, authorName: "Wyna", now: now)
+    }
+}
+
+#Preview("Every category") {
+    let alerts: [TripAlert] = [
+        .sample(.accident, distance: 800),
+        .sample(.heavyRain),
+        .sample(.stopFuel),
+        .sample(.carTrouble),
+        .sample(.message, message: "Lunch at Tapah?"),
+    ]
+    let centers = alerts.map { alert in
+        let center = AlertCenter(bannerDuration: .seconds(3_600))
+        center.showForDemo(alert)
+        return center
+    }
+    return VStack(spacing: Spacing.m) {
+        ForEach(centers.indices, id: \.self) { AlertBannerView(center: centers[$0]) }
+    }
+    .padding(Spacing.m)
+}
+#endif

@@ -77,6 +77,16 @@ final class CreateTripModel {
             return false
         }
     }
+
+    #if DEBUG
+    /// Shows `results` for `query`, searched from `originName`, without searching or locating.
+    func showForDemo(query: String, results: [DestinationResult], origin: CLLocationCoordinate2D, originName: String) {
+        self.query = query
+        self.results = results
+        self.origin = origin
+        self.originName = originName
+    }
+    #endif
 }
 
 /// Where to? (LocationSearch.dc.html): FROM your location, TO a search field, then results.
@@ -90,6 +100,12 @@ struct CreateTripView: View {
     var onDone: (String) -> Void
 
     init(changingTripId: String? = nil, onDone: @escaping (String) -> Void) {
+        self.changingTripId = changingTripId
+        self.onDone = onDone
+    }
+
+    init(model: CreateTripModel, changingTripId: String? = nil, onDone: @escaping (String) -> Void) {
+        _model = State(initialValue: model)
         self.changingTripId = changingTripId
         self.onDone = onDone
     }
@@ -304,3 +320,32 @@ private struct PlaceKind {
     }
     .environment(AuthModel())
 }
+
+#if DEBUG
+#Preview("Results") {
+    Backend.configure()
+    let model = CreateTripModel()
+    model.showForDemo(
+        query: "Ipoh",
+        results: [
+            DestinationResult(name: "Ipoh", subtitle: "Perak, Malaysia", coordinate: .init(latitude: 4.5975, longitude: 101.0901)),
+            DestinationResult(
+                name: "Petronas Jalan Gopeng", subtitle: "Jalan Gopeng, Ipoh",
+                coordinate: .init(latitude: 4.5600, longitude: 101.1100), category: MKPointOfInterestCategory.gasStation.rawValue),
+            DestinationResult(
+                name: "Restoran Nam Heong", subtitle: "Jalan Bandar Timah, Ipoh",
+                coordinate: .init(latitude: 4.5960, longitude: 101.0790), category: MKPointOfInterestCategory.restaurant.rawValue),
+            DestinationResult(
+                name: "Sultan Azlan Shah Airport", subtitle: "Ipoh",
+                coordinate: .init(latitude: 4.5680, longitude: 101.0920), category: MKPointOfInterestCategory.airport.rawValue),
+            DestinationResult(
+                name: "Kinta Riverfront Hotel", subtitle: "Jalan Lim Bo Seng, Ipoh",
+                coordinate: .init(latitude: 4.5940, longitude: 101.0830), category: MKPointOfInterestCategory.hotel.rawValue),
+        ],
+        origin: .init(latitude: 3.1390, longitude: 101.6869), originName: "Kuala Lumpur")
+    return NavigationStack {
+        CreateTripView(model: model) { _ in }
+    }
+    .environment(AuthModel())
+}
+#endif

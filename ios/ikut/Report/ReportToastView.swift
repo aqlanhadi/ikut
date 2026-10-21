@@ -52,3 +52,22 @@ struct ReportToastView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Every state") {
+    let states: [ReportToastModel.State] = [
+        .sending(label: "debris"),
+        .reported(label: "debris", eventId: "demo-debris"),
+        .failed(message: "Couldn't report debris. Check your connection."),
+    ]
+    let models = states.map { state in
+        let model = ReportToastModel()
+        model.showForDemo(state)
+        return model
+    }
+    return VStack(spacing: Spacing.m) {
+        ForEach(models.indices, id: \.self) { ReportToastView(model: models[$0]) }
+    }
+    .padding(Spacing.m)
+}
+#endif

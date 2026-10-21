@@ -399,3 +399,17 @@ private struct GlassPillButtonStyle: ButtonStyle {
     return TripsHomeView(onNewTrip: {}, onJoin: {})
         .environment(AuthModel())
 }
+
+#Preview("Past trips") {
+    Backend.configure()
+    // Saved in the preview's own defaults, so the plain preview lists them too after this one has run.
+    let day: TimeInterval = 86_400
+    PastTrips.record(tripId: "sample-3", name: "Cameron weekend", destination: "Tanah Rata",
+                     endedAt: Date().addingTimeInterval(-40 * day), others: ["Wyna"], now: Date().addingTimeInterval(-40 * day))
+    PastTrips.record(tripId: "sample-2", name: "Makan trip", destination: "Melaka",
+                     endedAt: Date().addingTimeInterval(-9 * day), others: nil, now: Date().addingTimeInterval(-9 * day))
+    PastTrips.record(tripId: "sample-1", name: "Balik kampung raya", destination: "Ipoh",
+                     endedAt: Date().addingTimeInterval(-day), others: ["Wyna", "Hafiz", "Daniel"])
+    return TripsHomeView(onNewTrip: {}, onJoin: {})
+        .environment(AuthModel())
+}
