@@ -682,3 +682,33 @@ struct StopCard: View {
         }
     }
 }
+
+#if DEBUG
+// Asking: no stop open yet.
+#Preview("Ask: reasons") { StopCardPreview() }
+#Preview("Ask: suggested place") { StopCardPreview(screen: "askplaces") }
+#Preview("Ask: place list") { StopCardPreview(screen: "placelist") }
+#Preview("Ask: sent") { StopCardPreview(screen: "sent") }
+#Preview("Ask: nobody answered") { StopCardPreview(scene: "noanswer") }
+
+// One stop open, as each car sees it.
+#Preview("Asker") { StopCardPreview(scene: "asker") }
+#Preview("Responder") { StopCardPreview(scene: "responder") }
+#Preview("Lead") { StopCardPreview(scene: "lead") }
+#Preview("Lead: another place") { StopCardPreview(scene: "lead", screen: "another") }
+#Preview("Lead: confirm pin") { StopCardPreview(scene: "lead", screen: "confirmpin") }
+#Preview("Pinned") { StopCardPreview(scene: "pinned") }
+#Preview("At the stop") { StopCardPreview(scene: "atstop") }
+#Preview("Two requests") { StopCardPreview(scene: "two") }
+
+// A moving phone.
+#Preview("Driving: ask") { StopCardPreview(screen: "driverask", driving: true) }
+#Preview("Driving: are you a passenger?") { StopCardPreview(screen: "passenger", driving: true) }
+#Preview("Driving: read only") { StopCardPreview(scene: "responder", driving: true) }
+
+// The card closed: the Pit stop button on the panel.
+#Preview("Pit stop button: no stop") { StopCardPreview(cardOpen: false) }
+#Preview("Pit stop button: waiting for me") { StopCardPreview(scene: "two", cardOpen: false) }
+#Preview("Pit stop button: pinned") { StopCardPreview(scene: "pinned", cardOpen: false) }
+#Preview("Pit stop button: nobody answered") { StopCardPreview(scene: "noanswer", cardOpen: false) }
+#endif
