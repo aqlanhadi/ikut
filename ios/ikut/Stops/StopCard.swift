@@ -1,3 +1,4 @@
+import MapKit
 import Observation
 import SwiftUI
 
@@ -8,6 +9,8 @@ final class StopCardModel {
     enum Screen: Equatable {
         /// What the board says: ask, or the open request(s).
         case home
+        /// The place list for a new ask (search box, then places).
+        case askPlaces
         /// The place list for another place on an open request.
         case places(eventId: String)
         /// "Are you a passenger?", before the place list on a moving phone.
@@ -17,13 +20,13 @@ final class StopCardModel {
     }
 
     var screen: Screen = .home
-    /// The request being made: reason tiles, then the place list.
+    /// The request being made: reason tiles, then the suggested place.
     let ask: RequestStopModel
     /// The places for another place on an open request.
     var suggest: RequestStopModel?
     var session = StopCardSession()
-    /// When the countdown sends the request; nil while it isn't counting.
-    var sendAt: Date?
+    /// The place list's search box.
+    var query = ""
     /// Sent; waiting for the request to show up on the board.
     var sentWaiting = false
 
@@ -40,19 +43,21 @@ final class StopCardModel {
 
     func startSuggesting(for state: StopRequestState) {
         suggest = RequestStopModel(context: context, existing: state, service: service, searcher: searcher)
+        query = ""
         screen = .places(eventId: state.eventId)
     }
 
     func backHome() {
         screen = .home
         suggest = nil
+        query = ""
     }
 }
 
 /// The stop card, layered on top of the convoy panel. It opens only when someone taps the Pit stop
-/// button, and closes by itself when the stop closes. What it shows follows the board:
-/// ask (tiles, then the places with a countdown), the asker's timeline, a request from another car,
-/// the lead car's votes and pin, at the stop, and read only while the car moves.
+/// button, and closes by itself when the stop closes. Sending is always an explicit tap. What it shows
+/// follows the board: ask (tiles, then the suggested place on a small map), the asker's timeline, a
+/// request from another car, the lead car's votes and pin, at the stop, and read only while the car moves.
 struct StopCard: View {
     let board: StopBoard
     let context: StopContext
@@ -62,22 +67,16 @@ struct StopCard: View {
     var onClose: () -> Void
 
     @State private var model: StopCardModel
-    /// Seconds before an ask goes out by itself.
-    private let countdown: TimeInterval
-
-    static let autoSendDelay: TimeInterval = 5
 
     init(
         board: StopBoard, context: StopContext, driving: Bool, actions: StopRequestActions,
         service: any StopServing = StopService(), searcher: any PlaceSearching = MapKitPlaceSearcher(),
-        countdown: TimeInterval = StopCard.autoSendDelay, demoScreen: String? = nil,
-        onClose: @escaping () -> Void
+        demoScreen: String? = nil, onClose: @escaping () -> Void
     ) {
         self.board = board
         self.context = context
         self.driving = driving
         self.actions = actions
-        self.countdown = countdown
         self.onClose = onClose
         let model = StopCardModel(context: context, service: service, searcher: searcher)
         #if DEBUG
@@ -90,30 +89,12 @@ struct StopCard: View {
         StopCardGate.mode(driving: driving, session: model.session, hasOpenStop: !board.requests.isEmpty)
     }
 
-    /// The search is done and nothing is in flight: the request goes by itself after the countdown.
-    private var readyToSend: Bool {
-        model.screen == .home && board.requests.isEmpty && !model.sentWaiting && model.ask.isReadyToAutoSend
-    }
-
     var body: some View {
         screen
             .simultaneousGesture(
                 DragGesture(minimumDistance: 20).onEnded { value in
                     if value.translation.height > 60, abs(value.translation.width) < value.translation.height { onClose() }
                 })
-            .onChange(of: readyToSend, initial: true) { _, ready in
-                model.sendAt = ready ? Date().addingTimeInterval(countdown) : nil
-            }
-            .onChange(of: model.ask.picked) {
-                // Picking another place restarts the countdown so there's time to see it.
-                if readyToSend { model.sendAt = Date().addingTimeInterval(countdown) }
-            }
-            .task(id: model.sendAt) {
-                guard let sendAt = model.sendAt else { return }
-                try? await Task.sleep(for: .seconds(max(0, sendAt.timeIntervalSinceNow)))
-                guard !Task.isCancelled, model.sendAt == sendAt else { return }
-                send()
-            }
             .task(id: model.sentWaiting) {
                 guard model.sentWaiting else { return }
                 try? await Task.sleep(for: .seconds(8))
@@ -123,8 +104,8 @@ struct StopCard: View {
                 if !ids.isEmpty {
                     // A request is open, mine or someone's: whatever was being asked is over.
                     model.sentWaiting = false
-                    model.sendAt = nil
                     model.ask.clearReason()
+                    if model.screen == .askPlaces || model.screen == .passengerCheck { model.backHome() }
                 }
                 switch model.screen {
                 case .places(let id) where !ids.contains(id): model.backHome()
@@ -137,6 +118,7 @@ struct StopCard: View {
     @ViewBuilder private var screen: some View {
         switch model.screen {
         case .home: home
+        case .askPlaces: askPlacesScreen
         case .places(let id): placesScreen(eventId: id)
         case .passengerCheck: passengerScreen
         case .confirmPin(let id, let place): confirmPinScreen(eventId: id, place: place)
@@ -148,7 +130,7 @@ struct StopCard: View {
             if model.sentWaiting {
                 sentScreen
             } else if let reason = model.ask.reason {
-                if mode == .driverAsk { driverConfirmScreen(reason) } else { askPlacesScreen(reason) }
+                askConfirmScreen(reason)
             } else {
                 tilesScreen
             }
@@ -163,24 +145,34 @@ struct StopCard: View {
 
     // MARK: Ask
 
+    /// The four reasons, laid out as in the Report sheet: a two column grid, icon and label in each tile.
     private var tilesScreen: some View {
-        StopCardFrame(title: "Ask to stop", subtitle: "One tap. We’ll find the next good place.", onClose: onClose) {
+        StopCardFrame(title: "Ask to stop", subtitle: nil, onClose: onClose) {
             if let missed = board.missed { missedNotice(missed) }
             LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible(), spacing: Spacing.gap)],
-                spacing: Spacing.gap
+                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap
             ) {
                 ForEach(StopReason.all) { reason in
                     Button { model.ask.choose(reason) } label: {
-                        VStack(spacing: Spacing.s) {
-                            StopReasonIcon(symbol: reason.symbol, size: 44)
-                            Text(reason.label).font(.headline).foregroundStyle(.primary)
+                        HStack(spacing: Spacing.m) {
+                            Image(systemName: reason.symbol)
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.orange, in: Circle())
+                            Text(reason.label)
+                                .font(.headline)
+                                .minimumScaleFactor(0.8)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 92)
+                        .padding(.horizontal, Spacing.m)
+                        .frame(maxWidth: .infinity, minHeight: 72)
                         .ikutTile()
                         .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(reason.label)
                     .accessibilityIdentifier("stop.reason.\(reason.type.rawValue)")
                 }
             }
@@ -203,106 +195,74 @@ struct StopCard: View {
         .accessibilityIdentifier("stop.noAnswer")
     }
 
-    private func askPlacesScreen(_ reason: StopReason) -> some View {
-        StopCardFrame(title: reason.label, subtitle: "The best place is picked. Change it if you like.", onClose: onClose) {
-            placeList(model.ask)
+    /// The suggested place on a small map, its distance and time, and one button that sends. A
+    /// driving driver gets the same screen with one big button.
+    private func askConfirmScreen(_ reason: StopReason) -> some View {
+        let ask = model.ask
+        let big = mode == .driverAsk
+        return StopCardFrame(title: reason.label, subtitle: nil, onClose: onClose) {
+            switch ask.search {
+            case .idle, .loading:
+                HStack(spacing: Spacing.gap) {
+                    ProgressView()
+                    Text("Finding the next good place…").foregroundStyle(.secondary)
+                }
+                .padding(.vertical, Spacing.section)
+                .frame(maxWidth: .infinity)
+            default:
+                if let chosen = ask.chosen {
+                    if let me = ask.myCoordinate {
+                        StopMiniMap(
+                            me: me, place: chosen.coordinate, symbol: reason.symbol,
+                            route: StopMapFraming.routeBetween(
+                                context.mainRoute, from: ask.myOffset ?? 0, to: chosen.routeOffset))
+                            .id(chosen.id)
+                    }
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.m) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(chosen.name).font(.headline).lineLimit(2)
+                            Text(chosen.whereText).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                        Spacer(minLength: 4)
+                        Text(chosen.costText).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
+                    }
+                    .padding(.horizontal, Spacing.xs)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("stop.suggested")
+                } else {
+                    note("No place found ahead. The lead car chooses where.")
+                }
+            }
         } actions: {
-            if case .failed(let message) = model.ask.sending {
+            if case .failed(let message) = ask.sending {
                 Text(message).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
             }
-            countdownButton
-            if model.sendAt != nil {
-                StopActionButton(title: "Send now", style: .ghost, height: 44, id: "stop.send") { send() }
+            StopActionButton(
+                title: "Ask for this stop", style: .primary, height: big ? 72 : 50,
+                disabled: !ask.canSend, id: "stop.send"
+            ) { send() }
+            StopActionButton(
+                title: "Another place", style: big ? .ghost : .secondary, height: big ? 44 : 50, id: "stop.anotherPlace"
+            ) {
+                if StopCardGate.needsPassengerCheck(driving: driving, session: model.session) {
+                    model.screen = .passengerCheck
+                } else {
+                    model.query = ""
+                    model.screen = .askPlaces
+                }
             }
         }
     }
 
-    /// The main action while asking: it fills up as the countdown runs, and tapping it is Undo.
-    private var countdownButton: some View {
-        Button {
-            if model.sendAt != nil {
-                undoSend()
-            } else {
-                send()
-            }
-        } label: {
-            TimelineView(.animation(minimumInterval: 0.1, paused: model.sendAt == nil)) { timeline in
-                let left = model.sendAt.map { max(0, $0.timeIntervalSince(timeline.date)) }
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.ikutAccent)
-                    if let left {
-                        GeometryReader { proxy in
-                            Capsule()
-                                .fill(Color.white.opacity(0.22))
-                                .frame(width: proxy.size.width * (1 - left / countdown))
-                        }
-                    }
-                    Group {
-                        if model.ask.sending == .sending {
-                            ProgressView().tint(.white)
-                        } else if let left {
-                            Text("Sending in \(Int(left.rounded(.up))) s · Undo")
-                        } else {
-                            Text("Send now")
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .font(.headline)
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .frame(height: 50)
-                .clipShape(Capsule())
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(!model.ask.canSend && model.sendAt == nil)
-        .accessibilityLabel(model.sendAt == nil ? "Send now" : "Undo")
-        .accessibilityHint(model.sendAt == nil ? "" : "Stops the request from being sent")
-        .accessibilityIdentifier("stop.countdown")
-    }
-
-    /// The driver's version: the best place read back, a huge Send now, Cancel. Never the place list.
-    private func driverConfirmScreen(_ reason: StopReason) -> some View {
-        let chosen = model.ask.chosen
-        return StopCardFrame(
-            title: chosen.map { "\(reason.label) at \($0.name)" } ?? reason.label,
-            subtitle: driverSubtitle, onClose: onClose
-        ) {
-            HStack(spacing: Spacing.m) {
-                TimelineView(.animation(minimumInterval: 0.2, paused: model.sendAt == nil)) { timeline in
-                    let left = model.sendAt.map { max(0, $0.timeIntervalSince(timeline.date)) }
-                    Text(left.map { "\(Int($0.rounded(.up)))" } ?? "·")
-                        .font(.system(.title, design: .rounded).weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.ikutAccent)
-                        .frame(width: 56, height: 56)
-                        .overlay(Circle().strokeBorder(Color.ikutAccent, lineWidth: 3))
-                }
-                .accessibilityIdentifier("stop.ring")
-                Text(model.sendAt == nil ? "Waiting for the best place." : "Sending by itself. Tap Cancel to stop it.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-            if case .failed(let message) = model.ask.sending {
-                Text(message).font(.footnote).foregroundStyle(.red)
+    /// The place list for a new ask: a search box, then places; picking one goes back to the map confirm.
+    private var askPlacesScreen: some View {
+        StopCardFrame(title: "Another place", subtitle: nil, onClose: onClose) {
+            placeList(model.ask) { candidate in
+                model.ask.picked = candidate.id
+                model.screen = .home
             }
         } actions: {
-            StopActionButton(title: "Send now", style: .primary, height: 72, disabled: !model.ask.canSend, id: "stop.send") {
-                send()
-            }
-            StopActionButton(title: "Cancel", style: .ghost, height: 44, id: "stop.cancelAsk") { undoSend() }
-            StopActionButton(title: "Choose another place", style: .ghost, height: 44, id: "stop.anotherPlace") {
-                model.sendAt = nil
-                model.screen = .passengerCheck
-            }
-        }
-    }
-
-    private var driverSubtitle: String {
-        switch model.ask.search {
-        case .idle, .loading: "Finding the next good place…"
-        case .failed: "The lead car chooses where"
-        case .loaded: model.ask.chosen.map { "\($0.whereText) · \($0.costText.lowercased())" } ?? "The lead car chooses where"
+            StopActionButton(title: "Back", style: .ghost, height: 44, id: "stop.back") { model.screen = .home }
         }
     }
 
@@ -314,7 +274,6 @@ struct StopCard: View {
     }
 
     private func send() {
-        model.sendAt = nil
         Task {
             if await model.ask.send() {
                 model.sentWaiting = true
@@ -323,14 +282,21 @@ struct StopCard: View {
         }
     }
 
-    private func undoSend() {
-        model.sendAt = nil
-        model.ask.clearReason()
-    }
-
     // MARK: Place list (shared by asking and "Another place")
 
-    @ViewBuilder private func placeList(_ list: RequestStopModel) -> some View {
+    /// The search box, then the places. `onPick` is what a tap on a place does.
+    @ViewBuilder private func placeList(_ list: RequestStopModel, onPick: @escaping (StopCandidate) -> Void) -> some View {
+        HStack(spacing: Spacing.s) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Search places", text: Bindable(model).query)
+                .textInputAutocapitalization(.never)
+                .submitLabel(.search)
+                .onSubmit { Task { await list.search(text: model.query) } }
+                .accessibilityIdentifier("stop.search")
+        }
+        .padding(.horizontal, Spacing.m)
+        .frame(minHeight: 44)
+        .ikutSurface(.quaternary, radius: Radius.control)
         switch list.search {
         case .idle, .loading:
             HStack(spacing: Spacing.gap) {
@@ -340,17 +306,11 @@ struct StopCard: View {
             .padding(.vertical, Spacing.section)
             .frame(maxWidth: .infinity)
         case .failed:
-            note(list.existing == nil
-                ? "Could not find places along the route. You can still ask; the lead car chooses where."
-                : "Could not find places along the route.")
+            note("Could not find places along the route. You can still ask; the lead car chooses where.")
         case .loaded where list.candidates.isEmpty:
-            note(list.existing == nil
-                ? "No places found 15 to 25 km ahead. You can still ask; the lead car chooses where."
-                : "No places found ahead.")
+            note("No places found ahead.")
         case .loaded:
-            Text("Ahead on the route").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                .padding(.horizontal, Spacing.xs)
-            ForEach(list.candidates) { candidate in candidateRow(candidate, in: list) }
+            ForEach(list.candidates) { candidate in candidateRow(candidate, in: list, onPick: onPick) }
         }
     }
 
@@ -363,9 +323,11 @@ struct StopCard: View {
             .ikutTile()
     }
 
-    private func candidateRow(_ candidate: StopCandidate, in list: RequestStopModel) -> some View {
+    private func candidateRow(
+        _ candidate: StopCandidate, in list: RequestStopModel, onPick: @escaping (StopCandidate) -> Void
+    ) -> some View {
         let selected = list.picked == candidate.id
-        return Button { list.picked = candidate.id } label: {
+        return Button { onPick(candidate) } label: {
             HStack(spacing: Spacing.m) {
                 IconTile(symbol: list.reason?.symbol ?? "mappin", color: .orange, size: 34, radius: Radius.iconLarge)
                 VStack(alignment: .leading, spacing: 1) {
@@ -595,13 +557,21 @@ struct StopCard: View {
         }
     }
 
+    /// "Are you a passenger?" as a short block inside the same card: the question, and two buttons.
     private var passengerScreen: some View {
-        StopCardFrame(title: "Search places", subtitle: "This phone is moving", onClose: onClose) {
-            StopPassengerCheck()
+        StopCardFrame(title: "Another place", subtitle: nil, onClose: onClose) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("Typing is off while the car moves.").font(.subheadline).foregroundStyle(.secondary)
+                Text("Are you a passenger?").font(.title3.bold())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("stop.passengerCheck")
         } actions: {
-            StopActionButton(title: "I’m a passenger", style: .primary, height: 60, id: "stop.passenger") {
+            StopActionButton(title: "I’m a passenger", style: .primary, id: "stop.passenger") {
                 model.session.confirmPassenger()
-                model.screen = .home
+                model.query = ""
+                model.screen = .askPlaces
             }
             StopActionButton(title: "I’m driving", style: .secondary, id: "stop.driving") {
                 model.session.confirmDriving()
@@ -619,7 +589,7 @@ struct StopCard: View {
                 subtitle: state.canPin ? "Pick the place to pin." : "Pick a place ahead. The lead car pins the final stop.",
                 onClose: onClose
             ) {
-                placeList(list)
+                placeList(list) { list.picked = $0.id }
             } actions: {
                 if case .failed(let message) = list.sending {
                     Text(message).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)

@@ -125,6 +125,10 @@ struct TripMapView: View {
                         model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
                         nextStop: stopBoard.requests.first?.place, stopButton: StopLogic.buttonContent(for: stopBoard),
                         onReport: openReport, onStop: openStopCard)
+                        // The glass card is see-through, so the panel fades out under it.
+                        .opacity(stopCardOpen ? 0 : 1)
+                        .allowsHitTesting(!stopCardOpen)
+                        .accessibilityHidden(stopCardOpen)
                     stopCard
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { panelMinY = $0 }
@@ -491,11 +495,6 @@ struct TripMapView: View {
         return mapHeight - (bannerShowing ? 158 : 74)
     }
 
-    /// A long countdown in the demo, so a screenshot can catch it.
-    private static var demoCountdown: TimeInterval {
-        ProcessInfo.processInfo.environment["IKUT_MAP_DEMO_COUNTDOWN"].flatMap(TimeInterval.init) ?? StopCard.autoSendDelay
-    }
-
     private func openStopCard() {
         withAnimation(.snappy) { stopCardOpen = true }
     }
@@ -510,12 +509,13 @@ struct TripMapView: View {
         if stopCardOpen, let context = stopContext {
             StopCard(
                 board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
-                service: stopService, searcher: placeSearcher,
-                countdown: liveServices ? StopCard.autoSendDelay : Self.demoCountdown, demoScreen: demoScreen,
+                service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
                 onClose: closeStopCard
             )
             .padding(.horizontal, Spacing.s)
             .padding(.bottom, Spacing.s)
+            // Above the panel for the whole of its exit too, or it would slide away behind it.
+            .zIndex(1)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -577,7 +577,8 @@ struct TripMapView: View {
     /// Sleeps until the pill's content changes by itself (20 seconds up, a confirmation done), then
     /// re-reads it.
     private func tickPill() async {
-        guard let next = StopPillPlanner.nextChange(requests: stopBoard.requests, memory: pillMemory, now: Date()) else { return }
+        // The demo keeps the pill on screen, so a screenshot can catch it.
+        guard liveServices, let next = StopPillPlanner.nextChange(requests: stopBoard.requests, memory: pillMemory, now: Date()) else { return }
         try? await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
         guard !Task.isCancelled else { return }
         withAnimation(.snappy) { pillNow = Date() }

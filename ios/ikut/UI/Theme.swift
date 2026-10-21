@@ -221,18 +221,25 @@ struct MapCloseButton: View {
 /// Sheet title with its one-line explanation and the close button.
 struct SheetHeader: View {
     var title: String
-    var subtitle: String
+    var subtitle: String?
     var subtitleFont: Font = .footnote
+    /// Moves the close button, for a card whose corners are rounder than a sheet's.
+    var closeOffset: CGSize = .zero
+    var closeIdentifier: String?
     var onClose: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.m) {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(title).font(.title2.bold())
-                Text(subtitle).font(subtitleFont).foregroundStyle(.secondary)
+                if let subtitle { Text(subtitle).font(subtitleFont).foregroundStyle(.secondary) }
             }
+            // Without a subtitle the title sits level with the middle of the 44 pt close button.
+            .frame(minHeight: subtitle == nil ? 44 : nil, alignment: .leading)
             Spacer(minLength: 0)
             SheetCloseButton(action: onClose)
+                .offset(closeOffset)
+                .accessibilityIdentifier(closeIdentifier ?? "sheet.close")
         }
     }
 }

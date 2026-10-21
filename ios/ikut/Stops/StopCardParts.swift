@@ -15,38 +15,49 @@ struct StopCardFrame<Content: View, Actions: View>: View {
 
     @State private var contentHeight: CGFloat = 0
 
+    private func body(of content: Content) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.gap) { content }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.cozy) {
-            HStack(alignment: .top, spacing: Spacing.m) {
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(title).font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
-                    if let subtitle, !subtitle.isEmpty {
-                        Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                SheetCloseButton(action: onClose).accessibilityIdentifier("stop.card.close")
+            SheetHeader(
+                title: title, subtitle: subtitle, subtitleFont: .subheadline,
+                // 16 pt from the top and trailing edges: the 38 pt corner minus the button's 22 pt radius.
+                closeOffset: CGSize(width: Spacing.xs, height: -Spacing.xs), closeIdentifier: "stop.card.close",
+                onClose: onClose
+            )
+            .accessibilityAddTraits(.isHeader)
+            // As tall as the content; past the cap the body scrolls.
+            // As tall as the content; past the cap the body scrolls. Nothing else fills the space.
+            let natural = body(of: content)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+            if contentHeight > Self.maxBodyHeight {
+                ScrollView { natural }
+                    .frame(height: Self.maxBodyHeight)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollIndicators(.hidden)
+            } else {
+                natural
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.gap) { content }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear.onChange(of: proxy.size.height, initial: true) { _, height in contentHeight = height }
-                        })
-            }
-            .frame(height: contentHeight > 0 ? min(contentHeight, Self.maxBodyHeight) : nil)
-            .frame(maxHeight: Self.maxBodyHeight)
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollIndicators(.hidden)
             VStack(spacing: Spacing.xs) { actions }
         }
-        .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.section)
-        .padding(.bottom, Spacing.section)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+        // 20 pt on every edge: 16 would put the title inside the 38 pt corner curve. The same frosted
+        // material, clip and shadow as the convoy panel, and its grabber (drag down to close).
+        .padding(.horizontal, Spacing.block)
+        .padding(.top, Spacing.block)
+        .padding(.bottom, Spacing.block)
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(Color(.systemGray3))
+                .frame(width: 36, height: 5)
+                .padding(.top, Spacing.tight)
+                .accessibilityHidden(true)
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
         .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.card")
@@ -216,21 +227,5 @@ struct StopTimeline: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// "Are you a passenger?": one big "I'm a passenger", one "I'm driving" (page section 3, step 3).
-struct StopPassengerCheck: View {
-    var body: some View {
-        VStack(spacing: Spacing.m) {
-            Text("Are you a passenger?").font(.title3.bold()).multilineTextAlignment(.center)
-            Text("Typing is off while the car moves, so the driver keeps their eyes on the road.")
-                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-        }
-        .padding(Spacing.cozy)
-        .frame(maxWidth: .infinity)
-        .ikutTile()
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("stop.passengerCheck")
     }
 }

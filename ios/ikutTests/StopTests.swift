@@ -580,6 +580,30 @@ struct StopLogicTests {
     }
 }
 
+// MARK: The ask confirm map
+
+struct StopMapFramingTests {
+    private let route = RouteLine((0...60).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.009) })
+
+    @Test func regionFitsBothPointsWithRoomAround() {
+        let a = CLLocationCoordinate2D(latitude: 3, longitude: 101)
+        let b = CLLocationCoordinate2D(latitude: 3.02, longitude: 101.18)
+        let region = StopMapFraming.region(a, b)
+        #expect(abs(region.center.longitude - 101.09) < 1e-9)
+        #expect(region.span.longitudeDelta >= 0.18 * 1.5 - 1e-9)
+        #expect(region.span.latitudeDelta >= 0.008)
+        // Two points on top of each other still get a street-level frame.
+        #expect(StopMapFraming.region(a, a).span.latitudeDelta == 0.008)
+    }
+
+    @Test func routeBetweenIsSampledAndEndsAtThePlace() {
+        let points = StopMapFraming.routeBetween(route, from: 1_000, to: 5_000)
+        #expect(points.count == 9)
+        #expect(StopMapFraming.routeBetween(route, from: 5_000, to: 1_000).isEmpty)
+        #expect(StopMapFraming.routeBetween(nil, from: 0, to: 1_000).isEmpty)
+    }
+}
+
 // MARK: Suggestions
 
 struct StopSuggestionTests {

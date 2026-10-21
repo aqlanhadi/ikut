@@ -204,38 +204,33 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             mark("a.sawAccident")
         }
 
-        try step("6. B's pit stop: card, agree, scripted votes, pin, resolve") {
+        try step("6. B's pit stop: button, votes, pin, leave") {
             try waitMark("b.stopRequested", timeout: 240)
-            let agree = app.buttons["Agree to Stop"]
-            try waitFor("stop card on A", timeout: 60) { agree.exists }
-            shot("07-stop-card")
-            agree.tap()
-            // Agreeing folds the card into its chip; a tap opens it again.
-            let chip = app.buttons["stopChip"]
-            try waitFor("A's card folded after agreeing", timeout: 20) { chip.exists && !agree.exists }
-            shot("07b-stop-chip")
-            chip.tap()
-            try waitFor("A's agreement shown", timeout: 20) { button(beginningWith: "Agreed").exists }
+            // A request never opens the card by itself: the Pit stop button shows it, with a badge.
+            let stopButton = app.buttons["stop.button"]
+            try waitFor("A's Pit stop button shows the stop", timeout: 60) { stopButton.label.hasPrefix("Fuel stop") }
+            XCTAssertFalse(element("stop.card").exists, "the stop card must not open by itself")
+            shot("07-stop-button")
+            stopButton.tap()
+            let pin = app.buttons["stop.pin"]
+            try waitFor("the stop card on A, with a pin button", timeout: 30) { pin.exists }
+            shot("07b-stop-card")
             try waitMark("cars.voted", timeout: 120)
-            try waitFor("votes from all four cars", timeout: 60) {
-                let votes = labelled("label BEGINSWITH %@", "Votes: ")
-                return votes.exists && votes.label.contains("of 4 agreed")
-                    && !votes.label.hasPrefix("Votes: 0") && !votes.label.hasPrefix("Votes: 1")
-                    && !votes.label.hasPrefix("Votes: 2")
+            try waitFor("votes from at least three of four cars", timeout: 60) {
+                // The panel (and its button) is hidden under the open card: count the agreed cars on the card.
+                app.descendants(matching: .any)
+                    .matching(NSPredicate(format: "identifier BEGINSWITH 'stop.voter.' AND label ENDSWITH ', agreed'")).count >= 3
             }
-            let pin = app.buttons["Pin this stop"].exists ? app.buttons["Pin this stop"] : button(beginningWith: "Pin ")
-            try waitFor("a pin button", timeout: 30) { pin.exists }
             shot("08-stop-votes")
             pin.tap()
-            try waitFor("stop pinned for everyone", timeout: 30) { button(beginningWith: "Agreed · Pinned").exists }
+            let leave = app.buttons["stop.leave"]
+            try waitFor("stop pinned for everyone: Leave now", timeout: 30) { leave.exists }
             shot("09-stop-pinned")
             mark("a.pinned")
             try waitMark("b.sawPin", timeout: 120)
-            let arrived = app.buttons["Everyone has arrived"]
-            XCTAssertTrue(arrived.waitForExistence(timeout: 10), "lead has no Everyone has arrived")
-            arrived.tap()
-            try waitFor("stop card gone on A", timeout: 60) {
-                !button(beginningWith: "Agreed").exists && !agree.exists && !app.buttons["stopChip"].exists
+            leave.tap()
+            try waitFor("the card closes by itself and the button is Pit stop again", timeout: 60) {
+                !element("stop.card").exists && stopButton.label == "Pit stop"
             }
             try waitFor("convoy list back on A", timeout: 30) { convoyOrder().count == 4 }
             shot("10-stop-resolved")
@@ -337,36 +332,35 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             mark("b.sawAccident")
         }
 
-        try step("6. asks for a fuel stop from the Pit stop sheet") {
+        try step("6. asks for a fuel stop from the stop card") {
             try waitMark("a.sawAccident", timeout: 120)
-            let pitStop = app.buttons["Pit stop"]
+            let pitStop = app.buttons["stop.button"]
             try waitFor("Pit stop button", timeout: 20) { pitStop.exists && pitStop.isHittable }
             pitStop.tap()
-            let fuel = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Fuel'")).firstMatch
-            XCTAssertTrue(fuel.waitForExistence(timeout: 10), "Pit stop sheet didn't open")
+            let fuel = app.buttons["stop.reason.stopFuel"]
+            XCTAssertTrue(fuel.waitForExistence(timeout: 10), "the stop card didn't open")
             fuel.tap()
-            Thread.sleep(forTimeInterval: 1)
-            shot("08-pit-stop-sheet")
-            // It finds a place ahead (or none) and sends by itself after a 5 s countdown.
-            try waitFor("request sent and the sheet closed", timeout: 90) { !app.staticTexts["Need gas"].exists }
-            // The requester's own card starts folded into its chip.
-            try waitFor("B's own request chip", timeout: 30) { app.buttons["stopChip"].exists }
+            // It finds a place ahead (or none); nothing is sent until the explicit "Ask for this stop".
+            let send = app.buttons["stop.send"]
+            try waitFor("Ask for this stop is ready", timeout: 60) { send.exists && send.isEnabled }
+            shot("08-stop-card-ask")
+            send.tap()
+            // The card then shows the asker's timeline.
+            try waitFor("request sent: the timeline", timeout: 90) { element("stop.timeline").exists }
             shot("09-stop-requested")
+            app.buttons["stop.card.close"].tap()
+            try waitFor("B's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }
             mark("b.stopRequested")
         }
 
         try step("7. sees the lead's pin, then the stop resolved") {
             try waitMark("a.pinned", timeout: 240)
-            try waitFor("pinned place on B's card", timeout: 60) {
-                labelled("label CONTAINS %@", "pinned by the lead car").exists
-                    || button(beginningWith: "Agreed · Pinned").exists
-            }
+            let stopButton = app.buttons["stop.button"]
+            try waitFor("the pinned stop on B's button", timeout: 60) { stopButton.label.contains("pinned at") }
             shot("10-stop-pinned")
             mark("b.sawPin")
             try waitMark("a.resolved", timeout: 120)
-            try waitFor("stop card gone on B", timeout: 60) {
-                !button(beginningWith: "Agreed").exists && !app.buttons["stopChip"].exists
-            }
+            try waitFor("the button is Pit stop again on B", timeout: 60) { stopButton.label == "Pit stop" }
             shot("11-stop-resolved")
         }
 

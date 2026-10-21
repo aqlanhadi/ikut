@@ -9,7 +9,12 @@ extension StopCardModel {
     /// for another place), `confirmpin` (the lead's confirm step). Anything else is the home screen.
     func applyDemo(_ name: String?, board: StopBoard) {
         switch name {
-        case "passenger": screen = .passengerCheck
+        case "passenger":
+            ask.choose(StopReason.all[0])
+            screen = .passengerCheck
+        case "placelist":
+            ask.choose(StopReason.all[0])
+            screen = .askPlaces
         case "askplaces", "driverask": ask.choose(StopReason.all[0])
         case "another": board.requests.first.map { startSuggesting(for: $0) }
         case "confirmpin":

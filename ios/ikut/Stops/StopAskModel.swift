@@ -45,6 +45,11 @@ final class RequestStopModel {
     private(set) var search: Search = .idle
     private(set) var sending: Sending = .idle
     var picked: StopCandidate.ID?
+    /// Where this car is and how far along the route, as of the last search; the minimap frames it.
+    private(set) var myCoordinate: CLLocationCoordinate2D?
+    private(set) var myOffset: Double?
+    /// Every candidate seen, so a place picked from one search stays chosen after another search.
+    private var seen: [StopCandidate.ID: StopCandidate] = [:]
     private var searchTask: Task<Void, Never>?
 
     init(
@@ -58,7 +63,7 @@ final class RequestStopModel {
         if let existing { choose(StopReason.all.first { $0.type == existing.type } ?? StopReason.all[3]) }
     }
 
-    var chosen: StopCandidate? { candidates.first { $0.id == picked } }
+    var chosen: StopCandidate? { picked.flatMap { seen[$0] } }
 
     /// A reason is chosen and a place is picked, or the search came up empty so the request goes
     /// without a place.
@@ -70,13 +75,14 @@ final class RequestStopModel {
 
     var sendLabel: String {
         if let existing { return existing.canPin ? "Pin this stop" : "Suggest this stop" }
-        return "Send to convoy"
+        return "Ask for this stop"
     }
 
     func choose(_ reason: StopReason) {
         self.reason = reason
         picked = nil
         candidates = []
+        seen = [:]
         searchTask?.cancel()
         searchTask = Task { await runSearch(for: reason) }
     }
@@ -87,16 +93,50 @@ final class RequestStopModel {
         reason = nil
         picked = nil
         candidates = []
+        seen = [:]
         search = .idle
         sending = .idle
     }
 
-    /// Search done (with or without places) and nothing in flight: the request can go by itself.
-    var isReadyToAutoSend: Bool {
-        existing == nil && canSend && (search == .loaded || search == .failed)
+    /// The place list's search box: places matching `text` near the route ahead. Empty text brings the
+    /// suggestions back. The place already picked stays picked.
+    func search(text: String) async {
+        guard let reason else { return }
+        let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty {
+            await runSearch(for: reason, keepPick: true)
+            return
+        }
+        search = .loading
+        let snapshot = context.snapshot()
+        guard let route = context.mainRoute ?? snapshot?.route, let snapshot else {
+            search = .failed
+            return
+        }
+        let mine = EventService.routeOffset(for: snapshot.coordinate, route: route, previousOffset: snapshot.previousOffset)
+        let from = max(mine, context.frontOffset() ?? 0)
+        guard let center = StopSuggestions.searchCenter(on: route, from: from) else {
+            search = .loaded
+            candidates = []
+            return
+        }
+        do {
+            let found = try await searcher.search(query: query, near: center, radius: StopSuggestions.searchRadius)
+            guard !Task.isCancelled, self.reason == reason else { return }
+            remember(StopSuggestions.rank(found, route: route, fromOffset: from))
+            search = .loaded
+        } catch {
+            guard !Task.isCancelled, self.reason == reason else { return }
+            search = .failed
+        }
     }
 
-    private func runSearch(for reason: StopReason) async {
+    private func remember(_ found: [StopCandidate]) {
+        candidates = found
+        for candidate in found { seen[candidate.id] = candidate }
+    }
+
+    private func runSearch(for reason: StopReason, keepPick: Bool = false) async {
         search = .loading
         let snapshot = context.snapshot()
         let route = context.mainRoute ?? snapshot?.route
@@ -105,14 +145,16 @@ final class RequestStopModel {
             return
         }
         let mine = EventService.routeOffset(for: snapshot.coordinate, route: route, previousOffset: snapshot.previousOffset)
+        myCoordinate = snapshot.coordinate
+        myOffset = mine
         let from = max(mine, context.frontOffset() ?? 0)
         do {
             let found = try await StopSuggestions.suggest(
                 type: reason.type, route: route, fromOffset: from, searcher: searcher)
             guard !Task.isCancelled, self.reason == reason else { return }
-            candidates = found
+            remember(found)
             // A new request goes with the nearest place unless the sender picks another.
-            if existing == nil { picked = found.first?.id }
+            if existing == nil, !keepPick || picked == nil { picked = found.first?.id }
             search = .loaded
         } catch {
             guard !Task.isCancelled, self.reason == reason else { return }
