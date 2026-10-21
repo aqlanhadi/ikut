@@ -212,6 +212,8 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             XCTAssertFalse(element("stop.card").exists, "the stop card must not open by itself")
             shot("07-stop-button")
             stopButton.tap()
+            // The phones drive at 90 km/h, so the card is read only until "I'm a passenger".
+            if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
             let pin = app.buttons["stop.pin"]
             try waitFor("the stop card on A, with a pin button", timeout: 30) { pin.exists }
             shot("07b-stop-card")
@@ -346,7 +348,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             shot("08-stop-card-ask")
             send.tap()
             // The card then shows the asker's timeline.
-            try waitFor("request sent: the timeline", timeout: 90) { element("stop.timeline").exists }
+            try waitFor("request sent: the timeline (or the read-only status while the phone drives)", timeout: 90) { element("stop.timeline").exists || element("stop.readOnlyNote").exists }
             shot("09-stop-requested")
             app.buttons["stop.card.close"].tap()
             try waitFor("B's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }

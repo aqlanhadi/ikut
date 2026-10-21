@@ -213,6 +213,8 @@ final class DemoOrganizerUITests: DemoBase {
         else { return }
         shot("stop-button")
         stopButton.tap()
+        // A moving phone shows the card read only until "I'm a passenger".
+        if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
         let pin = app.buttons["stop.pin"]
         guard soft("a pin button shows on the stop card", timeout: 30, core: true, { pin.exists }) else { return }
         shot("stop-pin-buttons")
@@ -315,7 +317,7 @@ final class DemoOwnCarUITests: DemoBase {
         guard soft("Ask for this stop is ready", timeout: 60, core: true, { send.exists && send.isEnabled }) else { return }
         shot("pit-stop-card")
         send.tap()
-        soft("the request is sent and the card shows the timeline", timeout: 90, core: true) { element("stop.timeline").exists }
+        soft("the request is sent and the card shows the timeline", timeout: 90, core: true) { element("stop.timeline").exists || element("stop.readOnlyNote").exists }
         app.buttons["stop.card.close"].tap()
         soft("Faiz's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }
         shot("stop-requested")

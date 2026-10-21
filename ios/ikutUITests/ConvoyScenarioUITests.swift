@@ -112,6 +112,8 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             stopButton.tap()
             let yes = app.buttons["stop.yes"]
             try waitFor("the stop card", timeout: 20) { element("stop.card").exists }
+            // The phone drives at highway speed: the card is read only until "I'm a passenger".
+            if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
             try waitFor("the place on the card", timeout: 40 / speed + 30) {
                 app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Petronas Tapah R&R'")).firstMatch.exists
             }
