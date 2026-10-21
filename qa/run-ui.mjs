@@ -100,7 +100,7 @@ say(`trip code ${simCode}`);
 const ios = path.join(repo, 'ios');
 const args = ['test', '-project', path.join(ios, 'ikut.xcodeproj'), '-scheme', 'ikut', '-destination', `platform=iOS Simulator,id=${o.udid}`,
   '-derivedDataPath', o.derivedData, '-clonedSourcePackagesDirPath', path.join(o.derivedData, 'SourcePackages'),
-  `-only-testing:${o.only}`];
+  `-only-testing:${o.only}`, '-collect-test-diagnostics', 'never'];
 if (o.skipBuild) args[0] = 'test-without-building';
 const xcLogPath = path.join(o.logs, 'xcodebuild.log');
 const xcLog = fs.createWriteStream(xcLogPath);

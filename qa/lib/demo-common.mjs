@@ -293,7 +293,7 @@ function startTest(o, tag, phone, syncDir, say, onFail) {
   const bundle = path.join(o.logs, `${tag}-${phone.id}.xcresult`);
   fs.rmSync(bundle, { recursive: true, force: true });
   const xc = spawn('xcodebuild', ['test-without-building', ...xcodeArgs(o), '-destination', `platform=iOS Simulator,id=${phone.udid}`,
-    `-only-testing:ikutUITests/${phone.test}`, '-resultBundlePath', bundle], {
+    `-only-testing:ikutUITests/${phone.test}`, '-resultBundlePath', bundle, '-collect-test-diagnostics', 'never'], {
     env: { ...process.env, TEST_RUNNER_IKUT_SYNC_DIR: syncDir, TEST_RUNNER_IKUT_QA_SCREENS: path.join(o.logs, `${tag}-screens`),
       ...(o.backend === 'production' ? { TEST_RUNNER_IKUT_USE_PRODUCTION: '1' } : {}),
       ...(phone.id === 'a' && endTrip ? { TEST_RUNNER_IKUT_END_TRIP: '1' } : {}), ...phone.env },
