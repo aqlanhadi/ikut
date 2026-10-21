@@ -13,6 +13,9 @@ struct ConvoyPanel: View {
     var canReport: Bool
     /// The pinned place of the open stop request, for NEXT STOP.
     var nextStop: StopPlace?
+    /// What the Pit stop button says: "Pit stop", or the open stop ("Fuel · 2 of 4") with a badge.
+    var stopButton = StopLogic.ButtonContent(
+        label: "Pit stop", symbol: "mappin.and.ellipse", badge: 0, accessibilityLabel: "Pit stop")
     var onReport: () -> Void
     var onStop: () -> Void
 
@@ -315,12 +318,35 @@ struct ConvoyPanel: View {
             .disabled(!canReport)
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
-                Label("Pit stop", systemImage: "mappin.and.ellipse")
-                .font(.headline)
-                .frame(width: 146, height: 50)
-                .foregroundStyle(.primary)
-                .background(Color(.systemGray5).opacity(0.7), in: Capsule())
+                // An open stop shows its reason's icon and how it stands; the label never wraps, the
+                // button widens over Report instead.
+                Label(stopButton.label, systemImage: stopButton.symbol)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, Spacing.l)
+                    .frame(minWidth: 146, minHeight: 50)
+                    .foregroundStyle(.primary)
+                    .background(Color(.systemGray5).opacity(0.7), in: Capsule())
+                    .overlay(alignment: .topTrailing) {
+                        if stopButton.badge > 0 {
+                            Text("\(stopButton.badge)")
+                                .font(.caption.weight(.bold))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 22, minHeight: 22)
+                                .background(Color.red, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color(.systemBackground), lineWidth: 2))
+                                .offset(x: 6, y: -6)
+                                .accessibilityHidden(true)
+                                .accessibilityIdentifier("stop.badge")
+                        }
+                    }
             }
+            .layoutPriority(1)
+            .accessibilityLabel(stopButton.accessibilityLabel)
+            .accessibilityIdentifier("stop.button")
         }
         .buttonStyle(.plain)
         .padding(.top, Spacing.m)

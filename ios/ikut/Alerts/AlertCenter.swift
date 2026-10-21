@@ -36,6 +36,10 @@ final class AlertCenter {
     /// The alert to show as a banner, nil when none. Cleared by `dismiss()` or after `bannerDuration`.
     private(set) var current: TripAlert?
 
+    /// What a spoken stop request asks the listener to do ("Tap yes.", or "Tap pin this stop." in the
+    /// lead car). The map sets it from this phone's role.
+    @ObservationIgnored var stopReply = AlertWording.defaultStopReply
+
     /// `.timeSensitive` needs the Time Sensitive Notifications entitlement, which needs the paid
     /// program, so alerts use `.active` until A2.
     nonisolated static let interruptionLevel: UNNotificationInterruptionLevel = .active
@@ -131,7 +135,8 @@ final class AlertCenter {
         let name = await names.displayName(tripId: tripId, userId: event.authorId)
         // The trip may have changed or stopped while the name loaded.
         guard self.tripId == tripId else { return false }
-        deliver(AlertWording.alert(for: event, tripId: tripId, distance: distance, authorName: name, now: now()))
+        deliver(AlertWording.alert(
+            for: event, tripId: tripId, distance: distance, authorName: name, now: now(), stopReply: stopReply))
         return true
     }
 

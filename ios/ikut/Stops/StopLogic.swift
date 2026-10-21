@@ -1,12 +1,30 @@
+import CoreLocation
 import FirebaseFirestore
 import Foundation
+
+/// The answer a car gives to a stop request. "Skip this one" is a later task.
+enum StopAnswer: String, Codable, Sendable, Equatable {
+    case yes
+    case notNow
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = StopAnswer(rawValue: raw) ?? .notNow
+    }
+
+    /// Old builds only know `agree`, so it is written next to `answer`.
+    var agree: Bool { self == .yes }
+}
 
 /// `trips/{tripId}/events/{eventId}/votes/{carId}`: one vote per car.
 struct StopVote: Codable, Sendable, Equatable, Identifiable {
     /// The car id.
     @DocumentID var id: String?
+    /// Who answered for the car.
     var userId: String
     var agree: Bool
+    /// Missing on votes from old builds; then `agree` is all there is.
+    var answer: StopAnswer?
     @ServerTimestamp var at: Date?
     /// Another place this car would rather stop at. The requesting car proposes its place this way.
     var suggestion: StopPlace?
@@ -23,13 +41,31 @@ enum StopPermissions {
     }
 }
 
+/// Where a car is, as far as the stop screens need it. Taken from the positions the phone already has.
+struct StopCarFix: Equatable, Sendable {
+    var latitude: Double
+    var longitude: Double
+    /// Meters along the main route; nil until the car has merged.
+    var offset: Double?
+
+    var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
+}
+
 /// What the stop card shows: the request, a row per car, and what this viewer may do.
 struct StopRequestState: Equatable, Sendable {
     enum VoteStatus: Equatable, Sendable {
         case agreed
         case waiting
+        /// Said "Not now".
+        case notNow
         /// Voted no and named another place.
         case suggested
+    }
+
+    /// Once a place is pinned: a car is here (within `StopLogic.hereRadius`) or this many minutes away.
+    enum Arrival: Equatable, Sendable {
+        case here
+        case minutes(Int)
     }
 
     struct Row: Equatable, Sendable, Identifiable {
@@ -41,7 +77,22 @@ struct StopRequestState: Equatable, Sendable {
         var isMine: Bool
         var status: VoteStatus
         var suggestion: StopPlace?
+        var arrival: Arrival?
         var id: String { carId }
+
+        init(
+            carId: String, number: Int?, colorHex: String, name: String, isMine: Bool, status: VoteStatus,
+            suggestion: StopPlace?, arrival: Arrival? = nil
+        ) {
+            self.carId = carId
+            self.number = number
+            self.colorHex = colorHex
+            self.name = name
+            self.isMine = isMine
+            self.status = status
+            self.suggestion = suggestion
+            self.arrival = arrival
+        }
     }
 
     var eventId: String
@@ -64,10 +115,28 @@ struct StopRequestState: Equatable, Sendable {
     /// The viewer's meters along the main route; nil while unknown.
     var viewerOffset: Double?
     var isResolved: Bool
+    /// The viewer wrote this request (the rules let only the author cancel it).
+    var isAuthor = false
+    /// The viewer's car's answer, nil while it has not answered.
+    var myAnswer: StopAnswer?
+    /// "Aisha": who pinned the place, when a car's tracker is known.
+    var pinnedByName: String?
+    /// Where the asking car is along the route, for the line the lead sends back.
+    var requesterOffset: Double?
+    /// Nobody pinned a place within `StopLogic.noAnswerAfter`.
+    var isNoAnswer = false
 
     var agreedCount: Int { rows.filter { $0.status == .agreed }.count }
 
-    /// "Wyna Needs Gas".
+    var isPinned: Bool { place != nil }
+
+    /// Cars at the pinned place.
+    var hereCount: Int { rows.filter { $0.arrival == .here }.count }
+
+    /// The viewer's car is at the pinned place.
+    var viewerIsHere: Bool { rows.first { $0.isMine }?.arrival == .here }
+
+    /// "Wyna needs fuel".
     var title: String { "\(requesterName) \(Self.need(for: type))" }
 
     /// "Car 2 · asked 1 min ago".
@@ -102,19 +171,47 @@ struct StopRequestState: Equatable, Sendable {
         return "About \(ConvoyFormat.duration(d / StopLogic.assumedSpeed))"
     }
 
+    /// Whole minutes from the viewer to the place, either way along the route; nil while unknown.
+    var viewerMinutes: Int? {
+        if case .minutes(let minutes)? = rows.first(where: { $0.isMine })?.arrival { return minutes }
+        guard let d = distanceToPlace else { return nil }
+        return StopLogic.minutes(forMeters: abs(d))
+    }
+
     static func need(for type: EventType) -> String {
         switch type {
-        case .stopFuel: "Needs Gas"
-        case .stopFood: "Needs Food"
-        case .stopToilet: "Needs a Toilet Break"
-        default: "Needs a Rest"
+        case .stopFuel: "needs fuel"
+        case .stopFood: "needs food"
+        case .stopToilet: "needs a toilet break"
+        default: "needs a rest"
         }
     }
+}
+
+/// Everything the stop screens read: the open requests (oldest first) and, when this car asked and
+/// nobody answered, that request.
+struct StopBoard: Equatable, Sendable {
+    var requests: [StopRequestState] = []
+    /// This car's own request that nobody pinned in time, shown as "No answer" so it can ask again.
+    var missed: StopRequestState?
+
+    static let empty = StopBoard()
+
+    /// Requests that still need this car's answer.
+    var unansweredCount: Int { requests.filter(StopLogic.needsAnswer).count }
 }
 
 enum StopLogic {
     /// Meters per second (90 km/h) used for the ETA to a stop, as in the design's "18 km · 12 min".
     static let assumedSpeed: Double = 25
+
+    /// A request nobody pinned this long after it was asked reads "No answer" (page section 4).
+    static let noAnswerAfter: TimeInterval = 10 * 60
+    /// A "No answer" request stays on the asker's screen this long after it was asked, so there is
+    /// time to see it and ask again.
+    static let missedVisibleFor: TimeInterval = 20 * 60
+    /// A car within this many meters of the pinned place is "here" (page section 4).
+    static let hereRadius: CLLocationDistance = 150
 
     /// The owner's first name from a car name: "Wyna’s X70" and "Wyna's car" both give "Wyna".
     static func ownerName(fromCarName name: String) -> String {
@@ -126,18 +223,70 @@ enum StopLogic {
         return name
     }
 
-    /// Latest unresolved stop request, or nil.
-    static func activeStop(in events: [TripEvent], now: Date) -> TripEvent? {
+    // MARK: Which requests are open
+
+    /// A stop request that has not been closed or resolved (no `expiresAt` yet, or one in the future).
+    static func isOpen(_ event: TripEvent, now: Date) -> Bool {
+        event.category == .stopRequest && event.id != nil && event.status != .closed
+            && (event.expiresAt.map { $0 > now } ?? true)
+    }
+
+    /// Open, still without a pinned place, and asked `noAnswerAfter` ago or longer.
+    static func isNoAnswer(_ event: TripEvent, now: Date) -> Bool {
+        guard isOpen(event, now: now), event.place == nil, event.status != .pinned,
+              let asked = event.createdAt else { return false }
+        return now.timeIntervalSince(asked) >= noAnswerAfter
+    }
+
+    /// Every open request, oldest first. One that nobody pinned in `noAnswerAfter` is not in it
+    /// (it is "No answer", see `missedAsk`). Replaces the single newest `activeStop`, which hid the
+    /// older of two requests while it was still open.
+    static func openStops(in events: [TripEvent], now: Date) -> [TripEvent] {
         events
-            .filter { $0.category == .stopRequest && $0.id != nil && ($0.expiresAt.map { $0 > now } ?? true) }
+            .filter { isOpen($0, now: now) && !isNoAnswer($0, now: now) }
+            .sorted { ($0.createdAt ?? .distantFuture) < ($1.createdAt ?? .distantFuture) }
+    }
+
+    /// Requests the lead car's or organizer's phone closes with `closedReason: noAnswer`.
+    static func noAnswerToClose(in events: [TripEvent], now: Date) -> [TripEvent] {
+        events.filter { isNoAnswer($0, now: now) }
+    }
+
+    /// This car's newest request, if nobody answered it (asked again since: nil).
+    static func missedAsk(in events: [TripEvent], myCarId: String, now: Date) -> TripEvent? {
+        let mine = events
+            .filter { $0.category == .stopRequest && $0.id != nil && $0.carId == myCarId && $0.closedReason != .cancelled }
             .max { ($0.createdAt ?? .distantFuture) < ($1.createdAt ?? .distantFuture) }
+        guard let mine, let asked = mine.createdAt, now.timeIntervalSince(asked) < missedVisibleFor else { return nil }
+        return isNoAnswer(mine, now: now) || mine.closedReason == .noAnswer ? mine : nil
+    }
+
+    // MARK: Cars
+
+    /// Whole minutes for `meters` at `assumedSpeed`, at least 1.
+    static func minutes(forMeters meters: Double) -> Int {
+        max(1, Int((meters / assumedSpeed / 60).rounded()))
+    }
+
+    /// Here when within `hereRadius` of the place, else the minutes still to drive: along the route
+    /// when the car's offset is known, else in a straight line.
+    static func arrival(of fix: StopCarFix, to place: StopPlace) -> StopRequestState.Arrival {
+        let target = CLLocationCoordinate2D(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude)
+        let straight = RouteLine.haversine(fix.coordinate, target)
+        if straight <= hereRadius { return .here }
+        return .minutes(minutes(forMeters: fix.offset.map { abs(place.routeOffset - $0) } ?? straight))
+    }
+
+    /// The lead car's tracker is this user.
+    static func isLeadTracker(cars: [Car], myCarId: String, myUserId: String) -> Bool {
+        cars.first { $0.id == myCarId }.map { $0.isLead && $0.trackerUserId == myUserId } ?? false
     }
 
     /// Cars that get a row: tracked cars, cars that voted, and the requesting car.
     /// The requesting car counts as agreed. Cars sort by badge number, then name.
     static func tally(
         event: TripEvent, votes: [StopVote], cars: [Car], myUserId: String, myCarId: String,
-        isOrganizer: Bool, viewerOffset: Double?, now: Date
+        isOrganizer: Bool, viewerOffset: Double?, now: Date, fixes: [String: StopCarFix] = [:]
     ) -> StopRequestState? {
         guard let eventId = event.id else { return nil }
         let voteByCar = votes.keyedByID()
@@ -154,21 +303,25 @@ enum StopLogic {
             let id = car.id ?? ""
             let vote = voteByCar[id]
             let status: StopRequestState.VoteStatus
-            if id == event.carId || vote?.agree == true {
+            if id == event.carId || vote?.answer == .yes || (vote?.answer == nil && vote?.agree == true) {
                 status = .agreed
             } else if vote?.suggestion != nil {
                 status = .suggested
+            } else if vote?.answer == .notNow {
+                status = .notNow
             } else {
                 status = .waiting
             }
+            let arrival = event.place.flatMap { place in fixes[id].map { arrival(of: $0, to: place) } }
             return StopRequestState.Row(
                 carId: id, number: car.number, colorHex: car.color,
                 name: id == myCarId ? "\(car.name) (you)" : car.name, isMine: id == myCarId,
-                status: status, suggestion: vote?.suggestion)
+                status: status, suggestion: vote?.suggestion, arrival: arrival)
         }
         let requester = cars.first { $0.id == event.carId }
-        let me = cars.first { $0.id == myCarId }
-        let isLeadTracker = me.map { $0.isLead && $0.trackerUserId == myUserId } ?? false
+        let isLeadTracker = isLeadTracker(cars: cars, myCarId: myCarId, myUserId: myUserId)
+        let pinner = event.place?.pinnedBy.flatMap { uid in cars.first { $0.trackerUserId == uid } }
+        let myVote = voteByCar[myCarId]
         return StopRequestState(
             eventId: eventId, type: event.type, requesterCarId: event.carId,
             requesterNumber: requester?.number,
@@ -180,48 +333,145 @@ enum StopLogic {
             canPin: StopPermissions.canPin(isLeadTracker: isLeadTracker, isOrganizer: isOrganizer),
             canResolve: StopPermissions.canResolve(
                 isAuthor: event.authorId == myUserId, isLeadTracker: isLeadTracker, isOrganizer: isOrganizer),
-            viewerOffset: viewerOffset, isResolved: event.expiresAt.map { $0 <= now } ?? false)
-    }
-}
-
-/// Whether the stop card is open or folded into a chip, and what it last saw.
-struct StopCardMemory: Equatable, Sendable {
-    /// The request plus the pinned place: a change re-opens the card once.
-    var key: String
-    var viewerAgreed: Bool
-    var collapsed: Bool
-}
-
-extension StopLogic {
-    /// "stop1|R&R Tapah": changes with a new request or a newly pinned place.
-    static func cardKey(_ state: StopRequestState) -> String {
-        "\(state.eventId)|\(state.place?.name ?? "")"
+            viewerOffset: viewerOffset, isResolved: event.expiresAt.map { $0 <= now } ?? false,
+            isAuthor: event.authorId == myUserId,
+            myAnswer: myVote.map { $0.answer ?? ($0.agree ? .yes : .notNow) },
+            pinnedByName: pinner.map { ownerName(fromCarName: $0.name) },
+            requesterOffset: fixes[event.carId]?.offset,
+            isNoAnswer: isNoAnswer(event, now: now) || event.closedReason == .noAnswer)
     }
 
-    /// The viewer's car asked for this stop.
+    // MARK: What each screen reads
+
+    /// The viewer's car is the one that asked.
     static func viewerIsRequester(_ state: StopRequestState) -> Bool {
         state.rows.contains { $0.isMine && $0.carId == state.requesterCarId }
     }
 
-    /// Collapse rules. A new request opens, except the requester's own (or one already agreed to);
-    /// a newly pinned place re-opens it once; agreeing folds it; otherwise the viewer's choice stands.
-    static func nextCardMemory(_ memory: StopCardMemory?, state: StopRequestState) -> StopCardMemory {
-        let key = cardKey(state)
-        guard let memory, memory.key.hasPrefix(state.eventId + "|") else {
-            return StopCardMemory(
-                key: key, viewerAgreed: state.viewerAgrees,
-                collapsed: viewerIsRequester(state) || state.viewerAgrees)
-        }
-        var next = memory
-        next.key = key
-        next.viewerAgreed = state.viewerAgrees
-        if memory.key != key {
-            next.collapsed = false
-        } else if !memory.viewerAgreed && state.viewerAgrees {
-            next.collapsed = true
-        }
-        return next
+    /// A question for this car: another car's request, no place pinned yet, and nothing answered
+    /// (the lead car or organizer answers by pinning).
+    static func needsAnswer(_ state: StopRequestState) -> Bool {
+        guard !viewerIsRequester(state), !state.isPinned else { return false }
+        return state.canPin || state.myAnswer == nil
     }
+
+    /// "Fuel", "Food", "Toilet", "Rest": the tile names, and what the Pit stop button says.
+    static func reasonLabel(_ type: EventType) -> String {
+        switch type {
+        case .stopFuel: "Fuel"
+        case .stopFood: "Food"
+        case .stopToilet: "Toilet"
+        default: "Rest"
+        }
+    }
+
+    /// The icon of the reason, for the button, the pill and the card.
+    static func reasonSymbol(_ type: EventType) -> String {
+        switch type {
+        case .stopFuel: "fuelpump.fill"
+        case .stopFood: "fork.knife"
+        case .stopToilet: "toilet.fill"
+        default: "cup.and.saucer.fill"
+        }
+    }
+
+    /// "Fuel · 2 of 4" while deciding, "Fuel · 12 min" once pinned, "Fuel · 3 of 4 here" at the stop.
+    static func statusLine(_ state: StopRequestState) -> String {
+        let reason = reasonLabel(state.type)
+        guard state.isPinned else { return "\(reason) · \(state.agreedCount) of \(state.rows.count)" }
+        if state.viewerIsHere { return "\(reason) · \(state.hereCount) of \(state.rows.count) here" }
+        if let minutes = state.viewerMinutes { return "\(reason) · \(minutes) min" }
+        return "\(reason) · pinned"
+    }
+
+    /// What the Pit stop button shows.
+    struct ButtonContent: Equatable, Sendable {
+        var label: String
+        var symbol: String
+        /// Requests this car has not answered; 0 hides the badge.
+        var badge: Int
+        var accessibilityLabel: String
+    }
+
+    static func buttonContent(for board: StopBoard) -> ButtonContent {
+        let plain = "mappin.and.ellipse"
+        let requests = board.requests
+        if requests.isEmpty {
+            if let missed = board.missed {
+                let reason = reasonLabel(missed.type)
+                return ButtonContent(
+                    label: "\(reason) · No answer", symbol: reasonSymbol(missed.type), badge: 0,
+                    accessibilityLabel: "\(reason) stop, nobody answered. Opens it so you can ask again")
+            }
+            return ButtonContent(label: "Pit stop", symbol: plain, badge: 0, accessibilityLabel: "Pit stop")
+        }
+        let unanswered = board.unansweredCount
+        let tail = unanswered == 0 ? "" : unanswered == 1 ? ", you have not answered" : ", you have \(unanswered) to answer"
+        if requests.count > 1 {
+            return ButtonContent(
+                label: "\(requests.count) stops", symbol: plain, badge: unanswered,
+                accessibilityLabel: "\(requests.count) stops open\(tail)")
+        }
+        let state = requests[0]
+        let reason = reasonLabel(state.type)
+        let detail: String
+        if state.isPinned {
+            if state.viewerIsHere {
+                detail = "\(state.hereCount) of \(state.rows.count) cars here"
+            } else if let minutes = state.viewerMinutes {
+                detail = "pinned at \(state.place?.name ?? "a place"), \(minutes) minutes away"
+            } else {
+                detail = "pinned at \(state.place?.name ?? "a place")"
+            }
+        } else {
+            detail = "\(state.agreedCount) of \(state.rows.count) cars agreed"
+        }
+        return ButtonContent(
+            label: statusLine(state), symbol: reasonSymbol(state.type), badge: unanswered,
+            accessibilityLabel: "\(reason) stop, \(detail)\(tail)")
+    }
+
+    /// "Petronas R&R Tapah · 18 km · 12 min", or what the lead car does when there is no place yet.
+    static func placeLine(_ state: StopRequestState) -> String {
+        guard let place = state.shownPlace else { return "The lead car chooses where" }
+        var parts = [place.name]
+        if let d = state.distanceToPlace {
+            parts.append(d < 0 ? "Passed" : ConvoyFormat.distance(d))
+            parts.append("\(minutes(forMeters: abs(d))) min")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "Aisha agreed. Waiting for Hafiz and Daniel", the Deciding step of the asker's timeline.
+    static func decidingText(_ state: StopRequestState) -> String {
+        let agreed = state.rows.filter { $0.status == .agreed && $0.carId != state.requesterCarId }
+        let waiting = state.rows.filter { $0.status != .agreed }
+        var parts: [String] = []
+        if !agreed.isEmpty { parts.append("\(joined(agreed.map { ownerName(fromCarName: $0.name) })) agreed.") }
+        if !waiting.isEmpty {
+            parts.append("Waiting for \(joined(waiting.map { $0.name.replacingOccurrences(of: " (you)", with: "") }))")
+        }
+        return parts.isEmpty ? "Waiting for the other cars" : parts.joined(separator: " ")
+    }
+
+    /// "Ali", "Ali and Sara", "Ali, Sara and Daniel".
+    static func joined(_ names: [String]) -> String {
+        switch names.count {
+        case 0: ""
+        case 1: names[0]
+        default: names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+        }
+    }
+
+    /// What the lead tells the asker after choosing a different place: "Aisha chose Petronas Bidor. 9 min back."
+    static func chosenLine(leadName: String, place: StopPlace, state: StopRequestState) -> String {
+        let base = "\(leadName) chose \(place.name)."
+        guard let from = state.requesterOffset else { return base }
+        let delta = place.routeOffset - from
+        return "\(base) \(minutes(forMeters: abs(delta))) min \(delta < 0 ? "back" : "ahead")."
+    }
+
+    // MARK: Small helpers kept from the old card
 
     /// "Me" for the viewer's car, else the owner's first name.
     static func shortName(_ row: StopRequestState.Row) -> String {
@@ -231,23 +481,18 @@ extension StopLogic {
     /// "Aisha’s Myvi, agreed"; the viewer's car adds ", you".
     static func voterAccessibilityLabel(_ row: StopRequestState.Row) -> String {
         let name = row.name.replacingOccurrences(of: " (you)", with: "")
-        let status = switch row.status {
-        case .agreed: "agreed"
-        case .waiting: "waiting"
-        case .suggested: "suggested another stop"
+        let status: String
+        switch row.arrival {
+        case .here?: status = "here"
+        case .minutes(let minutes)?: status = "\(minutes) minutes away"
+        case nil:
+            status = switch row.status {
+            case .agreed: "agreed"
+            case .waiting: "waiting"
+            case .notNow: "said not now"
+            case .suggested: "suggested another stop"
+            }
         }
         return "\(row.isMine ? "\(name), you" : name), \(status)"
-    }
-
-    /// "Fuel stop · R&R Demo · 3/4" for the folded card.
-    static func chipText(_ state: StopRequestState) -> String {
-        let kind = switch state.type {
-        case .stopFuel: "Fuel stop"
-        case .stopFood: "Food stop"
-        case .stopToilet: "Toilet stop"
-        default: "Rest stop"
-        }
-        return [kind, state.shownPlace?.name, "\(state.agreedCount)/\(state.rows.count)"]
-            .compactMap { $0 }.joined(separator: " · ")
     }
 }

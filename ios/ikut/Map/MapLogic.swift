@@ -311,6 +311,8 @@ struct DeviceFix: Equatable, Sendable {
     var coordinate: MapCoordinate
     /// Degrees clockwise from north; negative when unknown.
     var course: Double
+    /// Meters per second; negative when unknown (CoreLocation's own convention).
+    var speed: Double = -1
 }
 
 enum MapReportSnapshot {
@@ -396,6 +398,31 @@ extension TripMapModel {
             tripId: tripId, userId: userId, carId: carId, isOrganizer: isOrganizer,
             snapshot: { [weak self] in self?.reportSnapshot() },
             mainRoute: mainRoute,
-            frontOffset: { [weak self] in self?.convoy.convoy.first?.convoyOffset })
+            frontOffset: { [weak self] in self?.convoy.convoy.first?.convoyOffset },
+            carFixes: { [weak self] in self?.stopCarFixes() ?? [:] })
+    }
+
+    /// Where every car is, from the positions the phone already has: the convoy's cars on the main
+    /// route, then the joining cars by their own position.
+    func stopCarFixes() -> [String: StopCarFix] {
+        var fixes: [String: StopCarFix] = [:]
+        for entry in convoy.convoy {
+            fixes[entry.id] = StopCarFix(
+                latitude: entry.position.location.latitude, longitude: entry.position.location.longitude,
+                offset: entry.convoyOffset)
+        }
+        return fixes
+    }
+
+    /// This phone's own speed in m/s, or nil while it is unknown or old. The tracker's phone is its
+    /// car's position (the fixes the tracker writes); any other phone uses its own location.
+    func phoneSpeed(now: Date = Date()) -> Double? {
+        if isTracker {
+            guard let carId = myCarId, let position = carPosition(carId),
+                  HazardLogic.isFresh(position, now: now, config: .default) else { return nil }
+            return position.speed
+        }
+        guard let speed = device?.speed, speed >= 0 else { return nil }
+        return speed
     }
 }
