@@ -160,7 +160,7 @@ function startTest(who, udid, only) {
   const bundle = path.join(o.logs, `convoy2-${who}.xcresult`);
   fs.rmSync(bundle, { recursive: true, force: true });
   const xc = spawn('xcodebuild', ['test-without-building', ...common, '-destination', `platform=iOS Simulator,id=${udid}`,
-    `-only-testing:ikutUITests/${only}`, '-resultBundlePath', bundle], {
+    `-only-testing:ikutUITests/${only}`, '-resultBundlePath', bundle, '-collect-test-diagnostics', 'never'], {
     env: { ...process.env, TEST_RUNNER_IKUT_SYNC_DIR: syncDir, TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
   });
   const t = { who, logPath, checks: [], result: null };
