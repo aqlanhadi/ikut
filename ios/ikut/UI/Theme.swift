@@ -190,16 +190,30 @@ struct RowDivider: View {
 /// The round "x" at the top trailing corner of a sheet, 44 pt to tap.
 struct SheetCloseButton: View {
     var action: () -> Void
+    /// A Liquid Glass button (iOS 26), for a close button on a glass surface.
+    var onGlass = false
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 44, height: 44)
-                .background(.quaternary, in: Circle())
+        if onGlass, GlassSurface.useGlass, #available(iOS 26, *) {
+            Button(action: action) {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.bold))
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(.primary)
+            .accessibilityLabel("Close")
+        } else {
+            Button(action: action) {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+                    .background(.quaternary, in: Circle())
+            }
+            .accessibilityLabel("Close")
         }
-        .accessibilityLabel("Close")
     }
 }
 
@@ -226,6 +240,7 @@ struct SheetHeader: View {
     /// Moves the close button, for a card whose corners are rounder than a sheet's.
     var closeOffset: CGSize = .zero
     var closeIdentifier: String?
+    var closeOnGlass = false
     var onClose: () -> Void
 
     var body: some View {
@@ -237,7 +252,7 @@ struct SheetHeader: View {
             // Without a subtitle the title sits level with the middle of the 44 pt close button.
             .frame(minHeight: subtitle == nil ? 44 : nil, alignment: .leading)
             Spacer(minLength: 0)
-            SheetCloseButton(action: onClose)
+            SheetCloseButton(action: onClose, onGlass: closeOnGlass)
                 .offset(closeOffset)
                 .accessibilityIdentifier(closeIdentifier ?? "sheet.close")
         }

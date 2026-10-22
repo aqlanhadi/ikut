@@ -42,3 +42,77 @@ extension View {
         modifier(GlassSurfaceModifier(kind: kind))
     }
 }
+
+/// Which kind of button face `surfaceButton` gives.
+enum SurfaceButtonRole {
+    /// The main action: Liquid Glass tinted with the accent colour (prominent).
+    case primary
+    /// A quiet action next to it: clear Liquid Glass.
+    case secondary
+    /// Anything else (a chosen answer, a plain text button): always the flat fill below.
+    case flat
+}
+
+/// A flat capsule: the face of a surface button before iOS 26, and of the flat role.
+struct FilledCapsuleButtonStyle: ButtonStyle {
+    var fill: Color
+    var foreground: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(foreground)
+            .background(fill, in: Capsule())
+            .contentShape(Capsule())
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+extension View {
+    /// A button on a floating surface. On iOS 26 the primary and secondary roles are Liquid Glass
+    /// buttons (`.glassProminent` / `.glass`), which draw their own face, foreground and press
+    /// feedback; the label brings only its content and size. Before that, and for `.flat`, the label
+    /// sits on `fill` in `foreground`, as the buttons always looked.
+    @ViewBuilder
+    func surfaceButton(
+        _ role: SurfaceButtonRole, tint: Color = .ikutAccent, fill: Color, foreground: Color
+    ) -> some View {
+        if role != .flat, GlassSurface.useGlass, #available(iOS 26, *) {
+            if role == .primary {
+                buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(tint)
+            } else {
+                buttonStyle(.glass).buttonBorderShape(.capsule)
+            }
+        } else {
+            buttonStyle(FilledCapsuleButtonStyle(fill: fill, foreground: foreground))
+        }
+    }
+}
+
+extension View {
+    /// An inset tile (a stop reason, the suggested place) on a floating surface. On iOS 26 glass it is a
+    /// raised, translucent tile, so the glass shows through, not the opaque gray slab the sheets use.
+    @ViewBuilder
+    func surfaceTile(radius: CGFloat = Radius.tile) -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            background(Color.surfaceTileFill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5))
+        } else {
+            ikutTile(radius: radius)
+        }
+    }
+}
+
+extension Color {
+    /// The tile colour `surfaceTile` uses, for a tile that draws its own background (a place row).
+    static var surfaceTileBackground: Color {
+        if GlassSurface.useGlass, #available(iOS 26, *) { return surfaceTileFill }
+        return Color(.secondarySystemBackground)
+    }
+
+    /// Light: a milky white; dark: a faint lift. Both let the glass behind show.
+    static let surfaceTileFill = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.10) : UIColor(white: 1, alpha: 0.5)
+    })
+}

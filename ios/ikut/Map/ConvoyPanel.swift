@@ -313,9 +313,10 @@ struct ConvoyPanel: View {
                 Label("Report", systemImage: "exclamationmark.triangle")
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 50)
-                    .foregroundStyle(.white)
-                    .background(MapPalette.accent.opacity(canReport ? 1 : 0.4), in: Capsule())
             }
+            .surfaceButton(
+                .primary, tint: MapPalette.accent, fill: MapPalette.accent.opacity(canReport ? 1 : 0.4),
+                foreground: .white)
             .disabled(!canReport)
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
@@ -328,8 +329,6 @@ struct ConvoyPanel: View {
                     .fixedSize(horizontal: !stacked, vertical: false)
                     .padding(.horizontal, Spacing.l)
                     .frame(minWidth: stacked ? nil : 146, maxWidth: stacked ? .infinity : nil, minHeight: 50)
-                    .foregroundStyle(.primary)
-                    .background(Color(.systemGray5).opacity(0.7), in: Capsule())
                     .overlay(alignment: .topTrailing) {
                         if stopButton.badge > 0 {
                             Text("\(stopButton.badge)")
@@ -345,6 +344,7 @@ struct ConvoyPanel: View {
                         }
                     }
             }
+            .surfaceButton(.secondary, fill: Color(.systemGray5).opacity(0.7), foreground: .primary)
             .layoutPriority(1)
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")

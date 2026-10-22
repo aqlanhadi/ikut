@@ -172,7 +172,7 @@ struct StopCard: View {
                         }
                         .padding(.horizontal, Spacing.m)
                         .frame(maxWidth: .infinity, minHeight: 72)
-                        .ikutTile()
+                        .surfaceTile()
                         .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -194,7 +194,7 @@ struct StopCard: View {
         }
         .padding(Spacing.cozy)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ikutTile()
+        .surfaceTile()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.noAnswer")
     }
@@ -339,7 +339,7 @@ struct StopCard: View {
             .foregroundStyle(.secondary)
             .padding(Spacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .ikutTile()
+            .surfaceTile()
     }
 
     private func candidateRow(
@@ -367,7 +367,7 @@ struct StopCard: View {
             .frame(maxWidth: .infinity, minHeight: 56)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { placeRowHeights[candidate.id] = $0 }
             .background(
-                selected ? Color.accentColor.opacity(0.12) : Color(.secondarySystemBackground),
+                selected ? Color.accentColor.opacity(0.12) : Color.surfaceTileBackground,
                 in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous)
             )
             .overlay {
@@ -552,7 +552,7 @@ struct StopCard: View {
         }
         .padding(Spacing.cozy)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ikutTile()
+        .surfaceTile()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.request\(suffix)")
     }
@@ -665,7 +665,7 @@ struct StopCard: View {
                 }
                 .padding(Spacing.cozy)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .ikutTile()
+                .surfaceTile()
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("stop.confirmLine")
             } actions: {

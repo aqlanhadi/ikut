@@ -28,7 +28,7 @@ struct StopCardFrame<Content: View, Actions: View>: View {
             SheetHeader(
                 title: title, subtitle: subtitle, subtitleFont: .subheadline,
                 // 16 pt from the top and trailing edges: the 38 pt corner minus the button's 22 pt radius.
-                closeOffset: CGSize(width: Spacing.xs, height: -Spacing.xs), closeIdentifier: "stop.card.close",
+                closeOffset: CGSize(width: Spacing.xs, height: -Spacing.xs), closeIdentifier: "stop.card.close", closeOnGlass: true,
                 onClose: onClose
             )
             .accessibilityAddTraits(.isHeader)
@@ -52,8 +52,9 @@ struct StopCardFrame<Content: View, Actions: View>: View {
             }
             VStack(spacing: Spacing.xs) { actions }
         }
-        // 20 pt on every edge: 16 would put the title inside the 38 pt corner curve. The same frosted
-        // material, clip and shadow as the convoy panel, and its grabber (drag down to close).
+        // 20 pt on every edge: 16 would put the title inside the 38 pt corner curve. The same surface as the
+        // convoy panel. No grabber and no swipe down to close: the body scrolls, so a swipe is for
+        // scrolling; the close button is the way out.
         .padding(.horizontal, Spacing.block)
         .padding(.top, Spacing.block)
         .padding(.bottom, Spacing.block)
@@ -114,13 +115,19 @@ struct StopActionButton: View {
                 .padding(.vertical, large ? Spacing.s : 0)
                 .padding(.horizontal, large ? Spacing.l : 0)
                 .frame(maxWidth: .infinity, minHeight: height)
-                .foregroundStyle(foreground)
-                .background(background, in: Capsule())
-                .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .surfaceButton(role, fill: background, foreground: foreground)
         .disabled(disabled)
         .accessibilityIdentifier(id)
+    }
+
+    /// Primary and secondary are Liquid Glass buttons on iOS 26; the rest stay flat.
+    private var role: SurfaceButtonRole {
+        switch style {
+        case .primary: .primary
+        case .secondary: .secondary
+        case .positive, .ghost, .destructive: .flat
+        }
     }
 
     private var foreground: Color {
@@ -179,7 +186,7 @@ struct StopPlaceTile: View {
         .padding(.horizontal, Spacing.cozy)
         .padding(.vertical, Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ikutTile()
+        .surfaceTile()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("stop.place")
     }
@@ -240,7 +247,7 @@ struct StopTimeline: View {
         }
         .padding(Spacing.cozy)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ikutTile()
+        .surfaceTile()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.timeline")
     }
