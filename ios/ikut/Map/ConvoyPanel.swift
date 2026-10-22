@@ -43,11 +43,7 @@ struct ConvoyPanel: View {
         .padding(.horizontal, Spacing.l)
         .padding(.top, Spacing.tight)
         .padding(.bottom, Spacing.section)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
-        // While the list collapses (e.g. a stop card slides in above), the outgoing rows would
-        // otherwise draw outside the shrinking panel and over the card.
-        .clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
-        .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
+        .glassSurface()
         .padding(.horizontal, Spacing.s)
         .padding(.bottom, Spacing.s)
         .animation(.snappy, value: expanded)
@@ -116,7 +112,7 @@ struct ConvoyPanel: View {
                 if let departed = model.departedAt {
                     Text("Left \(ConvoyFormat.clock(departed))")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.surfaceSecondary)
                         .monospacedDigit()
                 }
             }
@@ -130,7 +126,7 @@ struct ConvoyPanel: View {
                 if let arrive, !mineArrived {
                     Text("Arrive \(Text(arrive).foregroundStyle(Color.ikutPositive).fontWeight(.semibold))")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.surfaceSecondary)
                         .monospacedDigit()
                 }
             }
@@ -176,7 +172,7 @@ struct ConvoyPanel: View {
                 Text(toGo(remaining: length - driven))
             }
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.surfaceSecondary)
             .monospacedDigit()
             .padding(.horizontal, Spacing.xs)
         }
@@ -206,7 +202,7 @@ struct ConvoyPanel: View {
         var text = Text(parts.driving).fontWeight(.semibold)
         if let joining = parts.joining { text = text + Text(" · \(joining)") }
         if let spread = parts.spread {
-            text = text + Text(" · ") + Text(spread)
+            text = text + Text(" · ") + Text(spread.replacingOccurrences(of: " km", with: "\u{00A0}km"))
                 .foregroundStyle(warn ? MapPalette.warning : Color.primary)
                 .fontWeight(warn ? .semibold : .regular)
         }
@@ -233,7 +229,7 @@ struct ConvoyPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.up")
                     .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.surfaceSecondary)
             }
             .padding(.horizontal, Spacing.cozy)
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -253,7 +249,7 @@ struct ConvoyPanel: View {
             .init("Spread", convoy.snapshot.spread.map(ConvoyFormat.distance),
                   color: model.separationWarning == nil ? nil : MapPalette.warning),
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
-            .init("Next stop", nextStop?.name ?? "None", color: nextStop == nil ? .secondary : nil),
+            .init("Next stop", nextStop?.name ?? "None", color: nextStop == nil ? Color.surfaceSecondary : nil),
         ], background: Color(.tertiarySystemFill), valueSize: 20)
         .padding(.top, Spacing.cozy)
     }
@@ -281,7 +277,7 @@ struct ConvoyPanel: View {
             if convoy.convoy.isEmpty && convoy.joining.isEmpty {
                 Text("Waiting for cars to share their location")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.surfaceSecondary)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
@@ -317,9 +313,10 @@ struct ConvoyPanel: View {
                 Label("Report", systemImage: "exclamationmark.triangle")
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 50)
-                    .foregroundStyle(.white)
-                    .background(MapPalette.accent.opacity(canReport ? 1 : 0.4), in: Capsule())
             }
+            .surfaceButton(
+                .primary, tint: MapPalette.accent, fill: MapPalette.accent.opacity(canReport ? 1 : 0.4),
+                foreground: .white)
             .disabled(!canReport)
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
@@ -332,8 +329,6 @@ struct ConvoyPanel: View {
                     .fixedSize(horizontal: !stacked, vertical: false)
                     .padding(.horizontal, Spacing.l)
                     .frame(minWidth: stacked ? nil : 146, maxWidth: stacked ? .infinity : nil, minHeight: 50)
-                    .foregroundStyle(.primary)
-                    .background(Color(.systemGray5).opacity(0.7), in: Capsule())
                     .overlay(alignment: .topTrailing) {
                         if stopButton.badge > 0 {
                             Text("\(stopButton.badge)")
@@ -349,6 +344,7 @@ struct ConvoyPanel: View {
                         }
                     }
             }
+            .surfaceButton(.secondary, fill: Color(.systemGray5).opacity(0.7), foreground: .primary)
             .layoutPriority(1)
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")
@@ -440,7 +436,7 @@ struct ConvoyRowView: View {
                 }
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
+                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.hasArrived {
@@ -459,13 +455,13 @@ struct ConvoyRowView: View {
                         .foregroundStyle(row.isSeparated ? MapPalette.warning : Color.primary)
                     Text(row.trailingSecondary)
                         .font(.footnote)
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .foregroundStyle(Color.surfaceSecondary)
                 }
             }
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
-        .opacity(row.isStale ? 0.6 : 1)
+        .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
     }
@@ -493,17 +489,17 @@ struct JoiningRowView: View {
                 if row.name == ConvoyFormat.me { MeCapsule() } else { Text(row.name).font(.body).lineLimit(1) }
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
+                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
                 Text(row.trailingPrimary).font(.body.weight(.semibold)).monospacedDigit()
-                Text(row.trailingSecondary).font(.footnote).foregroundStyle(Color(.secondaryLabel))
+                Text(row.trailingSecondary).font(.footnote).foregroundStyle(Color.surfaceSecondary)
             }
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
-        .opacity(row.isStale ? 0.6 : 1)
+        .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
     }

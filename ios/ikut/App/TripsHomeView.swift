@@ -213,7 +213,7 @@ struct TripsHomeView: View {
             .padding(.horizontal, Spacing.l)
             .frame(maxWidth: .infinity, alignment: .top)
             .frame(height: height, alignment: .top)
-            .glassSheetBackground()
+            .glassSurface(.sheet)
             .padding(.horizontal, Spacing.s)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .offset(y: bottomInset - 8)
@@ -359,24 +359,6 @@ struct TripsHomeView: View {
         }
         Task {
             do { try await auth.updateDisplayName(trimmed) } catch { renameError = error.localizedDescription }
-        }
-    }
-}
-
-private extension View {
-    /// Liquid Glass on iOS 26 and later, with bottom corners that follow the screen's; a material
-    /// before that.
-    @ViewBuilder
-    func glassSheetBackground() -> some View {
-        // Clipped to the same shape: a ScrollView draws on under the safe area and past the rounded
-        // corners, so past trips would show outside the glass.
-        if #available(iOS 26, *) {
-            let shape = ConcentricRectangle(corners: .concentric(minimum: .fixed(Radius.panel)), isUniform: false)
-            clipShape(shape).glassEffect(.regular, in: shape)
-        } else {
-            clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
-                .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
         }
     }
 }

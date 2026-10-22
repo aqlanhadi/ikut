@@ -120,26 +120,18 @@ struct TripMapView: View {
                 mapMaxY = $0
             }
             .overlay(alignment: .topTrailing) {
-                // Below whatever is at the top: the trip pill, a banner, the stop pill.
+                // Below whatever is at the top (the trip pill, a banner, the stop pill), with the same gap
+                // the stack keeps between its own items. Before the stack is measured: its top
+                // padding, the 56 pt pill and the gap.
                 MapModeControl(mode: $model.mode)
-                    .padding(.top, topHeight > 0 ? topHeight + 24 : 84)
+                    .padding(.top, viewButtonsTop)
                     .padding(.trailing, Spacing.m)
-                    .animation(.snappy, value: topHeight)
+                    .animation(.snappy, value: viewButtonsTop)
             }
             .overlay(alignment: .bottom) {
                 // The stop card is one more layer in the same stack: on top of the panel, same inset
                 // and radius, opened only by a tap on the Pit stop button.
-                ZStack(alignment: .bottom) {
-                    ConvoyPanel(
-                        model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
-                        nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
-                        onReport: openReport, onStop: openStopCard)
-                        // The glass card is see-through, so the panel fades out under it.
-                        .opacity(stopCardOpen ? 0 : 1)
-                        .allowsHitTesting(!stopCardOpen)
-                        .accessibilityHidden(stopCardOpen)
-                    stopCard
-                }
+                bottomStack
                 .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { panelMinY = $0 }
                 .frame(maxHeight: maxBottomHeight, alignment: .bottom)
             }
@@ -326,6 +318,19 @@ struct TripMapView: View {
     /// A stop request is announced by the pill at the top (and spoken), never by a banner.
     private var bannerHiding: Set<EventCategory> { [.stopRequest] }
 
+    /// Where the view buttons start: one `Spacing.s` below the last thing showing in the top stack,
+    /// the gap the stack keeps between its own items. The stack's height ends with a spacing after
+    /// its always-present, zero-height banner slot when nothing shows below it, so that is taken off.
+    private var viewButtonsTop: CGFloat {
+        guard topHeight > 0 else { return Spacing.xs + 56 + Spacing.s }
+        var bannerSlotEmpty = true
+        if let alert = alerts.current { bannerSlotEmpty = bannerHiding.contains(alert.category) || alert.id == approach?.id }
+        var toastHidden = false
+        if case .hidden = toast.state { toastHidden = true }
+        let nothingBelowSlot = bannerSlotEmpty && passedText == nil && toastHidden && stopError == nil
+        return nothingBelowSlot ? topHeight : topHeight + Spacing.s
+    }
+
     private var bannerShowing: Bool {
         if approach != nil || passedText != nil { return true }
         guard let alert = alerts.current else { return false }
@@ -389,6 +394,7 @@ struct TripMapView: View {
         }
     }
 
+    // viewButtonsTop (above) reads what this stack shows and how it spaces it: change one, change the other.
     private var topStack: some View {
         VStack(spacing: Spacing.s) {
             tripPill
@@ -432,7 +438,7 @@ struct TripMapView: View {
                     pillSubtitle(withCode: false)
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.surfaceSecondary)
                 .lineLimit(1)
                 .accessibilityIdentifier("trip.pill.status")
             }
@@ -457,6 +463,7 @@ struct TripMapView: View {
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
             }
+            .tint(GlassSurface.active ? Color.surfaceAccent : nil)
             .disabled(isWorking)
             .accessibilityLabel("Trip menu")
         }
@@ -466,8 +473,7 @@ struct TripMapView: View {
         .padding(.trailing, Spacing.xs)
         .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
-        .background(.regularMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .glassSurface(.pill)
     }
 
     /// The convoy's motion ("On the move", "Arrived", ...), shown first in the pill.
@@ -529,21 +535,42 @@ struct TripMapView: View {
         withAnimation(.snappy) { stopCardOpen = false }
     }
 
-    /// The card, on top of the panel, only while it is open.
-    @ViewBuilder
-    private var stopCard: some View {
-        if stopCardOpen, let context = stopContext {
-            StopCard(
-                board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
-                service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
-                onClose: closeStopCard
-            )
-            .padding(.horizontal, Spacing.s)
-            .padding(.bottom, Spacing.s)
-            // Above the panel for the whole of its exit too, or it would slide away behind it.
-            .zIndex(1)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+    /// The panel and the stop card. The card slides up over the panel, and the panel, with everything
+    /// on it, sinks and fades out in the same moment, so no button stays put under the moving card
+    /// (a glass or frosted card is see-through). Closing runs the same way backwards.
+    private var bottomStack: some View {
+        ZStack(alignment: .bottom) {
+            panel
+                .offset(y: stopCardOpen ? 40 : 0)
+                .opacity(stopCardOpen ? 0 : 1)
+                // Gone in a blink, so it never shows through the card on its way up.
+                .animation(.easeOut(duration: 0.12), value: stopCardOpen)
+                .allowsHitTesting(!stopCardOpen)
+                .accessibilityHidden(stopCardOpen)
+            if stopCardOpen, let context = stopContext {
+                stopCard(context)
+                    // Above the panel for the whole of its exit too, or it would slide away behind it.
+                    .zIndex(1)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+    }
+
+    private var panel: some View {
+        ConvoyPanel(
+            model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
+            nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
+            onReport: openReport, onStop: openStopCard)
+    }
+
+    private func stopCard(_ context: StopContext) -> some View {
+        StopCard(
+            board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
+            service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
+            onClose: closeStopCard
+        )
+        .padding(.horizontal, Spacing.s)
+        .padding(.bottom, Spacing.s)
     }
 
     /// Live actions that also tell the pill what happened (a tap on Yes is confirmed there for a few seconds).
@@ -794,8 +821,7 @@ struct MapModeControl: View {
             button(.fit, symbol: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", label: "Fit whole convoy")
         }
         .frame(width: 44)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .glassSurface(.control)
         .sensoryFeedback(.selection, trigger: mode)
     }
 
@@ -803,7 +829,7 @@ struct MapModeControl: View {
         Button { mode = target } label: {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(mode == target ? MapPalette.accent : Color.primary)
+                .foregroundStyle(mode == target ? Color.surfaceAccent : Color.primary)
                 .frame(width: 44, height: 46)
         }
         .accessibilityLabel(label)

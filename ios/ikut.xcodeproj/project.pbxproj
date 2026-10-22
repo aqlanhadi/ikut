@@ -46,6 +46,7 @@
 		4A62431BEA2E9F01E17A2CE2 /* LocationAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F08168BB70493362B6773C8 /* LocationAccess.swift */; };
 		4ABFF0E282D863E458E06571 /* RecapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 698FEDDD6491F2113B929776 /* RecapService.swift */; };
 		4AC34867A11F17F1141F7F70 /* MapDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3375CFBCC39B1C2F76B90699 /* MapDemo.swift */; };
+		4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */; };
 		4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 644401FB5F0CAB8C10EF3B3B /* StopTests.swift */; };
 		514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */; };
 		517060709B8037A3160EDCC1 /* ReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11DE0CC85044E36B54C8C0F /* ReportSheet.swift */; };
@@ -210,6 +211,7 @@
 		4310BE369727B65548BADA52 /* ConvoyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyPanel.swift; sourceTree = "<group>"; };
 		4365C32AF91E6D4FEA8C34F4 /* CarRouteLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarRouteLogic.swift; sourceTree = "<group>"; };
 		4374E90353623C476DD233DD /* EventService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventService.swift; sourceTree = "<group>"; };
+		4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		48AAE1E4ECEB3FDD4AEE0F07 /* RecapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapView.swift; sourceTree = "<group>"; };
 		53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillLogic.swift; sourceTree = "<group>"; };
 		55CC3926DEEA6AE07A394182 /* JoinTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTests.swift; sourceTree = "<group>"; };
@@ -557,6 +559,7 @@
 			isa = PBXGroup;
 			children = (
 				A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */,
+				4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */,
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
 				091C79B7B0A90381F07CB73D /* TripComponents.swift */,
 			);
@@ -839,6 +842,7 @@
 				3238E7CD833C608EF250940E /* EventService.swift in Sources */,
 				E54047B79F4DBB4FED8D948F /* FirestoreDecoding.swift in Sources */,
 				7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */,
+				4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */,
 				514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */,
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
 				27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */,
