@@ -171,6 +171,39 @@ service cloud.firestore {
         && d.expiresAt is timestamp;
     }
 
+    // An event update. Changed keys, the lead/organizer check and "is the stop open" are worked out once
+    // each: spelling them per branch used to hit the 1000-expression limit.
+    function eventUpdateAllowed(tripId, next, prev) {
+      let keys = next.diff(prev).affectedKeys();
+      let mine = prev.authorId == request.auth.uid;
+      let open = openStop(prev);
+      let closeKeys = keys.hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
+        && keys.hasAll(['status', 'closedReason', 'closedBy', 'expiresAt']);
+      let lead = isLeadOrOrganizer(tripId);
+      return
+        // Author sets or clears expiresAt (clear, resolve).
+        (mine
+          && keys.hasOnly(['expiresAt'])
+          && (optionalOf(next, 'expiresAt') == null || next.expiresAt is timestamp))
+        // The author closes their own stop request as cancelled.
+        || (mine && open && closeKeys && closesStop(next, ['cancelled']))
+        // Lead car or organizer pins the place of an open stop request (old builds send only
+        // the place; new ones also set status pinned).
+        || (lead && open && keys.hasOnly(['place']) && validPlace(next.place))
+        || (lead && open
+          && keys.hasOnly(['place', 'status'])
+          && keys.hasAll(['place'])
+          && next.get('status', null) == 'pinned'
+          && validPlace(next.place))
+        // Lead car or organizer closes a stop request: everyone left, or nobody answered.
+        || (lead && open && closeKeys && closesStop(next, ['left', 'noAnswer']))
+        // Lead car or organizer resolves (expires) a stop request.
+        || (lead
+          && prev.category == 'stopRequest'
+          && keys.hasOnly(['expiresAt'])
+          && next.expiresAt is timestamp);
+    }
+
     // ---------- rules ----------
 
     // Trips: members read; organizer creates and updates; nobody deletes.
@@ -313,46 +346,7 @@ service cloud.firestore {
 
         allow update: if isMember(tripId)
           && tripActive(tripId)
-          && (
-            // Author sets or clears expiresAt (clear, resolve).
-            (resource.data.authorId == request.auth.uid
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
-              && (optionalOf(request.resource.data, 'expiresAt') == null
-                  || request.resource.data.expiresAt is timestamp))
-            // The author closes their own stop request as cancelled.
-            || (resource.data.authorId == request.auth.uid
-              && openStop(resource.data)
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasAll(['status', 'closedReason', 'closedBy', 'expiresAt'])
-              && closesStop(request.resource.data, ['cancelled']))
-            // Lead car or organizer pins the place of an open stop request (old builds send only
-            // the place; new ones also set status pinned).
-            || (isLeadOrOrganizer(tripId)
-              && openStop(resource.data)
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['place'])
-              && validPlace(request.resource.data.place))
-            || (isLeadOrOrganizer(tripId)
-              && openStop(resource.data)
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['place', 'status'])
-              && request.resource.data.diff(resource.data).affectedKeys().hasAll(['place'])
-              && request.resource.data.get('status', null) == 'pinned'
-              && validPlace(request.resource.data.place))
-            // Lead car or organizer closes a stop request: everyone left, or nobody answered.
-            || (isLeadOrOrganizer(tripId)
-              && openStop(resource.data)
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasAll(['status', 'closedReason', 'closedBy', 'expiresAt'])
-              && closesStop(request.resource.data, ['left', 'noAnswer']))
-            // Lead car or organizer resolves (expires) a stop request.
-            || (isLeadOrOrganizer(tripId)
-              && resource.data.category == 'stopRequest'
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
-              && request.resource.data.expiresAt is timestamp)
-          );
+          && eventUpdateAllowed(tripId, request.resource.data, resource.data);
 
         allow delete: if isMember(tripId)
           && tripActive(tripId)

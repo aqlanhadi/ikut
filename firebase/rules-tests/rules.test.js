@@ -1,9 +1,10 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  assertFails,
+  assertFails as assertFailsRaw,
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
@@ -21,6 +22,14 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
+
+// Every denial must be a real "no", not the emulator giving up at 1000 expressions (a denial by
+// exhaustion hides a rule that is too big and could flip to allow-or-deny by accident).
+async function assertFails(promise) {
+  let message = '';
+  await assertFailsRaw(promise.catch((e) => { message = String(e?.message ?? e); throw e; }));
+  assert.ok(!message.includes('maximum of 1000'), `denied by the expression limit: ${message}`);
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const T = 'trip1';
