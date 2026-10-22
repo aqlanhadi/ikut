@@ -247,7 +247,8 @@ struct SheetHeader: View {
         HStack(alignment: .top, spacing: Spacing.m) {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(title).font(.title2.bold())
-                if let subtitle { Text(subtitle).font(subtitleFont).foregroundStyle(.secondary) }
+                if let subtitle { Text(subtitle).font(subtitleFont)
+                    .foregroundStyle(closeOnGlass ? Color.surfaceSecondary : Color.secondary) }
             }
             // Without a subtitle the title sits level with the middle of the 44 pt close button.
             .frame(minHeight: subtitle == nil ? 44 : nil, alignment: .leading)

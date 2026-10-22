@@ -32,7 +32,7 @@ struct StopPillView: View {
                 StopReasonIcon(symbol: symbol, size: 40)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(.headline).lineLimit(2)
-                    Text(detail).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                    Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
                 }
                 Spacer(minLength: 0)
             }

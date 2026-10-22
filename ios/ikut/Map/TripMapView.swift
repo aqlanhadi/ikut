@@ -39,7 +39,6 @@ struct TripMapView: View {
     @State private var stopBoard = StopBoard.empty
     /// The stop card is on top of the convoy panel only after a tap on the Pit stop button.
     @State private var stopCardOpen = false
-    @Namespace private var bottomSurface
     /// What the pill at the top has shown and when, so each question goes quiet after 20 seconds.
     @State private var pillMemory = StopPillMemory()
     @State private var pillNow = Date()
@@ -127,7 +126,7 @@ struct TripMapView: View {
                 MapModeControl(mode: $model.mode)
                     .padding(.top, viewButtonsTop)
                     .padding(.trailing, Spacing.m)
-                    .animation(.snappy, value: topHeight)
+                    .animation(.snappy, value: viewButtonsTop)
             }
             .overlay(alignment: .bottom) {
                 // The stop card is one more layer in the same stack: on top of the panel, same inset
@@ -395,6 +394,7 @@ struct TripMapView: View {
         }
     }
 
+    // viewButtonsTop (above) reads what this stack shows and how it spaces it: change one, change the other.
     private var topStack: some View {
         VStack(spacing: Spacing.s) {
             tripPill
