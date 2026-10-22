@@ -121,9 +121,11 @@ struct TripMapView: View {
                 mapMaxY = $0
             }
             .overlay(alignment: .topTrailing) {
-                // Below whatever is at the top: the trip pill, a banner, the stop pill.
+                // Below whatever is at the top (the trip pill, a banner, the stop pill), with the same gap
+                // the stack keeps between its own items. Before the stack is measured: its top
+                // padding, the 56 pt pill and the gap.
                 MapModeControl(mode: $model.mode)
-                    .padding(.top, topHeight > 0 ? topHeight + 24 : 84)
+                    .padding(.top, topHeight > 0 ? topHeight + Spacing.s : Spacing.xs + 56 + Spacing.s)
                     .padding(.trailing, Spacing.m)
                     .animation(.snappy, value: topHeight)
             }
