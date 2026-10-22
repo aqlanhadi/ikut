@@ -95,10 +95,6 @@ struct StopCard: View {
 
     var body: some View {
         screen
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 20).onEnded { value in
-                    if value.translation.height > 60, abs(value.translation.width) < value.translation.height { onClose() }
-                })
             .task(id: model.sentWaiting) {
                 guard model.sentWaiting else { return }
                 try? await Task.sleep(for: .seconds(8))

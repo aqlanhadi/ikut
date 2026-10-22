@@ -58,13 +58,6 @@ struct StopCardFrame<Content: View, Actions: View>: View {
         .padding(.horizontal, Spacing.block)
         .padding(.top, Spacing.block)
         .padding(.bottom, Spacing.block)
-        .overlay(alignment: .top) {
-            Capsule()
-                .fill(Color(.systemGray3))
-                .frame(width: 36, height: 5)
-                .padding(.top, Spacing.tight)
-                .accessibilityHidden(true)
-        }
         .glassSurface()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.card")
