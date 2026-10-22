@@ -94,11 +94,14 @@ class ConvoyUITestCase: XCTestCase {
 
     // MARK: Shared flows
 
-    /// Clears the field (a delete for every character it holds, more than once if the first pass leaves
+    /// Clears the field (cursor to the end, a delete for every character it holds, more than once if the first pass leaves
     /// some), types `text` and checks the field now holds exactly that. A field that is empty reports its
     /// placeholder as its value, which is not text to delete.
     func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
+        // A tap lands the cursor where it hit, and deletes only remove what is before it: tap the far right
+        // end of the field so the cursor is after the last character (this is what left "FaizAisha").
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         for _ in 0..<3 {
             let current = field.value as? String ?? ""
             if current.isEmpty || current == field.placeholderValue { break }
