@@ -26,10 +26,10 @@ struct RecapLogicTests {
                       convoyOffset: offset, updatedAt: t0.addingTimeInterval(minutes * 60))
     }
 
-    private func event(_ id: String, _ type: EventType, car: String, user: String, at minutes: Double, expires: Double? = nil) -> RecapEvent {
+    private func event(_ id: String, _ type: EventType, car: String, user: String, at minutes: Double, expires: Double? = nil, message: String? = nil) -> RecapEvent {
         RecapEvent(id: id, type: type.rawValue, carId: car, authorId: user, latitude: 4, longitude: 101,
                    createdAt: t0.addingTimeInterval(minutes * 60), expiresAt: expires.map { t0.addingTimeInterval($0 * 60) },
-                   message: nil, placeName: nil)
+                   message: message)
     }
 
     @Test func durationNeedsBothEnds() {
@@ -64,18 +64,26 @@ struct RecapLogicTests {
         #expect(r.duration == 10_000)
     }
 
-    @Test func timelineIsChronologicalWithResolvedStop() {
+    @Test func timelineIsChronologicalAndListsEachStopOnce() {
         let r = RecapLogic.recap(snapshot(
             positions: [pos("c1", near: true, offset: 100, at: 150)],
-            events: [event("s1", .stopFuel, car: "c2", user: "u2", at: 30, expires: 50), event("h1", .debris, car: "c1", user: "u1", at: 10)]))
-        #expect(r.timeline.map(\.id) == ["start", "h1", "s1", "s1-done", "arrived", "end"])
+            events: [event("s1", .stopFuel, car: "c2", user: "u2", at: 30, expires: 60), event("h1", .debris, car: "c1", user: "u1", at: 10)]))
+        // No "stopped at" row: a stop is the reason, who asked and when, nothing about a place.
+        #expect(r.timeline.map(\.id) == ["start", "h1", "s1", "arrived", "end"])
         #expect(r.timeline.first { $0.id == "s1" }?.title == "Wyna asked for a fuel stop")
         #expect(r.timeline.allSatisfy { $0.time >= t0 })
     }
 
-    @Test func openStopHasNoDoneRow() {
-        let r = RecapLogic.recap(snapshot(events: [event("s1", .stopRest, car: "c2", user: "u2", at: 30)]))
-        #expect(!r.timeline.contains { $0.id == "s1-done" })
+    @Test func aStopShowsItsMessageWhenThereWasOne() {
+        let r = RecapLogic.recap(snapshot(events: [
+            event("s1", .stopFuel, car: "c2", user: "u2", at: 30, message: "Low on fuel, next R&R please"),
+            event("s2", .stopRest, car: "c1", user: "u1", at: 40),
+        ]))
+        let withNote = r.timeline.first { $0.id == "s1" }
+        #expect(withNote?.detail.hasSuffix("Low on fuel, next R&R please") == true)
+        let without = r.timeline.first { $0.id == "s2" }
+        #expect(without?.detail.contains("R&R") == false)
+        #expect(r.timeline.contains { $0.id == "s1-done" } == false)
     }
 
     @Test func awardsFromWhatHappened() {

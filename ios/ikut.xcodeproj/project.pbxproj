@@ -130,7 +130,6 @@
 		DF3245BE5E06371D9D8F78DA /* AlertPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4E3792B5AD023C85CD5AA0 /* AlertPolicy.swift */; };
 		E0DA5017D0F92CF49077EA02 /* AlertBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9750682AB19CEB7CFF2B6B /* AlertBannerView.swift */; };
 		E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */; };
-		E46CBF63774E7C17DCE1C12E /* StopSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90BD0D4E774669C179661397 /* StopSuggestions.swift */; };
 		E4EF98D0A5B5842B9FC8EA69 /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A479378058FCF0288AE028C1 /* Fakes.swift */; };
 		E54047B79F4DBB4FED8D948F /* FirestoreDecoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = C46CA4198406B579655640C1 /* FirestoreDecoding.swift */; };
 		E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */; };
@@ -143,7 +142,6 @@
 		F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519810884A2F43AD0A1C337 /* HomeView.swift */; };
 		FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DBB4EC8798CACA623AE229 /* IkutApp.swift */; };
 		FECAA7A47E4F47DC37B0083F /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE37346B0076B57911BFD71C /* ModelTests.swift */; };
-		FF298D6964E7125CA8345B5B /* StopMiniMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357AD5AE662C1A507024F1D8 /* StopMiniMap.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -202,7 +200,6 @@
 		30373103D4B59BAB60C163E5 /* StopDriving.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopDriving.swift; sourceTree = "<group>"; };
 		3375CFBCC39B1C2F76B90699 /* MapDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDemo.swift; sourceTree = "<group>"; };
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
-		357AD5AE662C1A507024F1D8 /* StopMiniMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopMiniMap.swift; sourceTree = "<group>"; };
 		3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometryTests.swift; sourceTree = "<group>"; };
 		3D43EA449C4A10B16261D617 /* HazardMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardMapContent.swift; sourceTree = "<group>"; };
 		3EA475AFBE5E8DF067171FDC /* Member.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Member.swift; sourceTree = "<group>"; };
@@ -248,7 +245,6 @@
 		8C4E3792B5AD023C85CD5AA0 /* AlertPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertPolicy.swift; sourceTree = "<group>"; };
 		8EB8DC03DE6CE40C04670411 /* ConvoyFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyFormat.swift; sourceTree = "<group>"; };
 		8EEB2E053516041BB6ABA3EB /* StopContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopContext.swift; sourceTree = "<group>"; };
-		90BD0D4E774669C179661397 /* StopSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSuggestions.swift; sourceTree = "<group>"; };
 		9256AE8480413335567EC1FC /* HazardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardModel.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
 		991414E381145C07351D7F20 /* LocationDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationDeniedView.swift; sourceTree = "<group>"; };
@@ -576,11 +572,9 @@
 				8EEB2E053516041BB6ABA3EB /* StopContext.swift */,
 				30373103D4B59BAB60C163E5 /* StopDriving.swift */,
 				C3E80CE011C8490310C42F29 /* StopLogic.swift */,
-				357AD5AE662C1A507024F1D8 /* StopMiniMap.swift */,
 				53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */,
 				1DE38EDF4446EB6024A65E6A /* StopPillView.swift */,
 				85031A857FFEE9A7F7CEE986 /* StopService.swift */,
-				90BD0D4E774669C179661397 /* StopSuggestions.swift */,
 			);
 			path = Stops;
 			sourceTree = "<group>";
@@ -891,11 +885,9 @@
 				EA34025E916A7D1EF7A5734B /* StopContext.swift in Sources */,
 				51CFCAB78FFA18C207850A59 /* StopDriving.swift in Sources */,
 				641F85230B678E4EEA77E442 /* StopLogic.swift in Sources */,
-				FF298D6964E7125CA8345B5B /* StopMiniMap.swift in Sources */,
 				B7DDF8AAF5AC85A86C6F39D6 /* StopPillLogic.swift in Sources */,
 				7555E494FCA3E97B96F8F4C8 /* StopPillView.swift in Sources */,
 				303337D10340B4EF477BB00E /* StopService.swift in Sources */,
-				E46CBF63774E7C17DCE1C12E /* StopSuggestions.swift in Sources */,
 				5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */,
 				3948F54C6AB6FC2E960961D3 /* TrackingService.swift in Sources */,
 				902FF2CE4308539543381C77 /* TrackingTypes.swift in Sources */,

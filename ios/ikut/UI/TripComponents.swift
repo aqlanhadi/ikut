@@ -156,7 +156,7 @@ struct DashedDivider: View {
         StatGrid([
             .init("Spread", "8.2 km", color: .ikutWarning),
             .init("Lead", "96 km/h"),
-            .init("Next stop", "Tapah"),
+            .init("Cars", "5"),
         ], background: Color(.secondarySystemBackground), valueSize: 15)
         HStack(spacing: Spacing.gap) {
             StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)

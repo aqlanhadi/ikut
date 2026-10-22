@@ -3,19 +3,20 @@
 // The pieces, each small enough to read on its own:
 //   parseArgs      the common command-line options
 //   Car            a scripted car: a Firebase client that joins, publishes positions with the app's pipeline
-//                  (lib/tracking.mjs), logs approach alerts, reports and votes
+//                  (lib/tracking.mjs), logs approach alerts, reports and OKs
 //   Sync           marker files shared with the UI tests (ios/ikutUITests/DemoUITests.swift)
 //   Car.readTrip   the trip the phone created, read back through the client SDK as a member (works under the real rules)
 //   xcodebuild     build once, then one `test-without-building` per phone, QA CHECK lines collected
 //   runDemo        dry run, or the whole show: handshake with the phones, drive everyone along the trip's
 //                  route at 1x, run the timeline, summarize
-//   stopStory      the highlight both demos share: a stop request, votes, the organizer agrees and pins it, it
-//                  stays visible on the map for a while, the organizer taps "Everyone has arrived"
+//   stopStory      the highlight both demos share: Faiz informs the convoy with a message, Hafiz and Daniel
+//                  tap OK, it stays open for a while, the organizer taps "We've stopped"
 //
 // Handshake with the tests (marker files, $TMPDIR/ikut-qa/<tag>-sync). Test to script: a.code (the trip code),
-// b.lobby, a.map, b.map, a.pinned, b.sawPin, a.resolved. Script to tests: code, cars.joined, report.a / report.b
-// (report debris from the Report sheet), stop.b (Pit stop > Fuel), agree (organizer agrees and pins), arrive
-// (organizer taps Everyone has arrived), end (leave the map and finish), abort.
+// b.lobby, a.map, b.map, b.stopRequested, a.ok, a.stopped, b.sawStopped. Script to tests: code, cars.joined,
+// report.a / report.b (report debris from the Report sheet), stop.b (Pit stop > Fuel > Add a message > Inform the
+// convoy), agree (the organizer taps OK if her car is asked and opens the card), arrive (the organizer taps
+// We've stopped), end (leave the map and finish), abort.
 //
 // Reuse: lib/route.mjs, lib/tracking.mjs, the 20 s simctl location resync of run-ui.mjs, the REST read and
 // marker handshake of run-convoy2.mjs.
@@ -159,7 +160,7 @@ export class Car {
     }
   }
 
-  async reportEvent(type, category, severity, expirySeconds) {
+  async reportEvent(type, category, severity, expirySeconds, message = null) {
     const { lastFix: fix } = this;
     const here = { latitude: fix.latitude, longitude: fix.longitude };
     const routeOffset = this.route.project(here)?.offset ?? this.lastPosition.routeOffset;
@@ -169,16 +170,20 @@ export class Car {
       routeOffset, authorId: this.uid, carId: this.carId, createdAt: Timestamp.fromDate(createdAt),
     };
     if (expirySeconds) data.expiresAt = Timestamp.fromMillis(createdAt.getTime() + expirySeconds * 1000);
+    if (message) data.message = message;
     const ref = doc(collection(this.db, `trips/${this.tripId}/events`));
     await setDoc(ref, data);
     return { id: ref.id, routeOffset };
   }
 
-  /** A stop answer: `answer` next to `agree`, as the app writes it (the rules require them to match). */
-  async vote(eventId, agree, suggestion = null) {
-    const data = { userId: this.uid, agree, answer: agree ? 'yes' : 'notNow', at: serverTimestamp() };
-    if (suggestion) data.suggestion = suggestion;
-    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), data);
+  /** A stop OK, as the app writes it: this car's vote document with the user and the time. */
+  async ok(eventId) {
+    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), { userId: this.uid, at: serverTimestamp() });
+  }
+
+  /** We've stopped, by the car that asked (the author may close as stopped): status, who and why, expiresAt now. */
+  async markStopped(eventId) {
+    await updateDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}`), { status: 'closed', closedReason: 'stopped', closedBy: this.uid, expiresAt: Timestamp.now() });
   }
 
   goOffline() { return disableNetwork(this.db); }
@@ -558,50 +563,45 @@ async function runDemoInner(config, o) {
 
 // ---------------------------------------------------------------- the highlight
 
-/** How long the pinned stop stays on the map before "Everyone has arrived", seconds. */
-export const PIN_VISIBLE_S = 75;
+/** How long the open request stays on the phones, with the OKs in, before "We've stopped", seconds. */
+export const STOP_OPEN_S = 45;
+
+/** What Faiz types on his phone (the UI test types the same words). */
+export const STOP_MESSAGE = 'Low on fuel, next R&R please';
 
 /**
- * The stop story. `byPhone`: phone 2 requests it (marker stop.b, Pit stop > Fuel in the app); otherwise Hafiz does.
- * Hafiz always suggests "R&R Demo", 4 km ahead of the lead, so the organizer has a place to pin even when MapKit
- * finds none on the simulator. Daniel agrees; the organizer agrees and pins; both phones show the pin; the pin
- * stays PIN_VISIBLE_S; the organizer taps Everyone has arrived.
+ * The stop story: Faiz (phone 2) taps Pit stop > Fuel > Add a message > Inform the convoy (marker stop.b);
+ * Hafiz and then Daniel tap OK; the organizer taps OK on her pill if her car was asked (marker agree) and the OKs
+ * show on her card; the request stays STOP_OPEN_S; the organizer taps We've stopped (marker arrive) and the
+ * request closes on every phone.
  */
-export async function stopStory(d, { byPhone }) {
-  const { world, cars, sync, say, clock } = d;
-  const off = world.offsetOf('lead', clock.T) + 4000;
-  const co = world.route.coordinateAtOffset(off);
-  const place = { name: 'R&R Demo', coordinate: new GeoPoint(co.latitude, co.longitude), routeOffset: off };
+export async function stopStory(d) {
+  const { cars, sync, say } = d;
   let eventId;
-  if (byPhone) {
-    sync.mark('stop.b');
-    for (let i = 0; i < 180 && !eventId; i++) {
-      eventId = cars.hafiz.events.find((e) => e.category === 'stopRequest' && !e.expiresAt)?.id;
-      if (!eventId) await sleep(500);
-    }
-    if (!d.check('the stop request from phone 2 reached the scripted cars', Boolean(eventId))) throw new Error('no stop request arrived');
-    say('Hafiz suggests "R&R Demo" for it and agrees');
-    await cars.hafiz.vote(eventId, true, place);
-  } else {
-    const r = await cars.hafiz.reportEvent('stopFuel', 'stopRequest', 'medium', null);
-    eventId = r.id;
-    say('Hafiz asked for a fuel stop and suggests "R&R Demo"');
-    await cars.hafiz.vote(eventId, true, place);
+  sync.mark('stop.b');
+  for (let i = 0; i < 240 && !eventId; i++) {
+    eventId = cars.hafiz.events.find((e) => e.category === 'stopRequest' && e.status !== 'closed' && e.expiresAt?.toMillis() > Date.now())?.id;
+    if (!eventId) await sleep(500);
   }
-  await sleep(6000);
-  await cars.daniel.vote(eventId, true);
-  say('Daniel agrees');
-  await sleep(4000);
-  sync.mark('agree'); // phone 1: opens the stop from the Pit stop button, then Pin R&R Demo
-  await sync.wait('a.pinned', 120);
+  if (!d.check("Faiz's stop request reached the scripted cars", Boolean(eventId))) throw new Error('no stop request arrived');
   const ref = doc(cars.hafiz.db, `trips/${d.tripId}/events/${eventId}`);
-  const pinned = (await getDoc(ref)).data();
-  d.check('the lead car pinned a stop for the convoy', Boolean(pinned?.place?.name), pinned?.place?.name ?? 'no place');
-  await sync.wait('b.sawPin', 120);
-  say(`the pin is on both phones; it stays for ${PIN_VISIBLE_S} s so it can be watched on the map`);
-  await sleep(PIN_VISIBLE_S * 1000);
-  sync.mark('arrive'); // phone 1 taps Leave now
-  await sync.wait('a.resolved', 90);
-  const resolved = (await getDoc(ref)).data();
-  d.check('Leave now closed the stop (expiresAt set, status closed, reason left)', Boolean(resolved?.expiresAt) && resolved.expiresAt.toMillis() <= Date.now() + 1000 && resolved.status === 'closed' && resolved.closedReason === 'left', JSON.stringify({ status: resolved?.status, closedReason: resolved?.closedReason }));
+  const asked = (await getDoc(ref)).data();
+  d.check('the request carries his message, no place, and closes itself after 30 minutes', asked?.message === STOP_MESSAGE && asked.place === undefined && asked.expiresAt.toMillis() - asked.createdAt.toMillis() === 30 * 60 * 1000, JSON.stringify({ message: asked?.message, place: asked?.place }));
+  await sleep(6000);
+  await cars.hafiz.ok(eventId);
+  say('Hafiz taps OK');
+  await sleep(6000);
+  await cars.daniel.ok(eventId);
+  say('Daniel taps OK');
+  await sleep(4000);
+  sync.mark('agree'); // phone 1: OK on the pill if her car is asked, then the card with the OKs
+  await sync.wait('a.ok', 120);
+  say(`the OKs are in; the request stays open for ${STOP_OPEN_S} s so it can be watched`);
+  await sleep(STOP_OPEN_S * 1000);
+  sync.mark('arrive'); // phone 1 taps We've stopped
+  await sync.wait('a.stopped', 90);
+  const closed = (await getDoc(ref)).data();
+  d.check("We've stopped closed the request (status closed, reason stopped, expiresAt now)", closed?.status === 'closed' && closed.closedReason === 'stopped' && Boolean(closed.closedBy) && closed.expiresAt.toMillis() <= Date.now() + 1000, JSON.stringify({ status: closed?.status, closedReason: closed?.closedReason }));
+  await sync.wait('b.sawStopped', 120);
+  say("the request is closed on phone 2 too");
 }

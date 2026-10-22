@@ -438,28 +438,13 @@ struct MapCameraRoom: Equatable {
 // MARK: - Stop host helpers
 
 extension TripMapModel {
-    /// What the stop sheet and card need from this screen; nil until the trip knows my car.
+    /// What the stop card needs from this screen; nil until the trip knows my car.
     func stopContext(tripId: String, userId: String, isOrganizer: Bool) -> StopContext? {
         guard let carId = myCarId else { return nil }
         return StopContext(
             tripId: tripId, userId: userId, carId: carId, isOrganizer: isOrganizer,
             snapshot: { [weak self] in self?.reportSnapshot() },
-            mainRoute: mainRoute,
-            frontOffset: { [weak self] in self?.convoy.convoy.first?.convoyOffset },
-            carFixes: { [weak self] in self?.stopCarFixes() ?? [:] })
-    }
-
-    /// Where every car is, from the positions the phone already has: the convoy's cars on the main
-    /// route (joining cars are not included). A car whose position is older than a minute is left out,
-    /// so it never reads as "Here" from where it used to be.
-    func stopCarFixes(now: Date = Date()) -> [String: StopCarFix] {
-        var fixes: [String: StopCarFix] = [:]
-        for entry in convoy.convoy where HazardLogic.isFresh(entry.position, now: now, config: .default) {
-            fixes[entry.id] = StopCarFix(
-                latitude: entry.position.location.latitude, longitude: entry.position.location.longitude,
-                offset: entry.convoyOffset)
-        }
-        return fixes
+            mainRoute: mainRoute)
     }
 
     /// This phone's own speed in m/s, or nil while it is unknown or old. The tracker's phone is its

@@ -119,7 +119,7 @@ enum MapDemo {
         let model = model(fiveCars: five)
         // IKUT_MAP_DEMO_STOP picks what the stop screens show (see `stopBoard`); IKUT_MAP_DEMO_NO_STOP
         // shows none. IKUT_MAP_DEMO_CARD opens the stop card (or one of its screens), and
-        // IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.
+        // IKUT_MAP_DEMO_EXPANDED=1 unfolds the panel, IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.
         let board = env["IKUT_MAP_DEMO_NO_STOP"] == nil && !gallery
             ? stopBoard(env["IKUT_MAP_DEMO_STOP"] ?? "lead", fiveCars: five) : StopBoard.empty
         return NavigationStack {
@@ -127,21 +127,11 @@ enum MapDemo {
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
                 demoCard: env["IKUT_MAP_DEMO_CARD"], demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
-                searcher: DemoPlaceSearcher(), stopService: DemoStopService())
+                demoExpanded: env["IKUT_MAP_DEMO_EXPANDED"] != nil,
+                stopService: DemoStopService())
                 .overlay(alignment: .top) {
                     if gallery { BannerGallery(model: model).padding(.top, 72) }
                 }
-        }
-    }
-
-    /// Candidate places for the demo, ahead of the lead car near Tapah.
-    struct DemoPlaceSearcher: PlaceSearching {
-        func search(query: String, near center: CLLocationCoordinate2D, radius: CLLocationDistance) async throws -> [FoundPlace] {
-            [
-                FoundPlace(name: "Petronas Tapah R&R", coordinate: CLLocationCoordinate2D(latitude: 4.2100, longitude: 101.2600)),
-                FoundPlace(name: "Shell Gopeng", coordinate: CLLocationCoordinate2D(latitude: 4.3400, longitude: 101.2000)),
-                FoundPlace(name: "Caltex Gopeng", coordinate: CLLocationCoordinate2D(latitude: 4.3600, longitude: 101.1900)),
-            ]
         }
     }
 
@@ -167,25 +157,20 @@ enum MapDemo {
         return center
     }
 
-    private static let tapahStop = StopPlace(
-        name: "Petronas Tapah R&R", coordinate: GeoPoint(latitude: 4.21, longitude: 101.26),
-        routeOffset: 52_000, pinnedBy: nil)
-
-    /// The stop screens' scenes. Wyna (car 2) asks for fuel at Petronas Tapah R&R:
-    /// `lead` (Aqlan, the lead car, has not pinned), `responder` (a car that has not answered),
-    /// `asker` (Aqlan asked), `pinned` (heading there), `atstop` (cars arriving), `two` (a second
-    /// request from Daniel, food), `noanswer` (Aqlan's request nobody answered).
+    /// The stop screens' scenes. Wyna (car 2) asks for fuel; the viewer is Aqlan (car 1, the lead):
+    /// `lead` (Wyna's request with a message, Aqlan has not said OK and may say We've stopped),
+    /// `message` (the same, nobody else said OK), `responder` (no message), `asker` (Aqlan asked),
+    /// `two` (a second request from Daniel, food).
     static func stopBoard(_ scene: String, now: Date = Date(), fiveCars: Bool = false) -> StopBoard {
         func request(
             id: String = "demo-stop", type: EventType = .stopFuel, by requester: (String, Int, String) = ("c2", 2, "Wyna"),
-            asked: TimeInterval = -90, statuses: [String: StopRequestState.VoteStatus] = [:],
-            place: StopPlace? = nil, lead: Bool, author: Bool = false, arrivals: [String: StopRequestState.Arrival] = [:]
+            asked: TimeInterval = -90, oks: Set<String> = [], message: String? = nil,
+            canMarkStopped: Bool, author: Bool = false
         ) -> StopRequestState {
             func row(_ id: String, _ n: Int, _ color: String, _ name: String, mine: Bool = false) -> StopRequestState.Row {
-                let status = id == requester.0 ? .agreed : (statuses[id] ?? .waiting)
-                return .init(
-                    carId: id, number: n, colorHex: color, name: name, isMine: mine, status: status, suggestion: nil,
-                    arrival: place == nil ? nil : arrivals[id])
+                .init(
+                    carId: id, number: n, colorHex: color, name: name, isMine: mine,
+                    status: id == requester.0 || oks.contains(id) ? .ok : .waiting)
             }
             let rows = [
                 row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true),
@@ -193,41 +178,27 @@ enum MapDemo {
                 row("c3", 3, "#0F766E", "Hafiz’s Hilux"),
                 row("c4", 4, "#7C3AED", "Daniel’s City"),
             ] + (fiveCars ? [row("c5", 5, "#BE185D", "Faiz’s car")] : [])
-            let mine = rows.first { $0.isMine }
             return StopRequestState(
                 eventId: id, type: type, requesterCarId: requester.0, requesterNumber: requester.1,
-                requesterName: requester.2, askedAt: now.addingTimeInterval(asked), rows: rows, place: place,
-                proposal: tapahStop, alternatives: [], viewerAgrees: mine?.status == .agreed, canPin: lead,
-                canResolve: author || lead, viewerOffset: 40_000, isResolved: false, isAuthor: author,
-                myAnswer: mine?.status == .agreed ? .yes : (mine?.status == .notNow ? .notNow : nil),
-                pinnedByName: place == nil ? nil : "Aisha", requesterOffset: 40_500)
+                requesterName: requester.2, askedAt: now.addingTimeInterval(asked), message: message, rows: rows,
+                canMarkStopped: canMarkStopped, isAuthor: author)
         }
-        let pinned = StopPlace(
-            name: tapahStop.name, coordinate: tapahStop.coordinate, routeOffset: tapahStop.routeOffset, pinnedBy: "u-c1")
+        let note = "Low on fuel, next R&R please"
         switch scene {
         case "responder":
-            return StopBoard(requests: [request(statuses: ["c3": .agreed], lead: false)])
+            return StopBoard(requests: [request(oks: ["c3"], canMarkStopped: false)])
+        case "message":
+            return StopBoard(requests: [request(message: note, canMarkStopped: false)])
         case "asker":
             return StopBoard(requests: [request(
-                by: ("c1", 1, "Aqlan"), statuses: ["c3": .agreed], lead: false, author: true)])
-        case "pinned":
-            return StopBoard(requests: [request(
-                statuses: ["c1": .agreed, "c3": .agreed], place: pinned, lead: true,
-                arrivals: ["c1": .minutes(8), "c2": .minutes(4), "c3": .minutes(12), "c4": .minutes(15), "c5": .minutes(16)])])
-        case "atstop":
-            return StopBoard(requests: [request(
-                statuses: ["c1": .agreed, "c3": .agreed], place: pinned, lead: true,
-                arrivals: ["c1": .here, "c2": .here, "c3": .here, "c4": .minutes(2), "c5": .minutes(3)])])
+                by: ("c1", 1, "Aqlan"), oks: ["c3"], message: note, canMarkStopped: true, author: true)])
         case "two":
             return StopBoard(requests: [
-                request(statuses: ["c3": .agreed], lead: false),
-                request(
-                    id: "demo-food", type: .stopFood, by: ("c4", 4, "Daniel"), asked: -30, lead: false),
+                request(oks: ["c3"], canMarkStopped: false),
+                request(id: "demo-food", type: .stopFood, by: ("c4", 4, "Daniel"), asked: -30, canMarkStopped: false),
             ])
-        case "noanswer":
-            return StopBoard(requests: [], missed: request(by: ("c1", 1, "Aqlan"), asked: -660, lead: false, author: true))
         default:
-            return StopBoard(requests: [request(statuses: ["c3": .agreed], lead: true)])
+            return StopBoard(requests: [request(oks: ["c3"], message: note, canMarkStopped: true)])
         }
     }
     private static func bearing(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {

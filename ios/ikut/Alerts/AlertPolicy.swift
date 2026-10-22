@@ -7,12 +7,14 @@ struct AlertPolicy {
     static let backlogWindow: TimeInterval = 2 * 60
 
     let myUserId: String
+    /// This phone's car: a stop request from it is already known to everyone in it.
+    let myCarId: String?
     private(set) var seen: Set<String> = []
     private var primed = false
-    private var pinnedSeen: Set<String> = []
 
-    init(myUserId: String) {
+    init(myUserId: String, myCarId: String? = nil) {
         self.myUserId = myUserId
+        self.myCarId = myCarId
     }
 
     /// Events to announce for this snapshot, most severe first (newest first within a severity).
@@ -23,7 +25,7 @@ struct AlertPolicy {
         var fresh: [TripEvent] = []
         for event in events {
             guard let id = event.id, seen.insert(id).inserted else { continue }
-            guard event.authorId != myUserId else { continue }
+            guard !isMine(event) else { continue }
             if isBacklog {
                 let age = event.createdAt.map { now.timeIntervalSince($0) } ?? 0
                 guard event.severity == .high, age < Self.backlogWindow else { continue }
@@ -33,19 +35,10 @@ struct AlertPolicy {
         return Self.ranked(fresh)
     }
 
-    /// Stop requests that have a pinned place, once each, for events other than the viewer's own.
-    /// Call after `newEvents` with its result as `fresh`: a request announced in this same snapshot
-    /// is not repeated, and the caller decides whether the request was announced at all.
-    mutating func newlyPinned(from events: [TripEvent], excluding fresh: [TripEvent]) -> [TripEvent] {
-        let freshIds = Set(fresh.compactMap(\.id))
-        var out: [TripEvent] = []
-        for event in events {
-            guard event.category == .stopRequest, event.place != nil, let id = event.id,
-                  pinnedSeen.insert(id).inserted, event.authorId != myUserId, !freshIds.contains(id)
-            else { continue }
-            out.append(event)
-        }
-        return out
+    /// Written by this user, or a stop request from this user's car (the car's other phone asks too).
+    func isMine(_ event: TripEvent) -> Bool {
+        if event.authorId == myUserId { return true }
+        return event.category == .stopRequest && myCarId != nil && event.carId == myCarId
     }
 
     /// Most severe first, then newest first. Stable for equal keys.

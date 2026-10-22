@@ -77,7 +77,7 @@ simctl('location', o.udid, 'set', `${track[0].latitude},${track[0].longitude}`);
 
 // ---- sim
 const simLog = fs.createWriteStream(path.join(o.logs, 'sim.log'));
-const sim = end.track(spawn('node', [path.join(here, 'convoy-sim.mjs'), '--speed', String(o.speed), '--wait-app', '--wait-timeout', '1500', '--expect-app-vote'], { cwd: here }));
+const sim = end.track(spawn('node', [path.join(here, 'convoy-sim.mjs'), '--speed', String(o.speed), '--wait-app', '--wait-timeout', '1500', '--expect-app-ok'], { cwd: here }));
 let simCode = null;
 let simGo = false;
 let simDone = null;

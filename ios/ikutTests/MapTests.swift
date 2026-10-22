@@ -457,16 +457,6 @@ struct TripMapModelTests {
         #expect(model.cameraTarget == nil)
     }
 
-    @Test func stopCarFixesLeaveOutStaleCars() {
-        let model = fixedModel()
-        let cars = [car("a", lead: true), car("b", name: "Wyna’s X70", number: 2)]
-        model.apply(
-            trip: trip(), myCar: cars[0], myCarId: "a",
-            positions: ["a": position(offset: 5500, age: 5), "b": position(offset: 4000, age: 120)], isTracker: true)
-        model.setCars(cars)
-        #expect(Set(model.stopCarFixes(now: t0).keys) == ["a"])
-    }
-
     @Test func oldDeviceFixDoesNotGiveASpeed() {
         let model = fixedModel()
         model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-30))
@@ -597,9 +587,6 @@ struct MapStopContextTests {
         #expect(context.carId == "c1")
         #expect(context.isOrganizer)
         #expect(context.mainRoute != nil)
-        // The front car is Aqlan's, so suggestions start ahead of it.
-        #expect(context.frontOffset() == model.convoy.convoy.first?.convoyOffset)
-        #expect((context.frontOffset() ?? 0) > 0)
         #expect(context.snapshot() != nil)
     }
 

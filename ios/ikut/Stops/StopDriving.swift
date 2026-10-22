@@ -38,30 +38,17 @@ struct StopCardSession: Equatable, Sendable {
 
     mutating func confirmPassenger() { isPassenger = true }
 
-    /// "I'm driving": back to the default place; nothing is remembered.
+    /// "I'm driving": back to sending without a message; nothing is remembered.
     mutating func confirmDriving() { isPassenger = false }
 
     /// The card closed.
     mutating func close() { isPassenger = false }
 }
 
-/// What the card allows while the phone moves.
+/// What the card asks of a moving phone: only the message field is behind "Are you a passenger?".
+/// Every button on the card works while the car moves.
 enum StopCardGate {
-    enum Mode: Equatable, Sendable {
-        /// Not moving, or a passenger said so: everything works.
-        case full
-        /// Moving, a stop is open: status only, with "Stop and park to change anything."
-        case readOnly
-        /// Moving, no stop open: four tiles, then the best place read back. Never the place list.
-        case driverAsk
-    }
-
-    static func mode(driving: Bool, session: StopCardSession, hasOpenStop: Bool) -> Mode {
-        guard driving, !session.isPassenger else { return .full }
-        return hasOpenStop ? .readOnly : .driverAsk
-    }
-
-    /// Search, Drop a pin and the full place list ask "Are you a passenger?" first on a moving phone.
+    /// Add a message asks "Are you a passenger?" first on a moving phone.
     static func needsPassengerCheck(driving: Bool, session: StopCardSession) -> Bool {
         driving && !session.isPassenger
     }

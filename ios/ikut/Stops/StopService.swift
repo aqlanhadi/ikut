@@ -4,14 +4,11 @@ import Foundation
 
 /// What the stop card needs from the backend. A protocol so previews and tests can fake it.
 protocol StopServing: Sendable {
-    /// Asks for a stop and returns the new event's id. `place` is the requester's proposed stop.
-    func request(type: EventType, place: StopPlace?, context: StopContext, snapshot: ReportSnapshot) async throws -> String
-    /// Names another place for an open request: pins it for the lead car or organizer, otherwise
-    /// records it as the viewer's car's suggestion (a "Not now" that carries a place).
-    func suggest(place: StopPlace, eventId: String, canPin: Bool, context: StopContext) async throws
+    /// Asks for a stop and returns the new event's id. `message` is a passenger's optional note.
+    func request(type: EventType, message: String?, context: StopContext, snapshot: ReportSnapshot) async throws -> String
 }
 
-/// Requests, votes on, pins and closes stops (`trips/{id}/events` and their `votes`).
+/// Requests, OKs and closes stops (`trips/{id}/events` and their `votes`).
 ///
 /// Writes wait for the server's verdict so a rule rejection throws; if the server hasn't answered
 /// within `EventService.writeTimeout` (offline) they return and Firestore keeps the write queued.
@@ -22,64 +19,27 @@ struct StopService: StopServing {
 
     // MARK: Writes
 
-    /// Writes a stop event through `EventService.report`. A `place` becomes the requesting car's
-    /// suggestion (an agreeing vote carrying the place); the lead car or organizer pins it.
-    func request(type: EventType, place: StopPlace?, context: StopContext, snapshot: ReportSnapshot) async throws -> String {
-        let id = try await EventService.report(
+    /// Writes a stop event through `EventService.report`: the reason in `type`, the optional message,
+    /// and `expiresAt` = 30 minutes after it was asked (set by the event's category), so it closes
+    /// itself if nobody does.
+    func request(type: EventType, message: String?, context: StopContext, snapshot: ReportSnapshot) async throws -> String {
+        try await EventService.report(
             type: type, tripId: context.tripId, carId: context.carId, authorId: context.userId,
             location: snapshot.coordinate, heading: snapshot.heading,
-            route: context.mainRoute ?? snapshot.route, previousOffset: snapshot.previousOffset)
-        if let place {
-            try await vote(
-                tripId: context.tripId, eventId: id, carId: context.carId, userId: context.userId,
-                answer: .yes, suggestion: place)
-        }
-        return id
+            route: context.mainRoute ?? snapshot.route, previousOffset: snapshot.previousOffset,
+            message: StopLogic.cleanedMessage(message))
     }
 
-    func suggest(place: StopPlace, eventId: String, canPin: Bool, context: StopContext) async throws {
-        if canPin {
-            try await pin(tripId: context.tripId, eventId: eventId, place: place, userId: context.userId)
-        } else {
-            try await vote(
-                tripId: context.tripId, eventId: eventId, carId: context.carId, userId: context.userId,
-                answer: .notNow, suggestion: place)
-        }
-    }
-
-    /// The viewer's car answers. `suggestion` names another place (a "Not now" that carries a place)
-    /// or the requester's own proposal. Replaces the car's earlier vote. `agree` is written next to
-    /// `answer` so phones on an older build still count it.
-    func vote(
-        tripId: String, eventId: String, carId: String, userId: String, answer: StopAnswer,
-        suggestion: StopPlace? = nil
-    ) async throws {
-        nonisolated(unsafe) var data: [String: Any] = [
-            "userId": userId, "agree": answer.agree, "answer": answer.rawValue, "at": FieldValue.serverTimestamp(),
-        ]
-        if let suggestion { data["suggestion"] = Self.suggestionData(suggestion) }
-        nonisolated(unsafe) let payload = data
+    /// The viewer's car says OK. Replaces the car's earlier OK (a second phone in the car writes the same document).
+    func ok(tripId: String, eventId: String, carId: String, userId: String) async throws {
+        nonisolated(unsafe) let payload: [String: Any] = ["userId": userId, "at": FieldValue.serverTimestamp()]
         let ref = Firestore.firestore().document("\(Self.votes(tripId: tripId, eventId: eventId))/\(carId)")
         try await ServerWrite.commit { try await ref.setData(payload) }
     }
 
-    /// Pins `place` and marks the request pinned. Lead car's tracker or organizer only; anyone else
-    /// is rejected by the rules.
-    func pin(tripId: String, eventId: String, place: StopPlace, userId: String) async throws {
-        nonisolated(unsafe) let data: [String: Any] = [
-            "place": [
-                "name": place.name, "coordinate": place.coordinate, "routeOffset": place.routeOffset,
-                "pinnedBy": userId,
-            ] as [String: Any],
-            "status": StopStatus.pinned.rawValue,
-        ]
-        let ref = Firestore.firestore().document(FirestorePaths.event(tripId: tripId, eventId: eventId))
-        try await ServerWrite.commit { try await ref.updateData(data) }
-    }
-
     /// Closes the request: `status`, why and by whom, and `expiresAt` = now (phones on an older build,
-    /// and the QA scripts, read "no expiresAt" as open). The asker may only cancel; the lead car or
-    /// organizer closes it as left or no answer.
+    /// and the QA scripts, read "no expiresAt" as open). The asker may cancel or say the convoy has
+    /// stopped; the lead car or organizer says it has stopped.
     func close(
         tripId: String, eventId: String, reason: StopClosedReason, userId: String, now: Date = Date()
     ) async throws {
@@ -91,10 +51,6 @@ struct StopService: StopServing {
         try await ServerWrite.commit { try await ref.updateData(data) }
     }
 
-    static func suggestionData(_ place: StopPlace) -> [String: Any] {
-        ["name": place.name, "coordinate": place.coordinate, "routeOffset": place.routeOffset]
-    }
-
     // MARK: Actions for the card and the pill
 
     /// Live actions. Failures are reported to `onError`.
@@ -104,20 +60,11 @@ struct StopService: StopServing {
         onError: @escaping @MainActor @Sendable (Error) -> Void = { _ in }
     ) -> StopRequestActions {
         StopRequestActions(
-            answer: { eventId, answer in
+            ok: { eventId in
                 Task {
                     do {
-                        try await service.vote(
-                            tripId: context.tripId, eventId: eventId, carId: context.carId,
-                            userId: context.userId, answer: answer)
-                    } catch { onError(error) }
-                }
-            },
-            pin: { eventId, place in
-                Task {
-                    do {
-                        try await service.pin(
-                            tripId: context.tripId, eventId: eventId, place: place, userId: context.userId)
+                        try await service.ok(
+                            tripId: context.tripId, eventId: eventId, carId: context.carId, userId: context.userId)
                     } catch { onError(error) }
                 }
             },
@@ -133,10 +80,9 @@ struct StopService: StopServing {
 
     // MARK: Listening
 
-    /// Every open stop request with its votes, the cars and the viewer's progress along the route,
-    /// re-emitted on every change and every `refresh` seconds (distances, "here" and the ten minute
-    /// "No answer" move with time). When this phone is the lead car's or the organizer's, it also
-    /// closes requests nobody answered in ten minutes (there is no cloud job, that needs the Blaze plan).
+    /// Every open stop request with its votes and the cars, re-emitted on every change and every
+    /// `refresh` seconds (a request closes itself 30 minutes after it was asked, and nothing is written
+    /// for that, so the clock has to be looked at).
     static func listen(context: StopContext, refresh: Duration = .seconds(10)) -> AsyncStream<StopBoard> {
         AsyncStream { continuation in
             let hub = StopHub(context: context, continuation: continuation)
@@ -158,8 +104,6 @@ private final class StopHub: @unchecked Sendable {
     private var votesRegistrations: [String: ListenerRegistration] = [:]
     private var ticker: Task<Void, Never>?
     private var lastEmitted: StopBoard?
-    /// Requests this phone already asked to close as "No answer".
-    private var closing: Set<String> = []
 
     init(context: StopContext, continuation: AsyncStream<StopBoard>.Continuation) {
         self.context = context
@@ -246,48 +190,16 @@ private final class StopHub: @unchecked Sendable {
         lock.unlock()
         Task { @MainActor [self] in
             let now = Date()
-            let snapshot = context.snapshot()
-            let offset = snapshot.map {
-                EventService.routeOffset(
-                    for: $0.coordinate, route: context.mainRoute ?? $0.route, previousOffset: $0.previousOffset)
-            }
-            let fixes = context.carFixes()
-            func state(_ event: TripEvent, votes: [StopVote]) -> StopRequestState? {
-                StopLogic.tally(
-                    event: event, votes: votes, cars: cars, myUserId: context.userId, myCarId: context.carId,
-                    isOrganizer: context.isOrganizer, viewerOffset: offset, now: now, fixes: fixes)
-            }
             let requests = StopLogic.openStops(in: events, now: now).compactMap { event in
-                event.id.flatMap { id in state(event, votes: votes[id] ?? []) }
+                event.id.flatMap { id in
+                    StopLogic.tally(
+                        event: event, votes: votes[id] ?? [], cars: cars, myUserId: context.userId,
+                        myCarId: context.carId, isOrganizer: context.isOrganizer)
+                }
             }
-            let missed = StopLogic.missedAsk(in: events, myCarId: context.carId, now: now)
-                .flatMap { state($0, votes: []) }
-            closeUnanswered(events: events, cars: cars, now: now)
-            if recordIfChanged(StopBoard(requests: requests, missed: missed)) {
-                continuation.yield(StopBoard(requests: requests, missed: missed))
-            }
+            let board = StopBoard(requests: requests)
+            if recordIfChanged(board) { continuation.yield(board) }
         }
-    }
-
-    /// The lead car's tracker or the organizer closes a request nobody pinned in ten minutes.
-    @MainActor
-    private func closeUnanswered(events: [TripEvent], cars: [Car], now: Date) {
-        guard context.isOrganizer || StopLogic.isLeadTracker(cars: cars, myCarId: context.carId, myUserId: context.userId)
-        else { return }
-        for event in StopLogic.noAnswerToClose(in: events, now: now) {
-            guard let id = event.id, markClosing(id) else { continue }
-            let context = self.context
-            Task {
-                try? await StopService().close(
-                    tripId: context.tripId, eventId: id, reason: .noAnswer, userId: context.userId)
-            }
-        }
-    }
-
-    private func markClosing(_ id: String) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return closing.insert(id).inserted
     }
 
     private func recordIfChanged(_ board: StopBoard) -> Bool {

@@ -8,7 +8,7 @@
 // Both run XCUITests at the same time (ConvoyOrganizerUITests / ConvoyJoinerUITests in
 // ios/ikutUITests/TwoPhoneConvoyUITests.swift). Cars 3 and 4 are Firebase clients in this process: they join
 // through the joinTrip callable, publish positions with the app's pipeline (lib/tracking.mjs), report an
-// accident and vote on the stop.
+// accident and say OK to the stop.
 //
 // The tests and this script take turns through marker files in a sync directory ($TMPDIR/ikut-qa/convoy2-sync):
 // a side writes `<who>.<step>` when it has done a step and waits for the other side's file. This script:
@@ -18,7 +18,7 @@
 //   a.map, b.map  -> go: drives all four along the route at --kmh (simctl location playback for the
 //                    simulators, resynced every 20 s), writes `go`
 //   b.alerted     -> car 3 reports an accident, writes `cars.reported`
-//   b.stopRequested -> car 3 and car 4 vote (car 3 suggests a place when B's request has none), writes `cars.voted`
+//   b.stopRequested -> car 3 and car 4 say OK, writes `cars.voted`
 // and checks Firestore along the way (order, hazard, stop, pause, leave, end). Any failure writes `abort`.
 //
 // Options: --kmh N (default 90), --a-udid, --b-udid, --derived-data (default /tmp/ikut-dd-convoy2), --skip-build,
@@ -271,11 +271,9 @@ class ScriptedCar {
     return ref.id;
   }
 
-  // StopService.vote
-  async vote(eventId, agree, suggestion = null) {
-    const data = { userId: this.uid, agree, at: serverTimestamp() };
-    if (suggestion) data.suggestion = suggestion;
-    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), data);
+  // StopService.ok
+  async ok(eventId) {
+    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), { userId: this.uid, at: serverTimestamp() });
   }
 
   async close() {
@@ -395,32 +393,25 @@ async function scenario() {
   say(`car 3 reports an accident at ${car3.lastPosition.convoyOffset.toFixed(0)} m (event ${accidentId})`);
   mark('cars.reported');
 
-  // 6. B's stop request: the scripted cars vote
+  // 6. B's stop request (with a passenger message): the scripted cars say OK, A taps OK and We've stopped
   await waitMark('b.stopRequested', 300);
   const stop = (await getDocs(collection(reader(), `trips/${tripId}/events`))).docs
-    .map((d) => ({ id: d.id, ...d.data() })).find((e) => e.category === 'stopRequest' && !e.expiresAt);
+    .map((d) => ({ id: d.id, ...d.data() })).find((e) => e.category === 'stopRequest' && e.status !== 'closed' && e.expiresAt?.toMillis() > Date.now());
   if (!check('phone B\'s stop request is open in Firestore', Boolean(stop), stop ? `${stop.type}` : 'none')) throw new Error('no stop request');
+  check('B\'s request carries its passenger message, no place, and closes itself after 30 min', stop.message === 'Need fuel, next R and R please' && stop.place === undefined && stop.expiresAt.toMillis() - stop.createdAt.toMillis() === 30 * 60 * 1000, JSON.stringify({ message: stop.message, place: stop.place }));
   const bCarId = [...carDocs2.entries()].find(([, c]) => c.number === 2)?.[0];
-  const bVote = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}/votes/${bCarId}`))).data();
-  say(`B's vote: ${JSON.stringify({ agree: bVote?.agree, suggestion: bVote?.suggestion?.name ?? null })}`);
-  if (bVote?.suggestion) {
-    await car3.vote(stop.id, true);
-  } else {
-    // No place found ahead on B's phone: car 3 suggests one so the lead has something to pin.
-    const off = Math.max(...cars.map((c) => c.lastPosition.convoyOffset)) + 8000;
-    const c = route.coordinateAtOffset(off);
-    await car3.vote(stop.id, false, { name: 'QA Rest Area', coordinate: new GeoPoint(c.latitude, c.longitude), routeOffset: off });
-  }
-  await cars[1].vote(stop.id, true);
-  say(`car 3 ${bVote?.suggestion ? 'agrees' : 'suggests QA Rest Area'}, car 4 agrees`);
+  await car3.ok(stop.id);
+  await cars[1].ok(stop.id);
+  say('cars 3 and 4 say OK');
   mark('cars.voted');
 
-  await waitMark('a.pinned', 300);
-  const pinned = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();
-  check('stop pinned by phone A', Boolean(pinned.place?.name), pinned.place ? `${pinned.place.name}` : 'no place');
-  await waitMark('a.resolved', 300);
-  const resolved = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();
-  check('stop resolved (expiresAt set)', Boolean(resolved.expiresAt) && resolved.expiresAt.toMillis() <= Date.now() + 1000);
+  await waitMark('a.ok', 300);
+  const aCarId2 = [...carDocs2.entries()].find(([, c]) => c.number === 1)?.[0];
+  const aVote = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}/votes/${aCarId2}`))).data();
+  check('phone A said OK for its car', Boolean(aVote), JSON.stringify(aVote ? { userId: aVote.userId } : null));
+  await waitMark('a.stopped', 300);
+  const closed = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();
+  check('stop closed as stopped by phone A (We\'ve stopped)', closed.status === 'closed' && closed.closedReason === 'stopped' && Boolean(closed.closedBy) && closed.expiresAt.toMillis() <= Date.now() + 1000, JSON.stringify({ status: closed.status, closedReason: closed.closedReason }));
 
   // 7. pause / resume
   await waitMark('b.paused', 300);

@@ -10,7 +10,7 @@ import XCTest
 ///   2. signal drop: car 2 reads "Last seen ..." and falls down the list, then recovers
 ///   3. car 4 merges: JOINING disappears and it takes its place between cars 2 and 3
 ///   4. hazard: the marker appears, an approach alert is announced, the marker goes once everyone has passed
-///   5. stop request: the card appears with the pinned place, this car agrees, the card goes when resolved
+///   5. stop request: the card has the message, this car taps OK, the card goes when the lead taps We've stopped
 ///
 /// Skipped unless a code is given:
 ///
@@ -104,27 +104,23 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             shot("07-hazard-cleared")
         }
 
-        try step("8. Stop request: the button shows it, the card has the place, yes, then resolved") {
+        try step("8. Stop request: the button shows it, the card has its message, OK, then closed") {
             let stopButton = app.buttons["stop.button"]
             try waitFor("the Pit stop button shows the stop", timeout: 100 / speed + 60) { stopButton.label.hasPrefix("Fuel stop") }
             XCTAssertFalse(element("stop.card").exists, "the stop card must not open by itself")
-            // A tap on the stop the button shows opens the card.
+            // A tap on the stop the button shows opens the card. Its buttons all work while the phone drives.
             stopButton.tap()
-            let yes = app.buttons["stop.yes"]
+            let ok = app.buttons["stop.ok"]
             try waitFor("the stop card", timeout: 20) { element("stop.card").exists }
-            // The phone drives at highway speed: the card is read only until "I'm a passenger".
-            if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
-            try waitFor("the place on the card", timeout: 40 / speed + 30) {
-                app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Petronas Tapah R&R'")).firstMatch.exists
-            }
+            try waitFor("the passenger's message on the card", timeout: 40 / speed + 30) { element("stop.message").exists }
             Thread.sleep(forTimeInterval: 1)
             shot("08-stop-request")
-            // The scripted lead may have pinned already, and then there is nothing left to answer.
-            if yes.exists {
-                yes.tap()
-                try waitFor("the yes is shown", timeout: 15) { app.buttons["stop.yes"].label.hasPrefix("Said yes") }
+            // The phone is the fifth car: it taps OK (the card may already show it from the pill).
+            if ok.exists, ok.label == "OK" {
+                ok.tap()
+                try waitFor("the OK is shown", timeout: 15) { app.buttons["stop.ok"].label == "You said OK" }
             }
-            try waitFor("the card closes by itself after the lead resolves it", timeout: 120 / speed + 60) {
+            try waitFor("the card closes by itself after the lead says we've stopped", timeout: 120 / speed + 60) {
                 !element("stop.card").exists && stopButton.label == "Pit stop"
             }
             try waitFor("convoy list back", timeout: 20) { convoyOrder().count == 5 }

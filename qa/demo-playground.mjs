@@ -7,13 +7,13 @@
 //
 // You tap the real app on two simulators (phone 1 creates the trip, phone 2 joins it); this script provides the route:
 // where everybody starts, how fast each car drives, play/pause, and two generated cars (Daniel, Hafiz) with a few
-// a way to drop their signal and, on command, answer, ask and report. It fires no scripted events.
+// a way to drop their signal and, on command, say OK, ask (with a message) and report. It fires no scripted events.
 //
 // Commands arrive on stdin as `CMD {json}` lines (the dashboard writes them); state goes out as `DEMO {"type":"state"}`
 // every second, the shared route and each car's own roads as `DEMO {"type":"geometry"}` whenever they change.
 // Every car drives a TRACK (lib/playground.mjs): the shared route from a km, or a start road that merges into it, an own
 // ending, a deviation (out to a pin, wait, back). Commands: prepare, useTrip, placeAt, ending, clearEnding, deviate,
-// cancelDeviation, addCar, removeCar, rename, vote, voteAll, askStop, report, and the older place, speed, play, playAll,
+// cancelDeviation, addCar, removeCar, rename, vote, voteAll, askStop, markStopped, report, and the older place, speed, play, playAll,
 // drop. Cars: phone1, phone2, daniel, hafiz, g3, g4... Details in qa/README.md ("Playground").
 
 
@@ -27,9 +27,9 @@ import { loadRoutes } from './generate-gpx.mjs';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
-  MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, answersByCar, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
+  MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
   encodeLine, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
-  openStopSnapshot, optionalCoords, placeOnRoute, deviationStep, seenAfterChange, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
+  messageIn, openStopSnapshot, optionalCoords, oksByCar, deviationStep, seenAfterChange, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
   stepTrack, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
 } from './lib/playground.mjs';
 
@@ -44,8 +44,8 @@ const phones = [
 ];
 /** The two generated cars every playground starts with; more come from addCar (lib/playground.mjs nextCar). */
 const FIRST_GENERATED = [
-  { key: 'daniel', label: 'Daniel', name: 'Daniel’s City', color: '#7C3AED', place: 'R&R Demo' },
-  { key: 'hafiz', label: 'Hafiz', name: 'Hafiz’s Hilux', color: '#0F766E', place: 'Rest Stop Demo' },
+  { key: 'daniel', label: 'Daniel', name: 'Daniel’s City', color: '#7C3AED' },
+  { key: 'hafiz', label: 'Hafiz', name: 'Hafiz’s Hilux', color: '#0F766E' },
 ];
 const PHONE_COLORS = { phone1: '#0a6cff', phone2: '#d9480f' };
 const DEFAULTS = { phone1: 3000, phone2: 2200, daniel: 1400, hafiz: 600 };
@@ -97,7 +97,7 @@ let nextKeyNo = 3; // generated car keys: daniel, hafiz, g3, g4... never reused
 const cars = {};
 function makeCar(key, kind, props) {
   const c = {
-    key, kind, label: props.label, name: props.name ?? null, appName: props.name ?? null, color: props.color ?? PHONE_COLORS[key] ?? null, place: props.place ?? null,
+    key, kind, label: props.label, name: props.name ?? null, appName: props.name ?? null, color: props.color ?? PHONE_COLORS[key] ?? null,
     speed: DEFAULT_KMH, playing: false, moving: false,
     base: { kind: 'main', offset: props.offset ?? 0 }, startPin: null, deviation: null, ending: null, // the pieces of the track
     track: null, st: newCarState(), loc: null, parked: null, group: null, legsVersion: 0,
@@ -440,9 +440,8 @@ function eventsState() {
     return {
       id: e.id, type: e.type, category: e.category, by: label.get(e.carId) ?? (e.carId ? 'another car' : null), byKey: keyOf.get(e.carId) ?? null,
       offset: e.routeOffset === undefined ? null : Math.round(e.routeOffset), latitude: e.location?.latitude ?? null, longitude: e.location?.longitude ?? null,
-      ageSeconds: ageSeconds(e.createdAt, now), status: eventStatus(e, now), agree: v.filter((x) => x.agree).length, disagree: v.filter((x) => !x.agree).length,
-      answers: answersByCar(v, keyOf), suggestions: v.filter((x) => x.suggestion).map((x) => x.suggestion.name),
-      pinned: e.place?.name ?? null, resolved: Boolean(e.expiresAt) && e.expiresAt <= now,
+      ageSeconds: ageSeconds(e.createdAt, now), status: eventStatus(e, now), message: e.message ?? null,
+      ok: v.length, oks: oksByCar(v, keyOf), closedReason: e.closedReason ?? null, resolved: Boolean(e.expiresAt) && e.expiresAt <= now,
     };
   }).sort((a, b) => (a.ageSeconds ?? 0) - (b.ageSeconds ?? 0));
 }
@@ -629,7 +628,6 @@ function openStopFor(c, eventId) {
   if (!openStopSnapshot(e)) throw new UserError('That stop request is already closed.');
   return e;
 }
-const suggestionOf = (place) => place && { name: place.name, coordinate: new GeoPoint(place.latitude, place.longitude), routeOffset: place.routeOffset };
 
 async function addCar(m) {
   if (S.ended) throw new UserError('The trip has ended, so no more cars can join.');
@@ -640,7 +638,7 @@ async function addCar(m) {
   const label = m.name === undefined || m.name === null ? next.label : nameIn(m.name);
   const key = `g${nextKeyNo++}`;
   const offsets = allCars().map((x) => (x.loc?.onMain ? x.loc.mainOffset : x.base.kind === 'main' ? x.base.offset : null)).filter((x) => x !== null);
-  const c = makeCar(key, 'generated', { label, name: carNameFor(label, counter), color: next.color, place: `${label}’s pick`, offset: Math.max(0, (offsets.length ? Math.min(...offsets) : 3000) - BACK_OF_CONVOY) });
+  const c = makeCar(key, 'generated', { label, name: carNameFor(label, counter), color: next.color, offset: Math.max(0, (offsets.length ? Math.min(...offsets) : 3000) - BACK_OF_CONVOY) });
   say(`${c.label} added (${key}, ${c.name}), ${(c.base.offset / 1000).toFixed(1)} km`);
   if (S.route && !S.ended && S.phase === 'ready') {
     try {
@@ -789,14 +787,13 @@ async function command(m) {
     case 'addCar': return addCar(m);
     case 'removeCar': need(); return removeCar(c);
     case 'rename': need(); return renameCar(c, m.name);
-    case 'vote': {
-      need(); needJoined(c, 'answer');
-      if (m.answer !== 'yes' && m.answer !== 'notNow') throw new UserError('An answer is yes or notNow.');
-      openStopFor(c, m.event);
-      const place = m.place ? placeOnRoute(S.route, m.place) : null;
-      await c.car.vote(m.event, m.answer === 'yes', suggestionOf(place)).catch((e) => { throw plainWrite(e, 'The answer'); });
+    case 'vote': { // a generated car says OK (the card's OK button)
+      need(); needJoined(c, 'say OK');
+      const e = openStopFor(c, m.event);
+      if (e.carId === c.carId) throw new UserError('That car asked for the stop; its own car counts as OK.');
+      await c.car.ok(m.event).catch((err) => { throw plainWrite(err, 'The OK'); });
       c.voted.add(m.event);
-      say(`${c.label} answers ${m.answer}${place ? ` with ${place.name}` : ''}`);
+      say(`${c.label} says OK`);
       return;
     }
     case 'voteAll': {
@@ -810,8 +807,8 @@ async function command(m) {
         const answered = g.voted.has(m.event) || (rest.votes.get(m.event) ?? []).some((v) => v.id === g.carId);
         if (e.carId === g.carId || answered) continue;
         g.voted.add(m.event);
-        await g.car.vote(m.event, true).catch((err) => { g.voted.delete(m.event); say(`${g.label}'s answer failed: ${err.message}`); });
-        say(`${g.label} answers yes`);
+        await g.car.ok(m.event).catch((err) => { g.voted.delete(m.event); say(`${g.label}'s OK failed: ${err.message}`); });
+        say(`${g.label} says OK`);
       }
       if (!any && !allCars().some((x) => x.car?.events.some((e) => e.id === m.event))) throw new UserError('That stop request is not on the trip.');
       return;
@@ -819,11 +816,19 @@ async function command(m) {
     case 'askStop': {
       need(); needJoined(c, 'ask for a stop');
       const kind = eventKindIn(m.type, STOP_TYPES, 'The stop');
-      const place = m.place ? placeOnRoute(S.route, m.place) : null;
-      const { id } = await c.car.reportEvent(kind.type, kind.category, kind.severity, kind.expirySeconds).catch((e) => { throw plainWrite(e, 'The request'); });
-      if (place) await c.car.vote(id, true, suggestionOf(place)).catch((e) => { throw plainWrite(e, 'The place'); }); // the asker proposes its place through its own vote, as the app does
+      const message = messageIn(m.message);
+      const { id } = await c.car.reportEvent(kind.type, kind.category, kind.severity, kind.expirySeconds, message).catch((e) => { throw plainWrite(e, 'The request'); });
       c.voted.add(id);
-      say(`${c.label} asks for a stop (${kind.type})${place ? ` at ${place.name}` : ''}`);
+      say(`${c.label} asks for a stop (${kind.type})${message ? ` with the message "${message}"` : ''}`);
+      return;
+    }
+    case 'markStopped': { // We've stopped, by the generated car that asked (the author may close it as stopped)
+      need();
+      const asker = generatedCars().find((g) => g.car?.events.some((e) => e.id === m.event && e.carId === g.carId));
+      if (!asker) throw new UserError("Only the car that asked, the lead car or the organizer can say we've stopped. This one was asked by a phone, so tap We've stopped in the app.");
+      openStopFor(asker, m.event);
+      await asker.car.markStopped(m.event).catch((e) => { throw plainWrite(e, "We've stopped"); });
+      say(`${asker.label} says we've stopped`);
       return;
     }
     case 'report': {

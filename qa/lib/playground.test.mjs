@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { RouteLine, CarRouteLogic, haversine } from './route.mjs';
 import { loadRoutes } from '../generate-gpx.mjs';
 import {
-  advanceOffset, clampKmh, decodeDoc, destinationPoint, feedPoints, isOpenStop, nudged, offRouteCoords, parseStart,
-  pendingVotes, suggestionAhead, ageSeconds, UserError, numberIn, startFrom, validDerivedData, shouldPark, autoPick,
-  MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, answersByCar, buildTrack, carNameFor, carryState, composeTrack, coordIn, coordsIn,
+  advanceOffset, clampKmh, decodeDoc, destinationPoint, feedPoints, nudged, offRouteCoords, parseStart,
+  ageSeconds, UserError, numberIn, startFrom, validDerivedData, shouldPark, autoPick,
+  MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, oksByCar, messageIn, MAX_MESSAGE, STOP_LIFETIME_SECONDS, buildTrack, carNameFor, carryState, composeTrack, coordIn, coordsIn,
   divergeOffset, eventKindIn, eventStatus, fallbackStartRoad, locate, mainDistance, mainLeg, nameIn, newCarState, nextCar, nextWait, openStopSnapshot,
-  optionalCoords, ownLeg, placeOnRoute, planDeviation, planEnding, planStart, relocate, sideRoad, sliceFrom, stepTrack, straightRoad, trackFeedPoints,
-  deviationStep, seenAfterChange, trackFromOffset, trackHeading, trackLength, trackPoint, voteAnswer, waitLeg,
+  optionalCoords, ownLeg, planDeviation, planEnding, planStart, relocate, sideRoad, sliceFrom, stepTrack, straightRoad, trackFeedPoints,
+  deviationStep, seenAfterChange, trackFromOffset, trackHeading, trackLength, trackPoint, waitLeg,
 } from './playground.mjs';
 
 const route = new RouteLine(loadRoutes().mainCoords);
@@ -65,30 +65,6 @@ test('a simulator feed starts at the car and goes ahead in 80 m steps', () => {
 test('a parked nudge alternates', () => {
   const c = { latitude: 3, longitude: 101 };
   assert.notDeepEqual(nudged(c, 0), nudged(c, 1));
-});
-
-test('stop votes: after the delay, once, never on its own, only open stops', () => {
-  const events = [
-    { id: 'a', category: 'stopRequest', carId: 'phone' },
-    { id: 'b', category: 'stopRequest', carId: 'me' },
-    { id: 'c', category: 'hazard', carId: 'phone' },
-    { id: 'd', category: 'stopRequest', carId: 'phone', expiresAt: 5 },
-  ];
-  assert.equal(isOpenStop(events[3]), false);
-  const seen = new Map();
-  const voted = new Set();
-  assert.deepEqual(pendingVotes(events, 'me', seen, voted, 1000), []);
-  assert.deepEqual(pendingVotes(events, 'me', seen, voted, 5999), []);
-  assert.deepEqual(pendingVotes(events, 'me', seen, voted, 6000), ['a']);
-  voted.add('a');
-  assert.deepEqual(pendingVotes(events, 'me', seen, voted, 9000), []);
-});
-
-test('a suggestion is ahead of the lead, on the route', () => {
-  const s = suggestionAhead(route, 5000, 'R&R Demo');
-  assert.equal(s.routeOffset, 9000);
-  assert.ok(route.project(s).distance < 5);
-  assert.equal(suggestionAhead(route, route.length - 10, 'x').routeOffset, route.length);
 });
 
 test('Firestore REST documents decode', () => {
@@ -437,40 +413,41 @@ test('new cars take the next first name, car name and colour, distinct from the 
 test('events: type, category, severity and expiry are what the app writes (TripEvent.swift)', () => {
   assert.deepEqual(eventKindIn('debris', REPORT_TYPES, 'Type'), { type: 'debris', category: 'hazard', severity: 'high', expirySeconds: 2700 });
   assert.deepEqual(eventKindIn('heavyRain', REPORT_TYPES, 'Type'), { type: 'heavyRain', category: 'condition', severity: 'medium', expirySeconds: 3600 });
-  assert.deepEqual(eventKindIn('stopFuel', STOP_TYPES, 'Type'), { type: 'stopFuel', category: 'stopRequest', severity: 'medium', expirySeconds: null });
+  assert.deepEqual(eventKindIn('stopFuel', STOP_TYPES, 'Type'), { type: 'stopFuel', category: 'stopRequest', severity: 'medium', expirySeconds: 30 * 60 });
   assert.equal(REPORT_TYPES.length, 11);
   assert.throws(() => eventKindIn('stopFuel', REPORT_TYPES, 'Type'), UserError);
   assert.throws(() => eventKindIn('nope', STOP_TYPES, 'Type'), /one of: stopRest/);
   assert.equal(Object.keys(EVENT_KINDS).length, 15);
 });
 
-test('a place for a stop answer is put on the route and has the validSuggestion shape', () => {
-  const at = destinationPoint(route.coordinateAtOffset(7000), 90, 300);
-  const p = placeOnRoute(route, { name: '  R&R Bidor ', ...at, junk: 1 });
-  assert.deepEqual(Object.keys(p).sort(), ['latitude', 'longitude', 'name', 'routeOffset']);
-  assert.equal(p.name, 'R&R Bidor');
-  assert.ok(Math.abs(p.routeOffset - 7000) < 100);
-  for (const bad of [null, { name: '', ...at }, { name: 'x'.repeat(101), ...at }, { name: 'A', latitude: NaN, longitude: 1 }]) assert.throws(() => placeOnRoute(route, bad), UserError);
+test('a stop request is written with the 30 minute expiry the rules cap it at, a hazard keeps its own', () => {
+  assert.equal(STOP_LIFETIME_SECONDS, 30 * 60);
+  for (const t of STOP_TYPES) assert.equal(EVENT_KINDS[t].expirySeconds, 30 * 60);
+  assert.equal(EVENT_KINDS.debris.expirySeconds, 45 * 60);
 });
 
-test('what each car answered, as the card reads it', () => {
-  assert.equal(voteAnswer({ agree: true }), 'yes');
-  assert.equal(voteAnswer({ agree: false }), 'notNow');
-  assert.equal(voteAnswer({ agree: false, answer: 'notNow', suggestion: { name: 'X' } }), 'another');
-  assert.equal(voteAnswer({ agree: true, answer: 'yes', suggestion: { name: 'X' } }), 'yes');
+test('a stop message is optional, trimmed, and at most 280 letters', () => {
+  assert.equal(messageIn(undefined), null);
+  assert.equal(messageIn(null), null);
+  assert.equal(messageIn('   '), null);
+  assert.equal(messageIn('  Low on fuel, next R&R please '), 'Low on fuel, next R&R please');
+  assert.equal(messageIn('m'.repeat(MAX_MESSAGE)).length, 280);
+  assert.throws(() => messageIn('m'.repeat(MAX_MESSAGE + 1)), UserError);
+  assert.throws(() => messageIn(5), UserError);
+});
+
+test('which cars said OK, and whether the request is open', () => {
   const keys = new Map([['c1', 'daniel'], ['c2', 'phone1']]);
-  assert.deepEqual(answersByCar([{ id: 'c1', agree: true, answer: 'yes', suggestion: { name: 'Shell' } }, { id: 'c2', agree: false, answer: 'notNow' }, { id: 'zz', agree: true }], keys),
-    { daniel: { answer: 'yes', place: 'Shell' }, phone1: { answer: 'notNow', place: null } });
+  assert.deepEqual(oksByCar([{ id: 'c1', userId: 'u1' }, { id: 'zz', userId: 'u9' }], keys), { daniel: true });
   const now = 1_000_000;
   assert.equal(eventStatus({}, now), 'open');
-  assert.equal(eventStatus({ status: 'pinned' }, now), 'pinned');
-  assert.equal(eventStatus({ place: { name: 'x' } }, now), 'pinned');
   assert.equal(eventStatus({ status: 'closed' }, now), 'closed');
   assert.equal(eventStatus({ expiresAt: now - 1 }, now), 'closed');
   assert.equal(eventStatus({ expiresAt: now + 5 }, now), 'open');
   assert.equal(openStopSnapshot({ category: 'stopRequest' }, now), true);
   assert.equal(openStopSnapshot({ category: 'stopRequest', status: 'closed' }, now), false);
   assert.equal(openStopSnapshot({ category: 'stopRequest', expiresAt: { toMillis: () => now - 1 } }, now), false);
+  assert.equal(openStopSnapshot({ category: 'stopRequest', expiresAt: { toMillis: () => now + 1 } }, now), true);
   assert.equal(openStopSnapshot({ category: 'hazard' }, now), false);
 });
 

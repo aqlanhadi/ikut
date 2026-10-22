@@ -105,30 +105,6 @@ export function feedPoints(route, offset, opts) {
 /** A nudge of about half a meter, alternating, so a parked simulator location counts as a new one. */
 export const nudged = (c, n) => ({ latitude: c.latitude + (n % 2 ? 0.000005 : 0), longitude: c.longitude });
 
-/** An open stop request: category stopRequest, not resolved (no expiresAt yet). */
-export const isOpenStop = (e) => e.category === 'stopRequest' && !e.expiresAt;
-
-/**
- * Which open stop requests a car should vote on now. `seen` is a Map eventId -> first time seen (ms), updated here;
- * `voted` a Set of event ids. A car waits `delayMs` after it first sees a request, never votes on its own, once.
- */
-export function pendingVotes(events, carId, seen, voted, now, delayMs = 5000) {
-  const due = [];
-  for (const e of events) {
-    if (!isOpenStop(e) || e.carId === carId || voted.has(e.id)) continue;
-    if (!seen.has(e.id)) seen.set(e.id, now);
-    if (now - seen.get(e.id) >= delayMs) due.push(e.id);
-  }
-  return due;
-}
-
-/** A place for a suggestion: `ahead` meters in front of the lead car, on the route (the stopStory shape). */
-export function suggestionAhead(route, leadOffset, name, ahead = 4000) {
-  const routeOffset = Math.min(route.length, leadOffset + ahead);
-  const c = route.coordinateAtOffset(routeOffset);
-  return { name, latitude: c.latitude, longitude: c.longitude, routeOffset };
-}
-
 // ---- Firestore REST (the emulator, as the owner): { fields: { a: { stringValue } } } to plain objects
 
 export function decodeValue(v) {
@@ -153,7 +129,7 @@ export const decodeDoc = (d) => ({ id: d.name.split('/').pop(), ...decodeFields(
 /** Whole seconds since `ms`, or null. */
 export const ageSeconds = (ms, now) => (typeof ms === 'number' ? Math.max(0, Math.round((now - ms) / 1000)) : null);
 
-// ================================================================ Q7: tracks, pins, answers
+// ================================================================ Q7: tracks, pins
 
 /** Longest list of coordinates a command may carry (a Google road for a few hundred km). */
 export const MAX_POINTS = 20_000;
@@ -551,6 +527,9 @@ export function nameIn(v) {
 
 // ---------------------------------------------------------------- events and answers
 
+/** A stop request closes itself this long after it was asked (EventCategory.stopRequest.defaultExpiry, the rules' cap on expiresAt). */
+export const STOP_LIFETIME_SECONDS = 30 * 60;
+
 /** What the Report sheet and the stop buttons write, as the app does (TripEvent.swift: category, severity, expiry). */
 export const EVENT_KINDS = {
   debris: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
@@ -561,10 +540,10 @@ export const EVENT_KINDS = {
   roadworks: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
   heavyRain: { category: 'condition', severity: 'medium', expirySeconds: 60 * 60 },
   trafficJam: { category: 'condition', severity: 'medium', expirySeconds: 60 * 60 },
-  stopRest: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
-  stopFuel: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
-  stopFood: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
-  stopToilet: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
+  stopRest: { category: 'stopRequest', severity: 'medium', expirySeconds: STOP_LIFETIME_SECONDS },
+  stopFuel: { category: 'stopRequest', severity: 'medium', expirySeconds: STOP_LIFETIME_SECONDS },
+  stopFood: { category: 'stopRequest', severity: 'medium', expirySeconds: STOP_LIFETIME_SECONDS },
+  stopToilet: { category: 'stopRequest', severity: 'medium', expirySeconds: STOP_LIFETIME_SECONDS },
   pullingOver: { category: 'status', severity: 'high', expirySeconds: null },
   carTrouble: { category: 'status', severity: 'high', expirySeconds: null },
   runningLate: { category: 'status', severity: 'high', expirySeconds: null },
@@ -578,35 +557,31 @@ export function eventKindIn(type, allowed, what) {
   return { type, ...EVENT_KINDS[type] };
 }
 
-/** A place for a stop answer or a request, put on the shared route: { name, latitude, longitude, routeOffset } (validSuggestion shape). */
-export function placeOnRoute(main, place) {
-  if (!place || typeof place !== 'object') throw new UserError('A place needs a name and a spot on the map.');
-  const name = typeof place.name === 'string' ? place.name.trim() : '';
-  if (name.length < 1 || name.length > 100) throw new UserError('A place name should be 1 to 100 letters.');
-  const c = coordIn(place, 'A place');
-  return { name, ...c, routeOffset: Math.max(0, main.project(c)?.offset ?? 0) };
+/** The longest message a stop request may carry (the rules' limit on `message`). */
+export const MAX_MESSAGE = 280;
+
+/** A passenger's optional message: trimmed, or null when empty; a UserError past 280 characters. */
+export function messageIn(text) {
+  if (text === undefined || text === null) return null;
+  if (typeof text !== 'string') throw new UserError('A message is text.');
+  const t = text.trim();
+  if (t.length > MAX_MESSAGE) throw new UserError(`A message can be up to ${MAX_MESSAGE} letters.`);
+  return t || null;
 }
 
-/** A vote doc's answer as the card shows it: yes | notNow | another (a "Not now" that carries a place). */
-export function voteAnswer(v) {
-  const answer = v.answer ?? (v.agree ? 'yes' : 'notNow');
-  return answer === 'notNow' && v.suggestion ? 'another' : answer;
-}
-
-/** { carKey: { answer, place } } for an event's vote docs; votes of cars outside the playground are left out. */
-export function answersByCar(votes, keyOf) {
+/** { carKey: true } for the cars that said OK on an event's vote docs; votes of cars outside the playground are left out. */
+export function oksByCar(votes, keyOf) {
   const out = {};
   for (const v of votes) {
     const key = keyOf.get(v.id);
-    if (key) out[key] = { answer: voteAnswer(v), place: v.suggestion?.name ?? null };
+    if (key) out[key] = true;
   }
   return out;
 }
 
-/** open | pinned | closed: a closed or expired request is closed; a hazard is open until it expires. */
+/** open | closed: a request that was closed, or that has expired (30 minutes after it was asked), is closed; a hazard is open until it expires. */
 export function eventStatus(e, now) {
-  if (e.status === 'closed' || (typeof e.expiresAt === 'number' && e.expiresAt <= now)) return 'closed';
-  return e.status === 'pinned' || e.place ? 'pinned' : 'open';
+  return e.status === 'closed' || (typeof e.expiresAt === 'number' && e.expiresAt <= now) ? 'closed' : 'open';
 }
 
 /** A stop request a car may still answer: not closed and not expired (the rules' openStop), from a client snapshot (Timestamps). */

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The floating glass panel at the bottom of the map (Map.dc.html): FROM and TO with the arrival
-/// time, a progress bar with every car and hazard on the route, spread / lead speed / next stop,
+/// time, a progress bar with every car and hazard on the route, spread / lead speed,
 /// one row per car (joining cars last, with dashed badges), then Report and Pit stop. Tap or drag
 /// the grabber to collapse it to FROM/TO, progress, a one-line summary and the buttons.
 ///
@@ -12,9 +12,7 @@ struct ConvoyPanel: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var expanded: Bool
     var canReport: Bool
-    /// The pinned place of the open stop request, for NEXT STOP.
-    var nextStop: StopPlace?
-    /// What the Pit stop button says: "Pit stop", or the open stop ("Fuel · 2 of 4") with a badge.
+    /// What the Pit stop button says: "Pit stop", or the open stop ("Fuel · 2 of 4 OK") with a badge.
     var stopButton = StopLogic.ButtonContent(
         label: "Pit stop", symbol: "mappin.and.ellipse", badge: 0, accessibilityLabel: "Pit stop")
     var onReport: () -> Void
@@ -249,7 +247,6 @@ struct ConvoyPanel: View {
             .init("Spread", convoy.snapshot.spread.map(ConvoyFormat.distance),
                   color: model.separationWarning == nil ? nil : MapPalette.warning),
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
-            .init("Next stop", nextStop?.name ?? "None", color: nextStop == nil ? Color.surfaceSecondary : nil),
         ], background: Color(.tertiarySystemFill), valueSize: 20)
         .padding(.top, Spacing.cozy)
     }

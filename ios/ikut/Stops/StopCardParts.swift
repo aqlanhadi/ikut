@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The frame of the stop card (Decision #84): header with a close button, a body that is as tall as
-/// its content up to `maxBodyHeight` and scrolls past it, and the actions pinned at the bottom.
+/// its content up to `maxBodyHeight` and scrolls past it, and the actions fixed at the bottom.
 /// Opaque, with the convoy panel's inset and corner radius, because it sits on top of the panel.
 struct StopCardFrame<Content: View, Actions: View>: View {
     /// The convoy list's own cap (`ConvoyPanel.maxListHeight`); the card body never grows past it.
@@ -16,6 +16,10 @@ struct StopCardFrame<Content: View, Actions: View>: View {
     @ViewBuilder var actions: Actions
 
     @State private var contentHeight: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// A little taller at accessibility sizes, where a row is tall: the last row is not left half cut.
+    private var cap: CGFloat { typeSize.isAccessibilitySize ? bodyCap + 40 : bodyCap }
 
     private func body(of content: Content) -> some View {
         VStack(alignment: .leading, spacing: Spacing.gap) { content }
@@ -31,13 +35,15 @@ struct StopCardFrame<Content: View, Actions: View>: View {
                 closeOffset: CGSize(width: Spacing.xs, height: -Spacing.xs), closeIdentifier: "stop.card.close", closeOnGlass: true,
                 onClose: onClose
             )
+            // The header keeps all its lines; when room is short the body gives way, not the title.
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
             // As tall as the content; past the cap the body scrolls. Nothing else fills the space.
             let natural = body(of: content)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
-            if contentHeight > bodyCap {
-                ScrollView { natural }
-                    .frame(height: bodyCap)
+            if contentHeight > cap {
+                ScrollView { natural.padding(.bottom, GlassSurface.active ? 14 : 24) }
+                    .frame(maxHeight: cap)
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
                     // The last rows fade out above the actions instead of being cut.
@@ -64,24 +70,6 @@ struct StopCardFrame<Content: View, Actions: View>: View {
         .glassSurface()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.card")
-    }
-}
-
-/// A place row's trailing cost: "On route", or "+4 min" over "1.5 km off route".
-struct StopCostText: View {
-    var candidate: StopCandidate
-    /// Leading-aligned under the name (accessibility sizes) instead of a trailing column.
-    var stacked = false
-
-    var body: some View {
-        VStack(alignment: stacked ? .leading : .trailing, spacing: 1) {
-            Text(candidate.costText).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
-            if let off = candidate.offRouteText {
-                Text(off).font(.caption2).foregroundStyle(Color.surfaceSecondary)
-            }
-        }
-        .multilineTextAlignment(stacked ? .leading : .trailing)
-        .fixedSize(horizontal: !stacked, vertical: false)
     }
 }
 
@@ -161,34 +149,31 @@ struct StopReasonIcon: View {
     }
 }
 
-/// The place with its distance and time: a pin tile, name, "18 km · 12 min", and a note ("On route").
-struct StopPlaceTile: View {
-    var name: String
-    var detail: String
-    var trailing: String?
+/// What a passenger typed, in full, on the card.
+struct StopMessageTile: View {
+    var text: String
 
     var body: some View {
-        HStack(spacing: Spacing.m) {
-            IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name).font(.body.weight(.semibold)).lineLimit(2)
-                Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
-            }
-            Spacer(minLength: 4)
-            if let trailing {
-                Text(trailing).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
-            }
+        HStack(alignment: .top, spacing: Spacing.m) {
+            Image(systemName: "text.bubble.fill")
+                .font(.body)
+                .foregroundStyle(Color.surfaceSecondary)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, Spacing.cozy)
         .padding(.vertical, Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceTile()
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("stop.place")
+        .accessibilityLabel("Message: \(text)")
+        .accessibilityIdentifier("stop.message")
     }
 }
 
-/// One car in a stop's list: its badge, its name, and how it stands ("Agreed", "Here", "6 min away").
+/// One car in a stop's list: its badge, its name, and how it stands ("OK" or "Waiting").
 struct StopVoterRow: View {
     var row: StopRequestState.Row
     @Environment(\.colorScheme) private var scheme
@@ -197,12 +182,7 @@ struct StopVoterRow: View {
         let status = Self.status(row)
         HStack(spacing: Spacing.m) {
             CarBadge(number: row.number, colorHex: row.colorHex, size: 30)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(row.isMine ? "Me" : row.name).font(.body).lineLimit(1)
-                if let suggestion = row.suggestion, row.arrival == nil {
-                    Text("Suggests \(suggestion.name)").font(.footnote).foregroundStyle(Color.ikutWarning).lineLimit(1)
-                }
-            }
+            Text(row.isMine ? "Me" : row.name).font(.body).lineLimit(1)
             Spacer(minLength: 4)
             Text(status.text)
                 .font(.footnote.weight(.semibold))
@@ -219,96 +199,47 @@ struct StopVoterRow: View {
     }
 
     /// On dark glass the chip text is lifted toward white and the chip sits on a darker base, so
-    /// Agreed (green) and Waiting (gray) read clearly and apart.
+    /// OK (green) and Waiting (gray) read clearly and apart.
     private func chipText(_ color: Color) -> Color {
         guard GlassSurface.active, scheme == .dark, #available(iOS 18, *) else { return color }
         return color.mix(with: .white, by: 0.35)
     }
 
     static func status(_ row: StopRequestState.Row) -> (text: String, color: Color) {
-        switch row.arrival {
-        case .here?: return ("Here", Color.ikutPositive)
-        case .minutes(let minutes)?: return ("\(minutes) min away", Color.surfaceSecondary)
-        case nil: break
-        }
         switch row.status {
-        case .agreed: return ("Agreed", Color.ikutPositive)
-        case .waiting: return ("Waiting", Color.surfaceSecondary)
-        case .notNow: return ("Not now", Color.ikutWarning)
-        case .suggested: return ("Another place", Color.ikutWarning)
+        case .ok: ("OK", Color.ikutPositive)
+        case .waiting: ("Waiting", Color.surfaceSecondary)
         }
-    }
-}
-
-/// Asked, Deciding, Lead pins the place: the asker's view of where the request stands.
-struct StopTimeline: View {
-    var state: StopRequestState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.m) {
-            step("Asked", detail: StopLogic.placeLine(state), done: true)
-            step("Deciding", detail: StopLogic.decidingText(state), done: state.isPinned || state.agreedCount == state.rows.count)
-            step("Lead pins the place", detail: state.isPinned ? state.place?.name : "The lead car chooses where", done: state.isPinned)
-        }
-        .padding(Spacing.cozy)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .surfaceTile()
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("stop.timeline")
-    }
-
-    private func step(_ title: String, detail: String?, done: Bool) -> some View {
-        HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: done ? "checkmark.circle.fill" : "circle.dotted")
-                .font(.title3)
-                .foregroundStyle(done ? Color.ikutPositive : Color.surfaceSecondary)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.body.weight(.semibold))
-                if let detail, !detail.isEmpty { Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary) }
-            }
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
 #Preview("Buttons and tiles") {
     VStack(spacing: Spacing.s) {
-        StopActionButton(title: "Ask for this stop", style: .primary, id: "p") {}
-        StopActionButton(title: "Ask for this stop", style: .primary, height: 72, id: "p-big") {}
-        StopActionButton(title: "Ask for this stop", style: .primary, disabled: true, id: "p-off") {}
-        StopActionButton(title: "Another place", id: "s") {}
-        StopActionButton(title: "You said yes", style: .positive, id: "y") {}
+        StopActionButton(title: "Inform the convoy", style: .primary, id: "p") {}
+        StopActionButton(title: "Inform the convoy", style: .primary, height: 72, id: "p-big") {}
+        StopActionButton(title: "Inform the convoy", style: .primary, disabled: true, id: "p-off") {}
+        StopActionButton(title: "Cancel request", id: "s") {}
+        StopActionButton(title: "You said OK", style: .positive, id: "y") {}
         StopActionButton(title: "Back", style: .ghost, height: 44, id: "g") {}
-        StopActionButton(title: "Cancel the request", style: .destructive, height: 44, id: "d") {}
         HStack(spacing: Spacing.m) {
             StopReasonIcon(symbol: "fuelpump.fill")
             StopReasonIcon(symbol: "fork.knife", size: 40)
             StopReasonIcon(symbol: "toilet.fill", size: 34)
         }
-        StopPlaceTile(name: "Petronas Tapah R&R", detail: "18 km · 12 min", trailing: "On route")
-        StopPlaceTile(name: "Shell Gopeng, Jalan Besar off the old trunk road", detail: "31 km · 22 min", trailing: nil)
+        StopMessageTile(text: "Low on fuel, next R&R please")
     }
     .padding(Spacing.l)
 }
 
 #Preview("Voter rows") {
     func row(_ id: String, _ n: Int, _ color: String, _ name: String, mine: Bool = false,
-             _ status: StopRequestState.VoteStatus, suggestion: String? = nil,
-             arrival: StopRequestState.Arrival? = nil) -> StopRequestState.Row {
-        .init(carId: id, number: n, colorHex: color, name: name, isMine: mine, status: status,
-              suggestion: suggestion.map { StopPlace(name: $0, coordinate: .init(latitude: 4.34, longitude: 101.2),
-                                                       routeOffset: 70_000, pinnedBy: nil) },
-              arrival: arrival)
+             _ status: StopRequestState.VoteStatus) -> StopRequestState.Row {
+        .init(carId: id, number: n, colorHex: color, name: name, isMine: mine, status: status)
     }
     let rows = [
-        row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true, .agreed),
+        row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true, .ok),
         row("c2", 2, "#D9480F", "Wyna’s X70", .waiting),
-        row("c3", 3, "#0F766E", "Hafiz’s Hilux", .notNow),
-        row("c4", 4, "#7C3AED", "Daniel’s City", .suggested, suggestion: "Shell Gopeng"),
-        row("c5", 5, "#BE185D", "Faiz’s car", .agreed, arrival: .here),
-        row("c6", 6, "#CA8A04", "Siti’s Bezza", .agreed, arrival: .minutes(6)),
+        row("c3", 3, "#0F766E", "Hafiz’s Hilux", .ok),
     ]
     return VStack(spacing: Spacing.xs) {
         ForEach(rows) { StopVoterRow(row: $0) }
@@ -316,24 +247,14 @@ struct StopTimeline: View {
     .padding(Spacing.l)
 }
 
-#if DEBUG
-#Preview("Timeline") {
-    VStack(spacing: Spacing.m) {
-        if let asked = MapDemo.stopBoard("asker").requests.first { StopTimeline(state: asked) }
-        if let pinned = MapDemo.stopBoard("pinned").requests.first { StopTimeline(state: pinned) }
-    }
-    .padding(Spacing.l)
-}
-#endif
-
 #Preview("Frame") {
     VStack(spacing: Spacing.m) {
-        StopCardFrame(title: "Asked the convoy", subtitle: "Waiting for the other cars", onClose: {}) {
-            Text("The lead car pins the place once the cars have answered.").foregroundStyle(Color.surfaceSecondary)
+        StopCardFrame(title: "Informed the convoy", subtitle: "Waiting for the other cars", onClose: {}) {
+            Text("The cars tap OK when they see it.").foregroundStyle(Color.surfaceSecondary)
         } actions: {}
         // Taller than the cap: the body scrolls and the actions stay put.
-        StopCardFrame(title: "Another place", subtitle: nil, onClose: {}) {
-            ForEach(1...8, id: \.self) { StopPlaceTile(name: "Place \($0)", detail: "\($0 * 4) km · \($0 * 3) min", trailing: nil) }
+        StopCardFrame(title: "Wyna needs fuel", subtitle: nil, onClose: {}) {
+            ForEach(1...8, id: \.self) { StopMessageTile(text: "Line \($0)") }
         } actions: {
             StopActionButton(title: "Back", style: .ghost, height: 44, id: "back") {}
         }

@@ -15,8 +15,6 @@ struct TripMapView: View {
     var onEnded: () -> Void = {}
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
     private let liveServices: Bool
-    /// Where the stop card looks for places. MapKit, except in the demo.
-    private var placeSearcher: any PlaceSearching = MapKitPlaceSearcher()
     private var stopService: any StopServing = StopService()
     /// The demo can open the card on one of its screens (`IKUT_MAP_DEMO_CARD`); nil in the app.
     private var demoScreen: String?
@@ -39,6 +37,7 @@ struct TripMapView: View {
     @State private var stopBoard = StopBoard.empty
     /// The stop card is on top of the convoy panel only after a tap on the Pit stop button.
     @State private var stopCardOpen = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     /// What the pill at the top has shown and when, so each question goes quiet after 20 seconds.
     @State private var pillMemory = StopPillMemory()
     @State private var pillNow = Date()
@@ -87,18 +86,18 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
-        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false,
-        searcher: any PlaceSearching = MapKitPlaceSearcher(), stopService: any StopServing = StopService(),
+        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false,
+        stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
     ) {
         _alerts = State(initialValue: alerts)
         self.session = session
         self.onExit = onExit
         liveServices = false
-        placeSearcher = searcher
         self.stopService = stopService
         demoScreen = demoCard
         _stopCardOpen = State(initialValue: demoCard != nil)
+        _panelExpanded = State(initialValue: demoExpanded)
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
         _stopBoard = State(initialValue: stopBoard)
         _model = State(initialValue: model)
@@ -206,7 +205,6 @@ struct TripMapView: View {
             }
             .task(id: pillTimerKey) { await tickPill() }
             .task { await watchDriving() }
-            .onChange(of: stopReply, initial: true) { _, reply in alerts.stopReply = reply }
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
@@ -521,10 +519,12 @@ struct TripMapView: View {
     }
 
     /// The most the card and panel may take together: the map (already below the status bar) minus
-    /// the pill and a banner on top.
+    /// what is on top, as measured (the trip pill, the stop pill when it is up, a banner), so the
+    /// stop pill never sits under the expanded panel, at any text size. Never less room than the
+    /// usual estimate for a pill alone or with a banner.
     private var maxBottomHeight: CGFloat? {
         guard mapHeight > 0 else { return nil }
-        return mapHeight - (bannerShowing ? 158 : 74)
+        return mapHeight - max(bannerShowing ? 158 : 74, topHeight + Spacing.m)
     }
 
     private func openStopCard() {
@@ -538,15 +538,21 @@ struct TripMapView: View {
     /// The panel and the stop card. The card slides up over the panel, and the panel, with everything
     /// on it, sinks and fades out in the same moment, so no button stays put under the moving card
     /// (a glass or frosted card is see-through). Closing runs the same way backwards.
+    /// At accessibility text sizes the stop pill alone is taller than the room above even a folded panel,
+    /// so the panel steps aside while the pill is up (at most 20 seconds) instead of covering its OK.
+    private var panelAside: Bool {
+        stopCardOpen || (typeSize.isAccessibilitySize && stopPill != nil)
+    }
+
     private var bottomStack: some View {
         ZStack(alignment: .bottom) {
             panel
-                .offset(y: stopCardOpen ? 40 : 0)
-                .opacity(stopCardOpen ? 0 : 1)
+                .offset(y: panelAside ? 40 : 0)
+                .opacity(panelAside ? 0 : 1)
                 // Gone in a blink, so it never shows through the card on its way up.
-                .animation(.easeOut(duration: 0.12), value: stopCardOpen)
-                .allowsHitTesting(!stopCardOpen)
-                .accessibilityHidden(stopCardOpen)
+                .animation(.easeOut(duration: 0.12), value: panelAside)
+                .allowsHitTesting(!panelAside)
+                .accessibilityHidden(panelAside)
             if stopCardOpen, let context = stopContext {
                 stopCard(context)
                     // Above the panel for the whole of its exit too, or it would slide away behind it.
@@ -559,56 +565,40 @@ struct TripMapView: View {
     private var panel: some View {
         ConvoyPanel(
             model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
-            nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
+            stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: openReport, onStop: openStopCard)
     }
 
     private func stopCard(_ context: StopContext) -> some View {
         StopCard(
             board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
-            service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
+            service: stopService, demoScreen: demoScreen,
             onClose: closeStopCard
         )
         .padding(.horizontal, Spacing.s)
         .padding(.bottom, Spacing.s)
     }
 
-    /// Live actions that also tell the pill what happened (a tap on Yes is confirmed there for a few seconds).
+    /// Live actions that also tell the pill what happened (a tap on OK is confirmed there for a few seconds).
     private func stopActions(_ context: StopContext) -> StopRequestActions {
         let live = liveServices
             ? StopService.actions(context: context, onError: { _ in showStopError("Could not reach the convoy. Try again in a moment.") })
             : .none
         return StopRequestActions(
-            answer: { eventId, answer in
+            ok: { eventId in
                 if let request = stopBoard.requests.first(where: { $0.eventId == eventId }) {
-                    pillMemory.noteAnswered(request, answer: answer, now: Date())
+                    pillMemory.noteOK(request, now: Date())
                     pillNow = Date()
                 }
-                live.answer(eventId, answer)
-            },
-            pin: { eventId, place in
-                if let request = stopBoard.requests.first(where: { $0.eventId == eventId }) {
-                    pillMemory.notePinned(request, now: Date())
-                    pillNow = Date()
-                }
-                live.pin(eventId, place)
+                live.ok(eventId)
             },
             close: { eventId, reason in live.close(eventId, reason) })
     }
 
-    /// The pill's one big button: Yes, or Pin this stop for the lead car or organizer.
+    /// The pill's one big button: OK, for every car (the lead car and the organizer too).
     private func pillTapped(_ eventId: String) {
-        guard let context = stopContext, let request = stopBoard.requests.first(where: { $0.eventId == eventId }) else { return }
-        let actions = stopActions(context)
-        if request.canPin {
-            if let proposal = request.proposal {
-                actions.pin(eventId, proposal)
-            } else {
-                openStopCard()
-            }
-        } else {
-            actions.answer(eventId, .yes)
-        }
+        guard let context = stopContext else { return }
+        stopActions(context).ok(eventId)
     }
 
     private var stopPill: StopPill? {
@@ -635,13 +625,6 @@ struct TripMapView: View {
         try? await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
         guard !Task.isCancelled else { return }
         withAnimation(.snappy) { pillNow = Date() }
-    }
-
-    /// What the spoken request says to do: "Tap yes.", or "Tap pin this stop." for the lead car.
-    private var stopReply: String { canPinStops ? "Tap pin this stop." : "Tap yes." }
-
-    private var canPinStops: Bool {
-        session.isOrganizer || (model.myCar?.isLead == true && model.isTracker)
     }
 
     /// Feeds the driving detector once a second from this phone's own speed.
@@ -723,7 +706,7 @@ struct TripMapView: View {
         }
         model.start()
         model.startHazardAlerts(announcer: alerts, userId: session.userId)
-        alerts.start(tripId: session.tripId, myUserId: session.userId)
+        alerts.start(tripId: session.tripId, myUserId: session.userId, myCarId: session.member?.carId)
         onScreen = true
         updateAwake()
         nextAsk()

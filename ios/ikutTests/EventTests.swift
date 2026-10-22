@@ -170,9 +170,12 @@ struct EventServiceEmulatorTests {
             type: .stopFuel, tripId: tripId, carId: carId, authorId: uid, location: here,
             heading: 0, route: nil, previousOffset: nil)
         let stop = try await load(tripId, stopId)
-        #expect(stop.expiresAt == nil)
-        // Clearing a never-expiring event makes it inactive.
+        // A stop request closes itself 30 minutes after it was asked, and the rules accept that.
+        let asked = try #require(stop.createdAt)
+        #expect(stop.expiresAt == asked.addingTimeInterval(30 * 60))
+        // Clearing an event expires it now.
         try await EventService.clear(tripId: tripId, eventId: stopId)
-        #expect(try await load(tripId, stopId).expiresAt != nil)
+        let cleared = try #require(try await load(tripId, stopId).expiresAt)
+        #expect(cleared < asked.addingTimeInterval(30 * 60))
     }
 }

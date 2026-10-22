@@ -1,5 +1,6 @@
 import CoreLocation
 import FirebaseAuth
+import FirebaseCore
 import FirebaseFirestore
 import Foundation
 import Testing
@@ -16,23 +17,18 @@ struct StopLogicTests {
             mergeOffset: nil, state: .convoy, number: number)
     }
 
-    private func stop(by carId: String = "c2", author: String = "u2", expires: Date? = nil, place: StopPlace? = nil) -> TripEvent {
+    private func stop(
+        by carId: String = "c2", author: String = "u2", expires: Date? = nil, message: String? = nil
+    ) -> TripEvent {
         var e = TripEvent(
             type: .stopFuel, location: GeoPoint(latitude: 3, longitude: 101), heading: 0, routeOffset: 0,
-            authorId: author, carId: carId, createdAt: t0)
+            authorId: author, carId: carId, createdAt: t0, message: message)
         e.id = "stop1"
-        e.expiresAt = expires
-        e.place = place
+        if let expires { e.expiresAt = expires }
         return e
     }
 
-    private func vote(_ carId: String, agree: Bool, suggestion: StopPlace? = nil) -> StopVote {
-        StopVote(id: carId, userId: "u-\(carId)", agree: agree, at: t0, suggestion: suggestion)
-    }
-
-    private func place(_ name: String = "R&R", offset: Double = 18_000, pinned: String? = nil) -> StopPlace {
-        StopPlace(name: name, coordinate: GeoPoint(latitude: 3, longitude: 101), routeOffset: offset, pinnedBy: pinned)
-    }
+    private func ok(_ carId: String) -> StopVote { StopVote(id: carId, userId: "u-\(carId)", at: t0) }
 
     private var cars: [Car] {
         [
@@ -45,13 +41,15 @@ struct StopLogicTests {
     }
 
     private func tally(
-        _ event: TripEvent, votes: [StopVote] = [], me: String = "c1", user: String = "u1",
-        organizer: Bool = false, offset: Double? = 0, now: Date? = nil
+        _ event: TripEvent, votes: [StopVote] = [], me: String = "c1", user: String = "u1", organizer: Bool = false
     ) throws -> StopRequestState {
         try #require(StopLogic.tally(
-            event: event, votes: votes, cars: cars, myUserId: user, myCarId: me, isOrganizer: organizer,
-            viewerOffset: offset, now: now ?? t0.addingTimeInterval(60)))
+            event: event, votes: votes, cars: cars, myUserId: user, myCarId: me, isOrganizer: organizer))
     }
+
+    private func board(_ states: [StopRequestState]) -> StopBoard { StopBoard(requests: states) }
+
+    // MARK: Rows and the count
 
     @Test func rowsAreOrderedByNumberAndSkipUntrackedCars() throws {
         let state = try tally(stop())
@@ -59,52 +57,36 @@ struct StopLogicTests {
         #expect(state.rows.first { $0.isMine }?.name == "Aqlan’s Myvi (you)")
     }
 
-    @Test func requesterCountsAsAgreedOthersWaiting() throws {
+    @Test func theAskingCarCountsAsOKAndOthersWait() throws {
         let state = try tally(stop())
-        #expect(state.rows.map(\.status) == [.waiting, .agreed, .waiting, .waiting])
-        #expect(state.agreedCount == 1)
-        #expect(state.viewerAgrees == false)
+        #expect(state.rows.map(\.status) == [.waiting, .ok, .waiting, .waiting])
+        #expect(state.okCount == 1)
+        #expect(state.viewerCarIsOK == false)
     }
 
-    @Test func votesTally() throws {
-        let state = try tally(stop(), votes: [vote("c1", agree: true), vote("c3", agree: true), vote("c4", agree: false)])
-        #expect(state.rows.map(\.status) == [.agreed, .agreed, .agreed, .waiting])
-        #expect(state.agreedCount == 3)
-        #expect(state.viewerAgrees)
-    }
-
-    @Test func aNoVoteWithSuggestionShowsSuggested() throws {
-        let alt = place("Other R&R", offset: 26_000)
-        let state = try tally(stop(), votes: [vote("c3", agree: false, suggestion: alt)])
-        #expect(state.rows.first { $0.carId == "c3" }?.status == .suggested)
-        #expect(state.alternatives.map(\.carId) == ["c3"])
-        #expect(state.alternatives.first?.suggestion == alt)
-    }
-
-    @Test func requesterProposalIsItsOwnSuggestion() throws {
-        let proposal = place("Proposed")
-        let state = try tally(stop(), votes: [vote("c2", agree: true, suggestion: proposal)])
-        #expect(state.proposal == proposal)
-        #expect(state.alternatives.isEmpty)
-        #expect(state.shownPlace == proposal)
-    }
-
-    @Test func pinnedPlaceWinsOverProposal() throws {
-        let pinned = place("Pinned", pinned: "u1")
-        let state = try tally(stop(place: pinned), votes: [vote("c2", agree: true, suggestion: place("Proposed"))])
-        #expect(state.shownPlace == pinned)
+    @Test func eachCarsOKIsCountedOnce() throws {
+        // Two phones in car 3 write the same document, so there is one vote and one OK for the car.
+        let state = try tally(stop(), votes: [ok("c1"), ok("c3"), ok("c3")])
+        #expect(state.rows.map(\.status) == [.ok, .ok, .ok, .waiting])
+        #expect(state.okCount == 3)
+        #expect(state.viewerCarIsOK)
     }
 
     @Test func aVoterOnAnUntrackedCarGetsARow() throws {
-        let state = try tally(stop(), votes: [vote("c5", agree: true)])
+        let state = try tally(stop(), votes: [ok("c5")])
         #expect(state.rows.map(\.carId).contains("c5"))
     }
 
-    @Test func titleAndSubtitle() throws {
+    // MARK: Words
+
+    @Test func titleSubtitleAndPillLine() throws {
         let state = try tally(stop())
         #expect(state.title == "Wyna needs fuel")
         #expect(state.subtitle(now: t0.addingTimeInterval(65)) == "Car 2 · asked 1 min ago")
         #expect(state.subtitle(now: t0.addingTimeInterval(5)) == "Car 2 · asked just now")
+        // Without a message the pill's line says who and when.
+        #expect(state.pillDetail(now: t0.addingTimeInterval(5)) == "Car 2 · just now")
+        #expect(state.pillDetail(now: t0.addingTimeInterval(125)) == "Car 2 · 2 min ago")
         #expect(StopLogic.ownerName(fromCarName: "Wyna's car") == "Wyna")
         #expect(StopLogic.ownerName(fromCarName: "Convoy") == "Convoy")
         #expect(StopRequestState.need(for: .stopFood) == "needs food")
@@ -112,84 +94,121 @@ struct StopLogicTests {
         #expect(StopRequestState.need(for: .stopRest) == "needs a rest")
     }
 
-    @Test func distanceAndEtaToPlace() throws {
-        let state = try tally(stop(place: place(offset: 18_000, pinned: "u1")), offset: 0)
-        #expect(state.distanceText == "18 km ahead")
-        #expect(state.etaText == "About 12 min")
-        let passed = try tally(stop(place: place(offset: 18_000, pinned: "u1")), offset: 20_000)
-        #expect(passed.distanceText == "Passed")
-        #expect(passed.etaText == nil)
-        let unknown = try tally(stop(place: place(pinned: "u1")), offset: nil)
-        #expect(unknown.distanceText == nil)
+    @Test func theMessageIsTrimmedCutToOneLineOnThePillAndKeptInFullOnTheState() throws {
+        let long = "Low on fuel,\nnext R&R please"
+        let state = try tally(stop(message: "  \(long)  "))
+        #expect(state.message == long)
+        #expect(state.pillDetail(now: t0) == "Low on fuel, next R&R please")
+        #expect(try tally(stop(message: "   ")).message == nil)
+        #expect(try tally(stop(message: nil)).message == nil)
     }
 
-    // The UI gating: who may pin and resolve.
+    @Test func aMessageIsAtMost280CharactersAndEmptyMeansNone() {
+        #expect(StopLogic.cleanedMessage(nil) == nil)
+        #expect(StopLogic.cleanedMessage("  \n ") == nil)
+        #expect(StopLogic.cleanedMessage(" hi ") == "hi")
+        #expect(StopLogic.cleanedMessage(String(repeating: "m", count: 400))?.count == 280)
+    }
 
-    @Test func leadCarTrackerCanPinAndResolve() throws {
+    @Test func reasonLabelsAndTexts() throws {
+        #expect(StopLogic.reasonLabel(.stopFood) == "Food")
+        #expect(StopLogic.reasonLabel(.stopToilet) == "Toilet")
+        #expect(StopLogic.reasonLabel(.stopRest) == "Rest")
+        let asker = try tally(stop(), votes: [ok("c3")], me: "c2", user: "u2")
+        #expect(StopLogic.statusLine(asker) == "Fuel · 2 of 4 OK")
+        #expect(StopLogic.waitingText(asker) == "Waiting for 2 cars")
+        #expect(StopLogic.waitingText(try tally(stop(), votes: [ok("c1"), ok("c3"), ok("c4")])) == "Everyone said OK")
+    }
+
+    @Test func voterLabels() throws {
+        let state = try tally(stop(), votes: [ok("c1"), ok("c3")])
+        #expect(state.rows.map(StopLogic.shortName) == ["Me", "Wyna", "Hafiz", "Daniel"])
+        #expect(StopLogic.voterAccessibilityLabel(state.rows[2]) == "Hafiz’s Hilux, OK")
+        #expect(StopLogic.voterAccessibilityLabel(state.rows[3]) == "Daniel’s City, waiting")
+        #expect(StopLogic.voterAccessibilityLabel(state.rows[0]) == "Aqlan’s Myvi, you, OK")
+    }
+
+    // MARK: Who may tap We've stopped and Cancel request
+
+    @Test func leadCarTrackerCanMarkStopped() throws {
         let state = try tally(stop(), me: "c1", user: "u1")
-        #expect(state.canPin)
-        #expect(state.canResolve)
+        #expect(state.canMarkStopped)
+        #expect(state.isAuthor == false)
     }
 
-    @Test func organizerCanPinAndResolve() throws {
-        let state = try tally(stop(), me: "c3", user: "u3", organizer: true)
-        #expect(state.canPin)
-        #expect(state.canResolve)
+    @Test func organizerCanMarkStopped() throws {
+        #expect(try tally(stop(), me: "c3", user: "u3", organizer: true).canMarkStopped)
     }
 
-    @Test func requesterCanResolveButNotPin() throws {
+    @Test func askerCanMarkStoppedAndCancel() throws {
         let state = try tally(stop(), me: "c2", user: "u2")
-        #expect(state.canPin == false)
-        #expect(state.canResolve)
+        #expect(state.canMarkStopped)
+        #expect(state.isAuthor)
     }
 
-    @Test func otherMemberCanNeitherPinNorResolve() throws {
+    @Test func otherMemberCanDoNeither() throws {
         let state = try tally(stop(), me: "c3", user: "u3")
-        #expect(state.canPin == false)
-        #expect(state.canResolve == false)
+        #expect(state.canMarkStopped == false)
+        #expect(state.isAuthor == false)
     }
 
     @Test func leadFlagOnSomeoneElsesCarGrantsNothing() throws {
         // u9 shares car c1's lead flag in the viewer's context but doesn't track it.
-        let state = try tally(stop(), me: "c1", user: "u9")
-        #expect(state.canPin == false)
+        #expect(try tally(stop(), me: "c1", user: "u9").canMarkStopped == false)
     }
 
     @Test func permissionsTruthTable() {
-        #expect(StopPermissions.canPin(isLeadTracker: false, isOrganizer: false) == false)
-        #expect(StopPermissions.canPin(isLeadTracker: true, isOrganizer: false))
-        #expect(StopPermissions.canPin(isLeadTracker: false, isOrganizer: true))
-        #expect(StopPermissions.canResolve(isAuthor: false, isLeadTracker: false, isOrganizer: false) == false)
-        #expect(StopPermissions.canResolve(isAuthor: true, isLeadTracker: false, isOrganizer: false))
+        #expect(StopPermissions.canMarkStopped(isAuthor: false, isLeadTracker: false, isOrganizer: false) == false)
+        #expect(StopPermissions.canMarkStopped(isAuthor: true, isLeadTracker: false, isOrganizer: false))
+        #expect(StopPermissions.canMarkStopped(isAuthor: false, isLeadTracker: true, isOrganizer: false))
+        #expect(StopPermissions.canMarkStopped(isAuthor: false, isLeadTracker: false, isOrganizer: true))
+        #expect(StopPermissions.canCancel(isAuthor: true))
+        #expect(StopPermissions.canCancel(isAuthor: false) == false)
     }
 
-    @Test func resolvedWhenExpired() throws {
-        let state = try tally(stop(expires: t0), now: t0.addingTimeInterval(1))
-        #expect(state.isResolved)
-        #expect(try tally(stop()).isResolved == false)
-    }
-
-    // MARK: Open requests (D20)
+    // MARK: Open requests
 
     private func request(
         _ id: String, by carId: String = "c2", author: String = "u2", at offset: TimeInterval = 0,
-        place: StopPlace? = nil, status: StopStatus? = nil, closedReason: StopClosedReason? = nil,
-        expires: Date? = nil, type: EventType = .stopFuel
+        status: StopStatus? = nil, closedReason: StopClosedReason? = nil, expires: Date? = nil,
+        type: EventType = .stopFuel
     ) -> TripEvent {
-        var e = stop(by: carId, author: author, expires: expires, place: place)
+        var e = stop(by: carId, author: author)
         e.id = id
         e.type = type
         e.createdAt = t0.addingTimeInterval(offset)
+        e.expiresAt = expires ?? e.createdAt?.addingTimeInterval(StopLogic.lifetime)
         e.status = status
         e.closedReason = closedReason
         return e
+    }
+
+    @Test func aRequestClosesItselfThirtyMinutesAfterItWasAsked() {
+        let asked = request("a")
+        // The event is written with expiresAt = createdAt + 30 minutes, with no one closing it.
+        #expect(asked.expiresAt == t0.addingTimeInterval(30 * 60))
+        #expect(StopLogic.isOpen(asked, now: t0.addingTimeInterval(30 * 60 - 1)))
+        #expect(!StopLogic.isOpen(asked, now: t0.addingTimeInterval(30 * 60)))
+        #expect(!StopLogic.isOpen(asked, now: t0.addingTimeInterval(45 * 60)))
+        #expect(StopLogic.openStops(in: [asked], now: t0.addingTimeInterval(31 * 60)).isEmpty)
+        // A request made later is still open when the first has closed.
+        let later = request("b", at: 10 * 60)
+        #expect(StopLogic.openStops(in: [asked, later], now: t0.addingTimeInterval(31 * 60)).map(\.id) == ["b"])
+    }
+
+    @Test func aNewStopRequestIsBuiltWithAThirtyMinuteExpiry() {
+        let event = EventService.makeEvent(
+            type: .stopFuel, authorId: "u2", carId: "c2", location: .init(latitude: 3, longitude: 101),
+            heading: 0, routeOffset: 0, message: "Low on fuel", now: t0)
+        #expect(event.expiresAt == t0.addingTimeInterval(StopLogic.lifetime))
+        #expect(event.message == "Low on fuel")
     }
 
     @Test func openStopsListsEveryOpenRequestOldestFirst() {
         let a = request("a", at: 10)
         let b = request("b", at: 0)
         let done = request("done", at: 20, expires: t0.addingTimeInterval(5))
-        let closed = request("closed", at: 30, status: .closed, closedReason: .left)
+        let closed = request("closed", at: 30, status: .closed, closedReason: .stopped)
         var hazard = request("h", at: 40); hazard.category = .hazard
         let now = t0.addingTimeInterval(60)
         #expect(StopLogic.openStops(in: [a, b, done, closed, hazard], now: now).map(\.id) == ["b", "a"])
@@ -197,153 +216,101 @@ struct StopLogicTests {
     }
 
     @Test func aMissingStatusReadsAsOpenAndClosedNeverIs() {
-        let old = request("old")
+        var old = request("old")
+        old.expiresAt = nil
         #expect(old.status == nil)
         #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(1)))
-        // Closing sets expiresAt too, so old builds see it as resolved; a status alone also closes it here.
         #expect(!StopLogic.isOpen(request("x", status: .closed), now: t0.addingTimeInterval(1)))
-        #expect(StopLogic.isOpen(request("p", status: .pinned), now: t0.addingTimeInterval(1)))
+    }
+
+    @Test func aMissingExpiryFallsBackToThirtyMinutesAfterItWasAsked() {
+        var old = request("old")
+        old.expiresAt = nil
+        #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(StopLogic.lifetime - 1)))
+        #expect(!StopLogic.isOpen(old, now: t0.addingTimeInterval(StopLogic.lifetime + 1)))
+        // Not yet stamped by the server: just asked.
+        old.createdAt = nil
+        #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(5 * 3600)))
+    }
+
+    /// `@DocumentID` can only be decoded with a document reference, which needs a (never contacted) Firestore instance.
+    private func firestoreDecode<T: Decodable>(_ type: T.Type, from data: [String: Any]) throws -> T {
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure(options: FirebaseOptions(googleAppID: "1:1:ios:1", gcmSenderID: "1"))
+        }
+        let decoder = Firestore.Decoder()
+        decoder.userInfo[CodingUserInfoKey(rawValue: "DocumentRefUserInfoKey")!] = Firestore.firestore().document("trips/doc")
+        return try decoder.decode(type, from: data)
+    }
+
+    @Test func anOldStopRequestWithAPlaceAndPinnedStatusDecodesAsOpenAndIgnoresThePlace() throws {
+        let event = try firestoreDecode(TripEvent.self, from: [
+            "type": "stopFuel", "category": "stopRequest", "severity": "medium",
+            "location": GeoPoint(latitude: 3, longitude: 101), "heading": 0.0, "routeOffset": 0.0,
+            "authorId": "u2", "carId": "c2", "createdAt": Timestamp(date: t0),
+            "expiresAt": Timestamp(date: t0.addingTimeInterval(StopLogic.lifetime)),
+            "status": "pinned",
+            "place": ["name": "Petronas Tapah", "location": GeoPoint(latitude: 4, longitude: 101)],
+        ])
+        #expect(event.status == .open)
+        #expect(StopLogic.isOpen(event, now: t0.addingTimeInterval(60)))
+    }
+
+    @Test func anOldVoteWithAnAnswerAndASuggestionDecodesAsAnOK() throws {
+        let vote = try firestoreDecode(StopVote.self, from: [
+            "userId": "u3", "agree": false, "answer": "no", "suggestion": "Shell Kuala Kangsar",
+            "at": Timestamp(date: t0),
+        ])
+        #expect(vote.userId == "u3")
+        #expect(vote.id == "doc")
+        #expect(vote.at == t0)
     }
 
     @Test func statusAndClosingReasonsDecodeWithFallbacks() throws {
         let decoder = JSONDecoder()
         func decode<T: Decodable>(_ json: String, as: T.Type) throws -> T { try decoder.decode(T.self, from: Data(json.utf8)) }
-        #expect(try decode("\"pinned\"", as: StopStatus.self) == .pinned)
-        #expect(try decode("\"somethingNew\"", as: StopStatus.self) == .open)
-        #expect(try decode("\"noAnswer\"", as: StopClosedReason.self) == .noAnswer)
-        #expect(try decode("\"notNow\"", as: StopAnswer.self) == .notNow)
-        #expect(StopAnswer.yes.agree)
-        #expect(StopAnswer.notNow.agree == false)
+        #expect(try decode("\"closed\"", as: StopStatus.self) == .closed)
+        // An older build's pinned stop is still an open one.
+        #expect(try decode("\"pinned\"", as: StopStatus.self) == .open)
+        #expect(try decode("\"stopped\"", as: StopClosedReason.self) == .stopped)
+        #expect(try decode("\"cancelled\"", as: StopClosedReason.self) == .cancelled)
+        #expect(try decode("\"left\"", as: StopClosedReason.self) == .stopped)
+        #expect(try decode("\"noAnswer\"", as: StopClosedReason.self) == .stopped)
     }
 
-    @Test func noAnswerAfterTenMinutesWithoutAPin() {
-        let asked = request("a")
-        let nine = t0.addingTimeInterval(9 * 60 + 59)
-        let ten = t0.addingTimeInterval(10 * 60)
-        #expect(!StopLogic.isNoAnswer(asked, now: nine))
-        #expect(StopLogic.openStops(in: [asked], now: nine).count == 1)
-        #expect(StopLogic.isNoAnswer(asked, now: ten))
-        #expect(StopLogic.openStops(in: [asked], now: ten).isEmpty)
-        #expect(StopLogic.noAnswerToClose(in: [asked], now: ten).map(\.id) == ["a"])
-        // A pinned request never counts as no answer, however old.
-        let pinned = request("p", place: place(pinned: "u1"), status: .pinned)
-        #expect(!StopLogic.isNoAnswer(pinned, now: ten.addingTimeInterval(3_600)))
-        #expect(StopLogic.noAnswerToClose(in: [pinned], now: ten.addingTimeInterval(3_600)).isEmpty)
-        // Old builds pinned with the place only.
-        #expect(!StopLogic.isNoAnswer(request("q", place: place(pinned: "u1")), now: ten))
-    }
+    // MARK: Who is asked
 
-    @Test func theAskerSeesNoAnswerAndCanAskAgain() {
-        let asked = request("a", by: "c1", author: "u1")
-        let ten = t0.addingTimeInterval(10 * 60)
-        #expect(StopLogic.missedAsk(in: [asked], myCarId: "c1", now: ten)?.id == "a")
-        // Someone else's request is not mine to ask again.
-        #expect(StopLogic.missedAsk(in: [asked], myCarId: "c2", now: ten) == nil)
-        // Closed as no answer by the lead's phone: still shown for a while.
-        let closed = request("a", by: "c1", author: "u1", status: .closed, closedReason: .noAnswer, expires: ten)
-        #expect(StopLogic.missedAsk(in: [closed], myCarId: "c1", now: ten.addingTimeInterval(60))?.id == "a")
-        #expect(StopLogic.missedAsk(in: [closed], myCarId: "c1", now: t0.addingTimeInterval(21 * 60)) == nil)
-        // Asked again: the newer request replaces it.
-        let again = request("b", by: "c1", author: "u1", at: 11 * 60)
-        #expect(StopLogic.missedAsk(in: [closed, again], myCarId: "c1", now: ten.addingTimeInterval(120)) == nil)
-        // Cancelled on purpose is not "no answer".
-        let cancelled = request("c", by: "c1", author: "u1", status: .closed, closedReason: .cancelled, expires: t0)
-        #expect(StopLogic.missedAsk(in: [cancelled], myCarId: "c1", now: ten) == nil)
-    }
-
-    @Test func leadPhoneOnlyIsWhoClosesNoAnswer() {
-        #expect(StopLogic.isLeadTracker(cars: cars, myCarId: "c1", myUserId: "u1"))
-        #expect(!StopLogic.isLeadTracker(cars: cars, myCarId: "c2", myUserId: "u2"))
-        #expect(!StopLogic.isLeadTracker(cars: cars, myCarId: "c1", myUserId: "u9"))
-    }
-
-    // MARK: Answers and rows
-
-    @Test func answersCountAndOldVotesStillCount() throws {
-        func answered(_ car: String, _ answer: StopAnswer?, agree: Bool) -> StopVote {
-            StopVote(id: car, userId: "u-\(car)", agree: agree, answer: answer, at: t0, suggestion: nil)
-        }
-        let state = try tally(stop(), votes: [
-            answered("c1", .yes, agree: true), answered("c3", .notNow, agree: false), answered("c4", nil, agree: true),
-        ])
-        #expect(state.rows.map(\.status) == [.agreed, .agreed, .notNow, .agreed])
-        #expect(state.myAnswer == .yes)
-        // An old build's "no" with no answer and no place still reads as waiting.
-        let old = try tally(stop(), votes: [answered("c3", nil, agree: false)])
-        #expect(old.rows.first { $0.carId == "c3" }?.status == .waiting)
-        #expect(try tally(stop()).myAnswer == nil)
-    }
-
-    @Test func requesterCarCountsAsYes() throws {
+    @Test func theAskingCarIsNeverAsked() throws {
         let state = try tally(stop(), me: "c2", user: "u2")
-        #expect(state.agreedCount == 1)
-        #expect(state.rows.first { $0.carId == "c2" }?.status == .agreed)
         #expect(StopLogic.viewerIsRequester(state))
         #expect(!StopLogic.needsAnswer(state))
     }
 
-    @Test func aRequestNeedsMyAnswerUntilIAnswerOrItIsPinned() throws {
+    @Test func aCarIsAskedUntilItsOKIsIn() throws {
         let open = try tally(stop(), me: "c3", user: "u3")
         #expect(StopLogic.needsAnswer(open))
-        let said = try tally(stop(), votes: [vote("c3", agree: true)], me: "c3", user: "u3")
+        let said = try tally(stop(), votes: [ok("c3")], me: "c3", user: "u3")
         #expect(!StopLogic.needsAnswer(said))
-        let pinned = try tally(stop(place: place(pinned: "u1")), me: "c3", user: "u3")
-        #expect(!StopLogic.needsAnswer(pinned))
-        // The lead answers by pinning, so a vote does not clear its question.
-        let lead = try tally(stop(), votes: [vote("c1", agree: true)], me: "c1", user: "u1")
+    }
+
+    @Test func oneOKPerCarTheOtherPhoneInTheCarIsNotAsked() throws {
+        // Phone A in car 3 taps OK; phone B in car 3 (another user) now sees its car as OK.
+        let phoneB = try tally(stop(), votes: [ok("c3")], me: "c3", user: "u3-second-phone")
+        #expect(phoneB.viewerCarIsOK)
+        #expect(!StopLogic.needsAnswer(phoneB))
+        #expect(StopLogic.buttonContent(for: board([phoneB])).badge == 0)
+    }
+
+    @Test func theLeadCarIsAskedLikeEveryoneElse() throws {
+        let lead = try tally(stop(), me: "c1", user: "u1")
         #expect(StopLogic.needsAnswer(lead))
+        let said = try tally(stop(), votes: [ok("c1")], me: "c1", user: "u1")
+        #expect(!StopLogic.needsAnswer(said))
+        // There is no pinning, so an OK clears the lead car's question too.
+        #expect(said.canMarkStopped)
     }
 
-    @Test func carsAreHereWithin150MetersOrMinutesAway() throws {
-        let spot = place("R&R", offset: 18_000, pinned: "u1")
-        func fix(meters: Double, offset: Double?) -> StopCarFix {
-            // About 111,195 m per degree of latitude.
-            StopCarFix(latitude: 3 + meters / 111_195, longitude: 101, offset: offset)
-        }
-        #expect(StopLogic.arrival(of: fix(meters: 120, offset: 17_900), to: spot) == .here)
-        #expect(StopLogic.arrival(of: fix(meters: 200, offset: 17_800), to: spot) == .minutes(1))
-        // 15 km along the route at 25 m/s is 10 minutes, ahead or behind.
-        #expect(StopLogic.arrival(of: fix(meters: 15_000, offset: 3_000), to: spot) == .minutes(10))
-        #expect(StopLogic.arrival(of: fix(meters: 15_000, offset: 33_000), to: spot) == .minutes(10))
-        // No route offset: the straight line.
-        #expect(StopLogic.arrival(of: fix(meters: 15_000, offset: nil), to: spot) == .minutes(10))
-    }
-
-    @Test func rowsCarryArrivalOncePinned() throws {
-        let fixes: [String: StopCarFix] = [
-            "c1": StopCarFix(latitude: 3 + 18_000 / 111_195.0, longitude: 101, offset: 17_950),
-            "c3": StopCarFix(latitude: 3 + 3_000 / 111_195.0, longitude: 101, offset: 3_000),
-        ]
-        let place = StopPlace(
-            name: "R&R", coordinate: GeoPoint(latitude: 3 + 18_000 / 111_195.0, longitude: 101), routeOffset: 18_000,
-            pinnedBy: "u1")
-        let pinned = try #require(StopLogic.tally(
-            event: stop(place: place), votes: [], cars: cars, myUserId: "u1", myCarId: "c1", isOrganizer: false,
-            viewerOffset: 17_950, now: t0.addingTimeInterval(60), fixes: fixes))
-        #expect(pinned.rows.first { $0.carId == "c1" }?.arrival == .here)
-        #expect(pinned.rows.first { $0.carId == "c3" }?.arrival == .minutes(10))
-        #expect(pinned.rows.first { $0.carId == "c4" }?.arrival == nil)
-        #expect(pinned.hereCount == 1)
-        #expect(pinned.viewerIsHere)
-        // Before a pin nobody is "here".
-        let open = try tally(stop())
-        #expect(open.rows.allSatisfy { $0.arrival == nil })
-    }
-
-    // MARK: Button, badge and pill text
-
-    private func board(_ states: [StopRequestState], missed: StopRequestState? = nil) -> StopBoard {
-        StopBoard(requests: states, missed: missed)
-    }
-
-    @Test func nextStopSkipsRequestsWithoutAPlace() throws {
-        let unpinned = try tally(stop(by: "c3", author: "u3"))
-        var pinnedEvent = stop(place: place("Shell Tapah", pinned: "u1"))
-        pinnedEvent.id = "stop2"
-        let pinned = try tally(pinnedEvent)
-        #expect(StopLogic.nextStop(board([unpinned, pinned]))?.name == "Shell Tapah")
-        #expect(StopLogic.nextStop(board([unpinned])) == nil)
-    }
+    // MARK: The Pit stop button
 
     @Test func buttonSaysPitStopWithNoStop() {
         let content = StopLogic.buttonContent(for: .empty)
@@ -353,85 +320,36 @@ struct StopLogicTests {
     }
 
     @Test func buttonShowsTheOpenStopAndBadge() throws {
-        let deciding = try tally(stop(), votes: [vote("c3", agree: true)], me: "c4", user: "u4")
-        let content = StopLogic.buttonContent(for: board([deciding]))
-        #expect(content.label == "Fuel · 2 of 4")
+        let waiting = try tally(stop(), votes: [ok("c3")], me: "c4", user: "u4")
+        let content = StopLogic.buttonContent(for: board([waiting]))
+        #expect(content.label == "Fuel · 2 of 4 OK")
         #expect(content.symbol == "fuelpump.fill")
         #expect(content.badge == 1)
-        #expect(content.accessibilityLabel == "Fuel stop, 2 of 4 cars agreed, you have not answered")
-        // Answered: the badge clears.
-        let answered = try tally(stop(), votes: [vote("c3", agree: true), vote("c4", agree: true)], me: "c4", user: "u4")
+        #expect(content.accessibilityLabel == "Fuel stop, 2 of 4 cars said OK, you have not said OK")
+        // Said OK: the badge clears and the count moves.
+        let answered = try tally(stop(), votes: [ok("c3"), ok("c4")], me: "c4", user: "u4")
         let after = StopLogic.buttonContent(for: board([answered]))
-        #expect(after.label == "Fuel · 3 of 4")
+        #expect(after.label == "Fuel · 3 of 4 OK")
         #expect(after.badge == 0)
-        #expect(after.accessibilityLabel == "Fuel stop, 3 of 4 cars agreed")
+        #expect(after.accessibilityLabel == "Fuel stop, 3 of 4 cars said OK")
     }
 
-    @Test func buttonShowsMinutesOncePinnedAndHereAtTheStop() throws {
-        let spot = place("R&R", offset: 18_000, pinned: "u1")
-        let heading = try tally(stop(place: spot), me: "c3", user: "u3", offset: 3_000)
-        // 15 km to go at 25 m/s is 10 minutes.
-        #expect(StopLogic.buttonContent(for: board([heading])).label == "Fuel · 10 min")
-        #expect(StopLogic.buttonContent(for: board([heading])).badge == 0)
-        var here = heading
-        here.rows = here.rows.map { row in
-            var r = row
-            if row.carId == "c3" || row.carId == "c1" { r.arrival = .here } else { r.arrival = .minutes(3) }
-            return r
-        }
-        let content = StopLogic.buttonContent(for: board([here]))
-        #expect(content.label == "Fuel · 2 of 4 here")
-        #expect(content.accessibilityLabel == "Fuel stop, 2 of 4 cars here")
-    }
-
-    @Test func twoOpenRequestsReadTwoStops() throws {
-        var other = request("two", by: "c4", author: "u4", at: 5, type: .stopFood)
-        other.id = "two"
-        let a = try tally(request("one"), me: "c3", user: "u3")
-        let b = try #require(StopLogic.tally(
-            event: other, votes: [], cars: cars, myUserId: "u3", myCarId: "c3", isOrganizer: false, viewerOffset: 0,
-            now: t0.addingTimeInterval(60)))
-        let content = StopLogic.buttonContent(for: board([a, b]))
-        #expect(content.label == "2 stops")
-        #expect(content.badge == 2)
-        #expect(content.accessibilityLabel == "2 stops open, you have 2 to answer")
-    }
-
-    @Test func buttonSaysNoAnswerForMyIgnoredRequest() throws {
-        let missed = try tally(request("m", by: "c1", author: "u1"), me: "c1", user: "u1")
-        let content = StopLogic.buttonContent(for: board([], missed: missed))
-        #expect(content.label == "Fuel · No answer")
+    @Test func theAskersButtonCountsItsOwnCarAsOK() throws {
+        let mine = try tally(request("m", by: "c1", author: "u1"), me: "c1", user: "u1")
+        let content = StopLogic.buttonContent(for: board([mine]))
+        #expect(content.label == "Fuel · 1 of 4 OK")
         #expect(content.badge == 0)
     }
 
-    @Test func reasonLabelsAndTexts() throws {
-        #expect(StopLogic.reasonLabel(.stopFood) == "Food")
-        #expect(StopLogic.reasonLabel(.stopToilet) == "Toilet")
-        #expect(StopLogic.reasonLabel(.stopRest) == "Rest")
-        let state = try tally(stop(place: place("Petronas R&R Tapah", offset: 18_000, pinned: "u1")), offset: 0)
-        #expect(StopLogic.placeLine(state) == "Petronas R&R Tapah · 18 km · 12 min")
-        let asker = try tally(stop(), votes: [vote("c3", agree: true)], me: "c2", user: "u2")
-        #expect(StopLogic.decidingText(asker) == "Hafiz agreed. Waiting for Aqlan’s Myvi and Daniel’s City")
-        #expect(StopLogic.joined(["Ali", "Sara", "Daniel"]) == "Ali, Sara and Daniel")
-    }
-
-    @Test func theLeadsLineToTheAsker() throws {
-        let state = try #require(StopLogic.tally(
-            event: stop(), votes: [], cars: cars, myUserId: "u1", myCarId: "c1", isOrganizer: false, viewerOffset: 0,
-            now: t0.addingTimeInterval(60), fixes: ["c2": StopCarFix(latitude: 3, longitude: 101, offset: 20_000)]))
-        let back = StopLogic.chosenLine(leadName: "Aisha", place: place("Petronas Bidor", offset: 8_000), state: state)
-        #expect(back == "Aisha chose Petronas Bidor. 8 min back.")
-        let ahead = StopLogic.chosenLine(leadName: "Aisha", place: place("Shell Gopeng", offset: 26_000), state: state)
-        #expect(ahead == "Aisha chose Shell Gopeng. 4 min ahead.")
-        #expect(StopLogic.chosenLine(leadName: "Aisha", place: place("X"), state: try tally(stop())) == "Aisha chose X.")
-    }
-
-    @Test func voterLabelsAndTitles() throws {
-        let state = try tally(stop(place: place("R&R Demo", pinned: "u1")), votes: [vote("c1", agree: true), vote("c3", agree: true)])
-        #expect(state.rows.map(StopLogic.shortName) == ["Me", "Wyna", "Hafiz", "Daniel"])
-        #expect(StopLogic.voterAccessibilityLabel(state.rows[2]) == "Hafiz’s Hilux, agreed")
-        #expect(StopLogic.voterAccessibilityLabel(state.rows[3]) == "Daniel’s City, waiting")
-        #expect(StopLogic.voterAccessibilityLabel(state.rows[0]) == "Aqlan’s Myvi, you, agreed")
+    @Test func twoOpenRequestsReadTwoStops() throws {
+        let other = request("two", by: "c4", author: "u4", at: 5, type: .stopFood)
+        let a = try tally(request("one"), me: "c3", user: "u3")
+        let b = try #require(StopLogic.tally(
+            event: other, votes: [], cars: cars, myUserId: "u3", myCarId: "c3", isOrganizer: false))
+        let content = StopLogic.buttonContent(for: board([a, b]))
+        #expect(content.label == "2 stops")
+        #expect(content.badge == 2)
+        #expect(content.accessibilityLabel == "2 stops open, you have 2 to say OK to")
     }
 
     // MARK: The pill
@@ -440,24 +358,42 @@ struct StopLogicTests {
         let first = try tally(request("one", at: 0), me: "c3", user: "u3")
         let second = try #require(StopLogic.tally(
             event: request("two", by: "c4", author: "u4", at: 5, type: .stopFood), votes: [], cars: cars, myUserId: "u3",
-            myCarId: "c3", isOrganizer: false, viewerOffset: 0, now: t0.addingTimeInterval(60)))
+            myCarId: "c3", isOrganizer: false))
         var memory = StopPillMemory()
         memory.observe([first, second], now: t0)
-        guard case .question(let id, _, let title, _, let button, let isPin)? =
+        guard case .question(let id, _, let title, _)? =
             StopPillPlanner.current(requests: [first, second], memory: memory, now: t0.addingTimeInterval(1)) else {
             Issue.record("expected a question"); return
         }
         #expect(id == "one")
         #expect(title == "Wyna needs fuel")
-        #expect(button == "Yes")
-        #expect(!isPin)
         // Once the first is answered the second is offered.
-        let answered = try tally(request("one", at: 0), votes: [vote("c3", agree: true)], me: "c3", user: "u3")
-        guard case .question(let next, _, _, _, _, _)? =
+        let answered = try tally(request("one", at: 0), votes: [ok("c3")], me: "c3", user: "u3")
+        guard case .question(let next, _, _, _)? =
             StopPillPlanner.current(requests: [answered, second], memory: memory, now: t0.addingTimeInterval(2)) else {
             Issue.record("expected the second question"); return
         }
         #expect(next == "two")
+    }
+
+    @Test func pillShowsTheMessageOnOneLineOrWhoAndWhen() throws {
+        var withNote = stop(message: "Low on fuel, next R&R please")
+        withNote.id = "one"
+        let note = try tally(withNote, me: "c3", user: "u3")
+        let plain = try tally(request("two"), me: "c3", user: "u3")
+        var memory = StopPillMemory()
+        memory.observe([note, plain], now: t0)
+        guard case .question(_, let symbol, _, let detail)? =
+            StopPillPlanner.current(requests: [note], memory: memory, now: t0.addingTimeInterval(1)) else {
+            Issue.record("expected a question"); return
+        }
+        #expect(symbol == "fuelpump.fill")
+        #expect(detail == "Low on fuel, next R&R please")
+        guard case .question(_, _, _, let quiet)? =
+            StopPillPlanner.current(requests: [plain], memory: memory, now: t0.addingTimeInterval(1)) else {
+            Issue.record("expected a question"); return
+        }
+        #expect(quiet == "Car 2 · just now")
     }
 
     @Test func pillGoesQuietAfterTwentySeconds() throws {
@@ -467,53 +403,42 @@ struct StopLogicTests {
         #expect(StopPillPlanner.current(requests: [state], memory: memory, now: t0.addingTimeInterval(19)) != nil)
         #expect(StopPillPlanner.current(requests: [state], memory: memory, now: t0.addingTimeInterval(20)) == nil)
         #expect(StopPillPlanner.nextChange(requests: [state], memory: memory, now: t0.addingTimeInterval(1)) == t0.addingTimeInterval(20))
-        // The badge stays: the request still needs this car's answer.
+        // The badge stays: the request still needs this car's OK.
         #expect(StopLogic.buttonContent(for: board([state])).badge == 1)
     }
 
-    @Test func pillForTheLeadHasPinThisStop() throws {
+    @Test func theLeadGetsTheSameOKPillAsEveryoneElse() throws {
         let state = try tally(stop(), me: "c1", user: "u1")
         var memory = StopPillMemory()
         memory.observe([state], now: t0)
-        guard case .question(_, _, _, _, let button, let isPin)? =
-            StopPillPlanner.current(requests: [state], memory: memory, now: t0) else {
+        guard case .question(let id, _, let title, _)? = StopPillPlanner.current(requests: [state], memory: memory, now: t0) else {
             Issue.record("expected a question"); return
         }
-        #expect(button == "Pin this stop")
-        #expect(isPin)
+        #expect(id == "stop1")
+        #expect(title == "Wyna needs fuel")
     }
 
     @Test func tapConfirmsForFiveSeconds() throws {
-        let state = try tally(stop(), votes: [vote("c1", agree: true), vote("c3", agree: true)], me: "c3", user: "u3")
+        let state = try tally(stop(), votes: [ok("c1"), ok("c3")], me: "c3", user: "u3")
         var memory = StopPillMemory()
-        let before = try tally(stop(), votes: [vote("c1", agree: true)], me: "c3", user: "u3")
+        let before = try tally(stop(), votes: [ok("c1")], me: "c3", user: "u3")
         memory.observe([before], now: t0)
-        memory.noteAnswered(before, answer: .yes, now: t0.addingTimeInterval(3))
+        memory.noteOK(before, now: t0.addingTimeInterval(3))
         guard case .confirm(_, let title, let detail)? =
             StopPillPlanner.current(requests: [state], memory: memory, now: t0.addingTimeInterval(4)) else {
             Issue.record("expected a confirmation"); return
         }
-        #expect(title == "You said yes")
+        #expect(title == "You said OK")
         // Wyna's car, Aqlan's and mine: 3 of 4.
-        #expect(detail == "3 of 4 agreed")
+        #expect(detail == "3 of 4 OK")
         #expect(StopPillPlanner.current(requests: [state], memory: memory, now: t0.addingTimeInterval(8)) == nil)
     }
 
-    @Test func pinnedPillSaysWhereAndHowLong() throws {
+    @Test func aSecondTapDoesNotCountTheCarTwice() throws {
+        let already = try tally(stop(), votes: [ok("c1"), ok("c3")], me: "c3", user: "u3")
         var memory = StopPillMemory()
-        let before = try tally(stop(), me: "c3", user: "u3", offset: 3_000)
-        memory.observe([before], now: t0)
-        let spot = place("Petronas R&R Tapah", offset: 18_000, pinned: "u1")
-        let pinned = try tally(stop(place: spot), me: "c3", user: "u3", offset: 3_000)
-        memory.observe([pinned], now: t0.addingTimeInterval(30))
-        guard case .pinned(_, let title, let detail)? =
-            StopPillPlanner.current(requests: [pinned], memory: memory, now: t0.addingTimeInterval(31)) else {
-            Issue.record("expected the pinned pill"); return
-        }
-        #expect(title == "Stop in 10 min")
-        #expect(detail == "Petronas R&R Tapah · pinned by Aqlan")
-        // It folds into the button's label after a few seconds.
-        #expect(StopPillPlanner.current(requests: [pinned], memory: memory, now: t0.addingTimeInterval(40)) == nil)
+        memory.noteOK(already, now: t0)
+        #expect(memory.confirmation?.detail == "3 of 4 OK")
     }
 
     @Test func theAskerGetsAConfirmationNeverAQuestion() throws {
@@ -524,7 +449,7 @@ struct StopLogicTests {
             StopPillPlanner.current(requests: [mine], memory: memory, now: t0.addingTimeInterval(2)) else {
             Issue.record("expected the asked pill"); return
         }
-        #expect(title == "Asked the convoy")
+        #expect(title == "Informed the convoy")
         #expect(detail == "Waiting for 3 cars")
         #expect(StopPillPlanner.current(requests: [mine], memory: memory, now: t0.addingTimeInterval(10)) == nil)
         // An old request of mine that was already open is not announced again.
@@ -567,169 +492,119 @@ struct StopLogicTests {
 
     @Test func passengerAnswerLastsUntilTheCardCloses() {
         var session = StopCardSession()
-        #expect(StopCardGate.mode(driving: true, session: session, hasOpenStop: true) == .readOnly)
-        #expect(StopCardGate.mode(driving: true, session: session, hasOpenStop: false) == .driverAsk)
         #expect(StopCardGate.needsPassengerCheck(driving: true, session: session))
         session.confirmPassenger()
-        #expect(StopCardGate.mode(driving: true, session: session, hasOpenStop: true) == .full)
         #expect(!StopCardGate.needsPassengerCheck(driving: true, session: session))
         session.close()
         #expect(StopCardGate.needsPassengerCheck(driving: true, session: session))
-        // "I'm driving" keeps the default place and remembers nothing.
+        // "I'm driving" sends without a message and remembers nothing.
         session.confirmPassenger()
         session.confirmDriving()
-        #expect(StopCardGate.mode(driving: true, session: session, hasOpenStop: false) == .driverAsk)
+        #expect(StopCardGate.needsPassengerCheck(driving: true, session: session))
     }
 
-    @Test func nothingIsLockedWhileParked() {
+    @Test func nothingAsksWhileParked() {
         let session = StopCardSession()
-        #expect(StopCardGate.mode(driving: false, session: session, hasOpenStop: true) == .full)
-        #expect(StopCardGate.mode(driving: false, session: session, hasOpenStop: false) == .full)
         #expect(!StopCardGate.needsPassengerCheck(driving: false, session: session))
     }
 }
 
-// MARK: The ask confirm map
+// MARK: The card's ask steps
 
-struct StopMapFramingTests {
-    private let route = RouteLine((0...60).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.009) })
+/// Records what the card would send.
+private final class FakeStopService: StopServing, @unchecked Sendable {
+    private let lock = NSLock()
+    private var sent: [(type: EventType, message: String?)] = []
+    var failing = false
+    var requests: [(type: EventType, message: String?)] { lock.withLock { sent } }
 
-    @Test func regionFitsBothPointsWithRoomAround() {
-        let a = CLLocationCoordinate2D(latitude: 3, longitude: 101)
-        let b = CLLocationCoordinate2D(latitude: 3.02, longitude: 101.18)
-        let region = StopMapFraming.region(a, b)
-        #expect(abs(region.center.longitude - 101.09) < 1e-9)
-        #expect(region.span.longitudeDelta >= 0.18 * 1.5 - 1e-9)
-        #expect(region.span.latitudeDelta >= 0.008)
-        // Two points on top of each other still get a street-level frame.
-        #expect(StopMapFraming.region(a, a).span.latitudeDelta == 0.008)
-    }
-
-    @Test func routeBetweenIsSampledAndEndsAtThePlace() {
-        let points = StopMapFraming.routeBetween(route, from: 1_000, to: 5_000)
-        #expect(points.count == 9)
-        #expect(StopMapFraming.routeBetween(route, from: 5_000, to: 1_000).isEmpty)
-        #expect(StopMapFraming.routeBetween(nil, from: 0, to: 1_000).isEmpty)
+    func request(type: EventType, message: String?, context: StopContext, snapshot: ReportSnapshot) async throws -> String {
+        if failing { throw URLError(.notConnectedToInternet) }
+        lock.withLock { sent.append((type, message)) }
+        return "new"
     }
 }
 
-// MARK: Suggestions
-
-struct StopSuggestionTests {
-    /// A straight east-west route from (3, 101), about 111 m per 0.001 deg, 60 km long.
-    private let route = RouteLine((0...60).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.009) })
-
-    private func at(km: Double, offRouteMeters: Double = 0) -> CLLocationCoordinate2D {
-        route.coordinate(atOffset: km * 1000).map {
-            CLLocationCoordinate2D(latitude: $0.latitude + offRouteMeters / 111_195, longitude: $0.longitude)
-        }!
+@MainActor
+struct StopAskTests {
+    private func context(withFix: Bool = true) -> StopContext {
+        StopContext(
+            tripId: "t", userId: "u1", carId: "c1", isOrganizer: false,
+            snapshot: {
+                withFix
+                    ? ReportSnapshot(
+                        coordinate: .init(latitude: 3, longitude: 101), heading: 0, route: nil, previousOffset: nil,
+                        capturedAt: Date())
+                    : nil
+            },
+            mainRoute: nil)
     }
 
-    private func found(_ name: String, km: Double, off: Double = 0) -> FoundPlace {
-        FoundPlace(name: name, coordinate: at(km: km, offRouteMeters: off))
+    @Test func sendingNeedsAReasonAndSendsItWithoutAMessageByDefault() async {
+        let service = FakeStopService()
+        let ask = RequestStopModel(context: context(), service: service)
+        #expect(!ask.canSend)
+        #expect(await ask.send() == false)
+        ask.choose(StopReason.all[0])
+        #expect(ask.canSend)
+        #expect(await ask.send())
+        #expect(service.requests.count == 1)
+        #expect(service.requests[0].type == .stopFuel)
+        #expect(service.requests[0].message == nil)
     }
 
-    @Test func rankSortsByDistanceAlongRoute() {
-        let ranked = StopSuggestions.rank(
-            [found("C", km: 24), found("A", km: 12), found("B", km: 18)], route: route, fromOffset: 0)
-        #expect(ranked.map(\.name) == ["A", "B", "C"])
-        #expect(abs(ranked[1].distanceAhead - 18_000) < 50)
-        #expect(abs(ranked[1].routeOffset - 18_000) < 50)
+    @Test func aTypedMessageIsSentTrimmedAndAtMost280Characters() async {
+        let service = FakeStopService()
+        let ask = RequestStopModel(context: context(), service: service)
+        ask.choose(StopReason.all[2])
+        ask.message = "  Low on fuel, next R&R please  "
+        #expect(await ask.send())
+        #expect(service.requests[0].type == .stopFood)
+        #expect(service.requests[0].message == "Low on fuel, next R&R please")
+        ask.message = String(repeating: "m", count: 500)
+        #expect(ask.message.count == 280)
     }
 
-    @Test func rankMeasuresFromTheViewer() {
-        let ranked = StopSuggestions.rank([found("A", km: 30)], route: route, fromOffset: 10_000)
-        #expect(abs(ranked[0].distanceAhead - 20_000) < 50)
+    @Test func goingBackToTheTilesDropsTheMessage() {
+        let ask = RequestStopModel(context: context(), service: FakeStopService())
+        ask.choose(StopReason.all[0])
+        ask.message = "hello"
+        ask.clearReason()
+        #expect(ask.reason == nil)
+        #expect(ask.message.isEmpty)
     }
 
-    @Test func rankDropsPlacesBehindOrTooFarOffRoute() {
-        let ranked = StopSuggestions.rank(
-            [found("behind", km: 5), found("here", km: 10.2), found("far", km: 20, off: 5_000), found("ok", km: 20, off: 800)],
-            route: route, fromOffset: 10_000)
-        #expect(ranked.map(\.name) == ["ok"])
-        #expect(abs(ranked[0].offRoute - 800) < 20)
+    @Test func aFailedSendSaysSoInPlainWords() async {
+        let service = FakeStopService()
+        service.failing = true
+        let ask = RequestStopModel(context: context(), service: service)
+        ask.choose(StopReason.all[0])
+        #expect(await ask.send() == false)
+        #expect(ask.sending == .failed("Could not reach the convoy. Try again in a moment."))
+        let noFix = RequestStopModel(context: context(withFix: false), service: FakeStopService())
+        noFix.choose(StopReason.all[0])
+        #expect(await noFix.send() == false)
+        #expect(noFix.sending == .failed("Waiting for your location. Try again in a moment."))
     }
 
-    @Test func rankCollapsesDuplicatesAndLimits() {
-        let dupes = [found("Petronas", km: 15), found("Petronas", km: 15.05), found("Shell", km: 16)]
-        #expect(StopSuggestions.rank(dupes, route: route, fromOffset: 0).map(\.name) == ["Petronas", "Shell"])
-        let many = (1...9).map { found("P\($0)", km: Double($0) * 3) }
-        #expect(StopSuggestions.rank(many, route: route, fromOffset: 0, limit: 3).count == 3)
+    @Test func onlyTheMessageIsBehindThePassengerCheck() {
+        // On a moving phone Add a message asks first; nothing else on the card does (its buttons are
+        // plain actions, see StopCard), and a passenger's answer lasts until the card closes.
+        var session = StopCardSession()
+        #expect(StopCardGate.needsPassengerCheck(driving: true, session: session))
+        session.confirmPassenger()
+        #expect(!StopCardGate.needsPassengerCheck(driving: true, session: session))
+        #expect(!StopCardGate.needsPassengerCheck(driving: false, session: StopCardSession()))
     }
 
-    @Test func rankOnEmptyRoute() {
-        #expect(StopSuggestions.rank([found("A", km: 12)], route: RouteLine([]), fromOffset: 0).isEmpty)
-    }
-
-    @Test func candidateText() {
-        let onRoute = StopSuggestions.rank([found("A", km: 18)], route: route, fromOffset: 0)[0]
-        #expect(onRoute.costText == "On route")
-        #expect(onRoute.whereText == "18 km ahead · about 12 min")
-        let off = StopSuggestions.rank([found("B", km: 18, off: 1_500)], route: route, fromOffset: 0)[0]
-        #expect(off.costText == "+4 min")
-        #expect(off.whereText == "18 km ahead · about 12 min")
-        #expect(off.offRouteText == "1.5 km off route")
-        #expect(onRoute.offRouteText == nil)
-    }
-
-    @Test func queriesPerType() {
-        #expect(StopSuggestions.queries(for: .stopFuel).contains("petrol station"))
-        #expect(StopSuggestions.queries(for: .stopFood) == ["restaurant"])
-        #expect(StopSuggestions.queries(for: .stopRest).contains("R&R"))
-        #expect(StopSuggestions.queries(for: .stopToilet) == StopSuggestions.queries(for: .stopRest))
-    }
-
-    @Test func searchCenterIsTwentyKmAhead() throws {
-        let center = try #require(StopSuggestions.searchCenter(on: route, from: 5_000))
-        let expected = try #require(route.coordinate(atOffset: 25_000))
-        #expect(RouteLine.haversine(center, expected) < 1)
-        // Near the end it clamps to the route's end.
-        let end = try #require(StopSuggestions.searchCenter(on: route, from: route.length - 1_000))
-        #expect(RouteLine.haversine(end, route.coordinates.last!) < 1)
-    }
-
-    @Test func suggestSearchesEachQueryAndRanks() async throws {
-        let searcher = FakeSearcher(results: [found("A", km: 14), found("B", km: 22)])
-        let list = try await StopSuggestions.suggest(type: .stopRest, route: route, fromOffset: 0, searcher: searcher)
-        #expect(list.map(\.name) == ["A", "B"])
-        #expect(await searcher.queries == ["R&R", "rest area"])
-        let center = try #require(await searcher.centers.first)
-        #expect(RouteLine.haversine(center, try #require(route.coordinate(atOffset: 20_000))) < 1)
-    }
-
-    @Test func suggestToleratesOneFailingQueryButNotAll() async throws {
-        let partial = FakeSearcher(results: [found("A", km: 14)], failOn: ["petrol station"])
-        let list = try await StopSuggestions.suggest(type: .stopFuel, route: route, fromOffset: 0, searcher: partial)
-        #expect(list.map(\.name) == ["A"])
-        let broken = FakeSearcher(results: [], failOn: ["petrol station", "gas station"])
-        await #expect(throws: (any Error).self) {
-            try await StopSuggestions.suggest(type: .stopFuel, route: route, fromOffset: 0, searcher: broken)
-        }
-    }
-}
-
-private actor FakeSearcherState {
-    var queries: [String] = []
-    var centers: [CLLocationCoordinate2D] = []
-    func record(_ q: String, _ c: CLLocationCoordinate2D) { queries.append(q); centers.append(c) }
-}
-
-private struct FakeSearcher: PlaceSearching {
-    var results: [FoundPlace]
-    var failOn: Set<String> = []
-    private let state = FakeSearcherState()
-    var queries: [String] { get async { await state.queries } }
-    var centers: [CLLocationCoordinate2D] { get async { await state.centers } }
-
-    init(results: [FoundPlace], failOn: Set<String> = []) {
-        self.results = results
-        self.failOn = failOn
-    }
-
-    func search(query: String, near center: CLLocationCoordinate2D, radius: CLLocationDistance) async throws -> [FoundPlace] {
-        await state.record(query, center)
-        if failOn.contains(query) { throw URLError(.notConnectedToInternet) }
-        return results
+    @Test func sendingGoesThroughTheServiceWithTheReasonOnTheCard() async {
+        // The ask works with no passenger check at all: reason, then Inform the convoy.
+        let service = FakeStopService()
+        let model = StopCardModel(context: context(), service: service)
+        #expect(model.screen == .home)
+        model.ask.choose(StopReason.all[3])
+        #expect(await model.ask.send())
+        #expect(service.requests.map(\.type) == [.stopRest])
     }
 }
 
@@ -766,9 +641,9 @@ struct StopEmulatorTests {
             mainRoute: route)
     }
 
-    private func place(_ name: String, km: Double) -> StopPlace {
-        let c = route.coordinate(atOffset: km * 1000)!
-        return StopPlace(name: name, coordinate: GeoPoint(latitude: c.latitude, longitude: c.longitude), routeOffset: km * 1000, pinnedBy: nil)
+    private func eventDoc(_ tripId: String, _ eventId: String) async throws -> TripEvent {
+        try await Firestore.firestore().document(FirestorePaths.event(tripId: tripId, eventId: eventId))
+            .getDocument(as: TripEvent.self)
     }
 
     /// First board from `stream` that satisfies `predicate`, or nil after `seconds`.
@@ -798,50 +673,43 @@ struct StopEmulatorTests {
         return try #require(found?.requests.first(where: predicate), "no matching state arrived")
     }
 
-    /// Organizer (lead car) asks, votes, pins a place, then closes; the listener sees each step.
-    @Test func leadRequestsVotesPinsAndCloses() async throws {
+    /// Organizer (lead car) asks with a message, the request is written with a 30 minute expiry, then
+    /// the organizer says We've stopped; the listener sees each step.
+    @Test func leadAsksWithAMessageAndMarksItStopped() async throws {
         let trip = try await makeTrip()
         let ctx = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: true)
         let stream = StopService.listen(context: ctx, refresh: .seconds(60))
 
         let eventId = try await service.request(
-            type: .stopFuel, place: place("Petronas Tapah", km: 18), context: ctx, snapshot: try #require(ctx.snapshot()))
-        let asked = try await state(stream) { $0.proposal != nil }
+            type: .stopFuel, message: "Low on fuel, next R&R please", context: ctx, snapshot: try #require(ctx.snapshot()))
+        let asked = try await state(stream) { $0.message != nil }
         #expect(asked.eventId == eventId)
-        #expect(asked.proposal?.name == "Petronas Tapah")
-        #expect(asked.place == nil)
-        #expect(asked.canPin)
+        #expect(asked.message == "Low on fuel, next R&R please")
+        #expect(asked.canMarkStopped)
+        #expect(asked.isAuthor)
         #expect(asked.title == "Aqlan needs fuel")
-        #expect(asked.myAnswer == .yes)
+        #expect(asked.okCount == 1)
+        let written = try await eventDoc(trip.tripId, eventId)
+        let createdAt = try #require(written.createdAt)
+        #expect(written.expiresAt == createdAt.addingTimeInterval(30 * 60))
 
-        try await service.vote(tripId: trip.tripId, eventId: eventId, carId: trip.carId, userId: trip.uid, answer: .yes)
-        try await service.pin(tripId: trip.tripId, eventId: eventId, place: place("Petronas Tapah", km: 18), userId: trip.uid)
-        let pinned = try await state(stream) { $0.place != nil }
-        #expect(pinned.place?.name == "Petronas Tapah")
-        #expect(pinned.place?.pinnedBy == trip.uid)
-        #expect(pinned.distanceText != nil)
-        let pinnedDoc = try await Firestore.firestore().document(FirestorePaths.event(tripId: trip.tripId, eventId: eventId))
-            .getDocument(as: TripEvent.self)
-        #expect(pinnedDoc.status == .pinned)
-
-        try await service.close(tripId: trip.tripId, eventId: eventId, reason: .left, userId: trip.uid, now: Date().addingTimeInterval(-1))
+        try await service.close(tripId: trip.tripId, eventId: eventId, reason: .stopped, userId: trip.uid, now: Date().addingTimeInterval(-1))
         let closed = await next(stream) { $0.requests.isEmpty }
         #expect(closed != nil, "expected the listener to report no open stop")
-        let closedDoc = try await Firestore.firestore().document(FirestorePaths.event(tripId: trip.tripId, eventId: eventId))
-            .getDocument(as: TripEvent.self)
+        let closedDoc = try await eventDoc(trip.tripId, eventId)
         #expect(closedDoc.status == .closed)
-        #expect(closedDoc.closedReason == .left)
+        #expect(closedDoc.closedReason == .stopped)
         #expect(closedDoc.closedBy == trip.uid)
         #expect(closedDoc.expiresAt != nil)
     }
 
-    /// A joined car answers and is tallied; it cannot pin (rejected by the rules) or close someone
-    /// else's request, and the pin is not applied.
-    @Test func memberVotesButCannotPinOrClose() async throws {
+    /// A joined car says OK and is tallied; it cannot close someone else's request, nor say OK for
+    /// another car, and a stop with no message has none.
+    @Test func memberSaysOKButCannotCloseOrVoteForAnotherCar() async throws {
         let trip = try await makeTrip()
         let orgContext = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: true)
         let eventId = try await service.request(
-            type: .stopFood, place: nil, context: orgContext, snapshot: try #require(orgContext.snapshot()))
+            type: .stopFood, message: nil, context: orgContext, snapshot: try #require(orgContext.snapshot()))
 
         try Auth.auth().signOut()
         try await Auth.auth().signInAnonymously()
@@ -852,48 +720,40 @@ struct StopEmulatorTests {
         let stream = StopService.listen(context: ctx, refresh: .seconds(60))
 
         let before = try await state(stream) { $0.rows.count == 2 }
-        #expect(before.canPin == false)
-        #expect(before.canResolve == false)
-        #expect(before.viewerAgrees == false)
+        #expect(before.canMarkStopped == false)
+        #expect(before.isAuthor == false)
+        #expect(before.viewerCarIsOK == false)
+        #expect(before.message == nil)
 
-        try await service.vote(tripId: trip.tripId, eventId: eventId, carId: joined.carId, userId: joiner, answer: .yes)
-        let voted = try await state(stream) { $0.viewerAgrees }
-        #expect(voted.agreedCount == 2)
-
-        try await service.vote(tripId: trip.tripId, eventId: eventId, carId: joined.carId, userId: joiner, answer: .notNow)
-        let declined = try await state(stream) { $0.myAnswer == .notNow }
-        #expect(declined.rows.first { $0.isMine }?.status == .notNow)
-
-        try await service.suggest(place: place("Other R&R", km: 26), eventId: eventId, canPin: false, context: ctx)
-        let suggested = try await state(stream) { $0.alternatives.count == 1 }
-        #expect(suggested.rows.first { $0.isMine }?.status == .suggested)
+        try await service.ok(tripId: trip.tripId, eventId: eventId, carId: joined.carId, userId: joiner)
+        let said = try await state(stream) { $0.viewerCarIsOK }
+        #expect(said.okCount == 2)
+        // A second phone in the car writes the same document: still one OK for the car.
+        try await service.ok(tripId: trip.tripId, eventId: eventId, carId: joined.carId, userId: joiner)
 
         await #expect(throws: (any Error).self) {
-            try await service.pin(tripId: trip.tripId, eventId: eventId, place: place("Hax", km: 5), userId: joiner)
+            try await service.close(tripId: trip.tripId, eventId: eventId, reason: .stopped, userId: joiner)
         }
         await #expect(throws: (any Error).self) {
-            try await service.close(tripId: trip.tripId, eventId: eventId, reason: .left, userId: joiner)
+            try await service.close(tripId: trip.tripId, eventId: eventId, reason: .cancelled, userId: joiner)
         }
-        // Voting for the organizer's car is also rejected.
+        // An OK for the organizer's car is also rejected.
         await #expect(throws: (any Error).self) {
-            try await service.vote(tripId: trip.tripId, eventId: eventId, carId: trip.carId, userId: joiner, answer: .yes)
+            try await service.ok(tripId: trip.tripId, eventId: eventId, carId: trip.carId, userId: joiner)
         }
-        let doc = try await Firestore.firestore().document(FirestorePaths.event(tripId: trip.tripId, eventId: eventId))
-            .getDocument(as: TripEvent.self)
-        #expect(doc.place == nil)
-        #expect(doc.expiresAt == nil)
+        let doc = try await eventDoc(trip.tripId, eventId)
         #expect(doc.status == nil)
+        #expect(doc.closedReason == nil)
     }
 
-    /// The asker cancels their own request; nobody else's.
+    /// The asker cancels their own request.
     @Test func askerCancelsOwnRequest() async throws {
         let trip = try await makeTrip()
         let ctx = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: false)
         let eventId = try await service.request(
-            type: .stopToilet, place: nil, context: ctx, snapshot: try #require(ctx.snapshot()))
+            type: .stopToilet, message: nil, context: ctx, snapshot: try #require(ctx.snapshot()))
         try await service.close(tripId: trip.tripId, eventId: eventId, reason: .cancelled, userId: trip.uid)
-        let doc = try await Firestore.firestore().document(FirestorePaths.event(tripId: trip.tripId, eventId: eventId))
-            .getDocument(as: TripEvent.self)
+        let doc = try await eventDoc(trip.tripId, eventId)
         #expect(doc.status == .closed)
         #expect(doc.closedReason == .cancelled)
         #expect(doc.expiresAt != nil)

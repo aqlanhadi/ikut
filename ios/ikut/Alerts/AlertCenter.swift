@@ -36,10 +36,6 @@ final class AlertCenter {
     /// The alert to show as a banner, nil when none. Cleared by `dismiss()` or after `bannerDuration`.
     private(set) var current: TripAlert?
 
-    /// What a spoken stop request asks the listener to do ("Tap yes.", or "Tap pin this stop." in the
-    /// lead car). The map sets it from this phone's role.
-    @ObservationIgnored var stopReply = AlertWording.defaultStopReply
-
     /// `.timeSensitive` needs the Time Sensitive Notifications entitlement, which needs the paid
     /// program, so alerts use `.active` until A2.
     nonisolated static let interruptionLevel: UNNotificationInterruptionLevel = .active
@@ -92,10 +88,10 @@ final class AlertCenter {
     }
 
     /// Starts listening to `tripId`'s events. Replaces any earlier listener.
-    func start(tripId: String, myUserId: String) {
+    func start(tripId: String, myUserId: String, myCarId: String? = nil) {
         stop()
         self.tripId = tripId
-        policy = AlertPolicy(myUserId: myUserId)
+        policy = AlertPolicy(myUserId: myUserId, myCarId: myCarId)
         announced = []
         notifier.registerCategory(tripId: tripId)
         let stream = source.events(tripId: tripId)
@@ -126,17 +122,17 @@ final class AlertCenter {
 
     /// Announces `event` once per kind. With a `distance` it is an approach alert ("Debris ahead
     /// in 500 meters"), announced once even if the event itself was announced when it arrived.
-    /// Events the user wrote are skipped. Returns whether anything was announced.
+    /// Events the user wrote, and stop requests from the user's car, are skipped. Returns whether anything was announced.
     @discardableResult
     func announce(event: TripEvent, distance: Double? = nil) async -> Bool {
-        guard let tripId, let policy, let eventId = event.id, event.authorId != policy.myUserId else { return false }
+        guard let tripId, let policy, let eventId = event.id, !policy.isMine(event) else { return false }
         let key = AlertWording.alertId(eventId: eventId, approach: distance != nil)
         guard announced.insert(key).inserted else { return false }
         let name = await names.displayName(tripId: tripId, userId: event.authorId)
         // The trip may have changed or stopped while the name loaded.
         guard self.tripId == tripId else { return false }
         deliver(AlertWording.alert(
-            for: event, tripId: tripId, distance: distance, authorName: name, now: now(), stopReply: stopReply))
+            for: event, tripId: tripId, distance: distance, authorName: name, now: now()))
         return true
     }
 
@@ -145,18 +141,6 @@ final class AlertCenter {
     private func handle(_ events: [TripEvent]) async {
         guard let fresh = policy?.newEvents(from: events, now: now()) else { return }
         for event in fresh { await announce(event: event) }
-        let pinned = policy?.newlyPinned(from: events, excluding: fresh) ?? []
-        for event in pinned { await announcePinned(event: event) }
-    }
-
-    /// "Stop pinned: {place}", once, for a stop request that was announced before it had a place.
-    @discardableResult
-    func announcePinned(event: TripEvent) async -> Bool {
-        guard let tripId, let eventId = event.id, let place = event.place,
-              announced.contains(eventId), announced.insert(AlertWording.pinnedAlertId(eventId: eventId)).inserted
-        else { return false }
-        deliver(AlertWording.pinnedAlert(for: event, place: place, tripId: tripId, now: now()))
-        return true
     }
 
     private func deliver(_ alert: TripAlert) {

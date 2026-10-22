@@ -33,8 +33,7 @@ enum RecapService {
                 e.id.map {
                     RecapEvent(id: $0, type: e.type.rawValue, carId: e.carId, authorId: e.authorId,
                                latitude: e.location.latitude, longitude: e.location.longitude,
-                               createdAt: e.createdAt, expiresAt: e.expiresAt, message: e.message,
-                               placeName: e.place?.name)
+                               createdAt: e.createdAt, expiresAt: e.expiresAt, message: e.message)
                 }
             }
             .sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) })

@@ -67,7 +67,7 @@ Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the
 both, grants location, parks them at the start of the E1 just south of Bidor, builds once, then runs
 `ConvoyOrganizerUITests` on A and `ConvoyJoinerUITests` on B (`ios/ikutUITests/TwoPhoneConvoyUITests.swift`) at the same
 time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip, the app's position pipeline, a hazard
-report and stop votes. The three take turns through marker files in `$TMPDIR/ikut-qa/convoy2-sync` (`a.code`, `b.lobby`,
+report and stop OKs. The three take turns through marker files in `$TMPDIR/ikut-qa/convoy2-sync` (`a.code`, `b.lobby`,
 `cars.joined`, `go`, ...); any failure writes `abort` there and every side stops waiting.
 
 What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the script checks Firestore alongside):
@@ -78,8 +78,10 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
 4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.
-5. B taps Pit stop, Fuel, then Ask for this stop. A's Pit stop button shows the stop (the card does not open by itself), cars 3 and 4 vote (car 3 suggests a place if
-   B's phone found none), A opens the stop from the Pit stop button and pins it, B's button shows it pinned, A taps Leave now and both buttons are Pit stop again.
+5. B taps Pit stop, Fuel, Add a message (the phone drives, so "Are you a passenger?" first), types "Need fuel, next R and R please" and taps Inform the convoy. A's Pit
+   stop button shows the stop with a badge (the card does not open by itself) and the pill asks for an OK; A taps OK on the pill, cars 3 and 4 say OK, A opens the stop from the
+   Pit stop button (four OKs, the message in full) and taps We've stopped, B's button shows 4 of 4 OK and then both buttons are Pit stop again. The script checks the event (message, no
+   place, `expiresAt` 30 minutes after `createdAt`), A's vote and the close (`status closed`, `closedReason stopped`).
 6. B goes back to the lobby and pauses sharing: A's row 2 reads "Paused", `pausedAt` is set; Resume clears both.
 7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
    the map menu and lands on the recap, B's lobby says "Trip ended", the trip doc is `ended`.
@@ -121,9 +123,9 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 | 380 | Car 2 reconnects. |
 | 408 | Car 4 reaches its merge point: car doc `state: convoy`, `convoyOffset` appears, JOINING empties. Order 1 > 2 > 4 > 3 > phone. |
 | 520 | Car 1 reports debris. Cars behind get an approach alert 500 m before it (car 2 at T=536, car 4 at 568, car 3 at 587, phone about 625). Marker disappears once everyone has passed (phone about 645). |
-| 700 | Car 3 requests a fuel stop and proposes a place (agreeing vote with `suggestion`). |
-| 715 | Car 1 (lead) pins the place. 730, 735: cars 2 and 4 agree. The UI test makes the phone agree. |
-| 800 | Car 1 resolves the stop. Drive ends at 900. |
+| 700 | Car 3 asks for a fuel stop with the message "Low on fuel, next R&R please" (written with `expiresAt` = 30 minutes later, no place). |
+| 730, 735 | Cars 2 and 4 say OK (a vote with `userId` and `at`). The UI test makes the phone say OK from its card. |
+| 800 | Car 1 (lead) says We've stopped (`status closed`, `closedReason stopped`, `expiresAt` now). Drive ends at 900. |
 
 ## What is checked
 
@@ -135,8 +137,8 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 - signal drop: car 2 is older than 60 s while offline, fresh and back at its true position after reconnect
 - car 4 merge: state `convoy`, `convoyOffset` present, merged at the scripted time
 - hazard: stored with the app's field set and 45 minute expiry; reaches each car's listener within 5 s; ApproachCore (ported) fires exactly once per car behind, at about 500 m, at the time predicted from the GPX; not for the author
-- stop: event open with pinned place, three votes (requester's with `suggestion`), resolved by the lead
-- phone: has a position with `convoyOffset`, its car doc is `convoy` with a tracker, and it voted (with `--expect-app-vote`, which `run-ui.mjs` passes)
+- stop: event open with its message, no place, `expiresAt` 30 minutes after `createdAt`; OKs from cars 2 and 4 with nothing but `userId` and `at`; closed as stopped by the lead
+- phone: has a position with `convoyOffset`, its car doc is `convoy` with a tracker, and it said OK (with `--expect-app-ok`, which `run-ui.mjs` passes)
 
 `ConvoyScenarioUITests` (the panel as a person sees it, ids `convoy.row.N`, `joining.row.N`, `convoy.header`,
 `convoy.joining.header`, `hazard.marker`):
@@ -148,7 +150,7 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 5. hazard marker "Hazard: Debris ..." is on the map
 6. approach banner "Debris ahead in ... meters"
 7. hazard marker clears
-8. the Pit stop button shows the stop and the card has the pinned place; tapping Yes for our car is recorded; the card goes when resolved
+8. the Pit stop button shows the stop and the card has the message; tapping OK for our car is recorded; the card goes when the lead taps We've stopped
 
 ## Things to know
 
@@ -220,13 +222,13 @@ Timeline (T = seconds after go; the same shape in both, differences marked):
 | 0 | Aisha (phone 1) leads, Daniel and Hafiz behind; Faiz rides in her car (phone 2) | Faiz (phone 2) 800 m behind Aisha, ahead of Daniel and Hafiz |
 | 75 | Faiz (co-pilot) reports Debris from his Report sheet; the scripted cars behind log "approach alert" | Aisha reports Debris from phone 1; phone 2 behind gets the approach alert (about T+90) |
 | 150-270 | Hafiz loses signal; both phones show "Last seen" from about T+210; he comes back | same |
-| 300 | **Highlight.** Hafiz asks for a fuel stop and suggests "R&R Demo" (4 km ahead of the lead); Daniel agrees | **Highlight.** Faiz taps Pit stop > Fuel on phone 2 (then Ask for this stop sends it); Hafiz suggests "R&R Demo", Daniel agrees |
-| about 320 | Phone 1: Aisha opens the stop from the Pit stop button, then Pin R&R Demo ("the lead car pins a stop for the convoy"); phone 2's button shows it pinned | same; phone 2's button reads "Fuel · N min" |
-| about 400 | The pin has been on the map 75 s; Aisha taps Leave now and the button is Pit stop again on both phones | same |
+| 300 | **Highlight.** Faiz (a passenger in Aisha's car) taps Pit stop > Fuel > Add a message (the passenger check first), types "Low on fuel, next R&R please" and taps Inform the convoy on phone 2; Hafiz and Daniel tap OK | same, but Faiz drives his own car |
+| about 340 | Phone 1: Aisha opens the stop from the Pit stop button and watches the OKs come in (her car asked, so she has none to give) | Phone 1: the pill asks Aisha for an OK, she taps it, then the card shows the OKs |
+| about 390 | The request has been open 45 s; Aisha taps We've stopped and the button is Pit stop again on both phones | same |
 | 560 | End; the maps stay open until then | same |
 
 Handshake: the phones' tests and the script take turns through marker files in `$TMPDIR/ikut-qa/<demo|demo2>-sync`
-(tests to script `a.code`, `b.lobby`, `a.map`, `b.map`, `a.pinned`, `b.sawPin`, `a.resolved`; script to tests `code`,
+(tests to script `a.code`, `b.lobby`, `a.map`, `b.map`, `b.stopRequested`, `a.ok`, `a.stopped`, `b.sawStopped`; script to tests `code`,
 `cars.joined`, `report.a`/`report.b`, `stop.b`, `agree`, `arrive`, `end`, `abort`). The tests hold the map until `end` and
 never fail the demo over cosmetic checks: those print `QA CHECK: NOTE`, a failed core step prints `QA CHECK: FAIL` and
 fails that test after the demo has played out. Ctrl-C / SIGTERM kill the xcodebuilds and clear the simulators' locations.
@@ -257,9 +259,9 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
    UI tests make trips too). The page shows the code, big: **join on phone 2 with it.** When phone 1 ends the trip the page says
    "The trip has ended" and the generated cars stop.
 3. **Place and play.** On the page: drag pins for each car's start, own ending and deviation ("The page" below); the commands are in "Tracks, pins and the command reference". Per car: speed (0-200 km/h), Play/Pause; Play all / Pause all. Defaults: phone 1 at 3.0 km, phone 2 at 2.2, Daniel 1.4, Hafiz 0.6, all 90 km/h, paused. Phones are driven with `simctl location start` from the car's current offset (restarted on every change and every 20 s); a parked phone gets a nudged `location set` every 5 s (the simulator ignores an unchanged location, the app drops fixes older than 15 s).
-4. **Generated cars** (Daniel, Hafiz, and any you add) publish every second through the app's PositionBuilder/PositionPublisher (heartbeats while paused). They do nothing on their own: you answer, ask and report on command (the page's cards and menus). *Drop signal* is `disableNetwork`, which is what makes a car stale; "Give signal back" re-enables it.
+4. **Generated cars** (Daniel, Hafiz, and any you add) publish every second through the app's PositionBuilder/PositionPublisher (heartbeats while paused). They do nothing on their own: you say OK, ask and report on command (the page's cards and menus). *Drop signal* is `disableNetwork`, which is what makes a car stale; "Give signal back" re-enables it.
 5. The page shows, per car, the position the app/Firestore really has and its age (read as the emulator's owner over REST),
-   so a phone that is not following is flagged; plus the trip's events with votes, suggestions, pins and resolved state.
+   so a phone that is not following is flagged; plus the trip's events with their OKs, message and closed state.
 
 Close the playground (SIGTERM) stops the players, clears the locations of the simulators it started and closes the generated cars. The trip is
 left as it is; end it from phone 1's menu. Emulators only (`--backend production` is refused).
@@ -283,8 +285,7 @@ The **Scripted demos** tab is the old list (Play, Stop, timeline, checks, log). 
   (the pin, a wait in seconds, default 30, and a "leaves here" dot). Road paths come from Google's `Route.computeRoutes` and only when a pin is dropped or a drag ends (never while dragging), cached by endpoints:
   a start is one call, an ending one, a deviation two. If routing fails the page says so and sends straight lines. A pin is locked once the car has started driving that piece.
 - **Car rows:** place, ending (+ Clear), deviate (+ Cancel), speed, Play/Pause, Drop signal, *Ask stop* and *Report* menus, Rename (inline), Remove, and **Add car** (up to 8 generated cars). A mistake from the playground shows under the row it came from.
-- **Stop requests** show as a card over the map as they open (from a generated car or a phone): who asked, the type, the place, and each generated car with its answer as it lands. Each car that can still answer has **Agree / Not now / Another place**
-  (click the map to pick the place); **Everyone agrees** sends `voteAll`. The card goes away when the request is no longer open.
+- **Stop requests** show as a card over the map as they open (from a generated car or a phone): who asked, the type, the message if there is one, and each generated car with its OK as it lands. Each car that can still answer has **OK**; **Everyone says OK** sends `voteAll`, and **We’ve stopped** (when a generated car asked) sends `markStopped`. The card goes away when the request is no longer open. Each car's *Ask stop* menu sends the text of the box next to it as the message.
 
 ### Tracks, pins and the command reference
 
@@ -308,8 +309,9 @@ key: `phone1`, `phone2`, `daniel`, `hafiz`, then `g3`, `g4`... (stable, never re
 | `ending {car, end, road?, leaveKm?}` / `clearEnding {car}` | Own ending. `road` runs from a point on the shared route (the car's spot, or `leaveKm`) to `end`. Without `leaveKm` the car leaves where the road diverges from the route for good (the last point within 50 m of it, `divergeOffset`); with it, there (the road is used whole, a short hook is added if it does not start on the route). Without `road`, the road is a straight line from the leave point, and `leaveKm` defaults to where the car is (or where it rejoins). The car drives the shared route to the leave point, then the own road, then parks at the end and keeps publishing. A road that never leaves the shared route is just a parking offset (`pins.endOnRoute`). Refused: a leave point behind the car, a car already on its ending road, a road that leaves the route behind the car by more than about 300 m. `clearEnding` before the leave point drops it; after, the car goes back to the shared route at its old leave point. |
 | `deviate {car, pin, out?, back?, waitSeconds?, leaveKm?}` / `cancelDeviation {car}` | Deviation. `out` runs from the leave point to `pin`, `back` from the pin towards the destination; `back` is cut with `makePlan` where it meets the shared route (the car merges there and carries on, and still honours its ending). Defaults: `waitSeconds` 30 (0 to 600; the clock runs only while the car plays), `leaveKm` the car's spot about 5 s ahead, no roads = straight lines. Phases: onRoute, out, waiting, back, onRoute. Refused with a plain message: a car that is joining, already deviating, already on its ending, or a leave point behind the car; a way back that never meets the route or joins it before the pin. `cancelDeviation` before the leave point drops it; after it, the car skips the rest of its wait and drives back. |
 | `addCar {name?}` / `removeCar {car}` / `rename {car, name}` | Up to 8 generated cars (Daniel and Hafiz count). A new car takes the next first name from Mei Ling, Arjun, Siti, Kumar, Aina, Wei Jie, Farah, Raj ("<Name>’s <Myvi\|Axia\|Saga\|City\|X70\|Hilux…>"), the next colour of `#c2255c #2b8a3e #b08900 #1098ad #495057 #8b5e34`, joins the attached trip at once and starts paused 500 m behind the rearmost car on the shared route (3 km minus 500 m when none has a place yet; refused once the trip has ended; before a trip it just waits in the list). `removeCar` (generated cars only) stops its player and closes its client; the trip keeps its car doc, which the other phones see go stale. `rename` changes the first name in the playground; the car doc's name is changed too only if the rules let the car's own tracker (they let only the organizer), so after joining the app keeps the old name (`state.cars[].name` is what the app shows, `label` the playground's). |
-| `vote {car, event, answer:'yes'\|'notNow', place?:{name, latitude, longitude}}` / `voteAll {event}` | A generated car answers a stop request (vote doc with `answer` next to `agree`). `place` is put on the shared route for its `routeOffset` (name 1 to 100 characters; the `validSuggestion` shape), so `notNow` with a place is the card's "Another place". `voteAll` answers yes for every generated car that has not answered and did not ask. Refused: a closed request, a car with no signal, a phone. |
-| `askStop {car, type, place?}` | A generated car asks for a stop (`stopRest`, `stopFuel`, `stopFood`, `stopToilet`) at its current position and route offset, as the app writes it (no `status` or `expiresAt`: open until resolved). `place` goes in as the asker's own yes vote with that suggestion, as the app does. |
+| `vote {car, event}` / `voteAll {event}` | A generated car says OK to a stop request (a vote doc with `userId` and `at`, as the app writes it). `voteAll` does it for every generated car that has not said OK and did not ask. Refused: a closed request, the car that asked, a car with no signal, a phone. |
+| `askStop {car, type, message?}` | A generated car asks for a stop (`stopRest`, `stopFuel`, `stopFood`, `stopToilet`) at its current position and route offset, as the app writes it (`expiresAt` 30 minutes after `createdAt`, no place). `message` is optional, trimmed, 280 letters at most. |
+| `markStopped {event}` | We've stopped, written by the generated car that asked (the author may close it as stopped): `status closed`, `closedReason stopped`, `closedBy`, `expiresAt` now. Refused with a plain message when a phone asked: tap We've stopped in the app. |
 | `report {car, type}` | A generated car reports `debris`, `accident`, `pothole`, `animal`, `stoppedVehicle`, `roadworks` (hazard, high, 45 min), `heavyRain`, `trafficJam` (condition, medium, 60 min) or `pullingOver`, `carTrouble`, `runningLate` (status, high, no expiry) where it is. |
 | `place`, `speed`, `play`, `playAll`, `drop` | As before (`place {car, km, offRoute?, sideMeters?}` builds the same tracks: a main-only track from `km`, or a start road that merges at `km`). |
 
@@ -331,8 +333,8 @@ per-car destination: a road that never rejoins is exactly what `makePlan` return
   controls: `speed, playing, offline, state` (the car doc's), `joining, mergeKm, sideMeters` (old page);
   `pins`: `{start: {latitude, longitude}|null, startMergeKm, end: {latitude, longitude}|null, endLeaveKm, endOnRoute, deviation: {pin: {latitude, longitude}, leaveKm, mergeKm, waitSeconds}|null}` (a deviation is cleared once the car has merged back: `pins.deviation` null and its out/back legs leave the geometry, with a `legsVersion` and `geometryVersion` bump, as `cancelDeviation` after the merge);
   `legsVersion` (changes when its own roads change); `reported`: what the app/Firestore has, `{offset, convoyOffset, ageSeconds, speed, latitude, longitude, heading}` or null.
-- `events[]`, newest first: `id, type, category, by (label), byKey (car key|null), offset, latitude, longitude, ageSeconds, status ('open'|'pinned'|'closed'), pinned (place name),
-  resolved, agree, disagree, suggestions (names), answers {carKey: {answer: 'yes'|'notNow'|'another', place: name|null}}` (only cars of the playground; a car that has not answered is absent).
+- `events[]`, newest first: `id, type, category, by (label), byKey (car key|null), offset, latitude, longitude, ageSeconds, status ('open'|'closed'),
+  message (text|null), ok (the number of OK votes), oks {carKey: true} (only cars of the playground; a car that has not said OK is absent), closedReason ('stopped'|'cancelled'|null), resolved`.
 
 **Geometry** is a separate line, `DEMO {"type":"geometry"}`, sent when the trip is attached or anything below changes (and only then), never every second; the dashboard
 server keeps the latest like the state and replays it on reload (`{k:'geometry', geometry}` live, `snapshot.geometry` on connect). `state.geometryVersion` is its `version`:

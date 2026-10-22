@@ -130,28 +130,12 @@ service cloud.firestore {
         && d.createdAt < request.time + duration.value(5, 'm')
         && (optionalOf(d, 'expiresAt') == null
             || (d.expiresAt is timestamp && d.expiresAt > d.createdAt))
-        && (optionalOf(d, 'message') == null || isString(d.message, 0, 280));
-    }
-
-    // A pinned stop place: where the convoy will stop, set by the person writing it.
-    function validPlace(v) {
-      return v is map
-        && v.keys().hasOnly(['name', 'coordinate', 'routeOffset', 'pinnedBy'])
-        && v.keys().hasAll(['name', 'coordinate', 'routeOffset', 'pinnedBy'])
-        && isString(v.name, 1, 100)
-        && v.coordinate is latlng
-        && v.routeOffset is number && v.routeOffset >= 0
-        && v.pinnedBy == request.auth.uid;
-    }
-
-    // A place someone suggests for a stop (no pinnedBy; only the lead car's pin carries that).
-    function validSuggestion(v) {
-      return v is map
-        && v.keys().hasOnly(['name', 'coordinate', 'routeOffset'])
-        && v.keys().hasAll(['name', 'coordinate', 'routeOffset'])
-        && isString(v.name, 1, 100)
-        && v.coordinate is latlng
-        && v.routeOffset is number && v.routeOffset >= 0;
+        && (optionalOf(d, 'message') == null || isString(d.message, 0, 280))
+        // A stop request closes itself: it must carry an expiresAt at most 30 minutes (and the
+        // 5 minute clock slack) after it was asked.
+        && (d.category != 'stopRequest'
+            || (optionalOf(d, 'expiresAt') != null
+                && d.expiresAt <= d.createdAt + duration.value(35, 'm')));
     }
 
     // A stop request that has not been resolved: expiresAt unset or in the future, and not marked
@@ -180,28 +164,30 @@ service cloud.firestore {
       let closeKeys = keys.hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
         && keys.hasAll(['status', 'closedReason', 'closedBy', 'expiresAt']);
       let lead = isLeadOrOrganizer(tripId);
+      let expiryOnly = keys.hasOnly(['expiresAt']);
       return
-        // Author sets or clears expiresAt (clear, resolve).
+        // The author of any other kind of event sets or clears expiresAt (resolving a hazard).
         (mine
-          && keys.hasOnly(['expiresAt'])
+          && prev.category != 'stopRequest'
+          && expiryOnly
           && (optionalOf(next, 'expiresAt') == null || next.expiresAt is timestamp))
-        // The author closes their own stop request as cancelled.
-        || (mine && open && closeKeys && closesStop(next, ['cancelled']))
-        // Lead car or organizer pins the place of an open stop request (old builds send only
-        // the place; new ones also set status pinned).
-        || (lead && open && keys.hasOnly(['place']) && validPlace(next.place))
-        || (lead && open
-          && keys.hasOnly(['place', 'status'])
-          && keys.hasAll(['place'])
-          && next.get('status', null) == 'pinned'
-          && validPlace(next.place))
-        // Lead car or organizer closes a stop request: everyone left, or nobody answered.
-        || (lead && open && closeKeys && closesStop(next, ['left', 'noAnswer']))
-        // Lead car or organizer resolves (expires) a stop request.
-        || (lead
+        // The author closes their own stop request: cancelled it, or the convoy has stopped.
+        || (mine && open && closeKeys && closesStop(next, ['cancelled', 'stopped']))
+        // Lead car or organizer closes a stop request: the convoy has stopped.
+        || (lead && open && closeKeys && closesStop(next, ['stopped']))
+        // A stop request can only be closed earlier by moving expiresAt to now or before, give or take one
+        // minute of clock difference between phone and server (the asker, the
+        // lead car or the organizer): never cleared, never pushed later, so it cannot be reopened or held
+        // open. The old Release build resolves this way. It can only move the expiry earlier than it is now
+        // (else the minute of slack could be used again and again to keep an expired stop open); a stop with
+        // no expiresAt (written before D24) is refused here.
+        || ((mine || lead)
           && prev.category == 'stopRequest'
-          && keys.hasOnly(['expiresAt'])
-          && next.expiresAt is timestamp);
+          && expiryOnly
+          && next.expiresAt is timestamp
+          && optionalOf(prev, 'expiresAt') != null
+          && next.expiresAt <= prev.expiresAt
+          && next.expiresAt <= request.time + duration.value(1, 'm'));
     }
 
     // ---------- rules ----------
@@ -352,8 +338,7 @@ service cloud.firestore {
           && tripActive(tripId)
           && (resource.data.authorId == request.auth.uid || isOrganizer(tripId));
 
-        // Stop votes: one doc per car, written by a member of that car while the stop is open.
-        // A vote may carry a suggested place; the car that asked for the stop proposes its place this way.
+        // Stop votes: one doc per car, its OK, written by a member of that car while the stop is open.
         match /votes/{carId} {
           allow read: if isMember(tripId);
 
@@ -361,17 +346,10 @@ service cloud.firestore {
             && tripActive(tripId)
             && get(memberPath(tripId, request.auth.uid)).data.carId == carId
             && openStop(get(/databases/$(database)/documents/trips/$(tripId)/events/$(eventId)).data)
-            && request.resource.data.keys().hasOnly(['userId', 'agree', 'answer', 'at', 'suggestion'])
-            && request.resource.data.keys().hasAll(['userId', 'agree', 'at'])
+            && request.resource.data.keys().hasOnly(['userId', 'at'])
+            && request.resource.data.keys().hasAll(['userId', 'at'])
             && request.resource.data.userId == request.auth.uid
-            && request.resource.data.agree is bool
-            // answer is optional (old builds send only agree) and always matches agree.
-            && (optionalOf(request.resource.data, 'answer') == null
-                || (request.resource.data.answer == 'yes' && request.resource.data.agree == true)
-                || (request.resource.data.answer == 'notNow' && request.resource.data.agree == false))
-            && request.resource.data.at == request.time
-            && (optionalOf(request.resource.data, 'suggestion') == null
-                || validSuggestion(request.resource.data.suggestion));
+            && request.resource.data.at == request.time;
 
           allow delete: if false;
         }

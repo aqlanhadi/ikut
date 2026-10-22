@@ -81,6 +81,19 @@ struct AlertPolicyTests {
         #expect(out.map(\.id) == ["2"])
     }
 
+    @Test func skipsStopRequestsFromMyOwnCarButNotOtherEventsOrCars() {
+        var policy = AlertPolicy(myUserId: "me", myCarId: "c")
+        _ = policy.newEvents(from: [], now: alertT0)
+        var other = alertEvent(.stopFuel, id: "3")
+        other.carId = "c9"
+        let out = policy.newEvents(from: [
+            alertEvent(.stopFuel, id: "1"),   // my car, asked by someone else in it
+            alertEvent(.debris, id: "2"),     // my car's hazard still announces
+            other,
+        ], now: alertT0)
+        #expect(Set(out.compactMap(\.id)) == ["2", "3"])
+    }
+
     @Test func skipsSeen() {
         var policy = AlertPolicy(myUserId: "me")
         _ = policy.newEvents(from: [], now: alertT0)
@@ -163,13 +176,15 @@ struct AlertWordingTests {
 
     @Test func stopsStatusesAndMessages() {
         #expect(alert(alertEvent(.stopToilet, id: "1", ago: 120)).body == "Aqlan’s car needs a toilet break · 2 min ago")
-        // Spoken once, and it says what to do; voice answers are not built, so it never says "say yes".
-        #expect(alert(alertEvent(.stopFuel, id: "1")).spoken == "Aqlan needs fuel. Tap yes.")
-        #expect(alert(alertEvent(.stopFood, id: "1"), name: nil).spoken == "Another car needs food. Tap yes.")
-        #expect(alert(alertEvent(.stopToilet, id: "1")).spoken == "Aqlan needs a toilet break. Tap yes.")
-        #expect(AlertWording.alert(
-            for: alertEvent(.stopRest, id: "1"), tripId: "t", authorName: "Aqlan", now: alertT0,
-            stopReply: "Tap pin this stop.").spoken == "Aqlan needs a rest. Tap pin this stop.")
+        // Spoken once, and it says what to do; voice answers are not built, so it never says "say OK".
+        // The same line for every car, the lead car and the organizer too.
+        #expect(alert(alertEvent(.stopFuel, id: "1")).spoken == "Aqlan needs fuel. Tap OK.")
+        let withMessage = alert(alertEvent(.stopFuel, id: "1", message: "Low on fuel, next R&R please"))
+        #expect(withMessage.spoken == "Aqlan needs fuel. Tap OK.")
+        #expect(!withMessage.spoken.contains("fuel,") && !withMessage.spoken.contains("R&R") && !withMessage.spoken.contains("next"))
+        #expect(alert(alertEvent(.stopFood, id: "1"), name: nil).spoken == "Another car needs food. Tap OK.")
+        #expect(alert(alertEvent(.stopToilet, id: "1")).spoken == "Aqlan needs a toilet break. Tap OK.")
+        #expect(alert(alertEvent(.stopRest, id: "1")).spoken == "Aqlan needs a rest. Tap OK.")
         // The banner and notification keep their own wording.
         #expect(alert(alertEvent(.stopFuel, id: "1")).body == "Aqlan’s car wants to stop for fuel · just now")
         #expect(alert(alertEvent(.carTrouble, id: "1")).spoken == "Aqlan’s car has car trouble.")
@@ -396,58 +411,46 @@ struct AlertCenterTests {
         #expect(rig.speaker.stops >= 1)
     }
 
-    private func pinned(_ e: TripEvent, _ name: String = "Petronas Tapah") -> TripEvent {
-        var e = e
-        e.place = StopPlace(name: name, coordinate: GeoPoint(latitude: 3, longitude: 101), routeOffset: 100, pinnedBy: "lead")
-        return e
+    @Test func aPassengersMessageIsNeverSpokenOrShownInTheBanner() async {
+        var request = alertEvent(.stopFuel, id: "s1")
+        request.message = "Low on fuel, next R&R please"
+        let built = AlertWording.alert(for: request, tripId: "t", authorName: "Aqlan", now: alertT0)
+        #expect(built.spoken == "Aqlan needs fuel. Tap OK.")
+        #expect(!built.body.contains("R&R"))
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        rig.source.emit([request])
+        await waitUntil { rig.speaker.spoken.count == 1 }
+        #expect(rig.speaker.spoken.first?.text == "Aqlan needs fuel. Tap OK.")
     }
 
-    @Test func pinnedPlaceIsAnnouncedOnceAfterTheRequest() async {
+    @Test func aStopRequestFromMyOwnCarIsSilentOnThisPhone() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me", myCarId: "c")
+        rig.source.emit([])
+        rig.source.emit([alertEvent(.stopFuel, id: "s1", author: "faiz")])
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(rig.center.current == nil)
+        #expect(rig.speaker.spoken.isEmpty)
+        #expect(rig.notifier.posted.isEmpty)
+        let announced = await rig.center.announce(event: alertEvent(.stopFuel, id: "s2", author: "faiz"))
+        #expect(!announced)
+    }
+
+    @Test func aClosedStopRequestIsNotAnnouncedAgain() async {
         let rig = Rig()
         rig.center.start(tripId: "t", myUserId: "me")
         rig.source.emit([])
         let request = alertEvent(.stopFuel, id: "s1")
         rig.source.emit([request])
         await waitUntil { rig.speaker.spoken.count == 1 }
-        rig.source.emit([pinned(request)])
-        await waitUntil { rig.speaker.spoken.count == 2 }
-        rig.source.emit([pinned(request)])
-        rig.source.emit([pinned(request, "Elsewhere")])
-        try? await Task.sleep(for: .milliseconds(50))
-        #expect(rig.speaker.spoken.map(\.key) == ["s1", "s1@pinned"])
-        #expect(rig.speaker.spoken.last?.text == "Stop pinned: Petronas Tapah")
-        #expect(rig.center.current?.title == "Stop pinned")
-    }
-
-    @Test func pinnedPlaceIsSkippedForTheRequestersOwnCar() async {
-        let rig = Rig()
-        rig.center.start(tripId: "t", myUserId: "me")
-        rig.source.emit([])
-        let mine = alertEvent(.stopFuel, id: "s1", author: "me")
-        rig.source.emit([mine])
-        rig.source.emit([pinned(mine)])
+        var closed = request
+        closed.status = .closed
+        closed.closedReason = .stopped
+        rig.source.emit([closed])
         try? await Task.sleep(for: .milliseconds(80))
-        #expect(rig.speaker.spoken.isEmpty)
-    }
-
-    @Test func pinnedPlaceIsSkippedWhenTheRequestWasNeverAnnounced() async {
-        let rig = Rig()
-        rig.center.start(tripId: "t", myUserId: "me")
-        // Old backlog stop request: seen but not announced.
-        rig.source.emit([alertEvent(.stopFuel, id: "old", ago: 900)])
-        rig.source.emit([pinned(alertEvent(.stopFuel, id: "old", ago: 900))])
-        try? await Task.sleep(for: .milliseconds(80))
-        #expect(rig.speaker.spoken.isEmpty)
-    }
-
-    @Test func requestArrivingAlreadyPinnedIsAnnouncedOnce() async {
-        let rig = Rig()
-        rig.center.start(tripId: "t", myUserId: "me")
-        rig.source.emit([])
-        rig.source.emit([pinned(alertEvent(.stopFood, id: "s2"))])
-        await waitUntil { !rig.speaker.spoken.isEmpty }
-        try? await Task.sleep(for: .milliseconds(50))
-        #expect(rig.speaker.spoken.map(\.key) == ["s2"])
+        #expect(rig.speaker.spoken.map(\.key) == ["s1"])
     }
 
     @Test func notificationIdentifiersArePerTrip() {
