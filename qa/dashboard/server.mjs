@@ -22,7 +22,22 @@ const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? pro
 const PORT = Number(arg('--port') || process.env.PORT) || 4322;
 const DEMOS = arg('--demos') || process.env.DEMOS || QA;
 const LOG_LINES = 500;
+const MAX_BODY = 2 * 1024 * 1024; // a command body: a few Google roads of up to ~20,000 points each
 const KILL_AFTER_MS = 90_000; // a production demo waits up to 60 s for phone 1 to end the real trip
+
+// ---- .env (qa/dashboard/.env, gitignored): the Maps keys for the playground page. The environment wins when both are set.
+async function readEnvFile() {
+  const out = {};
+  try {
+    for (const line of (await readFile(join(here, '.env'), 'utf8')).split('\n')) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+      if (m && !line.trim().startsWith('#')) out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
+  } catch { /* no .env: the page runs without Google Maps */ }
+  return out;
+}
+const env = await readEnvFile();
+const config = () => ({ mapsKey: process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || null, mapId: process.env.GOOGLE_MAPS_MAP_ID || env.GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID' });
 
 // ---- discovery: `--demos` is a folder (files named demo*.mjs) or a path with a * in the file name
 const [demoDir, demoPattern] = DEMOS.includes('*')
@@ -67,12 +82,14 @@ const clients = new Set();
 const publish = (msg) => { for (const res of clients) res.write(`data: ${JSON.stringify(msg)}\n\n`); };
 const meta = () => run && { file: run.demo.file, title: run.demo.title, interactive: Boolean(run.demo.interactive), durationSeconds: run.demo.durationSeconds, timeline: run.demo.timeline,
   options: run.options, status: run.status, startedAt: run.startedAt, exitCode: run.exitCode, stopping: run.stopping };
-const snapshot = () => run ? { k: 'snapshot', run: meta(), events: run.events, log: run.log, state: run.state } : { k: 'snapshot', run: null, events: [], log: [], state: null };
+const snapshot = () => run ? { k: 'snapshot', run: meta(), events: run.events, log: run.log, state: run.state, geometry: run.geometry } : { k: 'snapshot', run: null, events: [], log: [], state: null, geometry: null };
 
 function addEvent(ev) {
   ev.ts = Date.now();
   // An interactive demo (the playground) sends its whole state every second: keep only the latest, not a history.
   if (ev.type === 'state') { run.state = ev; return publish({ k: 'state', state: ev }); }
+  // Its geometry (the shared route, each car's own roads) changes rarely: keep the latest like the state, replay it on reload.
+  if (ev.type === 'geometry') { run.geometry = ev; return publish({ k: 'geometry', geometry: ev }); }
   run.events.push(ev);
   publish({ k: 'ev', ev });
 }
@@ -91,7 +108,7 @@ function start(demo, options) {
   if (options.endTrip) args.push('--end-trip');
   args.push('--backend', options.backend);
   const child = spawn('node', args, { cwd: QA, stdio: ['pipe', 'pipe', 'pipe'] });
-  const r = run = { demo, options, status: 'running', startedAt: Date.now(), exitCode: null, stopping: false, events: [], log: [], state: null, child };
+  const r = run = { demo, options, status: 'running', startedAt: Date.now(), exitCode: null, stopping: false, events: [], log: [], state: null, geometry: null, child };
   child.stdin.on('error', () => {}); // a demo that never reads its input, or has left
   for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (l) => { if (run === r) addLine(l); });
   child.on('error', (e) => { if (run === r) addEvent({ type: 'error', message: `Could not start: ${e.message}` }); });
@@ -120,19 +137,30 @@ const send = (res, code, body, type = 'application/json') => {
   res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store' });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
+/** A request's JSON body: at most MAX_BODY bytes, an object. A mistake is an HttpError with words for the person. */
+class HttpError extends Error { constructor(code, message) { super(message); this.code = code; } }
 async function readJson(req) {
-  let body = '';
-  for await (const chunk of req) body += chunk;
-  return JSON.parse(body || '{}');
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_BODY) throw new HttpError(413, `That is too much to send at once (the most is ${MAX_BODY / 1024 / 1024} MB).`);
+    chunks.push(chunk);
+  }
+  let body;
+  try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { throw new HttpError(400, 'That request was not understood.'); }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'That request was not understood.');
+  return body;
 }
 const isRunning = () => run?.status === 'running';
 
 // Any web page the browser has open could POST to localhost: only JSON from a page served by this server gets through
 // (a cross-site form or text/plain post is a "simple" request and would not be stopped by the browser).
 const trusted = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
+const trustedHost = (req) => trusted.has(String(req.headers.host ?? '').toLowerCase());
 function allowedPost(req) {
   if (!String(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) return false;
-  if (!trusted.has(String(req.headers.host ?? '').toLowerCase())) return false;
+  if (!trustedHost(req)) return false;
   const origin = req.headers.origin;
   if (origin === undefined) return true; // not a browser page (curl)
   try { return trusted.has(new URL(origin).host.toLowerCase()); } catch { return false; }
@@ -145,6 +173,10 @@ createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, await readFile(PAGE), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && p === '/api/config') { // the Maps key: only for a page served from this server (not a rebinding host name)
+      if (!trustedHost(req)) return send(res, 403, { error: 'Only the demos page itself may ask for that.' });
+      return send(res, 200, config());
+    }
     if (req.method === 'GET' && p === '/api/demos') {
       if (url.searchParams.has('refresh')) await discover();
       return send(res, 200, { demos, running: isRunning(), backends: await backends() });
@@ -180,6 +212,7 @@ createServer(async (req, res) => {
     }
     send(res, 404, { error: 'not found' });
   } catch (err) {
+    if (err instanceof HttpError) return send(res, err.code, { error: err.message });
     console.error(err);
     send(res, 500, { error: String(err.message || err) });
   }
