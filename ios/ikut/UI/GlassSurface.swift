@@ -5,7 +5,7 @@ import SwiftUI
 enum GlassSurface {
     /// Liquid Glass on iOS 26 and later for the floating convoy panel and stop card. False gives them
     /// the frosted material, as before iOS 26. The home trips sheet is glass on iOS 26 either way.
-    static let useGlass = false
+    static let useGlass = true
 
     enum Kind {
         /// Full-width sheet with bottom corners that follow the screen's (home trips sheet, glass only).
