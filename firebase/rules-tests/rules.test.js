@@ -521,6 +521,16 @@ describe('stop requests', () => {
     it('non-member cannot resolve', () => assertFails(updateDoc(evRef('stranger'), { expiresAt: ts() })));
     it('organizer cannot expire a hazard they did not author', () =>
       assertFails(updateDoc(evRef('org', 'ev1'), { expiresAt: ts() })));
+    it('the asker cannot clear expiresAt on an expired stop to reopen it', () =>
+      assertFails(updateDoc(evRef('mem', 'stopDone'), { expiresAt: null })));
+    it('the asker cannot hold a stop open by setting expiresAt a year out', () =>
+      assertFails(updateDoc(evRef('mem'), { expiresAt: ts(-365 * 24 * 60 * MIN) })));
+    it('the lead cannot bring a closed stop back with 20 more minutes', async () => {
+      await updateDoc(evRef('lead'), closed('stopped', 'lead'));
+      await assertFails(updateDoc(evRef('lead'), { expiresAt: ts(-20 * MIN) }));
+    });
+    it('the lead cannot push an open stop later', () => assertFails(updateDoc(evRef('lead'), { expiresAt: ts(-31 * MIN) })));
+    it('the asker cannot clear expiresAt on an open stop', () => assertFails(updateDoc(evRef('mem'), { expiresAt: null })));
     it('lead cannot clear expiresAt to reopen', () => assertFails(updateDoc(evRef('lead', 'stopDone'), { expiresAt: null })));
     it('lead cannot change other fields while resolving', () =>
       assertFails(updateDoc(evRef('lead'), { expiresAt: ts(), message: 'x' })));

@@ -164,20 +164,25 @@ service cloud.firestore {
       let closeKeys = keys.hasOnly(['status', 'closedReason', 'closedBy', 'expiresAt'])
         && keys.hasAll(['status', 'closedReason', 'closedBy', 'expiresAt']);
       let lead = isLeadOrOrganizer(tripId);
+      let expiryOnly = keys.hasOnly(['expiresAt']);
       return
-        // Author sets or clears expiresAt (clear, resolve).
+        // The author of any other kind of event sets or clears expiresAt (resolving a hazard).
         (mine
-          && keys.hasOnly(['expiresAt'])
+          && prev.category != 'stopRequest'
+          && expiryOnly
           && (optionalOf(next, 'expiresAt') == null || next.expiresAt is timestamp))
         // The author closes their own stop request: cancelled it, or the convoy has stopped.
         || (mine && open && closeKeys && closesStop(next, ['cancelled', 'stopped']))
         // Lead car or organizer closes a stop request: the convoy has stopped.
         || (lead && open && closeKeys && closesStop(next, ['stopped']))
-        // Lead car or organizer resolves (expires) a stop request.
-        || (lead
+        // A stop request can only be closed earlier by moving expiresAt to now or before (the asker, the
+        // lead car or the organizer): never cleared, never pushed later, so it cannot be reopened or held
+        // open. The old Release build resolves this way.
+        || ((mine || lead)
           && prev.category == 'stopRequest'
-          && keys.hasOnly(['expiresAt'])
-          && next.expiresAt is timestamp);
+          && expiryOnly
+          && next.expiresAt is timestamp
+          && next.expiresAt <= request.time);
     }
 
     // ---------- rules ----------
