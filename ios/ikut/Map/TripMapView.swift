@@ -55,6 +55,13 @@ struct TripMapView: View {
     @State private var topHeight: CGFloat = 0
     @State private var panelMinY: CGFloat = 0
     @State private var mapMaxY: CGFloat = 0
+    @State private var mapMinY: CGFloat = 0
+    @State private var mapWidth: CGFloat = 0
+    /// The bottom inset the map keeps as safe area: the folded panel's, so the Legal label sits
+    /// above it. The rest of what covers the map goes into the camera (`cameraRoom`).
+    @State private var legalInset: CGFloat = 0
+    /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
+    @State private var latitudePerPointPerMeter = 0.0
     /// The hazard approach alert being followed: a pill, the hazard pinging and in view, until it's passed.
     @State private var approach: TripAlert?
     /// The camera mode to go back to once the hazard is passed.
@@ -106,6 +113,8 @@ struct TripMapView: View {
             }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { mapMaxX = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapHeight = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { mapWidth = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { mapMinY = $0 }
             // The map runs on under the home indicator, past the frame seen here.
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY + $0.safeAreaInsets.bottom } action: {
                 mapMaxY = $0
@@ -210,7 +219,10 @@ struct TripMapView: View {
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
             // The panel folding or a banner coming and going moves the visible middle; recenter on it.
-            .onChange(of: mapInsets) { _, _ in move(to: model.cameraTarget, animated: true) }
+            .onChange(of: mapInsets) { _, insets in
+                if !panelExpanded, !stopCardOpen { legalInset = insets.bottom }
+                move(to: model.cameraTarget, animated: true)
+            }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
     }
@@ -255,11 +267,17 @@ struct TripMapView: View {
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-        // MapKit centers the camera, and fits regions, inside the safe area: keeping the banner and
-        // panel out of it puts my car in the middle of the map that can actually be seen.
-        .safeAreaPadding(.top, mapInsets.top)
-        .safeAreaPadding(.bottom, mapInsets.bottom)
-        .onMapCameraChange { context in cameraHeading = context.camera.heading }
+        // MapKit centers the camera, and fits regions, inside the safe area; `cameraRoom` does the
+        // same for the rest of what covers the map, so my car is in the middle of what can be seen.
+        .safeAreaPadding(.bottom, legalInset)
+        .onMapCameraChange { context in
+            cameraHeading = context.camera.heading
+            let fullHeight = mapMaxY - mapMinY
+            guard fullHeight > 0, context.camera.distance > 0, context.camera.pitch == 0 else { return }
+            let measured = latitudePerPointPerMeter
+            latitudePerPointPerMeter = context.region.span.latitudeDelta / Double(fullHeight) / context.camera.distance
+            if measured == 0 { move(to: model.cameraTarget, animated: true) }
+        }
         // Any pan, pinch or rotate by the user hands the camera back to them.
         .onChange(of: camera.positionedByUser) { _, byUser in
             if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
@@ -271,6 +289,14 @@ struct TripMapView: View {
         let insets = MapObscuredInsets.insets(
             mapHeight: mapHeight, top: topHeight, bottom: panelMinY > 0 ? mapMaxY - panelMinY : 0)
         return EdgeInsets(top: insets.top, leading: 0, bottom: insets.bottom, trailing: 0)
+    }
+
+    /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`).
+    private var cameraRoom: MapCameraRoom {
+        MapCameraRoom(
+            width: mapWidth, height: max(mapMaxY - mapMinY - legalInset, 0),
+            top: mapInsets.top, bottom: max(mapInsets.bottom - legalInset, 0),
+            latitudePerPointPerMeter: latitudePerPointPerMeter)
     }
 
     private static func position(for target: CameraTarget?) -> MapCameraPosition? {
@@ -287,7 +313,7 @@ struct TripMapView: View {
     }
 
     private func move(to target: CameraTarget?, animated: Bool) {
-        guard let next = Self.position(for: target) else { return }
+        guard let next = Self.position(for: cameraRoom.target(target)) else { return }
         if animated {
             withAnimation(.easeInOut(duration: 0.8)) { camera = next }
         } else {

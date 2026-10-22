@@ -150,7 +150,7 @@ enum CameraTarget: Equatable, Sendable {
 
 enum MapCameraLogic {
     /// Extra room around the cars as a fraction of their spread. Even on every side: the banner and
-    /// panel are kept out of the map's visible area by its safe-area padding (`MapObscuredInsets`).
+    /// panel are kept out of the camera's aim by `MapCameraRoom`.
     struct Padding: Equatable, Sendable {
         var top: Double
         var bottom: Double
@@ -370,9 +370,8 @@ enum MapChipPlacement {
 
 // MARK: - Obscured edges
 
-/// How much of the map the trip banner (top) and the convoy panel (bottom) cover. The map gets
-/// these as safe-area padding, so MapKit centers the camera, and fits regions, in the part left
-/// visible between them.
+/// How much of the map the trip banner (top) and the convoy panel (bottom) cover. The camera aims
+/// at the part left visible between them (`MapCameraRoom`).
 enum MapObscuredInsets {
     /// The least map height left visible. When the stop card and panel take nearly the whole
     /// screen, both insets shrink in proportion so the camera still has a strip to center on.
@@ -387,6 +386,52 @@ enum MapObscuredInsets {
         guard top + bottom > room else { return (top, bottom) }
         let scale = room / (top + bottom)
         return (top * scale, bottom * scale)
+    }
+}
+
+/// The strip of the map the camera aims at: `top` and `bottom` points in from the edges of a
+/// `width` × `height` frame, which is the map less its safe area. The safe area keeps out only the
+/// folded panel, so the Legal label stays above it; the rest (an unfolded panel, a card, the banners)
+/// is put into the camera here. A panel folding then changes the camera itself, which animates,
+/// where a changed safe area makes MapKit refit at once.
+struct MapCameraRoom: Equatable {
+    var width: CGFloat = 0
+    var height: CGFloat = 0
+    var top: CGFloat = 0
+    var bottom: CGFloat = 0
+    /// Latitude degrees per point for each meter of camera distance, read off the map once it has
+    /// drawn; 0 until then, and follow is not moved.
+    var latitudePerPointPerMeter = 0.0
+
+    /// `target` aimed at the middle of the strip, and a fit grown so it fills the strip.
+    func target(_ target: CameraTarget?) -> CameraTarget? {
+        switch target {
+        case nil:
+            return nil
+        case .follow(let center, let distance)?:
+            let shift = Double(top - bottom) / 2 * latitudePerPointPerMeter * distance
+            return .follow(
+                center: MapCoordinate(latitude: center.latitude + shift, longitude: center.longitude),
+                distance: distance)
+        case .fit(let region)?:
+            return .fit(fit(region))
+        }
+    }
+
+    /// `region` grown to the whole frame and moved north or south, so that MapKit fitting it to the
+    /// frame shows the original in the strip, as large as the strip allows.
+    func fit(_ region: GeoRegion) -> GeoRegion {
+        let visible = height - top - bottom
+        guard width > 0, height > 0, visible > 0 else { return region }
+        // On the map a degree of latitude is 1/cos(latitude) times taller than one of longitude is wide.
+        let cosLat = max(cos(region.center.latitude * .pi / 180), 0.01)
+        let perPoint = max(region.latitudeSpan / Double(visible), region.longitudeSpan * cosLat / Double(width))
+        return GeoRegion(
+            center: MapCoordinate(
+                latitude: region.center.latitude + Double(top - bottom) / 2 * perPoint,
+                longitude: region.center.longitude),
+            latitudeSpan: min(perPoint * Double(height), 170),
+            longitudeSpan: min(perPoint * Double(width) / cosLat, 350))
     }
 }
 
