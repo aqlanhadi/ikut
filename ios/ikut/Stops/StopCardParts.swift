@@ -16,6 +16,10 @@ struct StopCardFrame<Content: View, Actions: View>: View {
     @ViewBuilder var actions: Actions
 
     @State private var contentHeight: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// A little taller at accessibility sizes, where a row is tall: the last row is not left half cut.
+    private var cap: CGFloat { typeSize.isAccessibilitySize ? bodyCap + 40 : bodyCap }
 
     private func body(of content: Content) -> some View {
         VStack(alignment: .leading, spacing: Spacing.gap) { content }
@@ -35,9 +39,9 @@ struct StopCardFrame<Content: View, Actions: View>: View {
             // As tall as the content; past the cap the body scrolls. Nothing else fills the space.
             let natural = body(of: content)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
-            if contentHeight > bodyCap {
+            if contentHeight > cap {
                 ScrollView { natural.padding(.bottom, GlassSurface.active ? 14 : 24) }
-                    .frame(height: bodyCap)
+                    .frame(height: cap)
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
                     // The last rows fade out above the actions instead of being cut.
