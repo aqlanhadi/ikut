@@ -6,10 +6,15 @@ start them first (`cd firebase && firebase emulators:start`). Node 20+.
 
 ```sh
 cd qa && npm install
-node convoy-sim.mjs                  # 4 simulated cars, real time, prints TRIP CODE: XXXXXX, PASS/FAIL per check
-node convoy-sim.mjs --speed 2        # 2x (the signal-drop check needs <= 2.5x, see below)
-node run-ui.mjs --speed 1            # everything, with the app on simulator C0A40D2A (iPhone 17 #1) as the fifth car
+node convoy-sim.mjs                  # 4 simulated cars, fast (about 3 min), prints TRIP CODE: XXXXXX, PASS/FAIL per check
+node convoy-sim.mjs --speed 1        # real time (15 min), for watching
+node run-ui.mjs                      # everything at 2x, with the app on simulator C0A40D2A (iPhone 17 #1) as the fifth car
 ```
+
+Nobody watches an agent's run, so the defaults are as fast as the checks allow, and `--speed 1` (real time) is for
+when a person watches or drives the phone. `convoy-sim.mjs` alone plays at 10x and slows to 2x for car 2's signal
+drop, the one stretch that has to last in real seconds (see Things to know). With a phone in the loop (`--wait-app`,
+`run-ui.mjs`) it plays at one steady speed, 2x by default, since the phone's playback can't follow a changing clock.
 
 `run-ui.mjs` boots the simulator, grants location, starts `convoy-sim.mjs --wait-app`, runs
 `ConvoyScenarioUITests` (`ios/ikutUITests`) with `TEST_RUNNER_IKUT_JOIN_CODE`, and feeds
@@ -18,7 +23,7 @@ node run-ui.mjs --speed 1            # everything, with the app on simulator C0A
 `--deadline S`.
 Screenshots land in `qa/screens/`, logs in `$TMPDIR/ikut-qa/`.
 
-To join by hand instead: `node convoy-sim.mjs --wait-app`, join with the printed code from any simulator or phone, and
+To join by hand instead: `node convoy-sim.mjs --speed 1 --wait-app`, join with the printed code from any simulator or phone, and
 feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
 `node convoy-sim.mjs --help` lists the other flags.
 
@@ -153,7 +158,8 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 ## Things to know
 
 - **Staleness is server time.** `updatedAt` is a server timestamp, so at `--speed` above about 2.5 the 60 s stale threshold is never reached in a 3 minute
-  (scenario time) gap; the sim then SKIPs that check. Use 1x for the real thing.
+  (scenario time) gap; the sim then SKIPs that check. So `convoy-sim.mjs` plays the drop at 2x at most (about 25 s of
+  margin), however fast the rest runs.
 - **Why a gap means a network drop.** A GPS-only gap does not make a car stale: `PositionPublisher` re-writes the last position every 10 s
   (30 s when still), so a car in a tunnel looks fresh at a frozen spot. What makes a phone stale is a dead network, where the one in-flight write
   hangs. The sim does that for real (`disableNetwork` on car 2's client between the last fix before the gap and the first after) and runs the same

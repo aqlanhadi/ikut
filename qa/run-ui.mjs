@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Runs the whole scenario with one real app in the loop:
 //
-//   node run-ui.mjs                      # real time, simulator C0A40D2A (iPhone 17 #1)
-//   node run-ui.mjs --speed 2            # 2x (the signal-drop check needs <= 2.5x)
+//   node run-ui.mjs                      # 2x (the default, every check runs), simulator C0A40D2A (iPhone 17 #1)
+//   node run-ui.mjs --speed 1            # real time, before a field test
 //   node run-ui.mjs --skip-build         # reuse a build in --derived-data
 //   node run-ui.mjs --deadline 3600      # give up (RESULT: ABORT) after 3600 s; default 2100 s + the scenario
 //
@@ -30,7 +30,7 @@ const repo = path.dirname(here);
 
 const o = {
   udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 #1 (shared, see CLAUDE.md)
-  speed: 1,
+  speed: 2, // the fastest at which every check runs (the signal drop needs <= 2x, lib/scenario.mjs)
   derivedData: '/tmp/ikut-dd-q1',
   skipBuild: false,
   name: 'Faiz',

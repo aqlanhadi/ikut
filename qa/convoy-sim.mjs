@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Multi-car convoy scenario driver for ikut, against the Firebase emulators (project ikut-b1083).
 //
-//   cd qa && npm install && node convoy-sim.mjs                 # real time, starts 5 s after setup
-//   node convoy-sim.mjs --speed 2 --wait-app                    # 2x, wait for a phone to join first
+//   cd qa && npm install && node convoy-sim.mjs                 # fast (about 3 min), starts 5 s after setup
+//   node convoy-sim.mjs --speed 1 --wait-app                    # real time, wait for a phone to join first
 //
 // What it does
 //   1. Creates a trip the way TripService.createTrip does (organizer = car 1), then joins cars 2-4 through the
@@ -18,6 +18,10 @@
 //   7. Reads everything back as a member and prints PASS / FAIL per check.
 //
 // Source of each piece of logic is cited in lib/route.mjs and lib/tracking.mjs.
+//
+// Speed: without a phone (no --wait-app) it plays at 10x by default, slowing to 2x for car 2's signal drop, the one
+// stretch that has to last in real seconds (the server judges staleness after 60 s). With --wait-app it plays at one
+// steady --speed (default 2), since the phone's playback can't follow a changing clock. 1x is for people watching.
 //
 // The output always ends in one `RESULT: PASS|FAIL|ABORT` line, also when it stops early or runs past --deadline
 // (default: the wait for the phone, the scenario and 300 s; none with --setup-only).
@@ -47,7 +51,7 @@ const REGION = 'asia-southeast1';
 // ---------------------------------------------------------------- CLI
 
 function parseArgs(argv) {
-  const o = { speed: 1, host: '127.0.0.1', waitApp: false, startIn: 5, goDelay: 5, waitTimeout: 900, deadline: null, endTrip: false, setupOnly: false, state: path.join(os.tmpdir(), 'ikut-qa', 'state.json'), results: path.join(os.tmpdir(), 'ikut-qa', 'results.json'), help: false };
+  const o = { speed: null, host: '127.0.0.1', waitApp: false, startIn: 5, goDelay: 5, waitTimeout: 900, deadline: null, endTrip: false, setupOnly: false, state: path.join(os.tmpdir(), 'ikut-qa', 'state.json'), results: path.join(os.tmpdir(), 'ikut-qa', 'results.json'), help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -66,6 +70,7 @@ function parseArgs(argv) {
     else if (a === '-h' || a === '--help') o.help = true;
     else throw new Error(`unknown option ${a}`);
   }
+  o.speed ??= o.waitApp ? 2 : 10;
   if (!(o.speed > 0)) throw new Error('--speed must be > 0');
   return o;
 }
@@ -73,7 +78,8 @@ function parseArgs(argv) {
 const opts = parseArgs(process.argv.slice(2));
 if (opts.help) {
   console.log(`Usage: node convoy-sim.mjs [options]
-  --speed N         play N times faster than real time (default 1). Stale-car checks need N <= 2.5
+  --speed N         play N times faster than real time (default 10, or 2 with --wait-app). Above 2, car 2's
+                    signal drop still plays at 2x so the stale check runs. 1 for real time, when a person watches
   --wait-app        after setup wait for a phone to join and start tracking (a position doc from an unknown car), then go
   --go-delay S      with --wait-app: seconds between the phone's first position and go (default 5)
   --start-in S      without --wait-app: seconds between setup and go (default 5)
@@ -87,8 +93,19 @@ if (opts.help) {
   --results-file F  JSON with the check results`);
   process.exit(0);
 }
+// The scenario clock. Without a phone, car 2's signal drop (and the checks just after it) plays at no more than 2x:
+// staleness is judged on the server clock after 60 real seconds, which a 3-minute gap only reaches at <= 2.5x.
+const dropGap = CARS.find((c) => c.key === 'car2').gap;
+const speedAt = (T) => (!opts.waitApp && dropGap && T >= dropGap.from - 5 && T < dropGap.to + 15 ? Math.min(opts.speed, 2) : opts.speed);
+/** Real seconds from go to scenario time T. */
+function wallAt(T) {
+  let w = 0;
+  for (let t = 0; t < T; t++) w += Math.min(1, T - t) / speedAt(t);
+  return w;
+}
+
 const end = endsWithResult({
-  deadlineS: opts.setupOnly ? 0 : opts.deadline ?? (opts.waitApp ? opts.waitTimeout : opts.startIn) + DURATION / opts.speed + 300,
+  deadlineS: opts.setupOnly ? 0 : opts.deadline ?? (opts.waitApp ? opts.waitTimeout : opts.startIn) + wallAt(DURATION) + 300,
   signals: true,
 });
 
@@ -370,7 +387,8 @@ async function main() {
   const organizer = phones.get('car1');
   const code = generateCode();
 
-  console.log(`ikut convoy simulator, project ${PROJECT_ID}, emulators on ${opts.host}, speed ${opts.speed}x`);
+  const slowed = speedAt(dropGap.from) < opts.speed ? ` (${speedAt(dropGap.from)}x during car 2's signal drop)` : '';
+  console.log(`ikut convoy simulator, project ${PROJECT_ID}, emulators on ${opts.host}, speed ${opts.speed}x${slowed}, about ${Math.round(wallAt(DURATION) / 60)} min`);
   console.log(`main route ${(mainRoute.length / 1000).toFixed(1)} km, ${mainCoords.length} points, polyline ${mainPolyline.length} chars`);
 
   // ---- setup
@@ -459,7 +477,7 @@ async function main() {
 
   for (let sec = 0; sec <= DURATION * FIX_HZ; sec++) {
     const T = sec / FIX_HZ;
-    const wait = goWall + (T * 1000) / opts.speed - Date.now();
+    const wait = goWall + wallAt(T) * 1000 - Date.now();
     if (wait > 0) await sleep(wait);
     clock.T = T;
 
@@ -576,7 +594,7 @@ async function readPositions(organizer, tripId) {
 function scheduleChecks({ phones, tripId, organizer }) {
   const keyByCar = () => new Map([...phones.values()].map((p) => [p.carId, p.key]));
   const gap = CARS.find((c) => c.key === 'car2').gap;
-  const speedOk = opts.speed <= 2.5;
+  const speedOk = speedAt(gap.to - 5) <= 2.5;
 
   const orderCheck = (at, label, extraWait = 0) => ({
     at: at + extraWait,
@@ -633,12 +651,12 @@ function scheduleChecks({ phones, tripId, organizer }) {
             // Off the main route: compare the stored location with the GPX point instead of a main-route offset.
             const pt = ctx.tracks[p.key].points.find((q) => q.t >= clock.T);
             const d = haversine({ latitude: doc_.location.latitude, longitude: doc_.location.longitude }, pt);
-            check(`${p.key} position fresh and on track`, age < 20 / opts.speed + 12 && d < tol, `age ${age.toFixed(0)} s, ${d.toFixed(0)} m from the GPX point, routeOffset ${doc_.routeOffset.toFixed(0)} of own-route merge at ${p.ownMergeOffset.toFixed(0)}`);
+            check(`${p.key} position fresh and on track`, age < 20 / speedAt(clock.T) + 12 && d < tol, `age ${age.toFixed(0)} s, ${d.toFixed(0)} m from the GPX point, routeOffset ${doc_.routeOffset.toFixed(0)} of own-route merge at ${p.ownMergeOffset.toFixed(0)}`);
             continue;
           }
           const expected = interpolate(ctx.truth[p.key], clock.T);
           const off = doc_.convoyOffset ?? doc_.routeOffset;
-          check(`${p.key} position fresh and on track`, age < 20 / opts.speed + 12 && Math.abs(off - expected) < tol, `age ${age.toFixed(0)} s, convoyOffset ${off.toFixed(0)} vs truth ${expected.toFixed(0)}`);
+          check(`${p.key} position fresh and on track`, age < 20 / speedAt(clock.T) + 12 && Math.abs(off - expected) < tol, `age ${age.toFixed(0)} s, convoyOffset ${off.toFixed(0)} vs truth ${expected.toFixed(0)}`);
         }
         const c4 = positions.get(phones.get('car4').carId);
         check('car4 starts joining: position has no convoyOffset', c4 && c4.convoyOffset === undefined, JSON.stringify(c4 && Object.keys(c4)));
@@ -652,7 +670,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
     {
       at: gap.to - 5, name: 'signal drop: car2 is stale before it recovers',
       async run() {
-        if (!speedOk) return skip('signal drop: car2 stale (server age > 60 s)', `needs speed <= 2.5, ran at ${opts.speed}x`);
+        if (!speedOk) return skip('signal drop: car2 stale (server age > 60 s)', `needs speed <= 2.5, ran at ${speedAt(gap.to - 5)}x`);
         const positions = await readPositions(organizer, tripId);
         const d = positions.get(phones.get('car2').carId);
         const age = (Date.now() - d.updatedAt.toMillis()) / 1000;
