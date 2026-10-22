@@ -618,3 +618,13 @@ export function openStopSnapshot(e, now = Date.now()) {
 /** The encoded form of a RouteLine's points for a map (simplified when very long). */
 export const encodeLine = (line) => Polyline.encode(simplifyToFit(line.coordinates, 60_000));
 
+
+/**
+ * The deviation the car has been seen driving (out, waiting or back), as one decision: a deviation is over once the car has been off the route
+ * for it and is back on it. Replacing or clearing the deviation forgets what was seen, or the next one is "over" before the car has left.
+ */
+export function deviationStep({ deviation, seen }, phase) {
+  const seenNow = Boolean(deviation) && (seen || ['out', 'waiting', 'back'].includes(phase));
+  return { seen: seenNow, over: Boolean(deviation) && seenNow && phase === 'onRoute' };
+}
+export const seenAfterChange = (before, after, seen) => (before === after ? seen : false);

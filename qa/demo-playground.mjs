@@ -7,14 +7,14 @@
 //
 // You tap the real app on two simulators (phone 1 creates the trip, phone 2 joins it); this script provides the route:
 // where everybody starts, how fast each car drives, play/pause, and two generated cars (Daniel, Hafiz) with a few
-// behaviours (agree to stop requests, suggest a place, drop their signal). It fires no scripted events.
+// a way to drop their signal and, on command, answer, ask and report. It fires no scripted events.
 //
 // Commands arrive on stdin as `CMD {json}` lines (the dashboard writes them); state goes out as `DEMO {"type":"state"}`
 // every second, the shared route and each car's own roads as `DEMO {"type":"geometry"}` whenever they change.
 // Every car drives a TRACK (lib/playground.mjs): the shared route from a km, or a start road that merges into it, an own
 // ending, a deviation (out to a pin, wait, back). Commands: prepare, useTrip, placeAt, ending, clearEnding, deviate,
 // cancelDeviation, addCar, removeCar, rename, vote, voteAll, askStop, report, and the older place, speed, play, playAll,
-// behaviour, drop. Cars: phone1, phone2, daniel, hafiz, g3, g4... Details in qa/README.md ("Playground").
+// drop. Cars: phone1, phone2, daniel, hafiz, g3, g4... Details in qa/README.md ("Playground").
 
 
 import { execFile, spawn, spawnSync } from 'node:child_process';
@@ -29,8 +29,8 @@ import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
   MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, answersByCar, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
   encodeLine, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
-  openStopSnapshot, optionalCoords, pendingVotes, placeOnRoute, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
-  stepTrack, suggestionAhead, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
+  openStopSnapshot, optionalCoords, placeOnRoute, deviationStep, seenAfterChange, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
+  stepTrack, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
 } from './lib/playground.mjs';
 
 // --no-sim (developing the script itself): no builds and no simctl calls at all, for trying the cars without simulators.
@@ -101,7 +101,7 @@ function makeCar(key, kind, props) {
     speed: DEFAULT_KMH, playing: false, moving: false,
     base: { kind: 'main', offset: props.offset ?? 0 }, startPin: null, deviation: null, ending: null, // the pieces of the track
     track: null, st: newCarState(), loc: null, parked: null, group: null, legsVersion: 0,
-    sideMeters: 2000, offline: false, agree: false, suggest: false, carId: null, car: null, player: null, nudges: 0, voted: new Set(), seen: new Map(),
+    sideMeters: 2000, offline: false, carId: null, car: null, player: null, nudges: 0, voted: new Set(),
   };
   cars[key] = c;
   return c;
@@ -269,6 +269,7 @@ function changePieces(c, patch, applyOptions) {
     Object.assign(c, saved);
     throw e;
   }
+  c.devSeen = seenAfterChange(saved.deviation, c.deviation, c.devSeen); // a new or cleared deviation has not been driven yet
 }
 
 /** The first shared-route offset where this car can still turn off for an ending or a deviation: where it is, or where it rejoins. */
@@ -352,18 +353,6 @@ async function setupGenerated(c) {
 
 const leadOffset = () => Math.max(0, ...allCars().map((c) => (c.loc?.phase === 'onRoute' ? c.loc.mainOffset : 0)));
 
-async function behave(c) {
-  if (!c.agree || c.offline) return;
-  const ids = pendingVotes(c.car.events, c.carId, c.seen, c.voted, Date.now(), 4000 + Math.random() * 2000);
-  for (const id of ids) {
-    c.voted.add(id);
-    const place = c.suggest ? suggestionAhead(S.route, leadOffset(), c.place ?? `${c.label}’s pick`) : null;
-    const suggestion = place && { name: place.name, coordinate: new GeoPoint(place.latitude, place.longitude), routeOffset: place.routeOffset };
-    c.car.vote(id, true, suggestion).catch((e) => say(`${c.label}'s vote failed: ${e.message}`));
-    say(`${c.label} agrees to the stop${place ? ` and suggests ${place.name} at ${(place.routeOffset / 1000).toFixed(1)} km` : ''}`);
-  }
-}
-
 // ---------------------------------------------------------------- ticking
 
 let tickNo = 0;
@@ -390,9 +379,10 @@ async function tickCar(c) {
   c.moving = c.st.d > before.d + 1e-6;
   if (before.waiting && !c.st.waiting) say(`${c.label} has waited and drives back`);
   else if (!before.waiting && c.st.waiting) say(`${c.label} reached its pin and waits ${c.st.waiting.left} s`);
-  if (c.deviation && ['out', 'waiting', 'back'].includes(loc.phase)) c.devSeen = true;
+  const dev = deviationStep({ deviation: c.deviation, seen: c.devSeen }, loc.phase);
+  c.devSeen = dev.seen;
   const g0 = c.kind === 'generated' && c.car?.publisher ? groupOf(loc) : null;
-  if (c.deviation && c.devSeen && loc.phase === 'onRoute') { // merged back: the deviation is over, its pin and roads leave the map
+  if (dev.over) { // merged back: the deviation is over, its pin and roads leave the map
     c.devSeen = false;
     try { changePieces(c, { deviation: null }); } catch (e) { say(`${c.label}: ${e.message}`); }
     say(`${c.label} is back on the route; its deviation is over`);
@@ -402,7 +392,6 @@ async function tickCar(c) {
     if (g !== c.group) enterGroup(c, g);
     c.car.onFix(fixFor(c), 0.8);
     c.car.publisher.tick();
-    await behave(c);
   } else if (c.kind === 'phone') {
     if (Boolean(before.waiting) !== Boolean(c.st.waiting)) feedPhone(c);
     else if (isParked(c) && tickNo % 5 === 0) simctlAsync('location', phone(c).udid, 'set', locStr(nudged(loc.point, c.nudges++))); // a parked simulator needs a changed fix
@@ -424,7 +413,7 @@ function carState(c) {
     key: c.key, label: c.label, kind: c.kind, name: c.kind === 'generated' ? c.appName : doc_?.name ?? null, color: c.kind === 'generated' ? c.color : doc_?.color ?? c.color,
     number: doc_?.number ?? null, joined: c.kind === 'generated' ? Boolean(c.car) : Boolean(c.carId), carId: c.carId,
     offset: Math.round(shown), speed: c.speed, playing: c.playing, joining: phase === 'joining', mergeKm: c.base.kind === 'road' ? c.base.mergeMain / 1000 : null, sideMeters: c.sideMeters,
-    state: doc_?.state ?? null, offline: c.offline, agree: c.agree, suggest: c.suggest,
+    state: doc_?.state ?? null, offline: c.offline,
     latitude: here?.latitude ?? null, longitude: here?.longitude ?? null, heading: loc ? Math.round(loc.heading) : null,
     phase, waitSecondsLeft: c.st.waiting ? Math.ceil(c.st.waiting.left) : null,
     trackMeters: c.track ? { at: Math.round(c.st.d), of: Math.round(c.track.length) } : null,
@@ -849,12 +838,6 @@ async function command(m) {
     case 'playAll':
       for (const x of allCars()) { x.playing = Boolean(m.playing); if (x.kind === 'phone') feedPhone(x); }
       say(m.playing ? 'all cars play' : 'all cars pause'); return;
-    case 'behaviour':
-      need();
-      if (c.kind !== 'generated') return;
-      if (typeof m.agree === 'boolean') { c.agree = m.agree; if (!m.agree) c.suggest = false; } // a suggestion goes with the agree vote
-      if (typeof m.suggest === 'boolean') { c.suggest = m.suggest; if (m.suggest) c.agree = true; }
-      say(`${c.label}: agrees ${c.agree}, suggests a place ${c.suggest}`); return;
     case 'drop':
       need();
       if (c.kind !== 'generated' || !c.car) return;

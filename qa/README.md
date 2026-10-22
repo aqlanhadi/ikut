@@ -243,7 +243,7 @@ needed). The trip is always ended at the end (also on Ctrl-C/SIGTERM) and the sc
 
 ## Playground
 
-`node dashboard/server.mjs --port 4324`, then the **Playground** card at the top of the page. For trying one event at a time
+`node dashboard/server.mjs --port 4324`, then the **Playground** tab (a full-height Google map with a side panel; see "The page" below). For trying one event at a time
 on the real app without a 9 minute scripted demo: **you tap the phones**, the playground only provides a playable route.
 (`demo-playground.mjs` is the script behind it; it takes `CMD {json}` lines on stdin and prints `DEMO {"type":"state"}` once a second.)
 
@@ -256,19 +256,9 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
    picks by itself only when there is exactly one new trip, with one car, reporting within 300 m of the start (convoy-sim and
    UI tests make trips too). The page shows the code, big: **join on phone 2 with it.** When phone 1 ends the trip the page says
    "The trip has ended" and the generated cars stop.
-3. **Place and play.** (The page that puts cars on a Google map from pins, with own starts, endings and deviations, is Q7 piece B; the commands are in
-   "Tracks, pins and the command reference" below.) Per car: where it starts (km along the route), speed (0-200 km/h), Play/Pause; Play all / Pause all.
-   A paused car moves right away when placed. Defaults: phone 1 at 3.0 km, phone 2 at 2.2, Daniel 1.4, Hafiz 0.6,
-   all 90 km/h, paused. Phones are driven with `simctl location start` from the car's current offset (restarted on every
-   change and every 20 s); a parked phone gets a nudged `location set` every 5 s (the simulator ignores an unchanged
-   location, the app drops fixes older than 15 s).
-4. **Generated cars** (Daniel, Hafiz) publish every second through the app's PositionBuilder/PositionPublisher
-   (heartbeats while paused). Toggles: *Agrees to stops* (agrees within about 5 s to an open stop request it did not make),
-   *Suggests a place* (switches Agrees on too; its agree vote carries a place 4 km ahead of the lead, the `stopStory` shape), *Drop signal*
-   (`disableNetwork`, which is what makes a car stale; "Give signal back" re-enables it). *Starts off the route* gives the car
-   its own straight road from a side point (default 2 km away) to a merge point at the km you type: it shows as joining
-   (no `convoyOffset`) and becomes `convoy` at the merge, as car 4 does in `convoy-sim.mjs`.
-5. The card shows, per car, the position the app/Firestore really has and its age (read as the emulator's owner over REST),
+3. **Place and play.** On the page: drag pins for each car's start, own ending and deviation ("The page" below); the commands are in "Tracks, pins and the command reference". Per car: speed (0-200 km/h), Play/Pause; Play all / Pause all. Defaults: phone 1 at 3.0 km, phone 2 at 2.2, Daniel 1.4, Hafiz 0.6, all 90 km/h, paused. Phones are driven with `simctl location start` from the car's current offset (restarted on every change and every 20 s); a parked phone gets a nudged `location set` every 5 s (the simulator ignores an unchanged location, the app drops fixes older than 15 s).
+4. **Generated cars** (Daniel, Hafiz, and any you add) publish every second through the app's PositionBuilder/PositionPublisher (heartbeats while paused). They do nothing on their own: you answer, ask and report on command (the page's cards and menus). *Drop signal* is `disableNetwork`, which is what makes a car stale; "Give signal back" re-enables it.
+5. The page shows, per car, the position the app/Firestore really has and its age (read as the emulator's owner over REST),
    so a phone that is not following is flagged; plus the trip's events with votes, suggestions, pins and resolved state.
 
 Close the playground (SIGTERM) stops the players, clears the locations of the simulators it started and closes the generated cars. The trip is
@@ -276,6 +266,25 @@ left as it is; end it from phone 1's menu. Emulators only (`--backend production
 
 Not covered: background tracking, push, off-route rerouting, MapKit ETAs. After a merge the generated car reports on the main route (the app keeps
 its own route offset).
+
+### The page (map and side panel)
+
+Playground tab: a full-height Google map on the left (the trip code, the car list and a live feed in a panel on the right; under the map on a narrow window), in ikut's own colours and car badges, light and dark following the system (`?theme=light` or `?theme=dark` in the address forces one, for screenshots; `#demos` opens the other tab).
+The **Scripted demos** tab is the old list (Play, Stop, timeline, checks, log). The page's logic that can be tested without a browser lives in `dashboard/page-logic.mjs` (tests: `lib/page-logic.test.mjs`).
+
+- **Key.** The map needs `GOOGLE_MAPS_API_KEY` in `qa/dashboard/.env` (see `.env.example`; never committed, never printed). `GOOGLE_MAPS_MAP_ID` defaults to `DEMO_MAP_ID`,
+  which makes Google ignore any `styles` array; to restyle the map later, make a cloud-styled map ID in the Cloud console and put it in `.env`. The Maps JavaScript API and the Routes API
+  must be enabled for the key. Without a key (or if Google rejects it) the page still works: no map, a route strip with the cars, and every pin is a number of kilometres along the route.
+- **Before the trip.** "Phones start at": the E1 start of the demos, pins on the map (place phone 1's start and phone 2's, drag to adjust; phone 2 follows phone 1 if not placed; sent as `prepare {starts}`), or a typed latitude, longitude.
+  Then Prepare phones, create the trip on phone 1, "Use this trip".
+- **On the map.** The shared route, each car's own roads (from the `geometry` line, redrawn only when a version changes), car badges in each car's colour with its initial (the two phones ringed, joining ones dashed,
+  a car with no signal faded), a dashed ghost where the app has a car when that is more than 500 m from the playground's, and hazard / stop markers.
+- **Pins** (per car, phones included): *Place start* (click, or drag the pin; a phone's start moves it by `placeAt`), *Set ending* (an end pin plus a "leaves here" dot you drag along the route), *Set pin* for a deviation
+  (the pin, a wait in seconds, default 30, and a "leaves here" dot). Road paths come from Google's `Route.computeRoutes` and only when a pin is dropped or a drag ends (never while dragging), cached by endpoints:
+  a start is one call, an ending one, a deviation two. If routing fails the page says so and sends straight lines. A pin is locked once the car has started driving that piece.
+- **Car rows:** place, ending (+ Clear), deviate (+ Cancel), speed, Play/Pause, Drop signal, *Ask stop* and *Report* menus, Rename (inline), Remove, and **Add car** (up to 8 generated cars). A mistake from the playground shows under the row it came from.
+- **Stop requests** show as a card over the map as they open (from a generated car or a phone): who asked, the type, the place, and each generated car with its answer as it lands. Each car that can still answer has **Agree / Not now / Another place**
+  (click the map to pick the place); **Everyone agrees** sends `voteAll`. The card goes away when the request is no longer open.
 
 ### Tracks, pins and the command reference
 
@@ -302,7 +311,7 @@ key: `phone1`, `phone2`, `daniel`, `hafiz`, then `g3`, `g4`... (stable, never re
 | `vote {car, event, answer:'yes'\|'notNow', place?:{name, latitude, longitude}}` / `voteAll {event}` | A generated car answers a stop request (vote doc with `answer` next to `agree`). `place` is put on the shared route for its `routeOffset` (name 1 to 100 characters; the `validSuggestion` shape), so `notNow` with a place is the card's "Another place". `voteAll` answers yes for every generated car that has not answered and did not ask. Refused: a closed request, a car with no signal, a phone. |
 | `askStop {car, type, place?}` | A generated car asks for a stop (`stopRest`, `stopFuel`, `stopFood`, `stopToilet`) at its current position and route offset, as the app writes it (no `status` or `expiresAt`: open until resolved). `place` goes in as the asker's own yes vote with that suggestion, as the app does. |
 | `report {car, type}` | A generated car reports `debris`, `accident`, `pothole`, `animal`, `stoppedVehicle`, `roadworks` (hazard, high, 45 min), `heavyRain`, `trafficJam` (condition, medium, 60 min) or `pullingOver`, `carTrouble`, `runningLate` (status, high, no expiry) where it is. |
-| `place`, `speed`, `play`, `playAll`, `behaviour`, `drop` | As before (`place {car, km, offRoute?, sideMeters?}` builds the same tracks: a main-only track from `km`, or a start road that merges at `km`). `behaviour.agree` (auto-agree after about 5 s) is still there. |
+| `place`, `speed`, `play`, `playAll`, `drop` | As before (`place {car, km, offRoute?, sideMeters?}` builds the same tracks: a main-only track from `km`, or a start road that merges at `km`). |
 
 What a generated car writes to its car doc as it moves (what CarRouteService writes in the app): on the shared route `state convoy` (a car placed there also
 clears its `route` and sets `mergeOffset`); on a start road `route` = the road, `mergeOffset` where it merges, `state joining`, no `convoyOffset` until it
@@ -319,7 +328,7 @@ per-car destination: a road that never rejoins is exactly what `makePlan` return
 - `cars[]`, in the order of the list (phones first): `key, label, kind ('phone'|'generated'), name (what the app shows), color, number, joined, carId`; where it is:
   `latitude, longitude, heading` (the car's own track point; null for a phone not yet placed), `offset` (m along the shared route, the nearest point while off it),
   `phase`: `onRoute | joining | out | waiting | back | ending | arrived | parked` (null before the trip), `waitSecondsLeft` (while `waiting`), `trackMeters {at, of}`;
-  controls: `speed, playing, offline, agree, suggest, state` (the car doc's), `joining, mergeKm, sideMeters` (old page);
+  controls: `speed, playing, offline, state` (the car doc's), `joining, mergeKm, sideMeters` (old page);
   `pins`: `{start: {latitude, longitude}|null, startMergeKm, end: {latitude, longitude}|null, endLeaveKm, endOnRoute, deviation: {pin: {latitude, longitude}, leaveKm, mergeKm, waitSeconds}|null}` (a deviation is cleared once the car has merged back: `pins.deviation` null and its out/back legs leave the geometry, with a `legsVersion` and `geometryVersion` bump, as `cancelDeviation` after the merge);
   `legsVersion` (changes when its own roads change); `reported`: what the app/Firestore has, `{offset, convoyOffset, ageSeconds, speed, latitude, longitude, heading}` or null.
 - `events[]`, newest first: `id, type, category, by (label), byKey (car key|null), offset, latitude, longitude, ageSeconds, status ('open'|'pinned'|'closed'), pinned (place name),
@@ -336,4 +345,4 @@ their lengths and merge points; `node --test 'lib/*.test.mjs'` covers every pure
 
 ## Dashboard
 
-`node qa/dashboard/server.mjs` opens http://localhost:4322: pick a live demo, press Play (emulators or production), watch its timeline, checks and log, and Stop it. Details in `qa/dashboard/README.md`.
+`node qa/dashboard/server.mjs` opens http://localhost:4322: the Playground tab (above), and the Scripted demos tab, where you pick a live demo, press Play (emulators or production), watch its timeline, checks and log, and Stop it. Details in `qa/dashboard/README.md`.

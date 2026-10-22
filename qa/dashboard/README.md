@@ -1,6 +1,6 @@
 # Demo dashboard
 
-A local page to list the live demos (`qa/demo*.mjs`), start one, stop it and watch its events.
+A local page with two tabs: the **Playground** (a Google map with a side panel, below) and **Scripted demos** (list the live demos `qa/demo*.mjs`, start one, stop it and watch its events).
 
     node qa/dashboard/server.mjs [--port 4322] [--demos <dir | dir/pattern*.mjs>]   # http://localhost:4322
 
@@ -16,8 +16,7 @@ A local page to list the live demos (`qa/demo*.mjs`), start one, stop it and wat
 
 ## Playground (interactive demos)
 
-A demo whose `--describe` says `"interactive": true` (`demo-playground.mjs`) gets its own card at the top of the page
-and is not in the list of scripted demos. The server starts it with its stdin piped and:
+A demo whose `--describe` says `"interactive": true` (`demo-playground.mjs`) is the Playground tab and is not in the list of scripted demos. The server starts it with its stdin piped and:
 
 - `POST /api/command` with a JSON body writes `CMD {json}` plus a newline to the running demo's stdin. It answers 409
   when nothing is running or the demo is not interactive.
@@ -30,8 +29,13 @@ and is not in the list of scripted demos. The server starts it with its stdin pi
   referrers to restrict the key to) or the environment, `GOOGLE_MAPS_API_KEY` (null when absent) and `GOOGLE_MAPS_MAP_ID` (default `DEMO_MAP_ID`).
   Read once at start; answered only for a trusted Host (below), 403 otherwise.
 
-The card walks through setup (start picker, Prepare phones, Skip the build), waiting for the trip, and the controls
-(trip code, route strip, one row per car, Play all / Pause all, what was reported). Production is never offered:
+The page walks through setup (start picker or start pins, Prepare phones, Skip the build), waiting for the trip, and the controls
+(trip code, one row per car with its pins, Play all / Pause all, Add car, what was reported), with the cars, roads, pins and stop request cards on the map.
+`GET /page-logic.mjs` serves the page's plain logic module (tested by `qa/lib/page-logic.test.mjs`).
+
+**Map key:** copy `.env.example` to `.env` and set `GOOGLE_MAPS_API_KEY`; open the page on `http://localhost:4322`, `http://127.0.0.1:4322` or the port you started it on, as the key's website restriction allows.
+`GOOGLE_MAPS_MAP_ID` defaults to `DEMO_MAP_ID` (Google ignores any `styles` array with it; set a cloud-styled map ID in `.env` to restyle). Without a key the page runs as a plain list with pins as kilometres. The page's
+layout, controls and pins are described in `qa/README.md`, "The page". Production is never offered:
 the playground refuses `--backend production`. See `qa/README.md`, "Playground".
 Developing the script without simulators: `IKUT_PLAYGROUND_NO_SIM=1 node qa/dashboard/server.mjs --port 4324`.
 
