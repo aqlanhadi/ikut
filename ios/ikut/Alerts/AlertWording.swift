@@ -23,7 +23,7 @@ enum AlertWording {
 
     static func alert(
         for event: TripEvent, tripId: String, distance: Double? = nil, authorName: String?,
-        now: Date, stopReply: String = defaultStopReply
+        now: Date
     ) -> TripAlert {
         let car = carPhrase(authorName)
         let ago = relativeTime(since: event.createdAt, now: now)
@@ -34,32 +34,17 @@ enum AlertWording {
             severity: event.severity, distance: distance,
             title: title(for: event, distance: distance),
             body: "\(lead) · \(ago)",
-            spoken: spoken(for: event, car: car, distance: distance, authorName: authorName, stopReply: stopReply))
+            spoken: spoken(for: event, car: car, distance: distance, authorName: authorName))
     }
 
-    /// What a stop request tells the listener to do. Voice answers are not built yet, so it never
-    /// says "say yes".
-    static let defaultStopReply = "Tap yes."
-
-    /// "Wyna needs fuel. Tap yes." The place is not in it: it is written a moment after the request.
-    static func spokenStopRequest(for type: EventType, authorName: String?, stopReply: String) -> String {
+    /// "Wyna needs fuel. Tap OK." Only the reason is spoken, never the message a passenger typed, and
+    /// no place (there is none). Voice answers are not built yet, so it never says "say OK".
+    static func spokenStopRequest(for type: EventType, authorName: String?) -> String {
         let trimmed = authorName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let who = trimmed.isEmpty ? "Another car" : trimmed
         let need = StopRequestState.need(for: type)
-        return "\(who) \(need). \(stopReply)"
+        return "\(who) \(need). Tap OK."
     }
-
-    /// "Stop pinned: Petronas Tapah", for a stop request whose place was just pinned.
-    static func pinnedAlert(for event: TripEvent, place: StopPlace, tripId: String, now: Date) -> TripAlert {
-        TripAlert(
-            id: pinnedAlertId(eventId: event.id ?? ""), eventId: event.id ?? "", tripId: tripId,
-            type: event.type, category: event.category, severity: event.severity, distance: nil,
-            title: "Stop pinned",
-            body: "\(place.name) · \(relativeTime(since: event.createdAt, now: now))",
-            spoken: "Stop pinned: \(place.name)")
-    }
-
-    static func pinnedAlertId(eventId: String) -> String { "\(eventId)@pinned" }
 
     static func alertId(eventId: String, approach: Bool) -> String {
         approach ? "\(eventId)@approach" : eventId
@@ -137,7 +122,7 @@ enum AlertWording {
     }
 
     private static func spoken(
-        for event: TripEvent, car: String, distance: Double?, authorName: String?, stopReply: String
+        for event: TripEvent, car: String, distance: Double?, authorName: String?
     ) -> String {
         switch event.category {
         case .hazard, .condition:
@@ -145,7 +130,7 @@ enum AlertWording {
             if let distance { return "\(what) ahead in \(distanceText(distance)), reported by \(car)." }
             return "\(what) reported by \(car)."
         case .stopRequest:
-            return spokenStopRequest(for: event.type, authorName: authorName, stopReply: stopReply)
+            return spokenStopRequest(for: event.type, authorName: authorName)
         case .status:
             return "\(capitalized(car)) \(statement(for: event.type))."
         case .message:

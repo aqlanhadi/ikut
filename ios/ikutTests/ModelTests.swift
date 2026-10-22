@@ -110,7 +110,8 @@ struct ModelTests {
         #expect(EventCategory.hazard.defaultExpiry == TimeInterval(45 * 60))
         #expect(EventCategory.condition.defaultExpiry == TimeInterval(60 * 60))
         #expect(EventCategory.message.defaultExpiry == TimeInterval(30 * 60))
-        #expect(EventCategory.stopRequest.defaultExpiry == nil)
+        // A stop request closes itself 30 minutes after it was asked.
+        #expect(EventCategory.stopRequest.defaultExpiry == TimeInterval(30 * 60))
         #expect(EventCategory.status.defaultExpiry == nil)
     }
 
@@ -120,7 +121,7 @@ struct ModelTests {
         #expect(hazard.expiresAt == date.addingTimeInterval(45 * 60))
         let stop = TripEvent(type: .stopRest, location: point, heading: 0, routeOffset: 0,
                              authorId: "u", carId: "c", createdAt: date)
-        #expect(stop.expiresAt == nil)
+        #expect(stop.expiresAt == date.addingTimeInterval(30 * 60))
     }
 
     @Test func pathsAreBuilt() {

@@ -1,31 +1,25 @@
 #if DEBUG
-import CoreLocation
-import FirebaseFirestore
 import Foundation
 import SwiftUI
 
 extension StopCardModel {
-    /// The demo can open the card on a later screen (`IKUT_MAP_DEMO_CARD`): `passenger` (Are you a
-    /// passenger?), `placelist` (the place list for a new ask), `askplaces` and `driverask` (a reason
-    /// already chosen), `sent` (Asked the convoy), `another` (the place list for another place),
-    /// `confirmpin` (the lead's confirm step). Anything else is the home screen.
-    func applyDemo(_ name: String?, board: StopBoard) {
+    /// The demo can open the card on a later screen (`IKUT_MAP_DEMO_CARD`): `reason` (Fuel chosen),
+    /// `typed` (Fuel chosen, with a message), `passenger` (Are you a passenger?), `message` (the message
+    /// field) and `sent` (Informed the convoy). Anything else is the home screen.
+    func applyDemo(_ name: String?) {
         switch name {
         case "sent": sentWaiting = true
+        case "reason": ask.choose(StopReason.all[0])
+        case "typed":
+            ask.choose(StopReason.all[0])
+            ask.message = "Low on fuel, next R&R please"
         case "passenger":
             ask.choose(StopReason.all[0])
             screen = .passengerCheck
-        case "placelist":
+        case "message":
             ask.choose(StopReason.all[0])
-            screen = .askPlaces
-        case "askplaces", "driverask": ask.choose(StopReason.all[0])
-        case "another": board.requests.first.map { startSuggesting(for: $0) }
-        case "confirmpin":
-            if let id = board.requests.first?.eventId {
-                screen = .confirmPin(eventId: id, place: StopPlace(
-                    name: "Petronas Bidor", coordinate: GeoPoint(latitude: 4.1, longitude: 101.29), routeOffset: 38_000,
-                    pinnedBy: nil))
-            }
+            ask.message = "Low on fuel, next R&R please"
+            screen = .message
         default: break
         }
     }
@@ -33,11 +27,9 @@ extension StopCardModel {
 
 /// Sends nothing: the demo has no backend behind the card.
 struct DemoStopService: StopServing {
-    func request(type: EventType, place: StopPlace?, context: StopContext, snapshot: ReportSnapshot) async throws -> String {
+    func request(type: EventType, message: String?, context: StopContext, snapshot: ReportSnapshot) async throws -> String {
         "demo-asked"
     }
-
-    func suggest(place: StopPlace, eventId: String, canPin: Bool, context: StopContext) async throws {}
 }
 
 /// The stop card on the demo trip, seen from Aqlan's car (car 1, the lead), for previews: `scene`
@@ -64,7 +56,7 @@ struct StopCardPreview: View {
             } else if let context = map.stopContext(tripId: "demo", userId: "u-c1", isOrganizer: false) {
                 StopCard(
                     board: board, context: context, driving: driving, actions: .none, service: DemoStopService(),
-                    searcher: MapDemo.DemoPlaceSearcher(), demoScreen: screen, onClose: {})
+                    demoScreen: screen, onClose: {})
                     .padding(.horizontal, Spacing.s)
                     .padding(.bottom, Spacing.s)
             }

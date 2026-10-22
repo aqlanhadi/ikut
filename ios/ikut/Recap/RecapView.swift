@@ -336,11 +336,11 @@ extension RecapSnapshot {
         let start = now.addingTimeInterval(-10_020)
         func at(_ f: Double) -> CLLocationCoordinate2D { line.coordinate(atOffset: line.length * f) ?? main[0] }
         let end = main.last!
-        func ev(_ id: String, _ type: EventType, car: String, user: String, _ min: Double, f: Double, expires: Double? = nil, place: String? = nil) -> RecapEvent {
+        func ev(_ id: String, _ type: EventType, car: String, user: String, _ min: Double, f: Double, expires: Double? = nil, message: String? = nil) -> RecapEvent {
             let c = at(f)
             return RecapEvent(id: id, type: type.rawValue, carId: car, authorId: user, latitude: c.latitude, longitude: c.longitude,
                               createdAt: start.addingTimeInterval(min * 60), expiresAt: expires.map { start.addingTimeInterval($0 * 60) },
-                              message: nil, placeName: place)
+                              message: message)
         }
         return RecapSnapshot(
             tripId: "demo", name: "Balik kampung raya", destinationName: "Ipoh",
@@ -362,7 +362,7 @@ extension RecapSnapshot {
             ],
             events: [
                 ev("e1", .debris, car: "c1", user: "u1", 36, f: 0.2),
-                ev("e2", .stopFuel, car: "c2", user: "u2", 65, f: 0.45, expires: 91, place: "Petronas Tapah"),
+                ev("e2", .stopFuel, car: "c2", user: "u2", 65, f: 0.45, expires: 95, message: "Low on fuel, next R&R please"),
                 ev("e3", .heavyRain, car: "c3", user: "u3", 107, f: 0.7),
             ])
     }

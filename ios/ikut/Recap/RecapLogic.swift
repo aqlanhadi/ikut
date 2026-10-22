@@ -7,7 +7,7 @@ import Foundation
 // - Positions: one doc per car, overwritten on each fix, so there is no track to replay; only
 //   where each car was last seen. They are deleted 7 days after `endedAt`.
 // - Events: hazards, conditions and messages expire (45/60/30 min) and are purged 1 hour after
-//   `expiresAt`, even while the trip runs; resolved stops likewise. Everything else goes 7 days
+//   `expiresAt`, even while the trip runs; stops likewise (30 minutes after they were asked, or when they closed). Everything else goes 7 days
 //   after the end. So a recap built right at the end can miss early hazards.
 // `RecapSnapshot` is therefore cached on the phone and merged with each fresh fetch, so what was
 // seen once stays in the recap.
@@ -45,8 +45,6 @@ struct RecapEvent: Codable, Sendable, Equatable {
     var createdAt: Date?
     var expiresAt: Date?
     var message: String?
-    /// Name of the pinned stop place, for stop requests.
-    var placeName: String?
 
     var eventType: EventType { EventType(rawValue: type) }
     var category: EventCategory { eventType.category }
@@ -273,16 +271,9 @@ enum RecapLogic {
             case .stopRequest:
                 items.append(.init(
                     id: e.id, kind: .stop, time: time, title: "\(who) asked for a \(stopNoun(e.eventType))",
-                    detail: carName(e.carId, in: s), symbol: "fuelpump.fill",
+                    detail: [carName(e.carId, in: s), e.message].compactMap { $0 }.joined(separator: " · "),
+                    symbol: StopLogic.reasonSymbol(e.eventType),
                     latitude: e.latitude, longitude: e.longitude))
-                // A stop resolved before the trip ended has its expiry set to the resolve time.
-                if let resolved = e.expiresAt, resolved <= (s.endedAt ?? .distantFuture) {
-                    let place = e.placeName.map { "Stopped at \($0)" } ?? "Stop done"
-                    items.append(.init(
-                        id: e.id + "-done", kind: .stop, time: resolved, title: place,
-                        detail: "Back on the road \(minutesText(resolved.timeIntervalSince(time))) after the request",
-                        symbol: "checkmark.circle.fill", latitude: e.latitude, longitude: e.longitude))
-                }
             case .status:
                 items.append(.init(
                     id: e.id, kind: .car, time: time, title: "\(carName(e.carId, in: s)): \(label.lowercased())",
@@ -317,11 +308,6 @@ enum RecapLogic {
         case .stopToilet: "toilet stop"
         default: "rest stop"
         }
-    }
-
-    static func minutesText(_ seconds: TimeInterval) -> String {
-        let m = max(0, Int((seconds / 60).rounded()))
-        return m == 1 ? "1 min" : "\(m) min"
     }
 
     private static let clockFormatter: DateFormatter = {

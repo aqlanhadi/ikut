@@ -36,10 +36,6 @@ final class AlertCenter {
     /// The alert to show as a banner, nil when none. Cleared by `dismiss()` or after `bannerDuration`.
     private(set) var current: TripAlert?
 
-    /// What a spoken stop request asks the listener to do ("Tap yes.", or "Tap pin this stop." in the
-    /// lead car). The map sets it from this phone's role.
-    @ObservationIgnored var stopReply = AlertWording.defaultStopReply
-
     /// `.timeSensitive` needs the Time Sensitive Notifications entitlement, which needs the paid
     /// program, so alerts use `.active` until A2.
     nonisolated static let interruptionLevel: UNNotificationInterruptionLevel = .active
@@ -136,7 +132,7 @@ final class AlertCenter {
         // The trip may have changed or stopped while the name loaded.
         guard self.tripId == tripId else { return false }
         deliver(AlertWording.alert(
-            for: event, tripId: tripId, distance: distance, authorName: name, now: now(), stopReply: stopReply))
+            for: event, tripId: tripId, distance: distance, authorName: name, now: now()))
         return true
     }
 
@@ -145,18 +141,6 @@ final class AlertCenter {
     private func handle(_ events: [TripEvent]) async {
         guard let fresh = policy?.newEvents(from: events, now: now()) else { return }
         for event in fresh { await announce(event: event) }
-        let pinned = policy?.newlyPinned(from: events, excluding: fresh) ?? []
-        for event in pinned { await announcePinned(event: event) }
-    }
-
-    /// "Stop pinned: {place}", once, for a stop request that was announced before it had a place.
-    @discardableResult
-    func announcePinned(event: TripEvent) async -> Bool {
-        guard let tripId, let eventId = event.id, let place = event.place,
-              announced.contains(eventId), announced.insert(AlertWording.pinnedAlertId(eventId: eventId)).inserted
-        else { return false }
-        deliver(AlertWording.pinnedAlert(for: event, place: place, tripId: tripId, now: now()))
-        return true
     }
 
     private func deliver(_ alert: TripAlert) {

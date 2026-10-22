@@ -15,8 +15,6 @@ struct TripMapView: View {
     var onEnded: () -> Void = {}
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
     private let liveServices: Bool
-    /// Where the stop card looks for places. MapKit, except in the demo.
-    private var placeSearcher: any PlaceSearching = MapKitPlaceSearcher()
     private var stopService: any StopServing = StopService()
     /// The demo can open the card on one of its screens (`IKUT_MAP_DEMO_CARD`); nil in the app.
     private var demoScreen: String?
@@ -88,14 +86,13 @@ struct TripMapView: View {
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false,
-        searcher: any PlaceSearching = MapKitPlaceSearcher(), stopService: any StopServing = StopService(),
+        stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
     ) {
         _alerts = State(initialValue: alerts)
         self.session = session
         self.onExit = onExit
         liveServices = false
-        placeSearcher = searcher
         self.stopService = stopService
         demoScreen = demoCard
         _stopCardOpen = State(initialValue: demoCard != nil)
@@ -206,7 +203,6 @@ struct TripMapView: View {
             }
             .task(id: pillTimerKey) { await tickPill() }
             .task { await watchDriving() }
-            .onChange(of: stopReply, initial: true) { _, reply in alerts.stopReply = reply }
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
@@ -559,56 +555,40 @@ struct TripMapView: View {
     private var panel: some View {
         ConvoyPanel(
             model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
-            nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
+            stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: openReport, onStop: openStopCard)
     }
 
     private func stopCard(_ context: StopContext) -> some View {
         StopCard(
             board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
-            service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
+            service: stopService, demoScreen: demoScreen,
             onClose: closeStopCard
         )
         .padding(.horizontal, Spacing.s)
         .padding(.bottom, Spacing.s)
     }
 
-    /// Live actions that also tell the pill what happened (a tap on Yes is confirmed there for a few seconds).
+    /// Live actions that also tell the pill what happened (a tap on OK is confirmed there for a few seconds).
     private func stopActions(_ context: StopContext) -> StopRequestActions {
         let live = liveServices
             ? StopService.actions(context: context, onError: { _ in showStopError("Could not reach the convoy. Try again in a moment.") })
             : .none
         return StopRequestActions(
-            answer: { eventId, answer in
+            ok: { eventId in
                 if let request = stopBoard.requests.first(where: { $0.eventId == eventId }) {
-                    pillMemory.noteAnswered(request, answer: answer, now: Date())
+                    pillMemory.noteOK(request, now: Date())
                     pillNow = Date()
                 }
-                live.answer(eventId, answer)
-            },
-            pin: { eventId, place in
-                if let request = stopBoard.requests.first(where: { $0.eventId == eventId }) {
-                    pillMemory.notePinned(request, now: Date())
-                    pillNow = Date()
-                }
-                live.pin(eventId, place)
+                live.ok(eventId)
             },
             close: { eventId, reason in live.close(eventId, reason) })
     }
 
-    /// The pill's one big button: Yes, or Pin this stop for the lead car or organizer.
+    /// The pill's one big button: OK, for every car (the lead car and the organizer too).
     private func pillTapped(_ eventId: String) {
-        guard let context = stopContext, let request = stopBoard.requests.first(where: { $0.eventId == eventId }) else { return }
-        let actions = stopActions(context)
-        if request.canPin {
-            if let proposal = request.proposal {
-                actions.pin(eventId, proposal)
-            } else {
-                openStopCard()
-            }
-        } else {
-            actions.answer(eventId, .yes)
-        }
+        guard let context = stopContext else { return }
+        stopActions(context).ok(eventId)
     }
 
     private var stopPill: StopPill? {
@@ -635,13 +615,6 @@ struct TripMapView: View {
         try? await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
         guard !Task.isCancelled else { return }
         withAnimation(.snappy) { pillNow = Date() }
-    }
-
-    /// What the spoken request says to do: "Tap yes.", or "Tap pin this stop." for the lead car.
-    private var stopReply: String { canPinStops ? "Tap pin this stop." : "Tap yes." }
-
-    private var canPinStops: Bool {
-        session.isOrganizer || (model.myCar?.isLead == true && model.isTracker)
     }
 
     /// Feeds the driving detector once a second from this phone's own speed.

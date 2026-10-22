@@ -21,7 +21,9 @@ enum EventCategory: String, Codable, Sendable, Equatable {
         case .hazard: 45 * 60
         case .condition: 60 * 60
         case .message: 30 * 60
-        case .stopRequest, .status: nil
+        // A stop request closes itself this long after it was asked; no phone has to write anything.
+        case .stopRequest: 30 * 60
+        case .status: nil
         }
     }
 }
@@ -82,22 +84,12 @@ extension EventType: Codable {
     }
 }
 
-/// A place for a stop. On a stop event's `place` field it is the pinned stop (`pinnedBy` set by the
-/// lead car or organizer); on a vote's `suggestion` field it is a proposal (`pinnedBy` nil).
-struct StopPlace: Codable, Sendable, Equatable {
-    var name: String
-    var coordinate: GeoPoint
-    /// Meters along the main route.
-    var routeOffset: Double
-    var pinnedBy: String?
-}
-
 /// Where a stop request stands. A missing status (an event from an old build) reads as `.open`.
 enum StopStatus: String, Codable, Sendable, Equatable {
     case open
-    case pinned
     case closed
 
+    /// Anything else (an old build's `pinned`) is still open.
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = StopStatus(rawValue: raw) ?? .open
@@ -106,16 +98,15 @@ enum StopStatus: String, Codable, Sendable, Equatable {
 
 /// Why a stop request closed; set only together with `StopStatus.closed`.
 enum StopClosedReason: String, Codable, Sendable, Equatable {
-    /// The lead car or organizer sent the convoy on.
-    case left
+    /// The asker, the lead car or the organizer said the convoy has stopped.
+    case stopped
     /// The asker withdrew the request.
     case cancelled
-    /// Nobody pinned a place in time; the lead or organizer's phone closed it.
-    case noAnswer
 
+    /// An old build's `left` or `noAnswer` reads as stopped.
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        self = StopClosedReason(rawValue: raw) ?? .left
+        self = StopClosedReason(rawValue: raw) ?? .stopped
     }
 }
 
@@ -134,9 +125,8 @@ struct TripEvent: Codable, Sendable, Equatable, Identifiable {
     @ServerTimestamp var createdAt: Date?
     /// nil means the event stays until resolved or cleared.
     var expiresAt: Date?
+    /// A stop request's optional note from a passenger (0 to 280 characters).
     var message: String?
-    /// The pinned stop; only ever set on stop requests, by the lead car or the organizer.
-    var place: StopPlace?
     /// Stop requests only. Nil on events written before states existed: read as open.
     var status: StopStatus?
     /// Set only when the request closes (with `closedBy` and `expiresAt` = now).

@@ -9,7 +9,6 @@ struct AlertPolicy {
     let myUserId: String
     private(set) var seen: Set<String> = []
     private var primed = false
-    private var pinnedSeen: Set<String> = []
 
     init(myUserId: String) {
         self.myUserId = myUserId
@@ -31,21 +30,6 @@ struct AlertPolicy {
             fresh.append(event)
         }
         return Self.ranked(fresh)
-    }
-
-    /// Stop requests that have a pinned place, once each, for events other than the viewer's own.
-    /// Call after `newEvents` with its result as `fresh`: a request announced in this same snapshot
-    /// is not repeated, and the caller decides whether the request was announced at all.
-    mutating func newlyPinned(from events: [TripEvent], excluding fresh: [TripEvent]) -> [TripEvent] {
-        let freshIds = Set(fresh.compactMap(\.id))
-        var out: [TripEvent] = []
-        for event in events {
-            guard event.category == .stopRequest, event.place != nil, let id = event.id,
-                  pinnedSeen.insert(id).inserted, event.authorId != myUserId, !freshIds.contains(id)
-            else { continue }
-            out.append(event)
-        }
-        return out
     }
 
     /// Most severe first, then newest first. Stable for equal keys.
