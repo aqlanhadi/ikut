@@ -517,10 +517,12 @@ struct TripMapView: View {
     }
 
     /// The most the card and panel may take together: the map (already below the status bar) minus
-    /// the pill and a banner on top.
+    /// what is on top, as measured (the trip pill, the stop pill when it is up, a banner), so the
+    /// stop pill never sits under the expanded panel, at any text size. Never less room than the
+    /// usual estimate for a pill alone or with a banner.
     private var maxBottomHeight: CGFloat? {
         guard mapHeight > 0 else { return nil }
-        return mapHeight - (bannerShowing ? 158 : 74)
+        return mapHeight - max(bannerShowing ? 158 : 74, topHeight + Spacing.m)
     }
 
     private func openStopCard() {
