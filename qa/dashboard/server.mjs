@@ -173,6 +173,7 @@ createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, await readFile(PAGE), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && p === '/page-logic.mjs') return send(res, 200, await readFile(join(here, 'page-logic.mjs')), 'text/javascript; charset=utf-8'); // the page's plain logic (tested in qa/lib)
     if (req.method === 'GET' && p === '/api/config') { // the Maps key: only for a page served from this server (not a rebinding host name)
       if (!trustedHost(req)) return send(res, 403, { error: 'Only the demos page itself may ask for that.' });
       return send(res, 200, config());

@@ -3,101 +3,779 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>ikut demos</title>
 <style>
-:root { --bg:#f6f6f4; --card:#fff; --fg:#1b1b1a; --dim:#6b6b66; --line:#dcdcd6; --accent:#0a6cff; --accent-fg:#fff;
-  --ok:#0f7b3f; --okbg:#dcf3e4; --bad:#b3261e; --badbg:#fbe0dd; --warn:#8a5a00; --warnbg:#fdf0cf; --watch:#fff3c4; }
+/* ikut's own look (ios/ikut/UI/Theme.swift, CarBadge.swift, TripComponents.swift): accent, positive and warning colours, grouped background with
+   white cards, 24 pt cards, 14 pt controls, capsule buttons, rounded bold car badges. Light and dark follow the system. */
+:root {
+  --screen:#f2f2f7; --card:#fff; --tile:#f2f2f7; --label:#000; --secondary:#6c6c70; --sep:#c6c6c8;
+  --accent:#0071e3; --accent-fg:#fff; --accent-soft:rgba(0,113,227,.12);
+  --pos:#1f7a35; --pos-soft:rgba(31,122,53,.13); --warn:#c93400; --warn-soft:rgba(201,52,0,.12); --red:#ff3b30; --red-soft:rgba(255,59,48,.12);
+  --shadow:0 6px 24px rgba(0,0,0,.14);
+  --r-card:24px; --r-control:14px; --r-tile:22px;
+  --badge-font:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;
+  /* names the scripted-demos tab still uses */
+  --bg:var(--screen); --fg:var(--label); --dim:var(--secondary); --line:var(--sep); --ok:var(--pos); --okbg:var(--pos-soft); --bad:var(--red); --badbg:var(--red-soft); --warnbg:var(--warn-soft); --watch:rgba(255,204,0,.28);
+}
 @media (prefers-color-scheme: dark) {
-  :root { --bg:#141413; --card:#1e1e1c; --fg:#ecece8; --dim:#9a9a92; --line:#3a3a36; --accent:#4d90ff; --accent-fg:#06142b;
-    --ok:#6fd49a; --okbg:#143323; --bad:#ff948b; --badbg:#3d1815; --warn:#f0c26a; --warnbg:#3a2e10; --watch:#4a3f12; }
+  :root {
+    --screen:#000; --card:#1c1c1e; --tile:#2c2c2e; --label:#fff; --secondary:#98989f; --sep:#38383a;
+    --accent:#2997ff; --accent-fg:#001a33; --accent-soft:rgba(41,151,255,.18);
+    --pos:#30d158; --pos-soft:rgba(48,209,88,.16); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16); --red:#ff453a; --red-soft:rgba(255,69,58,.18);
+    --shadow:0 6px 24px rgba(0,0,0,.6);
+    --watch:rgba(255,214,10,.22);
+  }
 }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
-main { max-width:960px; margin:0 auto; padding:16px; }
-h1 { font-size:1.4rem; margin:0 0 12px; } h2 { font-size:1.1rem; margin:0 0 4px; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
-.dim { color:var(--dim); } .small { font-size:.85rem; }
-button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:8px; padding:8px 14px; cursor:pointer; }
-button.primary { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); font-weight:600; }
-button.danger { background:var(--bad); color:var(--card); border-color:var(--bad); font-weight:600; }
-button:disabled { opacity:.45; cursor:not-allowed; }
-label { margin-right:14px; white-space:nowrap; }
-.row { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
-.pill { display:inline-block; padding:2px 12px; border-radius:999px; font-weight:600; background:var(--line); }
-.pill.running { background:var(--okbg); color:var(--ok); } .pill.ended { background:var(--okbg); color:var(--ok); }
-.pill.failed { background:var(--badbg); color:var(--bad); } .pill.joining,.pill.waiting,.pill.building { background:var(--warnbg); color:var(--warn); }
-.banner { background:var(--warnbg); color:var(--warn); border:1px solid var(--warn); border-radius:10px; padding:10px 14px; margin-bottom:12px; font-weight:600; }
-.seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-.seg button { border:0; border-radius:0; } .seg button.on { background:var(--accent); color:var(--accent-fg); font-weight:600; }
-.seg button.on.prod { background:var(--bad); color:var(--card); }
-.code { font:700 3rem/1.1 ui-monospace,Menlo,monospace; letter-spacing:.15em; }
-.bar { height:10px; border-radius:5px; background:var(--line); overflow:hidden; margin:6px 0; } .bar i { display:block; height:100%; background:var(--accent); }
+html, body { height:100%; }
+body { margin:0; background:var(--screen); color:var(--label); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; display:flex; flex-direction:column; -webkit-font-smoothing:antialiased; }
+.hidden { display:none !important; }
+.dim { color:var(--secondary); } .small { font-size:.85rem; }
+h2 { font-size:1.1rem; margin:0 0 4px; }
+
+/* buttons: capsules */
+button { font:inherit; font-weight:600; border:0; background:var(--card); color:var(--accent); border-radius:999px; padding:7px 14px; cursor:pointer; box-shadow:inset 0 0 0 1px var(--sep); }
+button:hover { filter:brightness(.97); }
+button.primary { background:var(--accent); color:var(--accent-fg); box-shadow:none; }
+button.danger { background:var(--red); color:#fff; box-shadow:none; }
+button.quiet { box-shadow:none; background:transparent; padding:4px 8px; }
+button.sm { padding:3px 10px; font-size:.82rem; }
+button.on { background:var(--accent); color:var(--accent-fg); box-shadow:none; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+input[type=number], input[type=text], select { font:inherit; font-size:.88rem; color:var(--label); background:var(--tile); border:0; border-radius:var(--r-control); padding:5px 10px; }
+select { padding-right:6px; cursor:pointer; font-weight:600; color:var(--accent); border-radius:999px; }
+input[type=number] { width:4.6em; } input.wide { width:13em; }
+label { white-space:nowrap; }
+.row { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
+.pill { display:inline-flex; align-items:center; gap:6px; padding:3px 11px; border-radius:999px; font-weight:600; font-size:.82rem; background:var(--tile); }
+.pill::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.9; }
+.pill.running, .pill.ended, .pill.ok { background:var(--pos-soft); color:var(--pos); }
+.pill.waiting, .pill.building, .pill.warn { background:var(--warn-soft); color:var(--warn); }
+.pill.failed { background:var(--red-soft); color:var(--red); }
+.cap { font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--secondary); }
+.err { background:var(--red-soft); color:var(--red); padding:8px 12px; border-radius:var(--r-control); margin:8px 0; font-size:.9rem; }
+.note { background:var(--warn-soft); color:var(--warn); padding:8px 12px; border-radius:var(--r-control); margin:8px 0; font-size:.88rem; }
+
+/* top bar */
+.top { display:flex; align-items:center; gap:16px; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--sep); flex:none; flex-wrap:wrap; }
+.brand { font:800 1.25rem var(--badge-font); letter-spacing:-.01em; } .brand span { color:var(--accent); }
+.tabs { display:inline-flex; background:var(--tile); border-radius:999px; padding:3px; }
+.tabs button { box-shadow:none; background:transparent; color:var(--label); padding:5px 16px; }
+.tabs button.on { background:var(--card); color:var(--label); box-shadow:0 1px 4px rgba(0,0,0,.18); }
+.grow { flex:1; }
+#notice { margin:0; border-radius:0; flex:none; }
+
+/* playground: map left, panel right */
+.split { flex:1; min-height:0; display:flex; }
+.mapcol { position:relative; flex:1; min-width:0; background:var(--tile); }
+#map { position:absolute; inset:0; }
+#plain { position:absolute; inset:0; overflow:auto; padding:16px; }
+#panel { width:410px; flex:none; overflow-y:auto; padding:12px; background:var(--screen); border-left:1px solid var(--sep); display:flex; flex-direction:column; gap:12px; }
+@media (max-width: 860px) {
+  .split { flex-direction:column; overflow-y:auto; }
+  .mapcol { flex:none; height:58vh; min-height:340px; }
+  #panel { width:auto; overflow:visible; border-left:0; border-top:1px solid var(--sep); }
+}
+.card { background:var(--card); border-radius:var(--r-card); padding:14px; }
+.card.flat { border-radius:var(--r-tile); }
+.code { font:800 2.6rem/1.05 var(--badge-font); letter-spacing:.16em; }
+
+/* over the map */
+.maptools { position:absolute; top:12px; right:12px; display:flex; gap:6px; z-index:5; }
+.maptools button { box-shadow:var(--shadow); }
+.hint { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:6; background:var(--label); color:var(--card); padding:9px 16px; border-radius:999px; font-weight:600; box-shadow:var(--shadow); display:flex; gap:12px; align-items:center; max-width:92%; }
+.hint button { background:rgba(128,128,128,.35); color:inherit; box-shadow:none; padding:2px 10px; }
+#prompts { position:absolute; left:12px; top:12px; bottom:12px; width:min(360px, calc(100% - 24px)); z-index:7; display:flex; flex-direction:column; gap:10px; overflow-y:auto; pointer-events:none; }
+.prompt { pointer-events:auto; background:var(--card); border-radius:28px; padding:14px 14px 12px; box-shadow:var(--shadow); }
+.prompt h3 { margin:0; font-size:1.05rem; } .prompt .sub { color:var(--secondary); font-size:.88rem; margin-bottom:8px; }
+.prow { display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--sep); flex-wrap:wrap; }
+.prow .who { font-weight:600; } .prow .says { color:var(--secondary); font-size:.85rem; flex:1; min-width:6em; }
+.prow .says.yes { color:var(--pos); } .prow .says.another { color:var(--accent); }
+.prompt .all { margin-top:8px; width:100%; padding:11px; }
+
+/* markers sit on their point by their middle (the map anchors them by the bottom) */
+.pin, .leave, .evmk, .mk, .destmk { transform:translateY(50%); }
+
+/* car badge (CarBadge.swift: filled circle, bold rounded initial/number, white) */
+.badge { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; color:#fff; font:700 15px var(--badge-font); flex:none; border:2px solid transparent; }
+.badge.sm { width:24px; height:24px; font-size:12px; }
+.badge.phone { box-shadow:0 0 0 3px var(--label); }
+.badge.joining { border:2px dashed #fff; }
+.badge.offline { opacity:.4; }
+.mk .badge { box-shadow:0 0 0 2px var(--card), 0 2px 6px rgba(0,0,0,.4); } .mk .badge.phone { box-shadow:0 0 0 2px var(--card), 0 0 0 5px var(--label), 0 2px 6px rgba(0,0,0,.4); }
+.ghost .badge { background:transparent !important; border:2px dashed currentColor; box-shadow:none; opacity:.8; } 
+.pin { display:flex; align-items:center; gap:5px; padding:3px 9px 3px 3px; border-radius:999px; background:var(--card); color:var(--label); font:600 12px system-ui; box-shadow:0 2px 8px rgba(0,0,0,.35); border:2px solid; white-space:nowrap; cursor:grab; }
+.pin .badge { width:20px; height:20px; font-size:11px; border:0; box-shadow:none; }
+.pin.fixed { cursor:default; opacity:.85; }
+.leave { width:18px; height:18px; border-radius:50%; background:var(--card); border:4px solid; box-shadow:0 2px 6px rgba(0,0,0,.4); cursor:grab; }
+.evmk { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; box-shadow:0 0 0 2px var(--card), 0 2px 6px rgba(0,0,0,.4); }
+.evmk.haz { background:var(--warn); } .evmk.stp { background:var(--accent); } .evmk.done { opacity:.4; }
+.destmk { background:var(--label); color:var(--card); padding:3px 10px; border-radius:999px; font:600 12px system-ui; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+
+/* car cards in the panel */
+.car { background:var(--card); border-radius:var(--r-tile); padding:12px; }
+.car .head { display:flex; align-items:center; gap:10px; }
+.car .name { font-weight:700; font-size:1rem; cursor:pointer; } .car .name .app { color:var(--secondary); font-weight:400; font-size:.8rem; }
+.tag { display:inline-block; font-size:.72rem; font-weight:600; border-radius:999px; padding:1px 8px; background:var(--tile); color:var(--secondary); margin-left:4px; vertical-align:middle; }
+.tag.joining { background:var(--warn-soft); color:var(--warn); } .tag.convoy { background:var(--pos-soft); color:var(--pos); } .tag.off { background:var(--red-soft); color:var(--red); }
+.car .line { color:var(--secondary); font-size:.84rem; margin:4px 0 2px 42px; } .car .line.warn { color:var(--warn); font-weight:600; }
+.car .ctl { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; margin:8px 0 0 0; }
+.car .pins { margin-top:8px; border-top:1px solid var(--sep); padding-top:6px; display:grid; grid-template-columns:auto 1fr; gap:5px 10px; align-items:center; }
+.car .pins .pk { color:var(--secondary); font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; }
+.car .pins .pv { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.88rem; }
+.car .carerr { margin:8px 0 0; }
+.car .rename { display:flex; gap:6px; align-items:center; }
+.feed { list-style:none; margin:0; padding:0; max-height:300px; overflow:auto; } .feed li { padding:6px 0; border-top:1px solid var(--sep); } .feed li:first-child { border-top:0; }
+.feed .evt { font-size:.78rem; color:var(--secondary); }
+details > summary { cursor:pointer; color:var(--secondary); font-size:.85rem; }
+pre { background:var(--tile); border-radius:var(--r-control); padding:8px; max-height:240px; overflow:auto; font-size:.76rem; white-space:pre-wrap; word-break:break-all; }
+.steps { margin:6px 0 10px; padding-left:1.2em; } .cand { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; border-top:1px solid var(--sep); padding:8px 0; }
+
+/* the plain list (no map) */
+.strip { position:relative; height:118px; margin:10px 8px 6px; }
+.strip .road { position:absolute; left:0; right:0; top:50px; height:6px; border-radius:3px; background:var(--sep); }
+.strip .ends { position:absolute; top:104px; font-size:.8rem; color:var(--secondary); } .strip .ends.r { right:0; }
+.strip .dot { position:absolute; top:34px; margin-left:-13px; width:26px; height:26px; font-size:.8rem; }
+.strip .name { position:absolute; font-size:.75rem; white-space:nowrap; transform:translateX(-50%); font-weight:600; }
+.strip .ev { position:absolute; top:60px; transform:translateX(-50%); font-size:.85rem; line-height:1; } .strip .ev.done { opacity:.35; } .strip .ev.haz { color:var(--warn); } .strip .ev.stp { color:var(--accent); }
+
+/* scripted demos tab */
+#tabDemos { flex:1; overflow-y:auto; padding:16px; } .demos { max-width:960px; margin:0 auto; }
+.seg { display:inline-flex; background:var(--tile); border-radius:999px; padding:3px; }
+.seg button { box-shadow:none; background:transparent; color:var(--label); padding:4px 14px; } .seg button.on { background:var(--accent); color:var(--accent-fg); } .seg button.on.prod { background:var(--red); color:#fff; }
+.banner { background:var(--warn-soft); color:var(--warn); padding:8px 12px; border-radius:var(--r-control); margin:8px 0; }
+.dcard { background:var(--card); border-radius:var(--r-card); padding:16px; margin-bottom:12px; }
+.bar { height:10px; border-radius:5px; background:var(--tile); overflow:hidden; margin:6px 0; } .bar i { display:block; height:100%; background:var(--accent); }
 ul.tl { list-style:none; margin:8px 0 0; padding:0; }
-.tl li { display:flex; gap:10px; padding:6px 8px; border-radius:8px; opacity:.55; }
+.tl li { display:flex; gap:10px; padding:6px 8px; border-radius:var(--r-control); opacity:.55; }
 .tl li.done { opacity:1; } .tl li.watch.done { background:var(--watch); } .tl li.next { opacity:1; outline:2px solid var(--accent); }
 .tl .at { font-family:ui-monospace,Menlo,monospace; min-width:3.6em; } .tl .cue { font-weight:700; }
-.checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
-.checks li { list-style:none; } .checks ul { padding:0; margin:4px 0 0; }
-.pass { color:var(--ok); font-weight:600; } .fail { color:var(--bad); font-weight:600; }
-.err { background:var(--badbg); color:var(--bad); padding:8px 12px; border-radius:8px; margin:8px 0; }
-pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; max-height:320px; overflow:auto; font-size:.8rem; white-space:pre-wrap; word-break:break-all; }
-
-.pg h2 { font-size:1.25rem; } .pg .lead { font-size:1.05rem; }
-.pg input[type=number], .pg input[type=text], .pg select { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
-.pg input[type=number] { width:5.5em; } .pg input.wide { width:14em; }
-.pg .code { font-size:clamp(2.5rem, 12vw, 4rem); }
-.pg .steps { margin:6px 0 10px; padding-left:1.2em; } .pg .steps li { margin:2px 0; }
-.strip { position:relative; height:118px; margin:10px 8px 6px; }
-.strip .road { position:absolute; left:0; right:0; top:50px; height:6px; border-radius:3px; background:var(--line); }
-.strip .ends { position:absolute; top:104px; font-size:.8rem; color:var(--dim); } .strip .ends.r { right:0; }
-.strip .dot { position:absolute; top:40px; width:26px; height:26px; margin-left:-13px; border-radius:50%; color:#fff; font-weight:700; font-size:.85rem; display:flex; align-items:center; justify-content:center; border:2px solid var(--card); box-shadow:0 0 0 1px var(--dim); }
-.strip .dot.phone { box-shadow:0 0 0 3px var(--fg); } .strip .dot.joining { top:8px; border:2px dashed #fff; opacity:.85; }
-.strip .name { position:absolute; font-size:.75rem; white-space:nowrap; transform:translateX(-50%); }
-.strip .name.j { transform:none; margin-left:18px; }
-.cand { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; border-top:1px solid var(--line); padding:8px 0; }
-.strip .ev { position:absolute; top:58px; transform:translateX(-50%); font-size:.85rem; line-height:1; } .strip .ev.done { opacity:.35; }
-.strip .ev.haz { color:var(--warn); } .strip .ev.stp { color:var(--accent); }
-.carrow { border-top:1px solid var(--line); padding:10px 0; }
-.carrow .nm { display:inline-flex; align-items:center; gap:8px; min-width:11em; font-weight:600; }
-.carrow .sw { width:14px; height:14px; border-radius:50%; display:inline-block; }
-.carrow .grid { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-top:6px; }
-.carrow .sees { margin-top:4px; } .sees.warn { color:var(--warn); font-weight:600; } .sees.bad { color:var(--bad); font-weight:600; }
-.feed { list-style:none; margin:6px 0 0; padding:0; max-height:260px; overflow:auto; } .feed li { padding:5px 0; border-top:1px solid var(--line); }
-.tag { display:inline-block; font-size:.75rem; border-radius:999px; padding:1px 8px; background:var(--line); margin-left:4px; }
-.tag.joining { background:var(--warnbg); color:var(--warn); } .tag.convoy { background:var(--okbg); color:var(--ok); } .tag.off { background:var(--badbg); color:var(--bad); }
-.hidden { display:none; }
+.checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; } .checks li { list-style:none; } .checks ul { padding:0; margin:4px 0 0; }
+.pass { color:var(--pos); font-weight:600; } .fail { color:var(--red); font-weight:600; }
+.dcard .code { font-size:2.4rem; }
 </style>
 </head>
 <body>
-<main>
-  <h1>ikut live demos</h1>
-  <div id="notice" class="err hidden"></div>
+<header class="top">
+  <div class="brand">ikut <span>demos</span></div>
+  <nav class="tabs" id="tabs"><button data-tab="pg" class="on">Playground</button><button data-tab="demos">Scripted demos</button></nav>
+  <div class="grow"></div>
+  <div id="topStatus" class="row"></div>
+</header>
+<div id="notice" class="err hidden"></div>
 
-  <section id="pg" class="card pg"></section>
-  <h2 style="margin:18px 0 8px">Scripted demos</h2>
-  <section id="runView" class="card hidden"></section>
+<div id="tabPg" class="split">
+  <div class="mapcol">
+    <div id="map"></div>
+    <div id="plain" class="hidden"></div>
+    <div class="maptools hidden" id="maptools"><button data-act="fitRoute" class="sm">Whole route</button><button data-act="fitCars" class="sm">Cars</button></div>
+    <div id="prompts"></div>
+    <div id="hint" class="hint hidden"></div>
+  </div>
+  <aside id="panel"></aside>
+</div>
 
+<div id="tabDemos" class="hidden"><div class="demos">
+  <div id="runView" class="dcard hidden"></div>
   <div class="row" style="margin-bottom:12px">
-    <span>Run on</span>
-    <span class="seg" id="backendSwitch"></span>
-    <button id="refresh" class="small">Look for demos again</button>
+    <span>Run on</span><span class="seg" id="backendSwitch"></span>
+    <button id="refresh" class="sm">Look for demos again</button>
   </div>
   <div id="prodBanner" class="banner hidden">Runs on the real Firebase project: creates a real trip and anonymous users; the trip is ended at the end.</div>
   <div id="list"></div>
-</main>
+</div></div>
 
-<script>
+<script type="module">
+import {
+  decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, roadKey, placeAtCmd, endingCmd, deviateCmd, voteCmd, prepareStartsCmd, clampWait, endingOrigin,
+  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1,
+} from '/page-logic.mjs';
+
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+const secs = (s) => (s === null || s === undefined ? '' : s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 let demos = [], backends = {}, backend = store.get('ikut-backend') === 'production' ? 'production' : 'emulators';
 let run = null, events = [], log = [], confirming = null, logOpen = false;
-const opts = {}; // per demo file: { skipBuild, endTrip }
+let pg = null, geometry = null, routeModel = null, pendingPrepare = null;
+const opts = {};
 const running = () => run?.status === 'running';
+const pgRun = () => (run?.interactive ? run : null);
+const carOf = (k) => pg?.cars?.find((c) => c.key === k);
 
-// ---- run state, derived from the events
+// ---------------------------------------------------------------- tabs
+let tab = store.get('ikut-tab') === 'demos' ? 'demos' : 'pg';
+function showTab() {
+  $('#tabPg').classList.toggle('hidden', tab !== 'pg');
+  $('#tabDemos').classList.toggle('hidden', tab !== 'demos');
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  if (tab === 'pg' && gm) setTimeout(() => google.maps.event.trigger(gm.map, 'resize'), 50);
+}
+$('#tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { tab = b.dataset.tab; store.set('ikut-tab', tab); showTab(); } });
+
+// ---------------------------------------------------------------- talking to the server
+let lastCmd = null;
+async function post(path, body) {
+  let r;
+  try { r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); }
+  catch { notice('The dashboard could not be reached. Is it still running?'); return false; }
+  const j = await r.json().catch(() => ({}));
+  notice(r.ok ? '' : (j.error || 'That did not work.'));
+  return r.ok;
+}
+function notice(text) { $('#notice').classList.toggle('hidden', !text); $('#notice').textContent = text; }
+const cmd = (body) => { lastCmd = { car: body.car ?? null, at: Date.now() }; return post('/api/command', body); };
+
+// ---------------------------------------------------------------- Google Maps (loaded only with a key)
+let gm = null, mapNote = '', config = null;
+function bootstrapMaps(key) { // Google's official dynamic-import bootstrap loader
+  ((g) => { var h, a, k, p = 'The Google Maps JavaScript API', c = 'google', l = 'importLibrary', q = '__ib__', m = document, b = window; b = b[c] || (b[c] = {}); var d = b.maps || (b.maps = {}), r = new Set(), e = new URLSearchParams(), u = () => h || (h = new Promise(async (f, n) => { await (a = m.createElement('script')); e.set('libraries', [...r] + ''); for (k in g) e.set(k.replace(/[A-Z]/g, (t) => '_' + t[0].toLowerCase()), g[k]); e.set('callback', c + '.maps.' + q); a.src = `https://maps.${c}apis.com/maps/api/js?` + e; d[q] = f; a.onerror = () => h = n(Error(p + ' could not load.')); a.nonce = m.querySelector('script[nonce]')?.nonce || ''; m.head.append(a); })); d[l] ? console.warn(p + ' only loads once. Ignoring:', g) : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)); })({ key, v: 'weekly' });
+}
+async function startMap() {
+  try { config = await (await fetch('/api/config')).json(); } catch { config = null; }
+  if (!config?.mapsKey) { mapNote = 'No Google Maps key: this is the plain list. Put GOOGLE_MAPS_API_KEY in qa/dashboard/.env and restart the dashboard to get the map.'; return renderAll(); }
+  window.gm_authFailure = () => mapFailed('Google Maps did not accept the key for this address (its website restriction may not list it), so this is the plain list.');
+  try {
+    bootstrapMaps(config.mapsKey);
+    const [{ Map }, { AdvancedMarkerElement }, { Route }] = await Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker'), google.maps.importLibrary('routes')]);
+    const map = new Map($('#map'), {
+      center: { lat: 3.9, lng: 101.7 }, zoom: 8, mapId: config.mapId || 'DEMO_MAP_ID', colorScheme: google.maps.ColorScheme.FOLLOW_SYSTEM,
+      mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
+    });
+    gm = { map, Marker: AdvancedMarkerElement, Route };
+    map.addListener('click', (e) => onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() }));
+    $('#maptools').classList.remove('hidden');
+    renderAll();
+  } catch (e) { console.error(e); mapFailed('The Google map could not load, so this is the plain list.'); }
+}
+function mapFailed(text) { mapNote = text; clearMap(); gm = null; renderAll(); }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (gm) { drawn = freshDrawn(); syncMap(); } });
+
+// ---- what is drawn
+const freshDrawn = () => ({ routeText: null, cars: {} });
+let drawn = freshDrawn();
+const layer = { route: null, legs: {}, cars: {}, ghosts: {}, pins: {}, events: {}, dest: null, pre: {} };
+const held = {}; // markers someone just dragged: left alone until the command has had time to land
+const gmap = () => gm.map;
+function clearMap() {
+  const kill = (o) => { if (o && typeof o.setMap === 'function') o.setMap(null); else if (o) o.map = null; };
+  kill(layer.route); layer.route = null; kill(layer.dest); layer.dest = null;
+  for (const group of [layer.legs, layer.cars, layer.ghosts, layer.pins, layer.events, layer.pre]) { for (const k of Object.keys(group)) { for (const o of [].concat(group[k])) kill(o); delete group[k]; } }
+  drawn = freshDrawn();
+}
+function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
+function marker(position, content, { title, drag, z } = {}) {
+  const m = new gm.Marker({ map: gmap(), position, content, title, gmpDraggable: Boolean(drag), zIndex: z });
+  return m;
+}
+const ll = (p) => ({ lat: p.lat, lng: p.lng });
+const posOf = (m) => { const p = m.position; return { lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng }; };
+
+function drawRoute() {
+  if (layer.route) layer.route.setMap(null);
+  layer.route = routeModel && new google.maps.Polyline({ map: gmap(), path: routeModel.path, strokeColor: css('--accent'), strokeOpacity: .9, strokeWeight: 6, zIndex: 1 });
+}
+function drawLegs(key, g, color) {
+  for (const p of [].concat(layer.legs[key] ?? [])) p.setMap(null);
+  layer.legs[key] = (g?.legs ?? []).map((leg) => new google.maps.Polyline({ map: gmap(), path: decodePolyline(leg.polyline), strokeColor: color, strokeOpacity: leg.role === 'start' ? .65 : .95, strokeWeight: 4, zIndex: 2 }));
+}
+function syncMap() {
+  if (!gm) return;
+  const st = pg, geo = geometry;
+  const ch = geometryChanges(drawn, st, geo);
+  if (ch.route) { drawRoute(); drawn.routeText = geo?.route ?? null; if (geo && routeModel && !fitted) { fitRoute(); fitted = true; } }
+  for (const k of ch.remove) { for (const p of [].concat(layer.legs[k] ?? [])) p.setMap(null); delete layer.legs[k]; delete drawn.cars[k]; }
+  for (const k of ch.cars) { drawLegs(k, geo.cars[k], carOf(k)?.color ?? css('--accent')); drawn.cars[k] = geo.cars[k].version; }
+  // the destination
+  if (geo?.destination && !layer.dest) layer.dest = marker({ lat: geo.destination.latitude, lng: geo.destination.longitude }, el(`<div class="destmk mk">${esc(geo.destination.name || 'Destination')}</div>`), { title: 'Destination' });
+  if (!geo && layer.dest) { layer.dest.map = null; layer.dest = null; }
+  syncCars(st); syncPins(st); syncEvents(st); syncPre(st);
+}
+let fitted = false;
+function fitRoute() { if (!gm || !routeModel) return; const b = new google.maps.LatLngBounds(); routeModel.path.forEach((p) => b.extend(p)); gmap().fitBounds(b, 40); }
+function fitCars() {
+  if (!gm || !pg?.cars) return;
+  const pts = pg.cars.filter((c) => c.latitude != null).map((c) => ({ lat: c.latitude, lng: c.longitude }));
+  if (!pts.length) return;
+  const b = new google.maps.LatLngBounds(); pts.forEach((p) => b.extend(p)); gmap().fitBounds(b, 120);
+  if (gmap().getZoom() > 15) gmap().setZoom(15);
+}
+function syncCars(st) {
+  const cars = (st?.cars ?? []).filter((c) => c.latitude != null);
+  const keep = new Set(cars.map((c) => c.key)), keepGhost = new Set();
+  for (const c of cars) {
+    const p = { lat: c.latitude, lng: c.longitude };
+    let m = layer.cars[c.key];
+    if (!m) m = layer.cars[c.key] = marker(p, el('<div class="mk"><div class="badge"></div></div>'), { z: 30 });
+    const b = m.content.firstElementChild;
+    b.className = badgeClasses(c); b.style.background = c.color; b.textContent = initialOf(c.label); m.title = `${c.label}${c.offline ? ' (no signal)' : ''}`;
+    m.position = p;
+    const g = ghostOf(c);
+    if (g) {
+      keepGhost.add(c.key);
+      let gh = layer.ghosts[c.key];
+      if (!gh) gh = layer.ghosts[c.key] = marker(g, el('<div class="mk ghost"><div class="badge"></div></div>'), { z: 20 });
+      const gb = gh.content.firstElementChild; gb.className = 'badge sm'; gb.style.color = c.color; gb.textContent = initialOf(c.label); gh.title = `Where the app has ${c.label}`; gh.position = g;
+    }
+  }
+  for (const [k, m] of Object.entries(layer.cars)) if (!keep.has(k)) { m.map = null; delete layer.cars[k]; }
+  for (const [k, m] of Object.entries(layer.ghosts)) if (!keepGhost.has(k)) { m.map = null; delete layer.ghosts[k]; }
+}
+// pins: start, end (+ leave), deviation (+ leave). Desired set from the state; markers created, moved or removed to match.
+function wantedPins(st) {
+  const out = {};
+  for (const c of st?.cars ?? []) {
+    const pins = c.pins ?? {};
+    if (pins.start) out[`${c.key}:start`] = { car: c, kind: 'start', at: fromCoord(pins.start), label: 'start' };
+    if (pins.end) out[`${c.key}:end`] = { car: c, kind: 'end', at: fromCoord(pins.end), label: 'end' };
+    if (pins.end && pins.endLeaveKm != null && routeModel) out[`${c.key}:leaveEnd`] = { car: c, kind: 'leaveEnd', at: pointAtOffset(routeModel, pins.endLeaveKm * 1000), leave: true };
+    if (pins.deviation) {
+      out[`${c.key}:deviation`] = { car: c, kind: 'deviation', at: fromCoord(pins.deviation.pin), label: `wait ${pins.deviation.waitSeconds} s` };
+      if (routeModel) out[`${c.key}:leaveDev`] = { car: c, kind: 'leaveDev', at: pointAtOffset(routeModel, pins.deviation.leaveKm * 1000), leave: true };
+    }
+  }
+  return out;
+}
+function syncPins(st) {
+  const want = wantedPins(st);
+  for (const [id, w] of Object.entries(want)) {
+    if (!w.at) continue;
+    const movable = canMovePin(w.car, w.kind.replace('leaveEnd', 'end').replace('leaveDev', 'deviation'));
+    let m = layer.pins[id];
+    if (!m) {
+      const content = w.leave ? el('<div class="leave" style="border-color:' + w.car.color + '"></div>') : el(`<div class="pin" style="border-color:${w.car.color}"><span class="badge"></span><span class="t"></span></div>`);
+      m = layer.pins[id] = marker(w.at, content, { drag: movable, z: 10, title: w.leave ? 'Leaves here (drag along the route)' : '' });
+      m.addListener('dragstart', () => { held[id] = Infinity; });
+      m.addListener('dragend', () => { held[id] = Date.now() + 5000; onPinDrag(id, posOf(m)); });
+    }
+    m.gmpDraggable = movable;
+    if (!w.leave) {
+      m.content.classList.toggle('fixed', !movable);
+      const b = m.content.querySelector('.badge'); b.style.background = w.car.color; b.textContent = initialOf(w.car.label);
+      m.content.querySelector('.t').textContent = w.label;
+      m.title = `${w.car.label}’s ${w.kind === 'deviation' ? 'deviation' : w.kind}`;
+    }
+    if (!(held[id] > Date.now())) m.position = w.at;
+  }
+  for (const [id, m] of Object.entries(layer.pins)) if (!want[id]) { m.map = null; delete layer.pins[id]; delete held[id]; }
+}
+const EVMARK = (e) => (e.category === 'stopRequest' ? (e.pinned ? '■' : '●') : '▲');
+function syncEvents(st) {
+  const evs = (st?.events ?? []).filter((e) => e.latitude != null);
+  const keep = new Set(evs.map((e) => e.id));
+  for (const e of evs) {
+    const stop = e.category === 'stopRequest', done = e.status === 'closed' || e.resolved;
+    let m = layer.events[e.id];
+    if (!m) m = layer.events[e.id] = marker({ lat: e.latitude, lng: e.longitude }, el('<div class="evmk"></div>'), { z: 5 });
+    m.content.className = `evmk ${stop ? 'stp' : 'haz'} ${done ? 'done' : ''}`; m.content.textContent = EVMARK(e);
+    m.title = `${EVLABEL[e.type] || e.type} by ${e.by || 'someone'}`;
+  }
+  for (const [k, m] of Object.entries(layer.events)) if (!keep.has(k)) { m.map = null; delete layer.events[k]; }
+}
+// before the trip: the start pins for the phones
+function syncPre(st) {
+  const want = {};
+  if (!st || st.phase === 'setup') {
+    if (pgForm.startKind === 'map') for (const [k, v] of [['pre1', pgForm.s1], ['pre2', pgForm.s2]]) if (v) want[k] = { at: v, text: k === 'pre1' ? '1 start' : '2 start', drag: true };
+  } else if (st.phase === 'waiting' || st.phase === 'preparing') {
+    for (const [k, v] of [['pre1', st.starts?.phone1], ['pre2', st.starts?.phone2]]) if (v) want[k] = { at: fromCoord(v), text: k === 'pre1' ? 'Phone 1 start' : 'Phone 2 start', drag: false };
+  }
+  for (const [k, w] of Object.entries(want)) {
+    let m = layer.pre[k];
+    if (!m) {
+      m = layer.pre[k] = marker(w.at, el(`<div class="pin" style="border-color:var(--accent)"><span class="badge" style="background:var(--accent)">${k === 'pre1' ? '1' : '2'}</span><span class="t"></span></div>`), { drag: w.drag, z: 10 });
+      m.addListener('dragstart', () => { held[k] = Infinity; });
+      m.addListener('dragend', () => { held[k] = Date.now() + 500; pgForm[k === 'pre1' ? 's1' : 's2'] = posOf(m); renderPanel(); });
+    }
+    m.content.querySelector('.t').textContent = w.text; m.gmpDraggable = w.drag;
+    if (!(held[k] > Date.now())) m.position = w.at;
+  }
+  for (const [k, m] of Object.entries(layer.pre)) if (!want[k]) { m.map = null; delete layer.pre[k]; }
+}
+
+// ---------------------------------------------------------------- roads (a handful of calls per demo, only when a pin is dropped)
+const roads = new Map();
+let routingDown = false;
+async function road(a, b) {
+  if (!gm) return null;
+  const key = roadKey(a, b);
+  if (roads.has(key)) return roads.get(key);
+  let path = null;
+  try {
+    const { routes } = await gm.Route.computeRoutes({ origin: ll(a), destination: ll(b), travelMode: 'DRIVING', fields: ['path'] });
+    path = routes?.[0]?.path?.map((p) => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng })) ?? null;
+    if (path && path.length < 2) path = null;
+  } catch (e) { console.warn('routing', e); }
+  if (!path) { routingDown = true; renderPanel(); }
+  roads.set(key, path);
+  return path;
+}
+const destination = () => (geometry?.destination ? { lat: geometry.destination.latitude, lng: geometry.destination.longitude } : null);
+
+// ---------------------------------------------------------------- pins: arming, clicks, drags
+let armed = null; // { car, kind: 'start'|'end'|'deviation'|'pre1'|'pre2' } or { pick: {event, car} }
+function setArmed(a) {
+  armed = a; renderPanel(); renderHint();
+  if (gm) gmap().setOptions({ draggableCursor: a ? 'crosshair' : null });
+}
+function renderHint() {
+  const h = $('#hint');
+  if (!armed) return h.classList.add('hidden');
+  let text;
+  if (armed.pick) text = `Click the map to pick the place ${carOf(armed.pick.car)?.label ?? 'the car'} suggests`;
+  else if (armed.kind === 'pre1' || armed.kind === 'pre2') text = `Click the map to place phone ${armed.kind === 'pre1' ? 1 : 2}’s start`;
+  else text = `Click the map to place ${carOf(armed.car)?.label}’s ${armed.kind === 'deviation' ? 'deviation' : armed.kind}`;
+  h.innerHTML = `<span>${esc(text)}</span><button data-act="disarm">Cancel</button>`;
+  h.classList.remove('hidden');
+}
+async function onMapClick(p) {
+  const a = armed; if (!a) return;
+  setArmed(null);
+  if (a.pick) return cmd(voteCmd(a.pick.car, a.pick.event, 'notNow', { name: pickedPlaceName(carOf(a.pick.car)?.label ?? 'Car'), lat: p.lat, lng: p.lng }));
+  if (a.kind === 'pre1' || a.kind === 'pre2') { pgForm[a.kind === 'pre1' ? 's1' : 's2'] = p; renderPanel(); return syncPre(pg); }
+  return placePin(a.car, a.kind, p);
+}
+function onPinDrag(id, p) {
+  const [key, kind] = id.split(':');
+  if (kind === 'leaveEnd' || kind === 'leaveDev') return moveLeave(key, kind, p);
+  return placePin(key, kind, p);
+}
+async function placePin(key, kind, p) {
+  const c = carOf(key); if (!c) return;
+  const dest = destination();
+  if (kind === 'start') return cmd(placeAtCmd(key, p, dest ? await road(p, dest) : null));
+  if (!routeModel) return;
+  if (kind === 'end') return cmd(endingCmd(key, p, { road: await road(endingOrigin(c, routeModel), p) }));
+  if (kind === 'deviation') {
+    const snap = snapToRoute(routeModel, p);
+    const leaveKm = defaultLeaveKm(c.offset, snap.offset);
+    return sendDeviation(c, p, leaveKm);
+  }
+}
+async function sendDeviation(c, pin, leaveKm) {
+  const wait = formFor(c).wait;
+  const leave = pointAtOffset(routeModel, leaveKm * 1000), dest = destination();
+  let out = await road(leave, pin), back = dest ? await road(pin, dest) : null;
+  if (!out || !back) { const s = straightDeviation(routeModel, pin, leaveKm); out = out ?? s.out; back = back ?? s.back; }
+  if (c.pins?.deviation) await cmd({ cmd: 'cancelDeviation', car: c.key });
+  return cmd(deviateCmd(c.key, pin, { out, back, waitSeconds: wait, leaveKm }));
+}
+async function moveLeave(key, kind, p) {
+  const c = carOf(key); if (!c || !routeModel) return;
+  const snap = snapToRoute(routeModel, p), km = snap.offset / 1000;
+  const m = layer.pins[`${key}:${kind}`]; if (m) m.position = snap.point; // it sits on the route
+  if (kind === 'leaveEnd') {
+    const end = fromCoord(c.pins.end);
+    return cmd(endingCmd(key, end, { road: await road(snap.point, end), leaveKm: km }));
+  }
+  return sendDeviation(c, fromCoord(c.pins.deviation.pin), km);
+}
+
+// ---------------------------------------------------------------- Playground
+const EVLABEL = { debris: 'Debris', accident: 'Accident', pothole: 'Pothole', animal: 'Animal on the road', stoppedVehicle: 'Stopped vehicle', roadworks: 'Roadworks', heavyRain: 'Heavy rain', trafficJam: 'Traffic jam',
+  stopRest: 'Rest stop', stopFuel: 'Fuel stop', stopFood: 'Food stop', stopToilet: 'Toilet stop', pullingOver: 'Pulling over', carTrouble: 'Car trouble', runningLate: 'Running late', message: 'Message' };
+const STOPS = ['stopRest', 'stopFuel', 'stopFood', 'stopToilet'];
+const REPORTS = ['debris', 'accident', 'pothole', 'animal', 'stoppedVehicle', 'roadworks', 'heavyRain', 'trafficJam', 'pullingOver', 'carTrouble', 'runningLate'];
+const pgForm = { startKind: 'default', startText: '', skipBuild: true, dd: '', code: '', s1: null, s2: null };
+const carForm = {};
+let editing = null;
+const formFor = (c) => carForm[c.key] ??= { wait: 30, speed: String(c.speed ?? 90), km: '', kmEnd: '', kmDev: '' };
+
+const panel = $('#panel');
+function section(id) {
+  let s = panel.querySelector(`[data-sec="${id}"]`);
+  if (!s) { s = document.createElement('div'); s.dataset.sec = id; panel.append(s); }
+  return s;
+}
+const typing = (root) => root.contains(document.activeElement) && document.activeElement.matches("select, input[type=text], input[type=number]");
+function patch(node, html) { if (node._html !== html && !typing(node)) { node._html = html; node.innerHTML = html; } }
+
+function phaseLine(c) {
+  const at = km1(c.offset);
+  switch (c.phase) {
+    case 'joining': return `Driving to the route, merges at ${typeof c.mergeKm === 'number' ? c.mergeKm.toFixed(1) + ' km' : '…'}`;
+    case 'out': return `Leaving the route for its stop (${at})`;
+    case 'waiting': return `Waiting at its stop, ${c.waitSecondsLeft ?? 0} s left`;
+    case 'back': return 'Driving back to the route';
+    case 'ending': return 'On its way to its own end';
+    case 'arrived': return 'Arrived at its own end';
+    case 'parked': return c.joined ? 'Parked at its start' : 'Parked at its start, not in the trip yet';
+    case 'onRoute': return `On the route at ${at}`;
+    default: return 'Not placed yet';
+  }
+}
+function seesLine(c) {
+  if (!c.joined) return { text: c.kind === 'generated' ? 'Joining…' : 'Not joined yet. Join on phone 2 with the code.', warn: false };
+  if (!c.reported) return { text: 'The app has no position for this car yet.', warn: true };
+  const r = c.reported, stale = r.ageSeconds !== null && r.ageSeconds > 60;
+  const off = c.phase === 'onRoute' && r.offset !== null && Math.abs(r.offset - c.offset) > 500;
+  return { text: `The app has this car at ${km1(r.offset)}, ${secs(r.ageSeconds)}${stale ? ' (stale: “Last seen” on the other phones)' : ''}${off ? `. It is not following: it should be at ${km1(c.offset)}.` : ''}`, warn: stale || off };
+}
+function carHtml(c) {
+  const f = formFor(c), gen = c.kind === 'generated', pins = c.pins ?? {}, dev = pins.deviation;
+  const placed = c.phase && c.phase !== 'parked';
+  const isArmed = (k) => armed && armed.car === c.key && armed.kind === k;
+  const mk = !gm;
+  const err = problemOwner(pg, lastCmd) === c.key ? `<div class="err carerr">${esc(pg.problem)}</div>` : '';
+  const nm = editing === c.key
+    ? `<span class="rename"><input type="text" id="rn-${c.key}" data-rename="${c.key}" value="${esc(c.label)}" maxlength="40" style="width:9em"><button class="sm primary" data-act="renameGo" data-car="${c.key}">Save</button><button class="sm quiet" data-act="renameStop">Cancel</button></span>`
+    : `<span class="name" data-act="focus" data-car="${c.key}" title="Show on the map">${esc(c.label)}${gen && c.name && c.name !== c.label ? ` <span class="app">${esc(c.name)}</span>` : ''}</span>`;
+  const endChip = pins.end ? `<span>${pins.endOnRoute ? 'Parks on the route' : 'Has its own end'}</span> <button class="sm" data-act="clearEnding" data-car="${c.key}">Clear</button>` : '';
+  const devChip = dev ? `<span>Waits ${dev.waitSeconds} s at the pin</span> <button class="sm" data-act="cancelDeviation" data-car="${c.key}">Cancel</button>` : '';
+  const noMapStart = mk ? `<input type="number" step="0.1" min="0" id="km-${c.key}" data-f="km" data-car="${c.key}" value="${esc(f.km)}" placeholder="km"> <button class="sm" data-act="kmStart" data-car="${c.key}">Place</button>` : '';
+  return `<div class="head"><span class="badge ${c.kind === 'phone' ? 'phone' : ''}" style="background:${c.color}">${esc(initialOf(c.label))}</span>
+      <span style="flex:1;min-width:0">${nm}${gen ? '' : `<span class="tag">phone ${c.key === 'phone1' ? 1 : 2}</span>`}${c.phase === 'joining' ? '<span class="tag joining">joining</span>' : c.joined && c.phase ? '<span class="tag convoy">in the convoy</span>' : ''}${c.offline ? '<span class="tag off">no signal</span>' : ''}</span>
+      ${gen && editing !== c.key ? `<button class="quiet sm" data-act="rename" data-car="${c.key}" title="Rename">Rename</button><button class="quiet sm" data-act="remove" data-car="${c.key}" title="Remove this car" style="color:var(--red)">Remove</button>` : ''}</div>
+    <div class="line" data-live="line"></div><div class="line" data-live="sees"></div>
+    <div class="ctl"><button data-act="play" data-car="${c.key}" class="${c.playing ? '' : 'primary'}" ${pg.phase === 'ready' ? '' : 'disabled'}>${c.playing ? 'Pause' : 'Play'}</button>
+      <label class="small dim">Speed <input type="number" step="5" min="0" max="200" id="sp-${c.key}" data-f="speed" data-car="${c.key}" value="${esc(f.speed)}"> km/h</label>
+      ${gen ? `<button data-act="drop" data-car="${c.key}" class="sm ${c.offline ? 'primary' : ''}">${c.offline ? 'Give signal back' : 'Drop signal'}</button>
+        <select data-ask="${c.key}" ${c.offline || !c.joined ? 'disabled' : ''}><option value="">Ask stop ▾</option>${STOPS.map((t) => `<option value="${t}">${EVLABEL[t]}</option>`).join('')}</select>
+        <select data-report="${c.key}" ${c.offline || !c.joined ? 'disabled' : ''}><option value="">Report ▾</option>${REPORTS.map((t) => `<option value="${t}">${EVLABEL[t]}</option>`).join('')}</select>` : ''}</div>
+    <div class="pins">
+      <span class="pk">Start</span><span class="pv"><button class="sm ${isArmed('start') ? 'on' : ''}" data-act="arm" data-kind="start" data-car="${c.key}" ${mk ? 'hidden' : ''}>${pins.start ? 'Move start' : 'Place start'}</button>${noMapStart}${pins.start && !mk ? '<span class="dim small">drag the pin or click</span>' : ''}</span>
+      <span class="pk">Ending</span><span class="pv">${pins.end ? endChip : mk
+        ? `<input type="number" step="0.1" min="0" data-f="kmEnd" data-car="${c.key}" value="${esc(f.kmEnd)}" placeholder="km"> <button class="sm" data-act="kmEnd" data-car="${c.key}" ${placed ? '' : 'disabled'}>Park there</button>`
+        : `<button class="sm ${isArmed('end') ? 'on' : ''}" data-act="arm" data-kind="end" data-car="${c.key}" ${placed && canMovePin(c, 'end') ? '' : 'disabled'} title="${placed ? '' : 'Place its start first'}">Set ending</button>`}</span>
+      <span class="pk">Deviate</span><span class="pv">${dev ? devChip : `<label class="small dim">wait <input type="number" min="0" max="600" step="5" data-f="wait" data-car="${c.key}" value="${esc(f.wait)}" id="wt-${c.key}"> s</label>${mk
+        ? `<input type="number" step="0.1" min="0" data-f="kmDev" data-car="${c.key}" value="${esc(f.kmDev)}" placeholder="km"> <button class="sm" data-act="kmDev" data-car="${c.key}" ${placed && c.phase !== 'joining' ? '' : 'disabled'}>Leave there</button>`
+        : `<button class="sm ${isArmed('deviation') ? 'on' : ''}" data-act="arm" data-kind="deviation" data-car="${c.key}" ${placed && c.phase !== 'joining' && canMovePin(c, 'deviation') ? '' : 'disabled'} title="${placed ? '' : 'Place its start first'}">Set pin</button>`}`}</span>
+    </div>${err}`;
+}
+function renderPanel() {
+  try { drawPanel(); renderTop(); renderPrompts(); renderPlain(); }
+  catch (e) { console.error(e); panel.innerHTML = '<div class="err">The playground could not be drawn. Reload the page.</div>'; }
+}
+function drawPanel() {
+  const r = pgRun(), live = r && r.status === 'running', st = live ? pg : null;
+  const other = running() && !live;
+  const mode = !live || !st || st.phase === 'setup' ? 'setup' : st.phase === 'preparing' ? 'preparing' : st.phase === 'waiting' ? 'waiting' : st.phase === 'ended' ? 'ended' : 'ready';
+  const secs_ = ['setup', 'trip', 'cars', 'feed'].map(section);
+  const [sSetup, sTrip, sCars, sFeed] = secs_;
+  if (mapNote) { /* shown in the plain list or as a note above the setup */ }
+  // ---- setup / waiting / ended
+  let setup = '';
+  if (mode === 'setup') {
+    const emuDown = backends.emulators && !backends.emulators.up;
+    const kinds = [['default', 'the E1 start used by the demos'], ...(gm ? [['map', 'pins on the map']] : []), ['free', 'a latitude, longitude']];
+    const needMap = pgForm.startKind === 'map';
+    const ok = !needMap || pgForm.s1;
+    setup = `<div class="card"><h2>Playground</h2><p class="dim small" style="margin:0 0 8px">Try one event at a time on the real app. You tap the phones; this puts cars on the route and plays them.</p>
+      <div class="row"><label>Phones start at <select id="startKind" data-pgf="startKind">${kinds.map(([v, t]) => `<option value="${v}" ${pgForm.startKind === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      ${pgForm.startKind === 'free' ? `<input type="text" class="wide" id="startText" data-pgf="startText" placeholder="3.45, 101.40" value="${esc(pgForm.startText)}">` : ''}</div>
+      ${needMap ? `<div class="row" style="margin-top:8px">${['pre1', 'pre2'].map((k) => `<button class="sm ${armed?.kind === k ? 'on' : ''}" data-act="arm" data-kind="${k}">${pgForm[k === 'pre1' ? 's1' : 's2'] ? 'Move' : 'Place'} phone ${k === 'pre1' ? 1 : 2}’s start</button>`).join('')}</div>
+        <p class="dim small" style="margin:6px 0 0">Click the map, then drag the pins to adjust. Phone 2 starts with phone 1 if you do not place it.</p>` : ''}
+      <div class="row" style="margin-top:10px"><label><input type="checkbox" data-pgf="skipBuild" ${pgForm.skipBuild ? 'checked' : ''}> Skip the build</label>
+        <label class="small dim">Build folder <input type="text" class="wide" id="ddText" data-pgf="dd" placeholder="/tmp/ikut-dd-q4 (default)" value="${esc(pgForm.dd)}"></label></div>
+      <div class="row" style="margin-top:10px"><button class="primary" data-act="prepare" ${other || pendingPrepare || !ok ? 'disabled' : ''}>Prepare phones</button>
+        <span class="dim small">Fresh app on iPhone 17 #1 and #2, location on, both parked at their start. Emulators only.</span></div>
+      ${other ? '<div class="err">A scripted demo is running. Stop it first.</div>' : ''}${emuDown ? `<div class="err">${esc(backends.emulators.hint)}</div>` : ''}
+      ${st?.problem ? `<div class="err">${esc(st.problem)}</div>` : ''}
+      ${r && !live ? '<p class="small dim">The playground is closed. The trip is still there; end it from the menu on phone 1.</p>' : ''}</div>`;
+  } else if (mode === 'preparing') {
+    setup = `<div class="card"><span class="pill building">Preparing</span> <span>${esc(st.detail)}</span></div>`;
+  } else if (mode === 'waiting') {
+    setup = `<div class="card"><span class="pill waiting">Ready</span> <b>Create a trip on phone 1.</b>
+      <ol class="steps"><li>On phone 1 tap New Trip and pick a destination (a long one, say Ipoh).</li><li>It shows up below. Press “Use this trip” (the generated cars join nothing before that).</li></ol>
+      ${st.candidates?.length ? st.candidates.map((t) => `<div class="cand"><b>${esc(t.code)}</b> to ${esc(t.destination)}
+        <span class="dim small">${t.cars} car${t.cars === 1 ? '' : 's'}${t.firstCarDistance === null ? ', no position yet' : `, first car ${t.firstCarDistance < 1000 ? t.firstCarDistance + ' m' : km1(t.firstCarDistance)} from the start`}</span>
+        <button class="primary sm" data-act="useTrip" data-trip="${esc(t.tripId)}">Use this trip</button></div>`).join('') : '<p class="dim small">No new trip yet.</p>'}
+      <div class="row" style="margin-top:8px"><label class="small dim">Or phone 1’s trip code <input type="text" class="wide" id="codeText" data-pgf="code" placeholder="ABC123" value="${esc(pgForm.code)}"></label><button class="sm" data-act="useCode">Use this code</button></div>
+      ${st.problem ? `<div class="err">${esc(st.problem)}</div>` : ''}</div>`;
+  } else if (mode === 'ended') {
+    setup = `<div class="card"><span class="pill failed">Over</span> <b>The trip has ended.</b> <span class="dim">The generated cars have stopped. Close the playground and start a new one for the next trip.</span></div>`;
+  }
+  patch(sSetup, setup);
+  // ---- the trip
+  let trip = '';
+  if (mode === 'ready' || mode === 'ended') {
+    const ready = mode === 'ready';
+    trip = `<div class="card"><div class="cap">Trip code · join on phone 2 with this</div><div class="code">${esc(st.code)}</div>
+      <div class="dim">to ${esc(st.destination || '…')} · ${km1(st.routeLength)}${ready ? '' : ' · ' + esc(st.detail)}</div>
+      <div class="row" style="margin-top:10px"><button class="primary" data-act="playAll" ${ready ? '' : 'disabled'}>Play all</button><button data-act="pauseAll" ${ready ? '' : 'disabled'}>Pause all</button></div>
+      ${routingDown ? '<div class="note">Road directions are not available, so pins get straight lines.</div>' : ''}
+      ${st.problem && !problemOwner(st, lastCmd) ? `<div class="err">${esc(st.problem)}</div>` : ''}</div>`;
+  }
+  patch(sTrip, trip);
+  // ---- the cars (one card each, kept apart so a menu stays open while the numbers change)
+  const cars = mode === 'ready' ? st.cars : [];
+  const have = new Map([...sCars.querySelectorAll(':scope > .car')].map((n) => [n.dataset.key, n]));
+  for (const [k, n] of have) if (!cars.some((c) => c.key === k)) n.remove();
+  cars.forEach((c, i) => {
+    let n = have.get(c.key);
+    if (!n) { n = document.createElement('div'); n.className = 'car'; n.dataset.key = c.key; sCars.insertBefore(n, sCars.querySelector('.addcar')); }
+    patch(n, carHtml(c));
+    const line = n.querySelector('[data-live=line]'), sees = seesLine(c), sl = n.querySelector('[data-live=sees]');
+    if (line) line.textContent = phaseLine(c);
+    if (sl) { sl.textContent = sees.text; sl.classList.toggle('warn', sees.warn); }
+  });
+  if (!sCars.querySelector('.addcar')) { const a = document.createElement('div'); a.className = 'addcar'; sCars.append(a); }
+  sCars.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+  const gens = cars.filter((c) => c.kind === 'generated').length;
+  patch(sCars.querySelector('.addcar'), mode === 'ready' ? `<button class="primary" data-act="addCar" ${gens >= 8 ? 'disabled' : ''} style="width:100%;padding:10px">Add car</button>${gens >= 8 ? '<div class="dim small" style="text-align:center">Eight generated cars is the most.</div>' : ''}` : '');
+  // ---- the live feed
+  let feed = '';
+  if (mode === 'ready' || mode === 'ended') feed = `<div class="card"><div class="cap" style="margin-bottom:6px">What was reported</div>${eventsHtml(st)}
+    <details style="margin-top:8px" ${logOpen ? 'open' : ''}><summary>Log (last ${log.length} lines)</summary><pre id="plog">${esc(log.slice(-60).join('\n'))}</pre></details></div>`;
+  patch(sFeed, feed);
+  const details = sFeed.querySelector('details'); if (details) details.ontoggle = (e) => { logOpen = e.target.open; };
+}
+function eventsHtml(st) {
+  if (!st.events.length) return '<p class="dim small" style="margin:0">Nothing reported yet. Ask for a stop or report a hazard from a car, or tap Report or Pit stop on a phone.</p>';
+  return `<ul class="feed">${st.events.map((e) => {
+    const bits = [];
+    if (e.category === 'stopRequest') {
+      bits.push(`${e.agree} agree${e.disagree ? `, ${e.disagree} not now` : ''}`);
+      if (e.suggestions.length) bits.push(`suggested: ${e.suggestions.map(esc).join(', ')}`);
+      if (e.pinned) bits.push(`pinned: ${esc(e.pinned)}`);
+      if (e.resolved) bits.push('everyone has arrived');
+      else if (e.status === 'closed') bits.push('closed');
+    } else if (e.resolved) bits.push('expired');
+    return `<li><b>${esc(EVLABEL[e.type] || e.type)}</b> by ${esc(e.by || 'someone')} at ${km1(e.offset)}${bits.length ? `<div class="evt">${bits.join(' · ')}</div>` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+function renderTop() {
+  const r = pgRun(), live = r && r.status === 'running';
+  const html = live ? `<span class="pill ${pg?.phase === 'ready' ? 'ok' : 'warn'}">${esc(pg?.phase === 'ready' ? 'Playing' : pg?.phase === 'ended' ? 'Trip ended' : pg?.phase === 'waiting' ? 'Waiting for a trip' : pg?.phase === 'preparing' ? 'Preparing' : 'Setting up')}</span>
+    <button class="danger sm" data-act="close" ${r.stopping ? 'disabled' : ''}>${r.stopping ? 'Closing…' : 'Close the playground'}</button>` : '';
+  const n = $('#topStatus'); if (n._html !== html) { n._html = html; n.innerHTML = html; }
+}
+
+// ---- the stop request cards over the map
+function promptHtml(p) {
+  const where = p.offset != null ? ` at ${km1(p.offset)}` : '';
+  const sub = p.fromPhone ? `${esc(p.by)} (the app) asks for ${esc(p.title.toLowerCase())}${where}` : `${esc(p.by)} asks for ${esc(p.title.toLowerCase())}${where}`;
+  const rows = p.rows.map((r) => `<div class="prow"><span class="badge sm ${r.offline ? 'offline' : ''}" style="background:${r.color}">${esc(initialOf(r.label))}</span><span class="who">${esc(r.label)}</span>
+      <span class="says ${r.answer === 'yes' ? 'yes' : r.answer === 'another' ? 'another' : ''}">${esc(answerText(r))}</span>
+      ${r.canAnswer ? `<button class="sm primary" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="yes">Agree</button><button class="sm" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="notNow">Not now</button>
+        <button class="sm ${armed?.pick?.event === p.id && armed.pick.car === r.key ? 'on' : ''}" data-act="pick" data-event="${esc(p.id)}" data-car="${r.key}" ${gm ? '' : 'disabled title="Needs the map"'}>Another place</button>` : ''}</div>`).join('');
+  return `<h3>${esc(p.title)}</h3><div class="sub">${sub}</div>${p.suggestions.length ? `<div class="sub" style="margin-top:-6px">Suggested: ${p.suggestions.map(esc).join(', ')}</div>` : ''}
+    ${rows || '<div class="dim small">No generated cars in the trip.</div>'}
+    ${p.anyToAnswer ? `<button class="primary all" data-act="voteAll" data-event="${esc(p.id)}">Everyone agrees</button>` : ''}`;
+}
+function renderPrompts() {
+  const box = $('#prompts');
+  const live = pgRun()?.status === 'running';
+  const list = live ? stopPrompts(pg) : [];
+  const have = new Map([...box.children].map((n) => [n.dataset.id, n]));
+  for (const [id, n] of have) if (!list.some((p) => p.id === id)) n.remove();
+  for (const p of list) {
+    let n = have.get(p.id);
+    if (!n) { n = document.createElement('div'); n.className = 'prompt'; n.dataset.id = p.id; box.append(n); }
+    const html = promptHtml(p);
+    if (n._html !== html) { n._html = html; n.innerHTML = html; }
+  }
+}
+
+// ---- the plain list (no map): the route strip and a note
+function renderPlain() {
+  const box = $('#plain'), mapMode = Boolean(gm);
+  $('#map').classList.toggle('hidden', !mapMode);
+  box.classList.toggle('hidden', mapMode);
+  if (mapMode) return;
+  const st = pgRun()?.status === 'running' && pg && pg.phase === 'ready' ? pg : null;
+  const html = `<div class="card"><h2>${st ? 'The cars on the route' : 'Playground'}</h2>${mapNote ? `<div class="note">${esc(mapNote)}</div>` : '<p class="dim">Loading the map…</p>'}${st ? strip(st) : '<p class="dim small">Prepare the phones from the panel on the right.</p>'}
+    ${st ? '<p class="dim small">Without the map, a car’s start, ending and deviation are kilometres along the route: type one and press its button.</p>' : ''}</div>`;
+  if (box._html !== html) { box._html = html; box.innerHTML = html; }
+}
+function strip(st) {
+  const L = st.routeLength; if (!L) return '';
+  const at = [...st.cars.filter((c) => c.joined || c.kind === 'generated').map((c) => c.offset), ...st.events.filter((e) => e.offset !== null).map((e) => e.offset)];
+  let lo = 0, hi = L;
+  if (at.length) { lo = Math.max(0, Math.min(...at) - 1500); hi = Math.min(L, Math.max(...at) + 2500); if (hi - lo < 6000) { hi = Math.min(L, lo + 6000); lo = Math.max(0, hi - 6000); } }
+  const pct = (m) => `${Math.max(0, Math.min(100, ((m - lo) / (hi - lo)) * 100))}%`, inView = (m) => m >= lo - 1 && m <= hi + 1;
+  const shown = st.cars.filter((c) => (c.joined || c.kind === 'generated') && c.offset != null && inView(c.offset)).sort((a, b) => a.offset - b.offset);
+  const dots = shown.map((c, i) => {
+    const top = c.phase === 'joining' ? 4 : i % 2 ? 4 : 78;
+    return `<span class="${badgeClasses(c)} dot" style="left:${pct(c.offset)};background:${c.color}" title="${esc(c.label)}">${esc(initialOf(c.label))}</span><span class="name" style="left:${pct(c.offset)};top:${top + (i % 2 ? 0 : 0)}px;color:${c.color}">${esc(c.label)}</span>`;
+  }).join('');
+  const evs = st.events.filter((e) => e.offset !== null && inView(e.offset)).map((e) => `<span class="ev ${e.category === 'stopRequest' ? 'stp' : 'haz'} ${e.resolved ? 'done' : ''}" style="left:${pct(e.offset)}" title="${esc(EVLABEL[e.type] || e.type)}">${e.pinned ? '■' : e.category === 'stopRequest' ? '●' : '▲'}</span>`).join('');
+  return `<div class="strip"><div class="road"></div>${dots}${evs}<span class="ends">${km1(lo)}</span><span class="ends r">${km1(hi)}</span></div>`;
+}
+
+// ---------------------------------------------------------------- clicks and fields in the panel
+async function startPlayground() {
+  const j = await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: 'demo-playground.mjs', backend: 'emulators' }) });
+  if (!j.ok) { notice((await j.json().catch(() => ({}))).error || 'Could not open the playground.'); return false; }
+  return true;
+}
+function prepareBody() {
+  const extra = { skipBuild: pgForm.skipBuild, derivedData: pgForm.dd.trim() || undefined };
+  if (pgForm.startKind === 'map' && pgForm.s1) return prepareStartsCmd(pgForm.s1, pgForm.s2 ?? undefined, extra);
+  return { cmd: 'prepare', start: pgForm.startKind === 'free' ? pgForm.startText : 'default', ...extra };
+}
+function kmPoint(km) { return routeModel && pointAtOffset(routeModel, Number(km) * 1000); }
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, k = b.dataset.car, c = k ? carOf(k) : null, f = c ? formFor(c) : null;
+  switch (act) {
+    case 'prepare': {
+      const body = prepareBody();
+      if (pgRun()?.status === 'running' && pg) { setArmed(null); return cmd(body); }
+      pendingPrepare = body; renderPanel();
+      if (!(await startPlayground())) { pendingPrepare = null; renderPanel(); }
+      return;
+    }
+    case 'close': return post('/api/stop');
+    case 'useTrip': return cmd({ cmd: 'useTrip', tripId: b.dataset.trip });
+    case 'useCode': return cmd({ cmd: 'useTrip', code: pgForm.code });
+    case 'playAll': return cmd({ cmd: 'playAll', playing: true });
+    case 'pauseAll': return cmd({ cmd: 'playAll', playing: false });
+    case 'play': return cmd({ cmd: 'play', car: k, playing: !c.playing });
+    case 'drop': return cmd({ cmd: 'drop', car: k, offline: !c.offline });
+    case 'addCar': return cmd({ cmd: 'addCar' });
+    case 'remove': return cmd({ cmd: 'removeCar', car: k });
+    case 'rename': editing = k; renderPanel(); return document.getElementById(`rn-${k}`)?.select();
+    case 'renameStop': editing = null; return renderPanel();
+    case 'renameGo': return doRename(k);
+    case 'clearEnding': return cmd({ cmd: 'clearEnding', car: k });
+    case 'cancelDeviation': return cmd({ cmd: 'cancelDeviation', car: k });
+    case 'arm': { const kind = b.dataset.kind; return setArmed(armed && armed.kind === kind && armed.car === k ? null : { car: k, kind }); }
+    case 'disarm': return setArmed(null);
+    case 'pick': return setArmed({ pick: { event: b.dataset.event, car: k } });
+    case 'vote': return cmd({ cmd: 'vote', car: k, event: b.dataset.event, answer: b.dataset.answer });
+    case 'voteAll': return cmd({ cmd: 'voteAll', event: b.dataset.event });
+    case 'focus': { const p = c?.latitude != null && gm; if (p) { gmap().panTo({ lat: c.latitude, lng: c.longitude }); if (gmap().getZoom() < 12) gmap().setZoom(13); } return; }
+    case 'fitRoute': return fitRoute();
+    case 'fitCars': return fitCars();
+    case 'kmStart': if (f.km !== '') return cmd({ cmd: 'place', car: k, km: Number(f.km) }); return;
+    case 'kmEnd': { const p = kmPoint(f.kmEnd); return f.kmEnd !== '' && p ? cmd(endingCmd(k, p)) : undefined; }
+    case 'kmDev': {
+      if (f.kmDev === '' || !routeModel) return;
+      const km = Number(f.kmDev), pin = sidePoint(routeModel, km, 800), s = straightDeviation(routeModel, pin, km);
+      if (c.pins?.deviation) await cmd({ cmd: 'cancelDeviation', car: k });
+      return cmd(deviateCmd(k, pin, { out: s.out, back: s.back, waitSeconds: f.wait, leaveKm: km }));
+    }
+  }
+});
+function doRename(k) { const v = document.getElementById(`rn-${k}`)?.value.trim(); editing = null; renderPanel(); if (v) cmd({ cmd: 'rename', car: k, name: v }); }
+document.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (t.dataset.f) formFor({ key: t.dataset.car })[t.dataset.f] = t.value;
+  if (t.dataset.pgf && t.type === 'text') pgForm[t.dataset.pgf] = t.value;
+});
+document.addEventListener('change', (ev) => {
+  const t = ev.target;
+  if (t.dataset.pgf) { pgForm[t.dataset.pgf] = t.type === 'checkbox' ? t.checked : t.value; t.blur(); if (t.dataset.pgf === 'startKind') setArmed(null); renderPanel(); syncPre(pg); return; }
+  if (t.dataset.ask) { const v = t.value; t.value = ''; t.blur(); return v && cmd({ cmd: 'askStop', car: t.dataset.ask, type: v }); }
+  if (t.dataset.report) { const v = t.value; t.value = ''; t.blur(); return v && cmd({ cmd: 'report', car: t.dataset.report, type: v }); }
+  if (t.dataset.f === 'speed') return cmd({ cmd: 'speed', car: t.dataset.car, kmh: Number(t.value) });
+  if (t.dataset.f === 'wait') t.value = clampWait(t.value);
+});
+document.addEventListener('focusout', () => setTimeout(() => { if (pg) renderPanel(); }, 120));
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && armed) return setArmed(null);
+  if (ev.key === 'Escape' && editing) { editing = null; return renderPanel(); }
+  if (ev.key !== 'Enter') return;
+  if (ev.target.dataset.rename) return doRename(ev.target.dataset.rename);
+  if (ev.target.matches('#panel input')) ev.target.blur();
+});
+
+// ---------------------------------------------------------------- scripted demos tab (as before, restyled)
 function derive() {
   const d = { phase: null, detail: '', code: null, tick: null, backend: null, errors: [], checks: {}, seen: [] };
   for (const e of events) {
@@ -116,8 +794,6 @@ function elapsed(d) {
   const over = running() && d.phase === 'running' ? (Date.now() - d.tick.ts) / 1000 : 0;
   return d.tick.t + Math.min(over, 5);
 }
-
-// ---- rendering
 function renderBackend() {
   $('#backendSwitch').innerHTML = ['emulators', 'production'].map((b) =>
     `<button data-b="${b}" class="${b === backend ? 'on' : ''} ${b === 'production' ? 'prod' : ''}" ${running() ? 'disabled' : ''}>${b === 'emulators' ? 'Emulators' : 'Production'}</button>`).join('');
@@ -129,7 +805,7 @@ function renderList() {
     const emuDown = backend === 'emulators' && backends.emulators && !backends.emulators.up;
     const prod = backend === 'production';
     const label = confirming === d.file ? 'Are you sure?' : prod ? 'Play on production' : 'Play';
-    return `<div class="card" data-f="${esc(d.file)}">
+    return `<div class="dcard" data-f="${esc(d.file)}">
       <div class="row" style="justify-content:space-between"><h2>${esc(d.title)}</h2>
         <span class="dim small">${d.durationSeconds ? 'about ' + mmss(d.durationSeconds) + ' min' : esc(d.file)}</span></div>
       <p>${esc(d.summary)}</p>
@@ -150,21 +826,20 @@ function renderRun() {
   if (!run || run.interactive) return el.classList.add('hidden');
   el.classList.remove('hidden');
   const d = derive(), t = elapsed(d), dur = run.durationSeconds || 0;
-  const done = new Set();
-  const used = new Set();
+  const done = new Set(), used = new Set();
   run.timeline.forEach((e, i) => { const j = d.seen.findIndex((s, k) => !used.has(k) && (s.text === e.text || s.at === e.at)); if (j >= 0) { used.add(j); done.add(i); } });
   const next = running() ? run.timeline.findIndex((_, i) => !done.has(i)) : -1;
-  const asked = run.options?.backend || 'emulators';
-  const be = d.backend?.backend || asked;
+  const be = d.backend?.backend || run.options?.backend || 'emulators';
   const names = Object.keys(d.checks).sort();
+  const ph = d.phase === 'running' ? 'running' : d.phase === 'ended' ? 'ended' : d.phase === 'failed' ? 'failed' : 'waiting';
   el.innerHTML = `
     <div class="row" style="justify-content:space-between">
       <div><h2>${esc(run.title)}</h2>
-        <span class="pill ${esc(d.phase)}">${esc(d.phase || 'starting')}</span> <span class="dim">${esc(d.detail)}</span>
-        <span class="pill" style="${be === 'production' ? 'background:var(--badbg);color:var(--bad)' : ''}">${be === 'production' ? 'Production' : 'Emulators'}${d.backend?.project ? ' · ' + esc(d.backend.project) : ''}</span></div>
+        <span class="pill ${ph}">${esc(d.phase || 'starting')}</span> <span class="dim">${esc(d.detail)}</span>
+        <span class="pill ${be === 'production' ? 'failed' : ''}">${be === 'production' ? 'Production' : 'Emulators'}${d.backend?.project ? ' · ' + esc(d.backend.project) : ''}</span></div>
       <button class="danger" data-stop ${running() && !run.stopping ? '' : 'disabled'}>${run.stopping && running() ? 'Stopping…' : 'Stop'}</button>
     </div>
-    ${d.code ? `<div><span class="dim small">Trip code</span><div class="code">${esc(d.code)}</div></div>` : ''}
+    ${d.code ? `<div><span class="cap">Trip code</span><div class="code">${esc(d.code)}</div></div>` : ''}
     ${d.errors.map((m) => `<div class="err">${esc(m)}</div>`).join('')}
     ${dur ? `<div class="row"><b>T+${mmss(t)}</b><span class="dim">of ${mmss(dur)}</span></div><div class="bar"><i style="width:${Math.min(100, t / dur * 100)}%"></i></div>` : ''}
     <ul class="tl">${run.timeline.map((e, i) => {
@@ -179,24 +854,13 @@ function renderRun() {
   const lb = $('#logbox'); if (lb) lb.scrollTop = lb.scrollHeight;
   $('#runView details').ontoggle = (e) => { logOpen = e.target.open; };
 }
-const renderAll = () => { renderBackend(); renderList(); renderRun(); renderPg(); };
-
-// ---- actions
-async function post(path, body) {
-  let r;
-  try { r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); }
-  catch { $('#notice').classList.remove('hidden'); $('#notice').textContent = 'The dashboard could not be reached. Is it still running?'; return false; }
-  const j = await r.json().catch(() => ({}));
-  $('#notice').classList.toggle('hidden', r.ok);
-  if (!r.ok) $('#notice').textContent = j.error || 'That did not work.';
-  return r.ok;
-}
+function renderAll() { renderBackend(); renderList(); renderRun(); renderPanel(); syncMap(); }
 async function loadDemos(refresh) {
   const j = await (await fetch('/api/demos' + (refresh ? '?refresh=1' : ''))).json();
   demos = j.demos; backends = j.backends; renderAll();
 }
 document.addEventListener('click', (ev) => {
-  const b = ev.target.closest('button'); if (!b) return;
+  const b = ev.target.closest('button'); if (!b || b.dataset.act) return;
   if (b.id === 'refresh') return loadDemos(true);
   if (b.dataset.b) { backend = b.dataset.b; store.set('ikut-backend', backend); confirming = null; return renderAll(); }
   if (b.dataset.stop !== undefined) return post('/api/stop');
@@ -208,206 +872,36 @@ document.addEventListener('click', (ev) => {
     post('/api/start', { file, backend, skipBuild: o.skipBuild, endTrip: backend === 'production' || o.endTrip });
   }
 });
-document.addEventListener('change', (ev) => {
-  const c = ev.target.closest('[data-o]'); if (c) opts[c.closest('[data-f]').dataset.f][c.dataset.o] = c.checked;
-});
+document.addEventListener('change', (ev) => { const c = ev.target.closest('[data-o]'); if (c) opts[c.closest('[data-f]').dataset.f][c.dataset.o] = c.checked; });
 
-
-// ---- Playground
-const CARCOLOR = { phone1: '#0a6cff', phone2: '#d9480f', daniel: '#7C3AED', hafiz: '#0F766E' };
-const EVLABEL = { debris: 'Debris', accident: 'Accident', pothole: 'Pothole', animal: 'Animal on the road', stoppedVehicle: 'Stopped vehicle', roadworks: 'Roadworks', heavyRain: 'Heavy rain', trafficJam: 'Traffic jam',
-  stopRest: 'Rest stop', stopFuel: 'Fuel stop', stopFood: 'Food stop', stopToilet: 'Toilet stop', pullingOver: 'Pulling over', carTrouble: 'Car trouble', runningLate: 'Running late', message: 'Message' };
-let pg = null, pgForm = { startKind: 'default', startText: '', skipBuild: true, dd: '', code: '' }, carForm = {}, pendingPrepare = null;
-const pgRun = () => (run?.interactive ? run : null);
-const km1 = (m) => (typeof m === 'number' && Number.isFinite(m) ? (m / 1000).toFixed(1) + ' km' : '–');
-const secs = (s) => (s === null || s === undefined ? '' : s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`);
-async function cmd(body) { return post('/api/command', body); }
-function formFor(c) {
-  return carForm[c.key] ??= { km: (c.joining && c.mergeKm !== null ? c.mergeKm : (pg?.defaults?.[c.key] ?? 0) / 1000).toFixed(1), speed: String(c.speed ?? 90), off: c.joining, side: String(c.sideMeters ?? 2000) };
+// ---------------------------------------------------------------- live updates
+function setGeometry(g) {
+  geometry = g;
+  routeModel = g?.route ? measure(decodePolyline(g.route)) : null;
+  if (!g) fitted = false;
 }
-let stripWhole = false;
-function pgStrip(st) {
-  const L = st.routeLength;
-  const at = [...st.cars.filter((c) => c.joined || c.kind === 'generated').map((c) => c.offset), ...st.events.filter((e) => e.offset !== null).map((e) => e.offset)];
-  let lo = 0, hi = L;
-  if (!stripWhole && at.length) {
-    lo = Math.max(0, Math.min(...at) - 1500); hi = Math.min(L, Math.max(...at) + 2500);
-    if (hi - lo < 6000) { hi = Math.min(L, lo + 6000); lo = Math.max(0, hi - 6000); }
-  }
-  const pct = (m) => `${Math.max(0, Math.min(100, ((m - lo) / (hi - lo)) * 100))}%`;
-  const inView = (m) => m >= lo - 1 && m <= hi + 1;
-  const shown = st.cars.filter((c) => (c.joined || c.kind === 'generated') && inView(c.offset)).sort((a, b) => a.offset - b.offset);
-  const dots = shown.map((c, i) => {
-    const level = i % 3; // names go above or below the road, in three heights, so close cars do not hide each other
-    const above = level === 1;
-    const top = c.joining ? 12 : above ? 4 : level === 0 ? 74 : 92;
-    return `<span class="dot ${c.kind} ${c.joining ? 'joining' : ''}" style="left:${pct(c.offset)};background:${CARCOLOR[c.key]}" title="${esc(c.label)}">${c.number ?? ''}</span>`
-      + `<span class="name ${c.joining ? 'j' : ''}" style="left:${pct(c.offset)};top:${top}px;color:${CARCOLOR[c.key]}">${esc(c.label)}${c.joining ? ' (joining)' : ''}</span>`;
-  }).join('');
-  const evs = st.events.filter((e) => e.offset !== null && inView(e.offset)).map((e) => {
-    const stop = e.category === 'stopRequest';
-    const mark = e.pinned ? '■' : stop ? '●' : '▲';
-    return `<span class="ev ${stop ? 'stp' : 'haz'} ${e.resolved ? 'done' : ''}" style="left:${pct(e.offset)}" title="${esc(EVLABEL[e.type] || e.type)} at ${km1(e.offset)}">${mark}</span>`;
-  }).join('');
-  return `<div class="strip"><div class="road"></div>${dots}${evs}<span class="ends">${stripWhole ? 'Start' : km1(lo)}</span><span class="ends r">${stripWhole ? esc(st.destination) + ' · ' : ''}${km1(hi)}</span></div>
-    <div class="row small dim"><span>Numbers are the car numbers in the app. Ringed dots are the phones, dashed ones are still joining. ▲ hazard, ● stop request, ■ pinned stop.</span>
-    <button data-pg="zoom" class="small">${stripWhole ? 'Zoom in on the cars' : 'Show the whole route'}</button></div>`;
-}
-function pgCar(c, st) {
-  const f = formFor(c);
-  const gen = c.kind === 'generated';
-  let sees = '';
-  if (!c.joined) sees = `<div class="sees dim small">${gen ? 'Joining…' : 'Not joined yet. Join on phone 2 with the code.'}</div>`;
-  else if (!c.reported) sees = `<div class="sees warn small">The app has no position for this car yet.</div>`;
-  else {
-    const r = c.reported, stale = r.ageSeconds !== null && r.ageSeconds > 60; // the app calls a car stale after 60 s
-    const off = !c.joining && r.offset !== null && Math.abs(r.offset - c.offset) > 500;
-    sees = `<div class="sees small ${stale || off ? 'warn' : 'dim'}">The app has this car at ${km1(r.offset)}, ${esc(secs(r.ageSeconds))}${stale ? ' (stale: “Last seen” on the other phones)' : ''}${off ? `. It is not following: it should be at ${km1(c.offset)}.` : ''}</div>`;
-  }
-  const play = `<button data-pg="play" data-car="${c.key}" class="${c.playing ? '' : 'primary'}">${c.playing ? 'Pause' : 'Play'}</button>`;
-  return `<div class="carrow"><div class="row" style="justify-content:space-between">
-    <span class="nm"><span class="sw" style="background:${CARCOLOR[c.key]}"></span>${esc(c.label)}${c.name ? ` <span class="dim small" style="font-weight:400">${esc(c.name)}</span>` : ''}
-      ${gen ? '' : '<span class="tag">phone ' + (c.key === 'phone1' ? '1' : '2') + '</span>'}${c.joining ? '<span class="tag joining">joining</span>' : c.joined ? '<span class="tag convoy">in the convoy</span>' : ''}
-      ${c.offline ? '<span class="tag off">no signal</span>' : ''}</span>
-    <span>Now at <b>${km1(c.offset)}</b>${c.joining ? ` · merges at ${typeof c.mergeKm === 'number' ? c.mergeKm.toFixed(1) : '?'} km` : ''} ${play}</span></div>
-    <div class="grid">
-      <label>${gen && f.off ? 'Merges at' : 'Place at'} <input type="number" step="0.1" min="0" id="km-${c.key}" data-f="km" data-car="${c.key}" value="${esc(f.km)}"> km</label>
-      <label>Speed <input type="number" step="5" min="0" max="200" id="sp-${c.key}" data-f="speed" data-car="${c.key}" value="${esc(f.speed)}"> km/h</label>
-      ${gen ? `<label><input type="checkbox" data-f="off" data-car="${c.key}" ${f.off ? 'checked' : ''}> Starts off the route</label>
-        ${f.off ? `<label>Side road <input type="number" step="100" min="500" id="sd-${c.key}" data-f="side" data-car="${c.key}" value="${esc(f.side)}"> m away</label>` : ''}` : ''}
-    </div>
-    ${gen ? `<div class="grid"><label><input type="checkbox" data-b="agree" data-car="${c.key}" ${c.agree ? 'checked' : ''}> Agrees to stops</label>
-      <label><input type="checkbox" data-b="suggest" data-car="${c.key}" ${c.suggest ? 'checked' : ''}> Suggests a place too (when it agrees)</label>
-      <button data-pg="drop" data-car="${c.key}" class="${c.offline ? 'primary' : ''}">${c.offline ? 'Give signal back' : 'Drop signal'}</button></div>` : ''}
-    ${sees}</div>`;
-}
-function pgEvents(st) {
-  if (!st.events.length) return '<p class="dim small">Nothing reported yet. Tap Report or Pit stop on a phone.</p>';
-  return `<ul class="feed">${st.events.map((e) => {
-    const bits = [];
-    if (e.category === 'stopRequest') {
-      bits.push(`${e.agree} agree${e.disagree ? `, ${e.disagree} not now` : ''}`);
-      if (e.suggestions.length) bits.push(`suggested: ${e.suggestions.map(esc).join(', ')}`);
-      if (e.pinned) bits.push(`pinned: ${esc(e.pinned)}`);
-      if (e.resolved) bits.push('everyone has arrived');
-    } else if (e.resolved) bits.push('expired');
-    return `<li><b>${esc(EVLABEL[e.type] || e.type)}</b> by ${esc(e.by || 'someone')} at ${km1(e.offset)} <span class="dim">${esc(secs(e.ageSeconds))}</span>${bits.length ? `<div class="small dim">${bits.join(' · ')}</div>` : ''}</li>`;
-  }).join('')}</ul>`;
-}
-function renderPg() {
-  try { drawPg(); } catch (e) { console.error(e); $('#pg').innerHTML = '<p class="err">The playground card could not be drawn. Reload the page.</p>'; }
-}
-function drawPg() {
-  const el = $('#pg');
-  if (el.contains(document.activeElement) && document.activeElement.dataset.dirty) return; // don't pull a field from under someone typing
-  const a = document.activeElement, keep = el.contains(a) && a.id ? { id: a.id, s: a.selectionStart, e: a.selectionEnd } : null;
-  const r = pgRun(), live = r && r.status === 'running', st = live ? pg : null;
-  const other = running() && !live;
-  let h = `<div class="row" style="justify-content:space-between"><div><h2>Playground</h2>
-    <p class="lead dim" style="margin:0">Try one event at a time on the real app. You tap the phones; this places the cars and plays the route.</p></div>
-    ${live ? `<button class="danger" data-pg="close" ${r.stopping ? 'disabled' : ''}>${r.stopping ? 'Closing…' : 'Close the playground'}</button>` : ''}</div>`;
-  if (!live || !st || st.phase === 'setup') {
-    const emuDown = backends.emulators && !backends.emulators.up;
-    h += `<div class="row" style="margin-top:10px"><label>Everyone starts at
-        <select id="startKind" data-pgf="startKind"><option value="default" ${pgForm.startKind === 'default' ? 'selected' : ''}>the E1 start used by the demos</option><option value="free" ${pgForm.startKind === 'free' ? 'selected' : ''}>somewhere else</option></select></label>
-      ${pgForm.startKind === 'free' ? `<input type="text" class="wide" id="startText" data-pgf="startText" placeholder="3.45, 101.40" value="${esc(pgForm.startText)}">` : ''}
-      <label><input type="checkbox" data-pgf="skipBuild" ${pgForm.skipBuild ? 'checked' : ''}> Skip the build</label>
-      <label class="small dim">Build folder <input type="text" class="wide" id="ddText" data-pgf="dd" placeholder="/tmp/ikut-dd-q4 (default)" value="${esc(pgForm.dd)}"></label>
-      <button class="primary" data-pg="prepare" ${other || pendingPrepare || (live && !st) ? 'disabled' : ''}>Prepare phones</button></div>
-      <p class="small dim">Puts a fresh copy of the app on iPhone 17 #1 and #2, switches on location, parks both at the start and opens the app. Emulators only.</p>
-      ${other ? '<div class="err small">A scripted demo is running. Stop it first.</div>' : ''}
-      ${emuDown ? `<div class="err small">${esc(backends.emulators.hint)}</div>` : ''}
-      ${st?.problem ? `<div class="err">${esc(st.problem)}</div>` : ''}
-      ${r && !live ? '<p class="small dim">The playground is closed. The trip is still there; end it from the menu on phone 1.</p>' : ''}`;
-  } else if (st.phase === 'preparing') {
-    h += `<p class="lead"><span class="pill building">Preparing</span> ${esc(st.detail)}</p>`;
-  } else if (st.phase === 'waiting') {
-    h += `<p class="lead"><span class="pill waiting">Ready</span> <b>Create a trip on phone 1.</b></p>
-      <ol class="steps"><li>On phone 1 tap New Trip and pick a destination (a long one, say Ipoh).</li><li>It shows up below. Press “Use this trip” (Daniel and Hafiz join nothing before that).</li></ol>
-      ${st.candidates?.length ? st.candidates.map((t) => `<div class="cand"><b>${esc(t.code)}</b> to ${esc(t.destination)}
-        <span class="dim small">${t.cars} car${t.cars === 1 ? '' : 's'}${t.firstCarDistance === null ? ', no position yet' : `, first car ${t.firstCarDistance < 1000 ? t.firstCarDistance + ' m' : km1(t.firstCarDistance)} from the start`}</span>
-        <button class="primary" data-pg="useTrip" data-trip="${esc(t.tripId)}">Use this trip</button></div>`).join('') : '<p class="dim small">No new trip yet.</p>'}
-      <div class="row" style="margin-top:8px"><label>Or type phone 1's trip code <input type="text" class="wide" id="codeText" data-pgf="code" placeholder="ABC123" value="${esc(pgForm.code)}"></label>
-        <button data-pg="useCode">Use this code</button></div>
-      ${st.problem ? `<div class="err">${esc(st.problem)}</div>` : ''}`;
-  } else if (st.phase === 'ended') {
-    h += `<p class="lead"><span class="pill failed">Over</span> <b>The trip has ended.</b> Daniel and Hafiz have stopped. Close the playground and start a new one for the next trip.</p>`;
-  } else {
-    const ready = st.phase === 'ready';
-    h += `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><span class="dim small">Trip code — join on phone 2 with this</span><div class="code">${esc(st.code)}</div>
-      <span class="dim">to ${esc(st.destination || '…')} · ${km1(st.routeLength)}${ready ? '' : ' · ' + esc(st.detail)}</span></div>
-      <div class="row"><button class="primary" data-pg="playAll" ${ready ? '' : 'disabled'}>Play all</button><button data-pg="pauseAll" ${ready ? '' : 'disabled'}>Pause all</button></div></div>`;
-    if (st.problem) h += `<div class="err">${esc(st.problem)}</div>`;
-    if (st.routeLength) h += pgStrip(st);
-    h += st.cars.map((c) => pgCar(c, st)).join('');
-    h += `<h2 style="margin-top:14px;font-size:1.05rem">What was reported</h2>${pgEvents(st)}`;
-  }
-  el.innerHTML = h;
-  if (keep) { const n = document.getElementById(keep.id); if (n) { n.focus(); try { n.setSelectionRange(keep.s, keep.e); } catch {} } }
-}
-async function startPlayground() {
-  const j = await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: 'demo-playground.mjs', backend: 'emulators' }) });
-  if (!j.ok) { $('#notice').classList.remove('hidden'); $('#notice').textContent = (await j.json().catch(() => ({}))).error || 'Could not open the playground.'; return false; }
-  return true;
-}
-function prepareBody() {
-  return { cmd: 'prepare', start: pgForm.startKind === 'free' ? pgForm.startText : 'default', skipBuild: pgForm.skipBuild, derivedData: pgForm.dd.trim() || undefined };
-}
-document.addEventListener('click', async (ev) => {
-  const b = ev.target.closest('button[data-pg]'); if (!b) return;
-  const k = b.dataset.car, c = pg?.cars?.find((x) => x.key === k), what = b.dataset.pg;
-  if (what === 'prepare') {
-    const body = prepareBody();
-    if (pgRun()?.status === 'running' && pg) return cmd(body);
-    pendingPrepare = body; renderPg();
-    if (!(pgRun()?.status === 'running') && !(await startPlayground())) { pendingPrepare = null; renderPg(); }
-  } else if (what === 'close') post('/api/stop');
-  else if (what === 'useTrip') cmd({ cmd: 'useTrip', tripId: b.dataset.trip });
-  else if (what === 'useCode') cmd({ cmd: 'useTrip', code: pgForm.code });
-  else if (what === 'playAll') cmd({ cmd: 'playAll', playing: true });
-  else if (what === 'pauseAll') cmd({ cmd: 'playAll', playing: false });
-  else if (what === 'play') cmd({ cmd: 'play', car: k, playing: !c.playing });
-  else if (what === 'drop') cmd({ cmd: 'drop', car: k, offline: !c.offline });
-});
-document.addEventListener('input', (ev) => {
-  const t = ev.target;
-  if (t.dataset.f) { carForm[t.dataset.car] ??= {}; carForm[t.dataset.car][t.dataset.f] = t.type === 'checkbox' ? t.checked : t.value; t.dataset.dirty = '1'; }
-  if (t.dataset.pgf && t.type === 'text') { pgForm[t.dataset.pgf] = t.value; t.dataset.dirty = '1'; }
-});
-document.addEventListener('change', (ev) => {
-  const t = ev.target; delete t.dataset.dirty;
-  if (t.dataset.pgf) { pgForm[t.dataset.pgf] = t.type === 'checkbox' ? t.checked : t.value; return renderPg(); }
-  if (t.dataset.b) return cmd({ cmd: 'behaviour', car: t.dataset.car, [t.dataset.b]: t.checked });
-  if (!t.dataset.f) return;
-  const k = t.dataset.car, f = carForm[k] ?? (carForm[k] = {});
-  if (t.dataset.f === 'speed') return cmd({ cmd: 'speed', car: k, kmh: Number(t.value) });
-  if (t.dataset.f === 'km' || t.dataset.f === 'side' || t.dataset.f === 'off') {
-    const gen = k === 'daniel' || k === 'hafiz';
-    cmd({ cmd: 'place', car: k, km: Number(f.km), offRoute: gen && Boolean(f.off), sideMeters: Number(f.side) });
-    if (t.dataset.f === 'off') renderPg();
-  }
-});
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('.pg input')) ev.target.blur(); });
-
-// ---- live updates
 function connect() {
   const es = new EventSource('/api/events');
   es.onmessage = (m) => {
     const msg = JSON.parse(m.data);
-    if (msg.k === 'snapshot') { run = msg.run; events = msg.events; log = msg.log; pg = msg.state; confirming = null; }
+    if (msg.k === 'snapshot') { run = msg.run; events = msg.events; log = msg.log; pg = msg.state; setGeometry(msg.geometry); confirming = null; }
     else if (msg.k === 'state') {
       pg = msg.state;
       if (pendingPrepare && pg.phase === 'setup') { const b = pendingPrepare; pendingPrepare = null; cmd(b); }
-      return renderPg();
+      renderPanel(); return syncMap();
     }
+    else if (msg.k === 'geometry') { setGeometry(msg.geometry); renderPanel(); return syncMap(); }
     else if (msg.k === 'ev') events.push(msg.ev);
     else if (msg.k === 'log') { log.push(msg.line); if (log.length > 500) log.shift(); }
     else if (msg.k === 'run') { run = msg.run; if (run && run.status !== 'running') pendingPrepare = null; }
-    if (msg.k === 'ev' || msg.k === 'log') renderRun(); else renderAll();
+    if (msg.k === 'ev' || msg.k === 'log') { if (pgRun()) { const pl = $('#plog'); if (pl) { pl.textContent = log.slice(-60).join('\n'); pl.scrollTop = pl.scrollHeight; } } return renderRun(); }
+    renderAll();
   };
 }
 setInterval(() => { if (running()) renderRun(); }, 1000);
-loadDemos().then(connect);
+showTab();
+loadDemos().then(() => { connect(); startMap(); });
+window.__ikut = { get pg() { return pg; }, get gm() { return gm; } }; // for looking at the page from the console
 </script>
 </body>
 </html>
