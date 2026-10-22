@@ -29,7 +29,7 @@ import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
   MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, answersByCar, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
   encodeLine, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
-  openStopSnapshot, optionalCoords, placeOnRoute, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
+  openStopSnapshot, optionalCoords, placeOnRoute, deviationStep, seenAfterChange, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
   stepTrack, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
 } from './lib/playground.mjs';
 
@@ -269,6 +269,7 @@ function changePieces(c, patch, applyOptions) {
     Object.assign(c, saved);
     throw e;
   }
+  c.devSeen = seenAfterChange(saved.deviation, c.deviation, c.devSeen); // a new or cleared deviation has not been driven yet
 }
 
 /** The first shared-route offset where this car can still turn off for an ending or a deviation: where it is, or where it rejoins. */
@@ -378,9 +379,10 @@ async function tickCar(c) {
   c.moving = c.st.d > before.d + 1e-6;
   if (before.waiting && !c.st.waiting) say(`${c.label} has waited and drives back`);
   else if (!before.waiting && c.st.waiting) say(`${c.label} reached its pin and waits ${c.st.waiting.left} s`);
-  if (c.deviation && ['out', 'waiting', 'back'].includes(loc.phase)) c.devSeen = true;
+  const dev = deviationStep({ deviation: c.deviation, seen: c.devSeen }, loc.phase);
+  c.devSeen = dev.seen;
   const g0 = c.kind === 'generated' && c.car?.publisher ? groupOf(loc) : null;
-  if (c.deviation && c.devSeen && loc.phase === 'onRoute') { // merged back: the deviation is over, its pin and roads leave the map
+  if (dev.over) { // merged back: the deviation is over, its pin and roads leave the map
     c.devSeen = false;
     try { changePieces(c, { deviation: null }); } catch (e) { say(`${c.label}: ${e.message}`); }
     say(`${c.label} is back on the route; its deviation is over`);

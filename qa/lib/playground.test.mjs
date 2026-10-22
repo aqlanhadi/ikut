@@ -8,7 +8,7 @@ import {
   MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, answersByCar, buildTrack, carNameFor, carryState, composeTrack, coordIn, coordsIn,
   divergeOffset, eventKindIn, eventStatus, fallbackStartRoad, locate, mainDistance, mainLeg, nameIn, newCarState, nextCar, nextWait, openStopSnapshot,
   optionalCoords, ownLeg, placeOnRoute, planDeviation, planEnding, planStart, relocate, sideRoad, sliceFrom, stepTrack, straightRoad, trackFeedPoints,
-  trackFromOffset, trackHeading, trackLength, trackPoint, voteAnswer, waitLeg,
+  deviationStep, seenAfterChange, trackFromOffset, trackHeading, trackLength, trackPoint, voteAnswer, waitLeg,
 } from './playground.mjs';
 
 const route = new RouteLine(loadRoutes().mainCoords);
@@ -512,4 +512,18 @@ test('a second deviation on the same car waits again', () => {
   assert.equal(nextWait(two, st).id, 'wait2');
   for (let i = 0; i < 400 && !st.waiting; i++) st = stepTrack(two, st, 200, 1, true);
   assert.equal(st.waiting.id, 'wait2', 'it stops and waits at the second pin');
+});
+
+test('a deviation is over only after the car has driven it; replacing it forgets what was seen', () => {
+  const dev1 = { id: 1 }, dev2 = { id: 2 };
+  let seen = false;
+  let r = deviationStep({ deviation: dev1, seen }, 'onRoute'); assert.deepEqual(r, { seen: false, over: false }, 'not left yet');
+  r = deviationStep({ deviation: dev1, seen }, 'waiting'); seen = r.seen; assert.equal(seen, true);
+  assert.equal(deviationStep({ deviation: dev1, seen }, 'onRoute').over, true, 'back on the route: over');
+  // the car's start was moved and a new deviation set while the old one was half driven
+  seen = seenAfterChange(dev1, dev2, seen);
+  assert.equal(seen, false);
+  assert.equal(deviationStep({ deviation: dev2, seen }, 'onRoute').over, false, 'the new one is not over before the car leaves');
+  assert.equal(seenAfterChange(dev2, dev2, true), true, 'an unchanged deviation keeps it');
+  assert.equal(deviationStep({ deviation: null, seen: true }, 'onRoute').seen, false);
 });
