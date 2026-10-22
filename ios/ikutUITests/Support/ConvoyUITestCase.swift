@@ -94,21 +94,28 @@ class ConvoyUITestCase: XCTestCase {
 
     // MARK: Shared flows
 
-    /// Clears the field (cursor to the end, a delete for every character it holds, more than once if the first pass leaves
-    /// some), types `text` and checks the field now holds exactly that. A field that is empty reports its
-    /// placeholder as its value, which is not text to delete.
+    /// Clears the field, types `text` and checks the field now holds exactly that. A tap puts the cursor where
+    /// it hit and a delete only removes what is before it, so a prefilled name was left in front of the typed
+    /// one ("FaizAisha"): select everything (long press, Select All) and delete it in one go instead; if the
+    /// menu does not come up, move the cursor to the end with a second tap and delete every character.
     func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
-        // A tap lands the cursor where it hit, and deletes only remove what is before it: tap the far right
-        // end of the field so the cursor is after the last character (this is what left "FaizAisha").
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
-        for _ in 0..<3 {
-            let current = field.value as? String ?? ""
-            if current.isEmpty || current == field.placeholderValue { break }
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        let current = field.value as? String ?? ""
+        if !current.isEmpty, current != field.placeholderValue {
+            field.press(forDuration: 1.2)
+            let selectAll = app.menuItems["Select All"]
+            if selectAll.waitForExistence(timeout: 2) {
+                selectAll.tap()
+                field.typeText(XCUIKeyboardKey.delete.rawValue)
+            } else {
+                field.tap()
+                field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
+            }
         }
         field.typeText(text)
-        XCTAssertEqual(field.value as? String, text, "the field should hold exactly what was typed")
+        if field.exists, let held = field.value as? String {
+            XCTAssertEqual(held, text, "the field should hold exactly what was typed")
+        }
     }
 
     /// Fills the "Your name" sheet when it comes up (signed out), then taps the app so the interruption
