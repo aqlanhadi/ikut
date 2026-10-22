@@ -344,6 +344,16 @@ export function sliceFrom(line, offset) {
   return [line.coordinateAtOffset(offset), ...line.coordinates.filter((_, i) => line.cumulative[i] > offset)];
 }
 
+/** A synthetic side road: leaves the route at `offset` and goes `meters` out to the left (or right: side 90), every `step` meters. */
+export function sideRoad(main, offset, meters, { side = -90, step = 40 } = {}) {
+  const a = main.coordinateAtOffset(offset);
+  const b = main.coordinateAtOffset(offset + 25);
+  const heading = bearing(a, b);
+  const out = [a];
+  for (let m = step; m <= meters; m += step) out.push(destinationPoint(a, heading + side, m));
+  return out;
+}
+
 /** The shared route for `meters` from `offset`, as coordinates every `step` meters. */
 function alongMain(main, offset, meters, step = 40) {
   const out = [];
@@ -436,7 +446,7 @@ export function planEnding(main, { end, road = null, leaveKm = null }) {
   } else {
     const full = new RouteLine(road);
     const d = divergeOffset(main, full);
-    if (d === null) return { kind: 'onRoute', parkOffset: main.project(end).offset };
+    if (d === null) return { kind: 'onRoute', parkOffset: main.project(end).offset, end };
     leaveOffset = d.mainOffset;
     coords = startingAt(sliceFrom(full, d.roadOffset), main.coordinateAtOffset(leaveOffset));
   }
@@ -480,19 +490,20 @@ export function composeTrack(main, { startOffset = 0, start = null, deviation = 
   const legs = [];
   let cursor;
   if (start) { legs.push(ownLeg('start', start.line, 'start')); cursor = start.mergeMain; } else cursor = clamp(startOffset, 0, main.length);
-  const leaveAfter = (leave, what) => {
-    if (leave < cursor - LEAVE_SLACK) throw new UserError(`${what} is behind where that car joins the route.`);
+  const leaveAfter = (leave, message) => {
+    if (leave < cursor - LEAVE_SLACK) throw new UserError(message);
     return Math.max(cursor, leave);
   };
+  const afterWhat = deviation ? 'before this deviation is over' : start ? 'before the car has joined the route' : 'behind where the car starts';
   if (deviation) {
-    const leave = leaveAfter(deviation.leaveOffset, 'The place where it leaves the route');
+    const leave = leaveAfter(deviation.leaveOffset, start ? 'The deviation leaves the route before the car has joined it.' : 'The deviation leaves the route behind where the car starts.');
     if (deviation.mergeMain < leave) throw new UserError('The way back joins the route behind the point where the car leaves it.');
     legs.push(mainLeg(cursor, leave), ownLeg('out', deviation.out), waitLeg(deviation.waitSeconds, deviation.pin), ownLeg('back', deviation.back));
     cursor = deviation.mergeMain;
   }
   if (ending && ending.kind === 'onRoute') legs.push(mainLeg(cursor, Math.max(cursor, ending.parkOffset), { park: true }));
   else if (ending) {
-    const leave = leaveAfter(ending.leaveOffset, 'The place where the ending leaves the route');
+    const leave = leaveAfter(ending.leaveOffset, `The ending leaves the route ${afterWhat}.`);
     legs.push(mainLeg(cursor, leave), ownLeg('ending', ending.line));
   } else legs.push(mainLeg(cursor, main.length));
   return buildTrack(main, legs);

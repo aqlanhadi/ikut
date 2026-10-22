@@ -7,7 +7,7 @@ import {
   pendingVotes, suggestionAhead, ageSeconds, UserError, numberIn, startFrom, validDerivedData, shouldPark, autoPick,
   MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, answersByCar, buildTrack, carNameFor, composeTrack, coordIn, coordsIn,
   divergeOffset, eventKindIn, eventStatus, fallbackStartRoad, locate, mainDistance, mainLeg, nameIn, newCarState, nextCar, nextWait, openStopSnapshot,
-  optionalCoords, ownLeg, placeOnRoute, planDeviation, planEnding, planStart, relocate, sliceFrom, stepTrack, straightRoad, trackFeedPoints,
+  optionalCoords, ownLeg, placeOnRoute, planDeviation, planEnding, planStart, relocate, sideRoad, sliceFrom, stepTrack, straightRoad, trackFeedPoints,
   trackFromOffset, trackHeading, trackLength, trackPoint, voteAnswer, waitLeg,
 } from './playground.mjs';
 
@@ -393,8 +393,8 @@ test('planDeviation: a way back that never meets the route, or meets it before t
 test('composeTrack: pieces must fit in order, with plain messages', () => {
   const dev = planDeviation(route, { leaveKm: 4, pin: branch(4000, 1500).at(-1), out: branch(4000, 1500), back: [branch(4000, 1500).at(-1), ...branch(6000, 1500).reverse(), route.coordinateAtOffset(6600)] });
   const end = planEnding(route, { end: branch(5000, 2000).at(-1), road: branch(5000, 2000), leaveKm: 5 });
-  assert.throws(() => composeTrack(route, { startOffset: 1000, deviation: { ...dev, waitSeconds: 5 }, ending: end }), /behind where that car joins/, 'the ending leaves before the deviation is over');
-  assert.throws(() => composeTrack(route, { startOffset: 5000, deviation: { ...dev, waitSeconds: 5 } }), /behind where that car joins/);
+  assert.throws(() => composeTrack(route, { startOffset: 1000, deviation: { ...dev, waitSeconds: 5 }, ending: end }), /before this deviation is over/, 'the ending leaves before the deviation is over');
+  assert.throws(() => composeTrack(route, { startOffset: 5000, deviation: { ...dev, waitSeconds: 5 } }), /behind where the car starts/);
   assert.ok(composeTrack(route, { startOffset: 4000 - LEAVE_SLACK / 2, deviation: { ...dev, waitSeconds: 5 } }));
   assert.throws(() => composeTrack(route, { startOffset: 1000, deviation: { ...dev, mergeMain: 3000, waitSeconds: 1 } }), /behind the point where the car leaves/);
 });
@@ -484,4 +484,13 @@ test('sliceFrom and straightRoad', () => {
   const r = straightRoad(a, b);
   assert.deepEqual(r.at(-1), b);
   assert.ok(Math.abs(new RouteLine(r).length - 1000) < 2);
+});
+
+test('a synthetic side road leaves the route where asked', () => {
+  const r = sideRoad(route, 5000, 1000);
+  assert.deepEqual(r[0], route.coordinateAtOffset(5000));
+  assert.ok(Math.abs(haversine(r[0], r.at(-1)) - 1000) < 2);
+  assert.ok(route.project(r.at(-1)).distance > 900);
+  const right = sideRoad(route, 5000, 1000, { side: 90 });
+  assert.ok(haversine(r.at(-1), right.at(-1)) > 1900, 'the other side');
 });

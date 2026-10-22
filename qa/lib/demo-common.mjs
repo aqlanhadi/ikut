@@ -174,8 +174,9 @@ export class Car {
     return { id: ref.id, routeOffset };
   }
 
+  /** A stop answer: `answer` next to `agree`, as the app writes it (the rules require them to match). */
   async vote(eventId, agree, suggestion = null) {
-    const data = { userId: this.uid, agree, at: serverTimestamp() };
+    const data = { userId: this.uid, agree, answer: agree ? 'yes' : 'notNow', at: serverTimestamp() };
     if (suggestion) data.suggestion = suggestion;
     await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), data);
   }
