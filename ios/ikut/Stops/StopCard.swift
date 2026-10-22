@@ -711,4 +711,10 @@ struct StopCard: View {
 #Preview("Pit stop button: waiting for me") { StopCardPreview(scene: "two", cardOpen: false) }
 #Preview("Pit stop button: pinned") { StopCardPreview(scene: "pinned", cardOpen: false) }
 #Preview("Pit stop button: nobody answered") { StopCardPreview(scene: "noanswer", cardOpen: false) }
+
+// Accessibility sizes: the place rows stack their cost under the name, the button row wraps to two lines.
+#Preview("Ask: place list, AX3") { StopCardPreview(screen: "placelist").dynamicTypeSize(.accessibility3) }
+#Preview("Pit stop button: waiting for me, AX3") {
+    StopCardPreview(scene: "two", cardOpen: false).dynamicTypeSize(.accessibility3)
+}
 #endif
