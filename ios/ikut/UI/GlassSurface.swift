@@ -7,6 +7,12 @@ enum GlassSurface {
     /// the frosted material, as before iOS 26. The home trips sheet is glass on iOS 26 either way.
     static let useGlass = true
 
+    /// True when the glass look is showing (the switch above, on iOS 26 or later).
+    static var active: Bool {
+        if #available(iOS 26, *) { return useGlass }
+        return false
+    }
+
     enum Kind {
         /// Full-width sheet with bottom corners that follow the screen's (home trips sheet, glass only).
         case sheet
@@ -115,4 +121,18 @@ extension Color {
     static let surfaceTileFill = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.10) : UIColor(white: 1, alpha: 0.5)
     })
+}
+
+extension Color {
+    /// Secondary text on a floating surface. On glass the system gray falls to about 3:1 in dark, so it
+    /// is lifted there; elsewhere it is the usual secondary label.
+    static var surfaceSecondary: Color {
+        guard GlassSurface.active else { return Color.secondary }
+        return Color(UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.78) : UIColor(white: 0, alpha: 0.68)
+        })
+    }
+
+    /// How much a stale car's row is dimmed: less on glass, where 0.6 went thin.
+    static var staleRowOpacity: Double { GlassSurface.active ? 0.78 : 0.6 }
 }

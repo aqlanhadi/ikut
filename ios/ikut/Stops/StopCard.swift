@@ -183,7 +183,7 @@ struct StopCard: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             Text("No answer").font(.body.weight(.semibold))
             Text("Nobody answered your \(StopLogic.reasonLabel(missed.type).lowercased()) stop. You can ask again.")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(Color.surfaceSecondary)
             StopActionButton(title: "Ask again", style: .secondary, height: 44, id: "stop.askAgain") {
                 model.ask.choose(StopReason.all.first { $0.type == missed.type } ?? StopReason.all[3])
             }
@@ -205,7 +205,7 @@ struct StopCard: View {
             case .idle, .loading:
                 HStack(spacing: Spacing.gap) {
                     ProgressView()
-                    Text("Finding the next good place…").foregroundStyle(.secondary)
+                    Text("Finding the next good place…").foregroundStyle(Color.surfaceSecondary)
                 }
                 .padding(.vertical, Spacing.section)
                 .frame(maxWidth: .infinity)
@@ -221,7 +221,7 @@ struct StopCard: View {
                     HStack(alignment: .firstTextBaseline, spacing: Spacing.m) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(chosen.name).font(.headline).lineLimit(2)
-                            Text(chosen.whereText).font(.footnote).foregroundStyle(.secondary)
+                            Text(chosen.whereText).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                         }
                         Spacer(minLength: 4)
                         StopCostText(candidate: chosen)
@@ -269,7 +269,7 @@ struct StopCard: View {
     private var sentScreen: some View {
         StopCardFrame(title: "Asked the convoy", subtitle: "Waiting for the other cars", onClose: onClose) {
             Text("The lead car pins the place once the cars have answered.")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
         } actions: {}
     }
 
@@ -287,7 +287,7 @@ struct StopCard: View {
     /// The search box, then the places. `onPick` is what a tap on a place does.
     @ViewBuilder private func placeList(_ list: RequestStopModel, onPick: @escaping (StopCandidate) -> Void) -> some View {
         HStack(spacing: Spacing.s) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            Image(systemName: "magnifyingglass").foregroundStyle(Color.surfaceSecondary)
             TextField("Search places", text: Bindable(model).query)
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
@@ -302,7 +302,7 @@ struct StopCard: View {
         case .idle, .loading:
             HStack(spacing: Spacing.gap) {
                 ProgressView()
-                Text("Finding the next good place…").foregroundStyle(.secondary)
+                Text("Finding the next good place…").foregroundStyle(Color.surfaceSecondary)
             }
             .padding(.vertical, Spacing.section)
             .frame(maxWidth: .infinity)
@@ -332,7 +332,7 @@ struct StopCard: View {
     private func note(_ text: String) -> some View {
         Text(text)
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.surfaceSecondary)
             .padding(Spacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
             .surfaceTile()
@@ -352,7 +352,7 @@ struct StopCard: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(candidate.name).font(.body.weight(.semibold)).lineLimit(big ? 2 : 1)
                         .layoutPriority(1)
-                    Text(candidate.whereText).font(.footnote).foregroundStyle(.secondary).lineLimit(big ? 2 : 1)
+                    Text(candidate.whereText).font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(big ? 2 : 1)
                     if big { StopCostText(candidate: candidate, stacked: true) }
                 }
                 Spacer(minLength: 4)
@@ -509,7 +509,7 @@ struct StopCard: View {
                 StopReasonIcon(symbol: StopLogic.reasonSymbol(state.type), size: 34)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(state.title).font(.body.weight(.semibold)).lineLimit(2)
-                    Text(StopLogic.placeLine(state)).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                    Text(StopLogic.placeLine(state)).font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
                 }
                 Spacer(minLength: 0)
             }
@@ -523,7 +523,7 @@ struct StopCard: View {
                     Text(StopLogic.statusLine(state)).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
                 }
             } else if StopLogic.viewerIsRequester(state) {
-                Text(StopLogic.decidingText(state)).font(.footnote).foregroundStyle(.secondary)
+                Text(StopLogic.decidingText(state)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 StopActionButton(title: "Cancel request", style: .secondary, height: 44, id: "stop.cancel\(suffix)") {
                     actions.close(state.eventId, .cancelled)
                 }
@@ -570,7 +570,7 @@ struct StopCard: View {
                         : "\(state.title) · \(StopLogic.statusLine(state))",
                     trailing: nil)
             }
-            Text("Stop and park to change anything.").font(.footnote).foregroundStyle(.secondary)
+            Text("Stop and park to change anything.").font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 .accessibilityIdentifier("stop.readOnlyNote")
         } actions: {
             StopActionButton(title: "I’m a passenger", style: .secondary, id: "stop.passenger") {
@@ -584,7 +584,7 @@ struct StopCard: View {
         StopCardFrame(title: "Another place", subtitle: nil, onClose: onClose) {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("Are you a passenger?").font(.title3.bold())
-                Text("Typing is off while the car moves.").font(.subheadline).foregroundStyle(.secondary)
+                Text("Typing is off while the car moves.").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)

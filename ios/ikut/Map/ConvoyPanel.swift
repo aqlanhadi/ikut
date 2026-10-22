@@ -112,7 +112,7 @@ struct ConvoyPanel: View {
                 if let departed = model.departedAt {
                     Text("Left \(ConvoyFormat.clock(departed))")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.surfaceSecondary)
                         .monospacedDigit()
                 }
             }
@@ -126,7 +126,7 @@ struct ConvoyPanel: View {
                 if let arrive, !mineArrived {
                     Text("Arrive \(Text(arrive).foregroundStyle(Color.ikutPositive).fontWeight(.semibold))")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.surfaceSecondary)
                         .monospacedDigit()
                 }
             }
@@ -172,7 +172,7 @@ struct ConvoyPanel: View {
                 Text(toGo(remaining: length - driven))
             }
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.surfaceSecondary)
             .monospacedDigit()
             .padding(.horizontal, Spacing.xs)
         }
@@ -202,7 +202,7 @@ struct ConvoyPanel: View {
         var text = Text(parts.driving).fontWeight(.semibold)
         if let joining = parts.joining { text = text + Text(" · \(joining)") }
         if let spread = parts.spread {
-            text = text + Text(" · ") + Text(spread)
+            text = text + Text(" · ") + Text(spread.replacingOccurrences(of: " km", with: "\u{00A0}km"))
                 .foregroundStyle(warn ? MapPalette.warning : Color.primary)
                 .fontWeight(warn ? .semibold : .regular)
         }
@@ -229,7 +229,7 @@ struct ConvoyPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.up")
                     .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.surfaceSecondary)
             }
             .padding(.horizontal, Spacing.cozy)
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -249,7 +249,7 @@ struct ConvoyPanel: View {
             .init("Spread", convoy.snapshot.spread.map(ConvoyFormat.distance),
                   color: model.separationWarning == nil ? nil : MapPalette.warning),
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
-            .init("Next stop", nextStop?.name ?? "None", color: nextStop == nil ? .secondary : nil),
+            .init("Next stop", nextStop?.name ?? "None", color: nextStop == nil ? Color.surfaceSecondary : nil),
         ], background: Color(.tertiarySystemFill), valueSize: 20)
         .padding(.top, Spacing.cozy)
     }
@@ -277,7 +277,7 @@ struct ConvoyPanel: View {
             if convoy.convoy.isEmpty && convoy.joining.isEmpty {
                 Text("Waiting for cars to share their location")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.surfaceSecondary)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
@@ -436,7 +436,7 @@ struct ConvoyRowView: View {
                 }
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
+                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.hasArrived {
@@ -455,13 +455,13 @@ struct ConvoyRowView: View {
                         .foregroundStyle(row.isSeparated ? MapPalette.warning : Color.primary)
                     Text(row.trailingSecondary)
                         .font(.footnote)
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .foregroundStyle(Color.surfaceSecondary)
                 }
             }
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
-        .opacity(row.isStale ? 0.6 : 1)
+        .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
     }
@@ -489,17 +489,17 @@ struct JoiningRowView: View {
                 if row.name == ConvoyFormat.me { MeCapsule() } else { Text(row.name).font(.body).lineLimit(1) }
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color(.secondaryLabel))
+                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
                 Text(row.trailingPrimary).font(.body.weight(.semibold)).monospacedDigit()
-                Text(row.trailingSecondary).font(.footnote).foregroundStyle(Color(.secondaryLabel))
+                Text(row.trailingSecondary).font(.footnote).foregroundStyle(Color.surfaceSecondary)
             }
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
-        .opacity(row.isStale ? 0.6 : 1)
+        .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
     }

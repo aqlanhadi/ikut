@@ -44,8 +44,11 @@ struct StopCardFrame<Content: View, Actions: View>: View {
                     .mask(
                         VStack(spacing: 0) {
                             Color.black
-                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 24)
+                            // Shorter and not quite clear on glass, so a half-shown row stays readable.
+                            LinearGradient(
+                                colors: [.black, GlassSurface.active ? .black.opacity(0.4) : .clear],
+                                startPoint: .top, endPoint: .bottom)
+                                .frame(height: GlassSurface.active ? 14 : 24)
                         })
             } else {
                 natural
@@ -74,7 +77,7 @@ struct StopCostText: View {
         VStack(alignment: stacked ? .leading : .trailing, spacing: 1) {
             Text(candidate.costText).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
             if let off = candidate.offRouteText {
-                Text(off).font(.caption2).foregroundStyle(.secondary)
+                Text(off).font(.caption2).foregroundStyle(Color.surfaceSecondary)
             }
         }
         .multilineTextAlignment(stacked ? .leading : .trailing)
@@ -169,7 +172,7 @@ struct StopPlaceTile: View {
             IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
             VStack(alignment: .leading, spacing: 1) {
                 Text(name).font(.body.weight(.semibold)).lineLimit(2)
-                Text(detail).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
             }
             Spacer(minLength: 4)
             if let trailing {
@@ -188,6 +191,7 @@ struct StopPlaceTile: View {
 /// One car in a stop's list: its badge, its name, and how it stands ("Agreed", "Here", "6 min away").
 struct StopVoterRow: View {
     var row: StopRequestState.Row
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let status = Self.status(row)
@@ -202,10 +206,11 @@ struct StopVoterRow: View {
             Spacer(minLength: 4)
             Text(status.text)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(status.color)
+                .foregroundStyle(chipText(status.color))
                 .padding(.horizontal, Spacing.gap)
                 .padding(.vertical, 5)
-                .background(status.color.opacity(0.14), in: Capsule())
+                .background(status.color.opacity(GlassSurface.active ? 0.2 : 0.14), in: Capsule())
+                .background(GlassSurface.active && scheme == .dark ? Color.black.opacity(0.4) : .clear, in: Capsule())
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .ignore)
@@ -213,15 +218,22 @@ struct StopVoterRow: View {
         .accessibilityIdentifier("stop.voter.\(row.number.map(String.init) ?? row.carId)")
     }
 
+    /// On dark glass the chip text is lifted toward white and the chip sits on a darker base, so
+    /// Agreed (green) and Waiting (gray) read clearly and apart.
+    private func chipText(_ color: Color) -> Color {
+        guard GlassSurface.active, scheme == .dark, #available(iOS 18, *) else { return color }
+        return color.mix(with: .white, by: 0.35)
+    }
+
     static func status(_ row: StopRequestState.Row) -> (text: String, color: Color) {
         switch row.arrival {
         case .here?: return ("Here", Color.ikutPositive)
-        case .minutes(let minutes)?: return ("\(minutes) min away", Color.secondary)
+        case .minutes(let minutes)?: return ("\(minutes) min away", Color.surfaceSecondary)
         case nil: break
         }
         switch row.status {
         case .agreed: return ("Agreed", Color.ikutPositive)
-        case .waiting: return ("Waiting", Color.secondary)
+        case .waiting: return ("Waiting", Color.surfaceSecondary)
         case .notNow: return ("Not now", Color.ikutWarning)
         case .suggested: return ("Another place", Color.ikutWarning)
         }
@@ -249,11 +261,11 @@ struct StopTimeline: View {
         HStack(alignment: .top, spacing: Spacing.m) {
             Image(systemName: done ? "checkmark.circle.fill" : "circle.dotted")
                 .font(.title3)
-                .foregroundStyle(done ? Color.ikutPositive : Color.secondary)
+                .foregroundStyle(done ? Color.ikutPositive : Color.surfaceSecondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(.body.weight(.semibold))
-                if let detail, !detail.isEmpty { Text(detail).font(.footnote).foregroundStyle(.secondary) }
+                if let detail, !detail.isEmpty { Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary) }
             }
             Spacer(minLength: 0)
         }
@@ -317,7 +329,7 @@ struct StopTimeline: View {
 #Preview("Frame") {
     VStack(spacing: Spacing.m) {
         StopCardFrame(title: "Asked the convoy", subtitle: "Waiting for the other cars", onClose: {}) {
-            Text("The lead car pins the place once the cars have answered.").foregroundStyle(.secondary)
+            Text("The lead car pins the place once the cars have answered.").foregroundStyle(Color.surfaceSecondary)
         } actions: {}
         // Taller than the cap: the body scrolls and the actions stay put.
         StopCardFrame(title: "Another place", subtitle: nil, onClose: {}) {
