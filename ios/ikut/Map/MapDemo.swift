@@ -119,7 +119,7 @@ enum MapDemo {
         let model = model(fiveCars: five)
         // IKUT_MAP_DEMO_STOP picks what the stop screens show (see `stopBoard`); IKUT_MAP_DEMO_NO_STOP
         // shows none. IKUT_MAP_DEMO_CARD opens the stop card (or one of its screens), and
-        // IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.
+        // IKUT_MAP_DEMO_EXPANDED=1 unfolds the panel, IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.
         let board = env["IKUT_MAP_DEMO_NO_STOP"] == nil && !gallery
             ? stopBoard(env["IKUT_MAP_DEMO_STOP"] ?? "lead", fiveCars: five) : StopBoard.empty
         return NavigationStack {
@@ -127,6 +127,7 @@ enum MapDemo {
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
                 demoCard: env["IKUT_MAP_DEMO_CARD"], demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
+                demoExpanded: env["IKUT_MAP_DEMO_EXPANDED"] != nil,
                 stopService: DemoStopService())
                 .overlay(alignment: .top) {
                     if gallery { BannerGallery(model: model).padding(.top, 72) }

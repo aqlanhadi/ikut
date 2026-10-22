@@ -112,7 +112,7 @@ extension View {
 }
 
 extension View {
-    /// An inset tile (a stop reason, the suggested place) on a floating surface. On iOS 26 glass it is a
+    /// An inset tile (a stop reason, a message) on a floating surface. On iOS 26 glass it is a
     /// raised, translucent tile, so the glass shows through, not the opaque gray slab the sheets use.
     @ViewBuilder
     func surfaceTile(radius: CGFloat = Radius.tile) -> some View {
@@ -128,7 +128,7 @@ extension View {
 }
 
 extension Color {
-    /// The tile colour `surfaceTile` uses, for a tile that draws its own background (a place row).
+    /// The tile colour `surfaceTile` uses, for a tile that draws its own background (a car row).
     static var surfaceTileBackground: Color {
         if GlassSurface.useGlass, #available(iOS 26, *) { return surfaceTileFill }
         return Color(.secondarySystemBackground)

@@ -301,7 +301,7 @@ struct EmptyRow: View {
     }
 }
 
-/// Colored rounded square with a white symbol: the stop flag, the role icon, a suggested place.
+/// Colored rounded square with a white symbol: the stop flag, the role icon.
 struct IconTile: View {
     var symbol: String
     var color: Color

@@ -18,7 +18,7 @@ struct WelcomeView: View {
             detail: "See the whole convoy live, and how far each car is behind the lead."),
         Feature(
             symbol: "fuelpump", title: "Call a stop in one tap",
-            detail: "Ask for fuel, food or a rest, and everyone agrees on where."),
+            detail: "Ask for fuel, food or a rest, and every car taps OK."),
         Feature(
             symbol: "exclamationmark.triangle", title: "Warn the cars behind you",
             detail: "Hazards you report are read aloud to the cars following."),

@@ -86,7 +86,7 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
-        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false,
+        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false,
         stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
     ) {
@@ -97,6 +97,7 @@ struct TripMapView: View {
         self.stopService = stopService
         demoScreen = demoCard
         _stopCardOpen = State(initialValue: demoCard != nil)
+        _panelExpanded = State(initialValue: demoExpanded)
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
         _stopBoard = State(initialValue: stopBoard)
         _model = State(initialValue: model)
@@ -705,7 +706,7 @@ struct TripMapView: View {
         }
         model.start()
         model.startHazardAlerts(announcer: alerts, userId: session.userId)
-        alerts.start(tripId: session.tripId, myUserId: session.userId)
+        alerts.start(tripId: session.tripId, myUserId: session.userId, myCarId: session.member?.carId)
         onScreen = true
         updateAwake()
         nextAsk()

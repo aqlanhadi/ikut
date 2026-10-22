@@ -36,7 +36,7 @@ struct StopCardFrame<Content: View, Actions: View>: View {
             let natural = body(of: content)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             if contentHeight > bodyCap {
-                ScrollView { natural }
+                ScrollView { natural.padding(.bottom, GlassSurface.active ? 14 : 24) }
                     .frame(height: bodyCap)
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)

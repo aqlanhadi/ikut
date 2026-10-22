@@ -144,9 +144,11 @@ enum StopLogic {
 
     /// A stop request that has not been closed: not marked closed, and `expiresAt` (30 minutes after
     /// it was asked, or now once closed) is still ahead. Nothing writes when the 30 minutes pass.
+    /// A document without `expiresAt` closes 30 minutes after it was asked; one with neither (a
+    /// write not yet stamped by the server) counts as just asked.
     static func isOpen(_ event: TripEvent, now: Date) -> Bool {
         event.category == .stopRequest && event.id != nil && event.status != .closed
-            && (event.expiresAt.map { $0 > now } ?? true)
+            && ((event.expiresAt ?? event.createdAt.map { $0.addingTimeInterval(lifetime) }).map { $0 > now } ?? true)
     }
 
     /// Every open request, oldest first.

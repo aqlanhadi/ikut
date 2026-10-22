@@ -184,7 +184,7 @@ struct StopCard: View {
         StopCardFrame(title: "Add a message", subtitle: nil, onClose: onClose) {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("Are you a passenger?").font(.title3.bold())
-                Text("Typing is off while the car moves.").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+                Text("Only a passenger can type while the car moves.").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
@@ -234,7 +234,13 @@ struct StopCard: View {
 
     // MARK: One open request
 
-    private func subtitle(_ state: StopRequestState) -> String { state.subtitle(now: Date()) }
+    /// "asked 2 min ago" keeps "2 min ago" together when the line wraps at large text sizes.
+    private func subtitle(_ state: StopRequestState) -> String {
+        let line = state.subtitle(now: Date())
+        guard let range = line.range(of: "asked ") else { return line }
+        let tail = line[range.upperBound...].replacingOccurrences(of: " ", with: "\u{00A0}")
+        return line[..<range.upperBound] + tail
+    }
 
     /// The one screen for every role: the message in full, a row per car, and the buttons this
     /// viewer may press.

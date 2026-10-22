@@ -88,10 +88,10 @@ final class AlertCenter {
     }
 
     /// Starts listening to `tripId`'s events. Replaces any earlier listener.
-    func start(tripId: String, myUserId: String) {
+    func start(tripId: String, myUserId: String, myCarId: String? = nil) {
         stop()
         self.tripId = tripId
-        policy = AlertPolicy(myUserId: myUserId)
+        policy = AlertPolicy(myUserId: myUserId, myCarId: myCarId)
         announced = []
         notifier.registerCategory(tripId: tripId)
         let stream = source.events(tripId: tripId)
@@ -122,10 +122,10 @@ final class AlertCenter {
 
     /// Announces `event` once per kind. With a `distance` it is an approach alert ("Debris ahead
     /// in 500 meters"), announced once even if the event itself was announced when it arrived.
-    /// Events the user wrote are skipped. Returns whether anything was announced.
+    /// Events the user wrote, and stop requests from the user's car, are skipped. Returns whether anything was announced.
     @discardableResult
     func announce(event: TripEvent, distance: Double? = nil) async -> Bool {
-        guard let tripId, let policy, let eventId = event.id, event.authorId != policy.myUserId else { return false }
+        guard let tripId, let policy, let eventId = event.id, !policy.isMine(event) else { return false }
         let key = AlertWording.alertId(eventId: eventId, approach: distance != nil)
         guard announced.insert(key).inserted else { return false }
         let name = await names.displayName(tripId: tripId, userId: event.authorId)

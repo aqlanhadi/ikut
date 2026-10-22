@@ -1,5 +1,6 @@
 import CoreLocation
 import FirebaseAuth
+import FirebaseCore
 import FirebaseFirestore
 import Foundation
 import Testing
@@ -220,6 +221,49 @@ struct StopLogicTests {
         #expect(old.status == nil)
         #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(1)))
         #expect(!StopLogic.isOpen(request("x", status: .closed), now: t0.addingTimeInterval(1)))
+    }
+
+    @Test func aMissingExpiryFallsBackToThirtyMinutesAfterItWasAsked() {
+        var old = request("old")
+        old.expiresAt = nil
+        #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(StopLogic.lifetime - 1)))
+        #expect(!StopLogic.isOpen(old, now: t0.addingTimeInterval(StopLogic.lifetime + 1)))
+        // Not yet stamped by the server: just asked.
+        old.createdAt = nil
+        #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(5 * 3600)))
+    }
+
+    /// `@DocumentID` can only be decoded with a document reference, which needs a (never contacted) Firestore instance.
+    private func firestoreDecode<T: Decodable>(_ type: T.Type, from data: [String: Any]) throws -> T {
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure(options: FirebaseOptions(googleAppID: "1:1:ios:1", gcmSenderID: "1"))
+        }
+        let decoder = Firestore.Decoder()
+        decoder.userInfo[CodingUserInfoKey(rawValue: "DocumentRefUserInfoKey")!] = Firestore.firestore().document("trips/doc")
+        return try decoder.decode(type, from: data)
+    }
+
+    @Test func anOldStopRequestWithAPlaceAndPinnedStatusDecodesAsOpenAndIgnoresThePlace() throws {
+        let event = try firestoreDecode(TripEvent.self, from: [
+            "type": "stopFuel", "category": "stopRequest", "severity": "medium",
+            "location": GeoPoint(latitude: 3, longitude: 101), "heading": 0.0, "routeOffset": 0.0,
+            "authorId": "u2", "carId": "c2", "createdAt": Timestamp(date: t0),
+            "expiresAt": Timestamp(date: t0.addingTimeInterval(StopLogic.lifetime)),
+            "status": "pinned",
+            "place": ["name": "Petronas Tapah", "location": GeoPoint(latitude: 4, longitude: 101)],
+        ])
+        #expect(event.status == .open)
+        #expect(StopLogic.isOpen(event, now: t0.addingTimeInterval(60)))
+    }
+
+    @Test func anOldVoteWithAnAnswerAndASuggestionDecodesAsAnOK() throws {
+        let vote = try firestoreDecode(StopVote.self, from: [
+            "userId": "u3", "agree": false, "answer": "no", "suggestion": "Shell Kuala Kangsar",
+            "at": Timestamp(date: t0),
+        ])
+        #expect(vote.userId == "u3")
+        #expect(vote.id == "doc")
+        #expect(vote.at == t0)
     }
 
     @Test func statusAndClosingReasonsDecodeWithFallbacks() throws {
