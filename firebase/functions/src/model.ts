@@ -84,16 +84,6 @@ export interface Position {
   updatedAt: Timestamp;
 }
 
-/** A pinned stop on a stop request, or a proposal on a vote. */
-export interface StopPlace {
-  name: string;
-  coordinate: GeoPoint;
-  /** Meters along the main route. */
-  routeOffset: number;
-  /** Set on a pinned stop; absent on a proposal. */
-  pinnedBy?: string;
-}
-
 /** trips/{tripId}/events/{eventId} */
 export interface TripEvent {
   type: EventType;
@@ -106,11 +96,10 @@ export interface TripEvent {
   authorId: string;
   carId: string;
   createdAt: Timestamp;
-  /** Absent means it lasts until resolved or cleared. */
+  /** Absent means it lasts until resolved or cleared. A stop request is written with createdAt + 30 min. */
   expiresAt?: Timestamp;
+  /** A stop request's optional note from a passenger (0 to 280 characters). */
   message?: string;
-  /** The pinned stop; only ever set on stop requests. */
-  place?: StopPlace;
   /** Stop requests only. Absent (an old event) reads as open. */
   status?: StopStatus;
   /** Set only when a stop request closes, with closedBy (a user id) and expiresAt = now. */
@@ -118,21 +107,15 @@ export interface TripEvent {
   closedBy?: string;
 }
 
-export type StopStatus = 'open' | 'pinned' | 'closed';
-export type StopClosedReason = 'left' | 'cancelled' | 'noAnswer';
+export type StopStatus = 'open' | 'closed';
+/** The asker, the lead car or the organizer says the convoy has stopped; or the asker cancels. */
+export type StopClosedReason = 'stopped' | 'cancelled';
 
-export type StopAnswer = 'yes' | 'notNow';
-
-/** trips/{tripId}/events/{eventId}/votes/{carId}: one vote per car. */
+/** trips/{tripId}/events/{eventId}/votes/{carId}: a car's OK; one per car. */
 export interface StopVote {
+  /** Who tapped OK for the car. */
   userId: string;
-  /** true for yes, false for not now; kept so old builds still count the vote. */
-  agree: boolean;
-  /** Absent on votes from old builds. */
-  answer?: StopAnswer;
   at: Timestamp;
-  /** Another place this car would rather stop at; the requesting car proposes its place this way. */
-  suggestion?: Omit<StopPlace, 'pinnedBy'>;
 }
 
 /** previewTrip callable result: what a non-member may see before joining. */

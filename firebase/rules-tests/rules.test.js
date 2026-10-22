@@ -350,15 +350,17 @@ describe('review: impersonation and escalation', () => {
   });
 });
 
-// Stop requests: votes per car, pinned place, resolve. Seed: 'mem' is on carA (author),
-// 'other' on carB, 'org' (organizer) on carO. Lead car is carO, tracked by 'lead' (a member of carO's
-// trip with their own member doc pointing at carO) unless a test says otherwise.
+// Stop requests (D24: no places): an OK per car, closing as stopped or cancelled, a 30 minute life.
+// Seed: 'mem' is on carA (author), 'other' on carB, 'org' (organizer) on carO. Lead car is carO, tracked
+// by 'lead' (a member with their own member doc pointing at carO) unless a test says otherwise.
 describe('stop requests', () => {
-  const stop = (over = {}) => event({ type: 'stopFuel', category: 'stopRequest', severity: 'medium', ...over });
-  const place = (over = {}) => ({ name: 'R&R Tapah', coordinate: pt, routeOffset: 18000, pinnedBy: 'lead', ...over });
+  const MIN = 60 * 1000;
+  const stop = (over = {}) =>
+    event({ type: 'stopFuel', category: 'stopRequest', severity: 'medium', expiresAt: ts(-30 * MIN), ...over });
   const evRef = (uid, id = 'stop1') => doc(db(uid), `trips/${T}/events/${id}`);
   const voteRef = (uid, carId, id = 'stop1') => doc(db(uid), `trips/${T}/events/${id}/votes/${carId}`);
-  const vote = (uid, over = {}) => ({ userId: uid, agree: true, at: serverTimestamp(), ...over });
+  const ok = (uid, over = {}) => ({ userId: uid, at: serverTimestamp(), ...over });
+  const closed = (reason, uid, over = {}) => ({ status: 'closed', closedReason: reason, closedBy: uid, expiresAt: ts(), ...over });
 
   beforeEach(async () => {
     await seed();
@@ -371,94 +373,135 @@ describe('stop requests', () => {
     });
   });
 
-  describe('votes', () => {
-    it('member votes for own car', () => assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem'))));
-    it('member can change own car vote', async () => {
-      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
-      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { agree: false })));
+  describe('asking', () => {
+    it('member can create a stop request that expires in 30 minutes', () =>
+      assertSucceeds(setDoc(evRef('mem', 'new'), stop())));
+    it('a passenger message of 280 characters rides along', () =>
+      assertSucceeds(setDoc(evRef('mem', 'new'), stop({ message: 'm'.repeat(280) }))));
+    it('a message over 280 characters fails', () =>
+      assertFails(setDoc(evRef('mem', 'new'), stop({ message: 'm'.repeat(281) }))));
+    it('a stop request without expiresAt fails', () => {
+      const e = stop();
+      delete e.expiresAt;
+      return assertFails(setDoc(evRef('mem', 'new'), e));
     });
-    it('another member of the same car can update the car vote', async () => {
+    it('a stop request that lasts 2 hours fails', () =>
+      assertFails(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-120 * MIN) }))));
+    it('a stop request that lasts 36 minutes fails', () =>
+      assertFails(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-36 * MIN) }))));
+    it('a stop request that lasts 34 minutes (clock slack) passes', () =>
+      assertSucceeds(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-34 * MIN) }))));
+    it('a hazard still needs no expiresAt', () => assertSucceeds(setDoc(evRef('mem', 'new'), event())));
+    it('a place cannot be supplied', () =>
+      assertFails(setDoc(evRef('mem', 'new'), stop({ place: { name: 'R&R', coordinate: pt, routeOffset: 1, pinnedBy: 'mem' } }))));
+    it('a status cannot be supplied', () => assertFails(setDoc(evRef('mem', 'new'), stop({ status: 'closed' }))));
+  });
+
+  describe('OK votes', () => {
+    it('member says OK for own car', () => assertSucceeds(setDoc(voteRef('mem', 'carA'), ok('mem'))));
+    it('the same car can say OK twice', async () => {
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), ok('mem')));
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), ok('mem')));
+    });
+    it('another member of the same car can say OK for it', async () => {
       await env.withSecurityRulesDisabled(async (c) => {
         await setDoc(doc(c.firestore(), `trips/${T}/members/mate`), memberDoc({ displayName: 'Mate' }));
       });
-      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
-      await assertSucceeds(setDoc(voteRef('mate', 'carA'), vote('mate', { agree: false })));
+      await assertSucceeds(setDoc(voteRef('mate', 'carA'), ok('mate')));
     });
-    it('member cannot vote for another car', () => assertFails(setDoc(voteRef('mem', 'carB'), vote('mem'))));
-    it('userId must be the caller', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('other'))));
-    it('agree must be a bool', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { agree: 'yes' }))));
-    it('extra field fails', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { weight: 5 }))));
-    it('missing field fails', () => {
-      const v = vote('mem');
-      delete v.agree;
+    it('member cannot say OK for another car', () => assertFails(setDoc(voteRef('mem', 'carB'), ok('mem'))));
+    it('userId must be the caller', () => assertFails(setDoc(voteRef('mem', 'carA'), ok('other'))));
+    it('the old agree field fails', () => assertFails(setDoc(voteRef('mem', 'carA'), ok('mem', { agree: true }))));
+    it('the old answer field fails', () => assertFails(setDoc(voteRef('mem', 'carA'), ok('mem', { answer: 'yes' }))));
+    it('a suggested place fails', () =>
+      assertFails(setDoc(voteRef('mem', 'carA'), ok('mem', { suggestion: { name: 'P', coordinate: pt, routeOffset: 1 } }))));
+    it('missing userId fails', () => {
+      const v = ok('mem');
+      delete v.userId;
       return assertFails(setDoc(voteRef('mem', 'carA'), v));
     });
-    it('client timestamp fails', () => assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { at: ts() }))));
-    it('non-member cannot vote', () => assertFails(setDoc(voteRef('stranger', 'carA'), vote('stranger'))));
-    it('cannot vote on a resolved stop', () => assertFails(setDoc(voteRef('mem', 'carA', 'stopDone'), vote('mem'))));
-    it('cannot vote on a non-stop event', () => assertFails(setDoc(voteRef('mem', 'carA', 'ev1'), vote('mem'))));
-    it('cannot vote on a missing event', () => assertFails(setDoc(voteRef('mem', 'carA', 'nope'), vote('mem'))));
-    it('cannot vote on an ended trip', async () => {
+    it('client timestamp fails', () => assertFails(setDoc(voteRef('mem', 'carA'), ok('mem', { at: ts() }))));
+    it('non-member cannot say OK', () => assertFails(setDoc(voteRef('stranger', 'carA'), ok('stranger'))));
+    it('cannot say OK on a resolved stop', () => assertFails(setDoc(voteRef('mem', 'carA', 'stopDone'), ok('mem'))));
+    it('cannot say OK on a non-stop event', () => assertFails(setDoc(voteRef('mem', 'carA', 'ev1'), ok('mem'))));
+    it('cannot say OK on a missing event', () => assertFails(setDoc(voteRef('mem', 'carA', 'nope'), ok('mem'))));
+    it('cannot say OK on a stop that closed itself 30 minutes after it was asked', async () => {
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/events/old`), stop({ createdAt: ts(31 * MIN), expiresAt: ts(MIN) }));
+      });
+      await assertFails(setDoc(voteRef('mem', 'carA', 'old'), ok('mem')));
+    });
+    it('cannot say OK on a stop that was closed', async () => {
+      await updateDoc(evRef('lead'), closed('stopped', 'lead', { expiresAt: ts(-3_600_000) }));
+      await assertFails(setDoc(voteRef('mem', 'carA'), ok('mem')));
+    });
+    it('cannot say OK on an ended trip', async () => {
       await seed({ ended: true });
       await env.withSecurityRulesDisabled(async (c) => {
         await setDoc(doc(c.firestore(), `trips/${T}/events/stop1`), stop());
       });
-      await assertFails(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertFails(setDoc(voteRef('mem', 'carA'), ok('mem')));
     });
-    it('vote may carry a suggested place', () =>
-      assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: 'Petronas', coordinate: pt, routeOffset: 1000 } }))));
-    it('suggestion with pinnedBy fails', () =>
-      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: 'P', coordinate: pt, routeOffset: 1, pinnedBy: 'mem' } }))));
-    it('suggestion with empty name fails', () =>
-      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: '', coordinate: pt, routeOffset: 1 } }))));
-    it('suggestion with bad coordinate fails', () =>
-      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { suggestion: { name: 'P', coordinate: 'here', routeOffset: 1 } }))));
     it('member can read votes', async () => {
-      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), ok('mem')));
       await assertSucceeds(getDocs(collection(db('other'), `trips/${T}/events/stop1/votes`)));
     });
     it('non-member cannot read votes', () =>
       assertFails(getDocs(collection(db('stranger'), `trips/${T}/events/stop1/votes`))));
     it('votes cannot be deleted', async () => {
-      await assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem')));
+      await assertSucceeds(setDoc(voteRef('mem', 'carA'), ok('mem')));
       await assertFails(deleteDoc(voteRef('mem', 'carA')));
     });
   });
 
-  describe('pinned place', () => {
-    it('lead car tracker can pin', () => assertSucceeds(updateDoc(evRef('lead'), { place: place() })));
-    it('organizer can pin', () => assertSucceeds(updateDoc(evRef('org'), { place: place({ pinnedBy: 'org' }) })));
-    it('lead can re-pin a different place', async () => {
-      await assertSucceeds(updateDoc(evRef('lead'), { place: place() }));
-      await assertSucceeds(updateDoc(evRef('lead'), { place: place({ name: 'Other R&R' }) }));
+  describe('no places any more', () => {
+    const place = { name: 'R&R Tapah', coordinate: pt, routeOffset: 18000, pinnedBy: 'lead' };
+    it('the lead car cannot pin a place', () => assertFails(updateDoc(evRef('lead'), { place })));
+    it('the organizer cannot pin a place', () =>
+      assertFails(updateDoc(evRef('org'), { place: { ...place, pinnedBy: 'org' }, status: 'pinned' })));
+    it('status pinned is not a state any more', () => assertFails(updateDoc(evRef('lead'), { status: 'pinned' })));
+    it('closing cannot slip a place in', () =>
+      assertFails(updateDoc(evRef('mem'), closed('cancelled', 'mem', { place: { ...place, pinnedBy: 'mem' } }))));
+  });
+
+  describe('closing', () => {
+    it('lead car tracker closes as stopped', () => assertSucceeds(updateDoc(evRef('lead'), closed('stopped', 'lead'))));
+    it('organizer closes as stopped', () => assertSucceeds(updateDoc(evRef('org'), closed('stopped', 'org'))));
+    it('the asker closes as stopped', () => assertSucceeds(updateDoc(evRef('mem'), closed('stopped', 'mem'))));
+    it('the asker cancels', () => assertSucceeds(updateDoc(evRef('mem'), closed('cancelled', 'mem'))));
+    it('lead cannot cancel someone else\'s request', () => assertFails(updateDoc(evRef('lead'), closed('cancelled', 'lead'))));
+    it('organizer cannot cancel someone else\'s request', () => assertFails(updateDoc(evRef('org'), closed('cancelled', 'org'))));
+    it('another member cannot close it at all', async () => {
+      await assertFails(updateDoc(evRef('other'), closed('stopped', 'other')));
+      await assertFails(updateDoc(evRef('other'), closed('cancelled', 'other')));
     });
-    it('non-lead member cannot pin', () => assertFails(updateDoc(evRef('other'), { place: place({ pinnedBy: 'other' }) })));
-    it('stop author who is not lead cannot pin', () => assertFails(updateDoc(evRef('mem'), { place: place({ pinnedBy: 'mem' }) })));
-    it('non-member cannot pin', () => assertFails(updateDoc(evRef('stranger'), { place: place({ pinnedBy: 'stranger' }) })));
-    it('a lead flag on a car someone else tracks does not grant pinning', async () => {
+    it('non-member cannot close it', () => assertFails(updateDoc(evRef('stranger'), closed('stopped', 'stranger'))));
+    it('the old reasons left and noAnswer fail', async () => {
+      await assertFails(updateDoc(evRef('lead'), closed('left', 'lead')));
+      await assertFails(updateDoc(evRef('org'), closed('noAnswer', 'org')));
+      await assertFails(updateDoc(evRef('mem'), closed('left', 'mem')));
+    });
+    it('a lead flag on a car someone else tracks does not grant closing', async () => {
       await env.withSecurityRulesDisabled(async (c) => {
         await setDoc(doc(c.firestore(), `trips/${T}/cars/carO`), carDoc({ isLead: true, trackerUserId: 'someoneElse' }));
       });
-      await assertFails(updateDoc(evRef('lead'), { place: place() }));
+      await assertFails(updateDoc(evRef('lead'), closed('stopped', 'lead')));
     });
-    it('pinnedBy must be the caller', () => assertFails(updateDoc(evRef('lead'), { place: place({ pinnedBy: 'org' }) })));
-    it('empty name fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ name: '' }) })));
-    it('name over 100 chars fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ name: 'x'.repeat(101) }) })));
-    it('coordinate must be a geopoint', () =>
-      assertFails(updateDoc(evRef('lead'), { place: place({ coordinate: { lat: 1, lng: 2 } }) })));
-    it('negative routeOffset fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ routeOffset: -1 }) })));
-    it('extra place field fails', () => assertFails(updateDoc(evRef('lead'), { place: place({ rating: 5 }) })));
-    it('place with missing field fails', () => {
-      const p = place();
-      delete p.routeOffset;
-      return assertFails(updateDoc(evRef('lead'), { place: p }));
+    it('closing needs closedBy to be the caller', () => assertFails(updateDoc(evRef('lead'), closed('stopped', 'org'))));
+    it('closing without closedReason fails', () => {
+      const c = closed('stopped', 'lead');
+      delete c.closedReason;
+      return assertFails(updateDoc(evRef('lead'), c));
     });
-    it('place must be a map', () => assertFails(updateDoc(evRef('lead'), { place: 'Tapah' })));
-    it('cannot pin and change another field in one write', () =>
-      assertFails(updateDoc(evRef('lead'), { place: place(), message: 'hi' })));
-    it('cannot pin a resolved stop', () => assertFails(updateDoc(evRef('lead', 'stopDone'), { place: place() })));
-    it('cannot pin a hazard event', () => assertFails(updateDoc(evRef('lead', 'ev1'), { place: place() })));
-    it('cannot pin on an ended trip', async () => {
+    it('closing without expiresAt fails', () => {
+      const c = closed('stopped', 'lead');
+      delete c.expiresAt;
+      return assertFails(updateDoc(evRef('lead'), c));
+    });
+    it('an unknown closedReason fails', () => assertFails(updateDoc(evRef('lead'), closed('bored', 'lead'))));
+    it('cannot close an already closed stop', () => assertFails(updateDoc(evRef('lead', 'stopDone'), closed('stopped', 'lead'))));
+    it('cannot close a hazard event', () => assertFails(updateDoc(evRef('lead', 'ev1'), closed('stopped', 'lead'))));
+    it('cannot close on an ended trip', async () => {
       await seed({ ended: true });
       await env.withSecurityRulesDisabled(async (c) => {
         const f = c.firestore();
@@ -466,11 +509,8 @@ describe('stop requests', () => {
         await setDoc(doc(f, `trips/${T}/cars/carO`), carDoc({ isLead: true, trackerUserId: 'lead' }));
         await setDoc(doc(f, `trips/${T}/events/stop1`), stop());
       });
-      await assertFails(updateDoc(evRef('lead'), { place: place() }));
+      await assertFails(updateDoc(evRef('lead'), closed('stopped', 'lead')));
     });
-    it('place cannot be supplied when creating the stop', () =>
-      assertFails(setDoc(evRef('mem', 'new'), stop({ place: place({ pinnedBy: 'mem' }) }))));
-    it('member can create a stop request', () => assertSucceeds(setDoc(evRef('mem', 'new'), stop())));
   });
 
   describe('resolve', () => {
@@ -492,70 +532,4 @@ describe('stop requests', () => {
       await assertFails(updateDoc(evRef('mem'), { expiresAt: ts() }));
     });
   });
-
-  // D20: request states, a real answer on the vote, and closing with a reason.
-  describe('request states and answers', () => {
-    const closed = (reason, uid, over = {}) => ({ status: 'closed', closedReason: reason, closedBy: uid, expiresAt: ts(), ...over });
-
-    it('a vote may carry answer yes with agree true', () =>
-      assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'yes' }))));
-    it('a vote may carry answer notNow with agree false', () =>
-      assertSucceeds(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'notNow', agree: false }))));
-    it('answer yes with agree false fails', () =>
-      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'yes', agree: false }))));
-    it('answer notNow with agree true fails', () =>
-      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'notNow', agree: true }))));
-    it('an unknown answer fails', () =>
-      assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'skip', agree: false }))));
-    it('an old-shape vote (agree only) still passes', () =>
-      assertSucceeds(setDoc(voteRef('mem', 'carA'), { userId: 'mem', agree: true, at: serverTimestamp() })));
-    it('an old-shape pin (place only) still passes', () => assertSucceeds(updateDoc(evRef('lead'), { place: place() })));
-    it('an old-shape resolve (expiresAt only) still passes for the author', () =>
-      assertSucceeds(updateDoc(evRef('mem'), { expiresAt: ts() })));
-
-    it('lead can pin with place and status pinned', () =>
-      assertSucceeds(updateDoc(evRef('lead'), { place: place(), status: 'pinned' })));
-    it('organizer can pin with place and status pinned', () =>
-      assertSucceeds(updateDoc(evRef('org'), { place: place({ pinnedBy: 'org' }), status: 'pinned' })));
-    it('a pin cannot set status closed', () =>
-      assertFails(updateDoc(evRef('lead'), { place: place(), status: 'closed' })));
-    it('status pinned without a place fails', () => assertFails(updateDoc(evRef('lead'), { status: 'pinned' })));
-    it('a non-lead member cannot pin with status', () =>
-      assertFails(updateDoc(evRef('other'), { place: place({ pinnedBy: 'other' }), status: 'pinned' })));
-    it('cannot pin a closed stop', async () => {
-      await updateDoc(evRef('lead'), closed('left', 'lead', { expiresAt: ts(-3_600_000) }));
-      await assertFails(updateDoc(evRef('lead'), { place: place(), status: 'pinned' }));
-    });
-
-    it('lead can close with left', () => assertSucceeds(updateDoc(evRef('lead'), closed('left', 'lead'))));
-    it('organizer can close with noAnswer', () => assertSucceeds(updateDoc(evRef('org'), closed('noAnswer', 'org'))));
-    it('lead cannot close as cancelled', () => assertFails(updateDoc(evRef('lead'), closed('cancelled', 'lead'))));
-    it('closing needs closedBy to be the caller', () => assertFails(updateDoc(evRef('lead'), closed('left', 'org'))));
-    it('closing without closedReason fails', () => {
-      const c = closed('left', 'lead');
-      delete c.closedReason;
-      return assertFails(updateDoc(evRef('lead'), c));
-    });
-    it('closing without expiresAt fails', () => {
-      const c = closed('left', 'lead');
-      delete c.expiresAt;
-      return assertFails(updateDoc(evRef('lead'), c));
-    });
-    it('an unknown closedReason fails', () => assertFails(updateDoc(evRef('lead'), closed('bored', 'lead'))));
-    it('a non-lead member cannot close with left', () => assertFails(updateDoc(evRef('other'), closed('left', 'other'))));
-    it('the author can close their own request as cancelled', () =>
-      assertSucceeds(updateDoc(evRef('mem'), closed('cancelled', 'mem'))));
-    it('the author cannot close as left or noAnswer', async () => {
-      await assertFails(updateDoc(evRef('mem'), closed('left', 'mem')));
-      await assertFails(updateDoc(evRef('mem'), closed('noAnswer', 'mem')));
-    });
-    it('the author cannot slip a place in with the close', () =>
-      assertFails(updateDoc(evRef('mem'), closed('cancelled', 'mem', { place: place({ pinnedBy: 'mem' }) }))));
-    it('cannot close an already closed stop', () => assertFails(updateDoc(evRef('lead', 'stopDone'), closed('left', 'lead'))));
-    it('cannot vote on a stop closed with a status', async () => {
-      await updateDoc(evRef('lead'), closed('left', 'lead', { expiresAt: ts(-3_600_000) }));
-      await assertFails(setDoc(voteRef('mem', 'carA'), vote('mem', { answer: 'yes' })));
-    });
-  });
 });
-
