@@ -37,6 +37,7 @@ struct TripMapView: View {
     @State private var stopBoard = StopBoard.empty
     /// The stop card is on top of the convoy panel only after a tap on the Pit stop button.
     @State private var stopCardOpen = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     /// What the pill at the top has shown and when, so each question goes quiet after 20 seconds.
     @State private var pillMemory = StopPillMemory()
     @State private var pillNow = Date()
@@ -536,15 +537,21 @@ struct TripMapView: View {
     /// The panel and the stop card. The card slides up over the panel, and the panel, with everything
     /// on it, sinks and fades out in the same moment, so no button stays put under the moving card
     /// (a glass or frosted card is see-through). Closing runs the same way backwards.
+    /// At accessibility text sizes the stop pill alone is taller than the room above even a folded panel,
+    /// so the panel steps aside while the pill is up (at most 20 seconds) instead of covering its OK.
+    private var panelAside: Bool {
+        stopCardOpen || (typeSize.isAccessibilitySize && stopPill != nil)
+    }
+
     private var bottomStack: some View {
         ZStack(alignment: .bottom) {
             panel
-                .offset(y: stopCardOpen ? 40 : 0)
-                .opacity(stopCardOpen ? 0 : 1)
+                .offset(y: panelAside ? 40 : 0)
+                .opacity(panelAside ? 0 : 1)
                 // Gone in a blink, so it never shows through the card on its way up.
-                .animation(.easeOut(duration: 0.12), value: stopCardOpen)
-                .allowsHitTesting(!stopCardOpen)
-                .accessibilityHidden(stopCardOpen)
+                .animation(.easeOut(duration: 0.12), value: panelAside)
+                .allowsHitTesting(!panelAside)
+                .accessibilityHidden(panelAside)
             if stopCardOpen, let context = stopContext {
                 stopCard(context)
                     // Above the panel for the whole of its exit too, or it would slide away behind it.
