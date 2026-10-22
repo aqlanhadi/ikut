@@ -70,6 +70,13 @@ time. Cars 3 (Hafiz) and 4 (Daniel) are Firebase clients in the script: joinTrip
 report and stop OKs. The three take turns through marker files in `$TMPDIR/ikut-qa/convoy2-sync` (`a.code`, `b.lobby`,
 `cars.joined`, `go`, ...); any failure writes `abort` there and every side stops waiting.
 
+Both phones start from the same state every run: before booting anything else the script terminates and uninstalls
+the ikut app on A and B (the app's UserDefaults go with it, so `Backend.dropUserFromOtherBackend` signs out the Keychain
+user that survives an uninstall) and sets the text size to the default (`simctl ui content_size large`; a leftover
+accessibility size from a screenshot session made A's stop button untappable). A phone that kept an old session never
+reached the emulators at all ("No connection to the server" on A, a prefilled name on B), so no hand reset is needed.
+If a phone still opens in a lobby, the test says so ("This phone is already in a trip") instead of failing on a field.
+
 What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the script checks Firestore alongside):
 
 1. A creates the trip in the UI (name, New Trip, Where to? Ipoh, lobby) and reads the code off the lobby.
