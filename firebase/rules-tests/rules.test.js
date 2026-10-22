@@ -529,6 +529,9 @@ describe('stop requests', () => {
       await updateDoc(evRef('lead'), closed('stopped', 'lead'));
       await assertFails(updateDoc(evRef('lead'), { expiresAt: ts(-20 * MIN) }));
     });
+    it('a phone clock a few seconds ahead can still close a stop early', () =>
+      assertSucceeds(updateDoc(evRef('mem'), { expiresAt: ts(-5000) })));
+    it('two minutes ahead is too far', () => assertFails(updateDoc(evRef('mem'), { expiresAt: ts(-2 * MIN) })));
     it('the lead cannot push an open stop later', () => assertFails(updateDoc(evRef('lead'), { expiresAt: ts(-31 * MIN) })));
     it('the asker cannot clear expiresAt on an open stop', () => assertFails(updateDoc(evRef('mem'), { expiresAt: null })));
     it('lead cannot clear expiresAt to reopen', () => assertFails(updateDoc(evRef('lead', 'stopDone'), { expiresAt: null })));

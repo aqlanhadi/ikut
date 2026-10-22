@@ -175,14 +175,15 @@ service cloud.firestore {
         || (mine && open && closeKeys && closesStop(next, ['cancelled', 'stopped']))
         // Lead car or organizer closes a stop request: the convoy has stopped.
         || (lead && open && closeKeys && closesStop(next, ['stopped']))
-        // A stop request can only be closed earlier by moving expiresAt to now or before (the asker, the
+        // A stop request can only be closed earlier by moving expiresAt to now or before, give or take one
+        // minute of clock difference between phone and server (the asker, the
         // lead car or the organizer): never cleared, never pushed later, so it cannot be reopened or held
         // open. The old Release build resolves this way.
         || ((mine || lead)
           && prev.category == 'stopRequest'
           && expiryOnly
           && next.expiresAt is timestamp
-          && next.expiresAt <= request.time);
+          && next.expiresAt <= request.time + duration.value(1, 'm'));
     }
 
     // ---------- rules ----------
