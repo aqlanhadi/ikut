@@ -22,12 +22,18 @@ and is not in the list of scripted demos. The server starts it with its stdin pi
 - `POST /api/command` with a JSON body writes `CMD {json}` plus a newline to the running demo's stdin. It answers 409
   when nothing is running or the demo is not interactive.
 - the demo's `DEMO {"type":"state", ...}` lines (one a second) are not kept as a history: only the latest is kept,
-  sent to the page as `{k:'state'}` and replayed on reload.
+  sent to the page as `{k:'state'}` and replayed on reload. `DEMO {"type":"geometry", ...}` lines (the playground's shared route and each
+  car's own roads, sent only when they change) are kept the same way: sent as `{k:'geometry', geometry}` and replayed as `snapshot.geometry`.
+- `POST /api/command` bodies are at most 2 MB (413 with plain words beyond) and must be a JSON object (400 otherwise); the demo checks every
+  coordinate (finite, at most 20,000 points a list) and number and reports mistakes in `state.problem`.
+- `GET /api/config` returns `{mapsKey, mapId}` for the page's Google map: from `qa/dashboard/.env` (gitignored; `.env.example` lists the names and the
+  referrers to restrict the key to) or the environment, `GOOGLE_MAPS_API_KEY` (null when absent) and `GOOGLE_MAPS_MAP_ID` (default `DEMO_MAP_ID`).
+  Read once at start; answered only for a trusted Host (below), 403 otherwise.
 
 The card walks through setup (start picker, Prepare phones, Skip the build), waiting for the trip, and the controls
 (trip code, route strip, one row per car, Play all / Pause all, what was reported). Production is never offered:
 the playground refuses `--backend production`. See `qa/README.md`, "Playground".
 Developing the script without simulators: `IKUT_PLAYGROUND_NO_SIM=1 node qa/dashboard/server.mjs --port 4324`.
 
-POSTs (`/api/start`, `/api/stop`, `/api/command`) need `Content-Type: application/json` and a Host (and Origin, when a browser sends one) of
-`127.0.0.1` or `localhost` on the server's own port; anything else gets a 403. With curl add `-H 'content-type: application/json'`.
+POSTs (`/api/start`, `/api/stop`, `/api/command`) and `GET /api/config` need `Content-Type: application/json` and a Host (and Origin, when a browser sends one) of
+`127.0.0.1` or `localhost` on the server's own port; anything else gets a 403 (a GET has no content type to check). With curl add `-H 'content-type: application/json'`.

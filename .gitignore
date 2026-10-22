@@ -29,6 +29,7 @@ database-debug.log*
 # Secrets
 .env
 .env.*
+!.env.example
 *.p8
 
 # Battery-watch recordings (qa/battery-watch.mjs)

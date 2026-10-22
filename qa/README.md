@@ -256,7 +256,8 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
    picks by itself only when there is exactly one new trip, with one car, reporting within 300 m of the start (convoy-sim and
    UI tests make trips too). The page shows the code, big: **join on phone 2 with it.** When phone 1 ends the trip the page says
    "The trip has ended" and the generated cars stop.
-3. **Place and play.** Per car: where it starts (km along the route), speed (0-200 km/h), Play/Pause; Play all / Pause all.
+3. **Place and play.** (The page that puts cars on a Google map from pins, with own starts, endings and deviations, is Q7 piece B; the commands are in
+   "Tracks, pins and the command reference" below.) Per car: where it starts (km along the route), speed (0-200 km/h), Play/Pause; Play all / Pause all.
    A paused car moves right away when placed. Defaults: phone 1 at 3.0 km, phone 2 at 2.2, Daniel 1.4, Hafiz 0.6,
    all 90 km/h, paused. Phones are driven with `simctl location start` from the car's current offset (restarted on every
    change and every 20 s); a parked phone gets a nudged `location set` every 5 s (the simulator ignores an unchanged
@@ -273,8 +274,65 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
 Close the playground (SIGTERM) stops the players, clears the locations of the simulators it started and closes the generated cars. The trip is
 left as it is; end it from phone 1's menu. Emulators only (`--backend production` is refused).
 
-Not covered: events reported by the generated cars (only votes and suggestions), background tracking, push, off-route
-rerouting, MapKit ETAs. After a merge the generated car reports on the main route (the app keeps its own route offset).
+Not covered: background tracking, push, off-route rerouting, MapKit ETAs. After a merge the generated car reports on the main route (the app keeps
+its own route offset).
+
+### Tracks, pins and the command reference
+
+Every car (both phones and every generated car) drives a **track** (`lib/playground.mjs`): an ordered list of legs, each a stretch of the shared
+route (main offsets from-to), an own road (a `RouteLine` with a role: `start`, `out`, `back`, `ending`) or a wait (no length, at a pin). A car keeps
+one distance along its track and advances it at its speed. The old "km along the route" is a track that is just the shared route from km X.
+A phone plays its track with `simctl location start` from the car's distance, up to the next wait (restarted on every change, every 20 s, and when
+a wait starts or ends); a parked phone, one that waits, or one at the end of its track gets the nudged `location set` every 5 s.
+Pieces fit in this order: start road, then a deviation, then an ending. A deviation ends (and is cleared) when the car has merged back; a second one on the same car waits again. A piece that does not fit the others (an ending that leaves before a
+deviation is over) is refused with a plain message and nothing changes.
+
+Commands are `CMD {json}` lines (the dashboard's `POST /api/command` body). A mistake sets `state.problem` to "That didn't work: <plain words>"
+(and `problemAt`, ms); it is cleared by the next command. Coordinates are `{latitude, longitude}`, lists of them have 2 to 20,000 points. `car` is a
+key: `phone1`, `phone2`, `daniel`, `hafiz`, then `g3`, `g4`... (stable, never reused). "km" values are kilometres along the shared route.
+
+| Command | Does |
+| --- | --- |
+| `prepare {starts?:{phone1:{..},phone2:{..}}, start?, skipBuild?, derivedData?}` | As before. `starts` gives each phone its own start (phone 1's is where the trip starts, phone 2 is parked at its own); `start` ("default" or "lat,lng", the old page) puts both phones at one spot and, after the trip is attached, at the default km placements. `state.starts` echoes the phones' starts. |
+| `useTrip {tripId?\|code?}` | As before. Attaching joins every generated car. With `starts`: phone 1 gets a start pin track (like `placeAt` without a road), phone 2 stays parked at its start (phase `parked`, no track) until the page sends `placeAt`; without `starts` both phones are at their default km. |
+| `placeAt {car, start, road?}` | Start pin. `road` is Google's road from `start` towards the trip destination. Within 150 m of the shared route (`CarRouteLogic.nearMainThreshold`) the car starts on it at the projected offset. Otherwise `CarRouteLogic.makePlan(road, main)` cuts the road at the merge and the car is `joining` (own leg, then the shared route from the merge). No road (or one that never meets the route): a straight densified line to the route about 1.5 km ahead of the start's nearest point. Resets the car to the start of its new track (paused or playing as it was), clears its deviation, keeps its ending when it still fits. |
+| `ending {car, end, road?, leaveKm?}` / `clearEnding {car}` | Own ending. `road` runs from a point on the shared route (the car's spot, or `leaveKm`) to `end`. Without `leaveKm` the car leaves where the road diverges from the route for good (the last point within 50 m of it, `divergeOffset`); with it, there (the road is used whole, a short hook is added if it does not start on the route). Without `road`, the road is a straight line from the leave point, and `leaveKm` defaults to where the car is (or where it rejoins). The car drives the shared route to the leave point, then the own road, then parks at the end and keeps publishing. A road that never leaves the shared route is just a parking offset (`pins.endOnRoute`). Refused: a leave point behind the car, a car already on its ending road, a road that leaves the route behind the car by more than about 300 m. `clearEnding` before the leave point drops it; after, the car goes back to the shared route at its old leave point. |
+| `deviate {car, pin, out?, back?, waitSeconds?, leaveKm?}` / `cancelDeviation {car}` | Deviation. `out` runs from the leave point to `pin`, `back` from the pin towards the destination; `back` is cut with `makePlan` where it meets the shared route (the car merges there and carries on, and still honours its ending). Defaults: `waitSeconds` 30 (0 to 600; the clock runs only while the car plays), `leaveKm` the car's spot about 5 s ahead, no roads = straight lines. Phases: onRoute, out, waiting, back, onRoute. Refused with a plain message: a car that is joining, already deviating, already on its ending, or a leave point behind the car; a way back that never meets the route or joins it before the pin. `cancelDeviation` before the leave point drops it; after it, the car skips the rest of its wait and drives back. |
+| `addCar {name?}` / `removeCar {car}` / `rename {car, name}` | Up to 8 generated cars (Daniel and Hafiz count). A new car takes the next first name from Mei Ling, Arjun, Siti, Kumar, Aina, Wei Jie, Farah, Raj ("<Name>’s <Myvi\|Axia\|Saga\|City\|X70\|Hilux…>"), the next colour of `#c2255c #2b8a3e #b08900 #1098ad #495057 #8b5e34`, joins the attached trip at once and starts paused 500 m behind the rearmost car on the shared route (3 km minus 500 m when none has a place yet; refused once the trip has ended; before a trip it just waits in the list). `removeCar` (generated cars only) stops its player and closes its client; the trip keeps its car doc, which the other phones see go stale. `rename` changes the first name in the playground; the car doc's name is changed too only if the rules let the car's own tracker (they let only the organizer), so after joining the app keeps the old name (`state.cars[].name` is what the app shows, `label` the playground's). |
+| `vote {car, event, answer:'yes'\|'notNow', place?:{name, latitude, longitude}}` / `voteAll {event}` | A generated car answers a stop request (vote doc with `answer` next to `agree`). `place` is put on the shared route for its `routeOffset` (name 1 to 100 characters; the `validSuggestion` shape), so `notNow` with a place is the card's "Another place". `voteAll` answers yes for every generated car that has not answered and did not ask. Refused: a closed request, a car with no signal, a phone. |
+| `askStop {car, type, place?}` | A generated car asks for a stop (`stopRest`, `stopFuel`, `stopFood`, `stopToilet`) at its current position and route offset, as the app writes it (no `status` or `expiresAt`: open until resolved). `place` goes in as the asker's own yes vote with that suggestion, as the app does. |
+| `report {car, type}` | A generated car reports `debris`, `accident`, `pothole`, `animal`, `stoppedVehicle`, `roadworks` (hazard, high, 45 min), `heavyRain`, `trafficJam` (condition, medium, 60 min) or `pullingOver`, `carTrouble`, `runningLate` (status, high, no expiry) where it is. |
+| `place`, `speed`, `play`, `playAll`, `behaviour`, `drop` | As before (`place {car, km, offRoute?, sideMeters?}` builds the same tracks: a main-only track from `km`, or a start road that merges at `km`). `behaviour.agree` (auto-agree after about 5 s) is still there. |
+
+What a generated car writes to its car doc as it moves (what CarRouteService writes in the app): on the shared route `state convoy` (a car placed there also
+clears its `route` and sets `mergeOffset`); on a start road `route` = the road, `mergeOffset` where it merges, `state joining`, no `convoyOffset` until it
+merges, then `state convoy`; on a deviation (leave point, out, wait, back) `route` = that whole road from the leave point to the merge, `joining`, then
+`convoy` at the merge; on its own ending `route` = the ending road, `mergeOffset` = where its end projects onto the shared route, `joining` (the app has no
+per-car destination: a road that never rejoins is exactly what `makePlan` returns for a car driving off to somewhere else), and it never gets a `convoyOffset`.
+
+**State** (`DEMO {"type":"state"}` once a second, plus what the old page reads: `phase, detail, problem, start, code, tripId, destination, routeLength, defaults, candidates`):
+
+- top: `phase` (`setup | preparing | waiting | joining | ready | ended`), `detail` (a sentence for the person), `problem` / `problemAt`, `start` and `starts`
+  (`{latitude, longitude, label}`; `starts` is `{phone1, phone2}` or null before Prepare, `start` is phone 1's), `code`, `tripId`, `destination` (name), `routeLength` (m),
+  `defaults` ({key: metres} of the old km placements), `candidates` (while `waiting`: `[{tripId, code, destination, cars, firstCarDistance (m|null)}]`), `geometryVersion`, `cars[]`, `events[]`.
+  `sideMeters` and `mergeKm` on a car are old-page fields; a phone 2 that was given its own start in `prepare` and has not been placed yet has `phase: 'parked'`, no track and its start as lat/lng.
+- `cars[]`, in the order of the list (phones first): `key, label, kind ('phone'|'generated'), name (what the app shows), color, number, joined, carId`; where it is:
+  `latitude, longitude, heading` (the car's own track point; null for a phone not yet placed), `offset` (m along the shared route, the nearest point while off it),
+  `phase`: `onRoute | joining | out | waiting | back | ending | arrived | parked` (null before the trip), `waitSecondsLeft` (while `waiting`), `trackMeters {at, of}`;
+  controls: `speed, playing, offline, agree, suggest, state` (the car doc's), `joining, mergeKm, sideMeters` (old page);
+  `pins`: `{start: {latitude, longitude}|null, startMergeKm, end: {latitude, longitude}|null, endLeaveKm, endOnRoute, deviation: {pin: {latitude, longitude}, leaveKm, mergeKm, waitSeconds}|null}` (a deviation is cleared once the car has merged back: `pins.deviation` null and its out/back legs leave the geometry, with a `legsVersion` and `geometryVersion` bump, as `cancelDeviation` after the merge);
+  `legsVersion` (changes when its own roads change); `reported`: what the app/Firestore has, `{offset, convoyOffset, ageSeconds, speed, latitude, longitude, heading}` or null.
+- `events[]`, newest first: `id, type, category, by (label), byKey (car key|null), offset, latitude, longitude, ageSeconds, status ('open'|'pinned'|'closed'), pinned (place name),
+  resolved, agree, disagree, suggestions (names), answers {carKey: {answer: 'yes'|'notNow'|'another', place: name|null}}` (only cars of the playground; a car that has not answered is absent).
+
+**Geometry** is a separate line, `DEMO {"type":"geometry"}`, sent when the trip is attached or anything below changes (and only then), never every second; the dashboard
+server keeps the latest like the state and replays it on reload (`{k:'geometry', geometry}` live, `snapshot.geometry` on connect). `state.geometryVersion` is its `version`:
+the page redraws geometry when it differs from the one it holds. Shape: `{type, version, route (the shared route, Google-encoded polyline, precision 5), routeLength (m),
+destination: {name, latitude, longitude}|null, cars: {key: {version (= that car's legsVersion), legs: [{role: 'start'|'out'|'back'|'ending', polyline, meters}]}}}`.
+Own legs only (the shared stretches are the route); a car with no own road has `legs: []`. Long roads are simplified for display (about 5 m) above 60 kB encoded.
+
+`--dry-run` also builds a start-pin track (the car 4 road of osrm-car4.json), a straight one, an ending and a deviation on the stand-in route and checks
+their lengths and merge points; `node --test 'lib/*.test.mjs'` covers every pure function (track maths, divergence, plans, names, answers).
 
 ## Dashboard
 

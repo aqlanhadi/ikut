@@ -2,7 +2,7 @@
 // car that starts off the route takes to its merge point, the points a simulator plays, who votes on which stop, and
 // reading Firestore's REST format. Pure functions, tested in playground.test.mjs.
 
-import { EARTH_RADIUS, RouteLine } from './route.mjs';
+import { CarRouteLogic, EARTH_RADIUS, Polyline, RouteLine, bearing, haversine, simplifyToFit, truncate } from './route.mjs';
 
 export const MAX_KMH = 200;
 
@@ -97,12 +97,9 @@ export function offRouteCoords(route, mergeOffset, sideMeters, { runUp = 1500, t
   return out;
 }
 
-/** The points a simulator is told to play: the car's point, then every `step` meters up to `ahead` meters on. */
-export function feedPoints(route, offset, { step = 80, ahead = 25_000 } = {}) {
-  const pts = [route.coordinateAtOffset(offset)];
-  for (let off = offset + step; off < Math.min(route.length, offset + ahead); off += step) pts.push(route.coordinateAtOffset(off));
-  if (pts.length < 2 && offset < route.length) pts.push(route.coordinateAtOffset(route.length)); // simctl needs two waypoints
-  return pts;
+/** The points a simulator is told to play on the shared route: the car's point, then every `step` meters up to `ahead` meters on. */
+export function feedPoints(route, offset, opts) {
+  return trackFeedPoints(buildTrack(route, [mainLeg(0, route.length)]), offset, opts);
 }
 
 /** A nudge of about half a meter, alternating, so a parked simulator location counts as a new one. */
@@ -155,3 +152,469 @@ export const decodeDoc = (d) => ({ id: d.name.split('/').pop(), ...decodeFields(
 
 /** Whole seconds since `ms`, or null. */
 export const ageSeconds = (ms, now) => (typeof ms === 'number' ? Math.max(0, Math.round((now - ms) / 1000)) : null);
+
+// ================================================================ Q7: tracks, pins, answers
+
+/** Longest list of coordinates a command may carry (a Google road for a few hundred km). */
+export const MAX_POINTS = 20_000;
+
+/** One coordinate {latitude, longitude} (other fields dropped), else a UserError naming `what`. */
+export function coordIn(v, what = 'That place') {
+  const lat = v && typeof v === 'object' ? v.latitude : undefined;
+  const lng = v && typeof v === 'object' ? v.longitude : undefined;
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    throw new UserError(`${what} needs a latitude and a longitude, like 3.45 and 101.40.`);
+  }
+  return { latitude: lat, longitude: lng };
+}
+
+/** A list of coordinates: between `min` and MAX_POINTS points, each valid. */
+export function coordsIn(v, what = 'That road', { min = 2 } = {}) {
+  if (!Array.isArray(v) || v.length < min) throw new UserError(`${what} needs at least ${min} points.`);
+  if (v.length > MAX_POINTS) throw new UserError(`${what} has too many points (the most is ${MAX_POINTS}).`);
+  return v.map((p, i) => coordIn(p, `Point ${i + 1} of ${what.toLowerCase()}`));
+}
+
+/** The same, but an absent value (undefined or null) is "no road sent". */
+export const optionalCoords = (v, what, opts) => (v === undefined || v === null ? null : coordsIn(v, what, opts));
+
+// ---------------------------------------------------------------- tracks
+//
+// A track is the ordered legs a car drives: a stretch of the shared route (main offsets from-to), an own road (a RouteLine
+// with a role: start | out | back | ending), or a wait (zero length, at a pin). A car keeps one distance along its track.
+
+export const mainLeg = (from, to, { park = false } = {}) => ({ kind: 'main', from, to, park });
+export const ownLeg = (role, line, id = role) => ({ kind: 'own', role, id, line });
+export const waitLeg = (seconds, at, id = 'wait') => ({ kind: 'wait', seconds, at, id });
+
+/** Lays the legs end to end (zero-length main and own legs are dropped). `main` is the shared route's RouteLine. */
+export function buildTrack(main, legs) {
+  const out = [];
+  let at = 0;
+  for (const leg of legs) {
+    const length = leg.kind === 'main' ? Math.max(0, leg.to - leg.from) : leg.kind === 'own' ? leg.line.length : 0;
+    if (leg.kind !== 'wait' && !(length > 0)) continue;
+    out.push({ ...leg, startAt: at, length });
+    at += length;
+  }
+  return { main, legs: out, length: at };
+}
+
+export const trackLength = (track) => track.length;
+
+/** The old km placement: the shared route from `offset` to its end. */
+export const trackFromOffset = (main, offset) => buildTrack(main, [mainLeg(Math.min(main.length, Math.max(0, offset)), main.length)]);
+
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+function legAt(track, d, waitingId = null) {
+  if (waitingId) {
+    const w = track.legs.findIndex((l) => l.id === waitingId && l.kind === 'wait');
+    if (w >= 0) return w;
+  }
+  const dd = clamp(d, 0, track.length);
+  let last = -1;
+  for (let i = 0; i < track.legs.length; i++) {
+    const l = track.legs[i];
+    if (l.kind === 'wait') continue;
+    last = i;
+    if (dd < l.startAt + l.length) return i;
+  }
+  return last;
+}
+
+function pointOn(track, leg, dd) {
+  const local = leg.kind === 'wait' ? 0 : clamp(dd - leg.startAt, 0, leg.length);
+  if (leg.kind === 'main') return track.main.coordinateAtOffset(leg.from + local);
+  if (leg.kind === 'own') return leg.line.coordinateAtOffset(local);
+  return leg.at;
+}
+
+/** The point at track distance `d` (a wait counts as no distance: the point is where the next leg starts). */
+export function trackPoint(track, d) {
+  const i = legAt(track, d);
+  return i < 0 ? track.main.coordinates[0] : pointOn(track, track.legs[i], clamp(d, 0, track.length));
+}
+
+const HEADING_STEP = 25;
+
+/** Heading in degrees at track distance `d`: towards the point 25 m on (or from 25 m back at the very end). */
+export function trackHeading(track, d) {
+  const dd = clamp(d, 0, track.length);
+  const here = trackPoint(track, dd);
+  const ahead = trackPoint(track, Math.min(track.length, dd + HEADING_STEP));
+  if (haversine(here, ahead) > 0.5) return bearing(here, ahead);
+  const behind = trackPoint(track, Math.max(0, dd - HEADING_STEP));
+  return haversine(behind, here) > 0.5 ? bearing(behind, here) : 0;
+}
+
+/**
+ * Where a car is: { index, leg, local (m into the leg), point, heading, onMain, mainOffset (null off the shared route),
+ * phase: onRoute | joining | out | waiting | back | ending | arrived }. `waiting` is the id of the wait leg the car is
+ * standing at (a wait has no distance, so the car's own state says whether it is in it).
+ */
+export function locate(track, d, { waiting = null } = {}) {
+  const dd = clamp(d, 0, track.length);
+  const index = legAt(track, dd, waiting);
+  if (index < 0) return { index: -1, leg: null, local: 0, point: track.main.coordinates[0], heading: 0, onMain: true, mainOffset: 0, phase: 'onRoute' };
+  const leg = track.legs[index];
+  const local = leg.kind === 'wait' ? 0 : clamp(dd - leg.startAt, 0, leg.length);
+  const onMain = leg.kind === 'main';
+  let phase;
+  if (leg.kind === 'main') phase = leg.park && local >= leg.length - 0.5 ? 'arrived' : 'onRoute';
+  else if (leg.kind === 'wait') phase = 'waiting';
+  else if (leg.role === 'start') phase = 'joining';
+  else if (leg.role === 'ending' && local >= leg.length - 0.5) phase = 'arrived';
+  else phase = leg.role;
+  return { index, leg, local, point: pointOn(track, leg, dd), heading: trackHeading(track, dd), onMain, mainOffset: onMain ? leg.from + local : null, phase };
+}
+
+/** The first wait this car still has to stand at, at or ahead of its distance; null when none. */
+export function nextWait(track, st) {
+  return track.legs.find((l) => l.kind === 'wait' && l.seconds > 0 && !st.served.has(l.id) && l.startAt >= st.d - 0.001) ?? null;
+}
+
+export const newCarState = () => ({ d: 0, waiting: null, served: new Set() });
+
+/**
+ * One step of driving along the track: `dt` seconds at `kmh`. The car stops at the next wait, stands there for its seconds
+ * (the clock runs only while playing), then goes on. Returns a new state { d, waiting: {id, left} | null, served }.
+ */
+export function stepTrack(track, st, kmh, dt, playing) {
+  if (st.waiting) {
+    if (!playing) return st;
+    const left = st.waiting.left - dt;
+    if (left > 0) return { ...st, waiting: { ...st.waiting, left } };
+    return { d: st.d, waiting: null, served: new Set([...st.served, st.waiting.id]) };
+  }
+  if (!playing || !(kmh > 0)) return st;
+  const d = st.d + (kmh / 3.6) * dt;
+  const w = nextWait(track, st);
+  if (w && d >= w.startAt) return { d: w.startAt, waiting: { id: w.id, left: w.seconds }, served: st.served };
+  return { ...st, d: clamp(d, 0, track.length) };
+}
+
+/** Track distance of shared-route offset `offset`, or null when that stretch is not on the track. */
+export function mainDistance(track, offset) {
+  const leg = track.legs.find((l) => l.kind === 'main' && offset >= l.from - 0.5 && offset <= l.to + 0.5);
+  return leg ? leg.startAt + clamp(offset - leg.from, 0, leg.length) : null;
+}
+
+/** Where a car standing at `d` of `oldTrack` is on `newTrack` (same shared-route offset, or the same own leg and place); null when gone. */
+export function relocate(oldTrack, d, waitingId, newTrack) {
+  const loc = locate(oldTrack, d, { waiting: waitingId });
+  if (!loc.leg) return null;
+  if (loc.onMain) return mainDistance(newTrack, loc.mainOffset);
+  const leg = newTrack.legs.find((l) => l.id === loc.leg.id && l.kind === loc.leg.kind);
+  return leg ? leg.startAt + Math.min(loc.local, leg.length) : null;
+}
+
+/**
+ * A car's state when its track changes to `newTrack`: the same place (see relocate), else `fallbackOffset` on the shared route,
+ * else `nearestOffset`; waits already served or in progress are kept only while their leg is still on the new track.
+ */
+export function carryState(oldTrack, st, newTrack, { fallbackOffset = null, nearestOffset = 0 } = {}) {
+  let d = relocate(oldTrack, st.d, st.waiting?.id ?? null, newTrack);
+  if (d === null && fallbackOffset !== null) d = mainDistance(newTrack, fallbackOffset);
+  if (d === null) d = mainDistance(newTrack, nearestOffset) ?? 0;
+  const ids = new Set(newTrack.legs.map((l) => l.id));
+  return { d, waiting: st.waiting && ids.has(st.waiting.id) ? st.waiting : null, served: new Set([...st.served].filter((id) => ids.has(id))) };
+}
+
+/**
+ * The points a simulator plays from track distance `d`: every `step` meters up to `ahead` meters on, or up to `stopAt`
+ * (the next wait). Two waypoints at least while there is track left (simctl needs two).
+ */
+export function trackFeedPoints(track, d, { step = 80, ahead = 25_000, stopAt = null } = {}) {
+  const end = Math.min(track.length, stopAt ?? Infinity, d + ahead);
+  const pts = [trackPoint(track, d)];
+  for (let x = d + step; x < end; x += step) pts.push(trackPoint(track, x));
+  if (pts.length < 2 && d < end) pts.push(trackPoint(track, end));
+  return pts;
+}
+
+// ---------------------------------------------------------------- building tracks from pins
+
+/** Within this distance two points are the same place for stitching roads together. */
+const SAME_PLACE = 2;
+
+/** `coords` starting at `first` (prepended when the road does not start there already). */
+const startingAt = (coords, first) => (haversine(coords[0], first) > SAME_PLACE ? [first, ...coords] : coords);
+const endingAt = (coords, last) => (haversine(coords[coords.length - 1], last) > SAME_PLACE ? [...coords, last] : coords);
+
+/** A straight, densified road from `a` to `b` (every `step` meters). */
+export function straightRoad(a, b, step = 40) {
+  const line = new RouteLine([a, b]);
+  const out = [];
+  for (let m = 0; m < line.length; m += step) out.push(line.coordinateAtOffset(m));
+  out.push(b);
+  return out;
+}
+
+/** The coordinates of `line` from `offset` on. */
+export function sliceFrom(line, offset) {
+  return [line.coordinateAtOffset(offset), ...line.coordinates.filter((_, i) => line.cumulative[i] > offset)];
+}
+
+/** A synthetic side road: leaves the route at `offset` and goes `meters` out to the left (or right: side 90), every `step` meters. */
+export function sideRoad(main, offset, meters, { side = -90, step = 40 } = {}) {
+  const a = main.coordinateAtOffset(offset);
+  const b = main.coordinateAtOffset(offset + 25);
+  const heading = bearing(a, b);
+  const out = [a];
+  for (let m = step; m <= meters; m += step) out.push(destinationPoint(a, heading + side, m));
+  return out;
+}
+
+/** The shared route for `meters` from `offset`, as coordinates every `step` meters. */
+function alongMain(main, offset, meters, step = 40) {
+  const out = [];
+  for (let m = step; m <= meters; m += step) out.push(main.coordinateAtOffset(Math.min(main.length, offset + m)));
+  return out;
+}
+
+/**
+ * The road of a car whose start has no Google road (no Maps key): a straight line from the start to the shared route about
+ * `ahead` meters ahead of the start's nearest point, then `tail` meters along the route (so CarRouteLogic finds the merge).
+ */
+export function fallbackStartRoad(main, start, { ahead = 1500, tail = 600 } = {}) {
+  const p = main.project(start);
+  const mergeAt = Math.min(main.length, p.offset + ahead);
+  const target = main.coordinateAtOffset(mergeAt);
+  return [...straightRoad(start, target), ...alongMain(main, mergeAt, tail)];
+}
+
+/**
+ * A car that starts at a pin. Within CarRouteLogic.nearMainThreshold of the shared route it starts on it: { kind: 'main', offset }.
+ * Otherwise `road` (Google's road from the pin towards the destination, or a straight fallback) is cut at the merge:
+ * { kind: 'road', line (the own leg, start to merge), mergeMain, mergeOwn, plan (CarRouteLogic.makePlan: what the car doc gets), straight }.
+ */
+export function planStart(main, start, road = null) {
+  const near = main.project(start);
+  if (!near) throw new UserError('The trip has no route yet.');
+  if (near.distance <= CarRouteLogic.nearMainThreshold) return { kind: 'main', offset: near.offset };
+  let coords = road && road.length >= 2 ? startingAt(road, start) : null;
+  let plan = coords && CarRouteLogic.makePlan(coords, main);
+  let straight = false;
+  if (!plan || plan.kind !== 'merges') {
+    coords = fallbackStartRoad(main, start);
+    plan = CarRouteLogic.makePlan(coords, main);
+    straight = true;
+  }
+  const full = new RouteLine(coords);
+  const merge = main.mergeOffset(full, CarRouteLogic.mergeTolerance);
+  if (!merge || !plan) throw new UserError('That road never reaches the shared route.');
+  const line = new RouteLine(truncate(full, merge.otherOffset));
+  if (line.length < 1) return { kind: 'main', offset: merge.mainOffset };
+  return { kind: 'road', line, mergeMain: merge.mainOffset, mergeOwn: merge.otherOffset, plan, straight };
+}
+
+/**
+ * Where `road` (a RouteLine) leaves the shared route for good: the last point within `tolerance` of it.
+ * { roadOffset, mainOffset } there; { ..., never: true } when no point of the road is on the route (it leaves at its start);
+ * null when the road ends on the route (it never leaves).
+ */
+export function divergeOffset(main, road, tolerance = CarRouteLogic.mergeTolerance, step = 25) {
+  const samples = [];
+  for (let s = 0; s < road.length; s += step) samples.push(s);
+  samples.push(road.length);
+  const hints = [];
+  let hint = null;
+  let lastOn = -1;
+  samples.forEach((s, i) => {
+    const p = main.project(road.coordinateAtOffset(s), { hint, fallbackDistance: tolerance * 2 });
+    hint = p.segmentIndex;
+    hints.push(hint);
+    if (p.distance <= tolerance) lastOn = i;
+  });
+  if (lastOn < 0) return { roadOffset: 0, mainOffset: main.project(road.coordinates[0]).offset, never: true };
+  if (lastOn === samples.length - 1) return null;
+  let lo = samples[lastOn];
+  let hi = samples[lastOn + 1];
+  const h = hints[lastOn];
+  while (hi - lo > 1) {
+    const mid = (lo + hi) / 2;
+    const p = main.project(road.coordinateAtOffset(mid), { hint: h, fallbackDistance: tolerance * 2 });
+    if (p.distance <= tolerance) lo = mid; else hi = mid;
+  }
+  return { roadOffset: lo, mainOffset: main.project(road.coordinateAtOffset(lo), { hint: h, fallbackDistance: tolerance * 2 }).offset };
+}
+
+/**
+ * A car's own ending: `road` runs from a point on the shared route to `end` (without `road`, a straight line from the leave
+ * point, which then needs `leaveKm`). With `leaveKm` the car leaves the route there; without, where the road leaves it for good.
+ * { kind: 'road', line (leave point to end), leaveOffset, end, plan (what the car doc gets: a road that never rejoins) }, or
+ * { kind: 'onRoute', parkOffset } when the end is on the shared route (the car just parks there).
+ */
+export function planEnding(main, { end, road = null, leaveKm = null }) {
+  const hasLeave = leaveKm !== null && leaveKm !== undefined;
+  if (!road && !hasLeave) throw new UserError('Without a road the ending needs the km where the car leaves the route.');
+  let leaveOffset;
+  let coords;
+  if (hasLeave) {
+    leaveOffset = clamp(leaveKm * 1000, 0, main.length);
+    const from = main.coordinateAtOffset(leaveOffset);
+    coords = road ? startingAt(road, from) : straightRoad(from, end);
+  } else {
+    const full = new RouteLine(road);
+    const d = divergeOffset(main, full);
+    if (d === null) return { kind: 'onRoute', parkOffset: main.project(end).offset, end };
+    leaveOffset = d.mainOffset;
+    coords = startingAt(sliceFrom(full, d.roadOffset), main.coordinateAtOffset(leaveOffset));
+  }
+  coords = endingAt(coords, end);
+  const line = new RouteLine(coords);
+  if (line.length < 1) throw new UserError('The ending is where the car leaves the route; pick a place further away.');
+  return { kind: 'road', line, leaveOffset, end, plan: CarRouteLogic.makePlan(coords, main) };
+}
+
+/**
+ * A deviation: the car leaves the shared route at `leaveKm`, drives `out` to the `pin`, waits, and drives `back` (a road from
+ * the pin towards the destination, cut where it meets the shared route again). Without roads, straight lines (a fallback for no
+ * Maps key). { leaveOffset, out (RouteLine), back (RouteLine), mergeMain, pin, plan (the car doc: out + back as one road) }.
+ */
+export function planDeviation(main, { leaveKm, pin, out = null, back = null }) {
+  const leaveOffset = clamp(leaveKm * 1000, 0, main.length);
+  const from = main.coordinateAtOffset(leaveOffset);
+  const outCoords = endingAt(out ? startingAt(out, from) : straightRoad(from, pin), pin);
+  let backCoords = back ? startingAt(back, pin) : null;
+  if (!backCoords) backCoords = [pin, ...fallbackStartRoad(main, pin)];
+  const combined = [...outCoords, ...backCoords.slice(1)];
+  const plan = CarRouteLogic.makePlan(combined, main);
+  if (!plan || plan.kind !== 'merges') throw new UserError('The way back from that pin never meets the route again. Try a pin nearer a road that leads on.');
+  const full = new RouteLine(combined);
+  const merge = main.mergeOffset(full, CarRouteLogic.mergeTolerance);
+  const outLine = new RouteLine(outCoords);
+  if (!merge || merge.otherOffset <= outLine.length + 1) throw new UserError('The way back joins the route before the pin. Pick a pin further off the route.');
+  const backLine = new RouteLine(truncate(new RouteLine(backCoords), merge.otherOffset - outLine.length));
+  return { leaveOffset, out: outLine, back: backLine, mergeMain: merge.mainOffset, pin, plan };
+}
+
+/** How far behind a car's earlier point a new leave point may be before it is a mistake (the page computes it from a spot just passed). */
+export const LEAVE_SLACK = 200;
+
+/**
+ * Lays a car's whole track from its pieces: `startOffset` (or `start`, a planStart road, then its merge), then an optional
+ * deviation (shared route to its leave point, out, wait, back), then an optional ending (shared route to its leave point and
+ * its own road, or just the shared route to a parking offset). Throws a UserError when the pieces do not fit in that order.
+ */
+export function composeTrack(main, { startOffset = 0, start = null, deviation = null, ending = null }) {
+  const legs = [];
+  let cursor;
+  if (start) { legs.push(ownLeg('start', start.line, 'start')); cursor = start.mergeMain; } else cursor = clamp(startOffset, 0, main.length);
+  const leaveAfter = (leave, message) => {
+    if (leave < cursor - LEAVE_SLACK) throw new UserError(message);
+    return Math.max(cursor, leave);
+  };
+  const afterWhat = deviation ? 'before this deviation is over' : start ? 'before the car has joined the route' : 'behind where the car starts';
+  if (deviation) {
+    const leave = leaveAfter(deviation.leaveOffset, start ? 'The deviation leaves the route before the car has joined it.' : 'The deviation leaves the route behind where the car starts.');
+    if (deviation.mergeMain < leave) throw new UserError('The way back joins the route behind the point where the car leaves it.');
+    const tag = deviation.id ?? 0; // each deviation has its own leg ids, so a second one waits again
+    legs.push(mainLeg(cursor, leave), ownLeg('out', deviation.out, `out${tag}`), waitLeg(deviation.waitSeconds, deviation.pin, `wait${tag}`), ownLeg('back', deviation.back, `back${tag}`));
+    cursor = deviation.mergeMain;
+  }
+  if (ending && ending.kind === 'onRoute') legs.push(mainLeg(cursor, Math.max(cursor, ending.parkOffset), { park: true }));
+  else if (ending) {
+    const leave = leaveAfter(ending.leaveOffset, `The ending leaves the route ${afterWhat}.`);
+    legs.push(mainLeg(cursor, leave), ownLeg('ending', ending.line));
+  } else legs.push(mainLeg(cursor, main.length));
+  return buildTrack(main, legs);
+}
+
+// ---------------------------------------------------------------- the cars
+
+export const MAX_GENERATED = 8;
+export const FIRST_NAMES = ['Mei Ling', 'Arjun', 'Siti', 'Kumar', 'Aina', 'Wei Jie', 'Farah', 'Raj'];
+export const CAR_MODELS = ['Myvi', 'Axia', 'Saga', 'City', 'X70', 'Hilux', 'Persona', 'Vios'];
+/** Distinct from the phones (#0a6cff, #d9480f), Daniel (#7C3AED), Hafiz (#0F766E) and each other. */
+export const PALETTE = ['#c2255c', '#2b8a3e', '#b08900', '#1098ad', '#495057', '#8b5e34'];
+
+/** The next generated car's first name, car name and colour, skipping those in use (`used`: [{ label, color }]). */
+export function nextCar(used, counter = used.length) {
+  const labels = new Set(used.map((u) => u.label));
+  const colors = new Set(used.map((u) => String(u.color).toLowerCase()));
+  const label = FIRST_NAMES.find((n) => !labels.has(n)) ?? `Car ${counter + 1}`;
+  const color = PALETTE.find((c) => !colors.has(c)) ?? PALETTE[counter % PALETTE.length];
+  return { label, name: carNameFor(label, counter), color };
+}
+
+/** "Mei Ling’s Myvi": the car name for a first name; `n` picks the model. */
+export const carNameFor = (label, n = 0) => `${label}’s ${CAR_MODELS[((n % CAR_MODELS.length) + CAR_MODELS.length) % CAR_MODELS.length]}`;
+
+/** A first name typed by the person: trimmed, 1 to 30 characters. */
+export function nameIn(v) {
+  const s = typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '';
+  if (s.length < 1 || s.length > 30) throw new UserError('A name should be 1 to 30 letters.');
+  return s;
+}
+
+// ---------------------------------------------------------------- events and answers
+
+/** What the Report sheet and the stop buttons write, as the app does (TripEvent.swift: category, severity, expiry). */
+export const EVENT_KINDS = {
+  debris: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
+  accident: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
+  pothole: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
+  animal: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
+  stoppedVehicle: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
+  roadworks: { category: 'hazard', severity: 'high', expirySeconds: 45 * 60 },
+  heavyRain: { category: 'condition', severity: 'medium', expirySeconds: 60 * 60 },
+  trafficJam: { category: 'condition', severity: 'medium', expirySeconds: 60 * 60 },
+  stopRest: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
+  stopFuel: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
+  stopFood: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
+  stopToilet: { category: 'stopRequest', severity: 'medium', expirySeconds: null },
+  pullingOver: { category: 'status', severity: 'high', expirySeconds: null },
+  carTrouble: { category: 'status', severity: 'high', expirySeconds: null },
+  runningLate: { category: 'status', severity: 'high', expirySeconds: null },
+};
+export const STOP_TYPES = ['stopRest', 'stopFuel', 'stopFood', 'stopToilet'];
+export const REPORT_TYPES = Object.keys(EVENT_KINDS).filter((t) => !STOP_TYPES.includes(t));
+
+/** The kind of a type a person may ask for: one of `allowed`, else a UserError. */
+export function eventKindIn(type, allowed, what) {
+  if (typeof type !== 'string' || !allowed.includes(type)) throw new UserError(`${what} should be one of: ${allowed.join(', ')}.`);
+  return { type, ...EVENT_KINDS[type] };
+}
+
+/** A place for a stop answer or a request, put on the shared route: { name, latitude, longitude, routeOffset } (validSuggestion shape). */
+export function placeOnRoute(main, place) {
+  if (!place || typeof place !== 'object') throw new UserError('A place needs a name and a spot on the map.');
+  const name = typeof place.name === 'string' ? place.name.trim() : '';
+  if (name.length < 1 || name.length > 100) throw new UserError('A place name should be 1 to 100 letters.');
+  const c = coordIn(place, 'A place');
+  return { name, ...c, routeOffset: Math.max(0, main.project(c)?.offset ?? 0) };
+}
+
+/** A vote doc's answer as the card shows it: yes | notNow | another (a "Not now" that carries a place). */
+export function voteAnswer(v) {
+  const answer = v.answer ?? (v.agree ? 'yes' : 'notNow');
+  return answer === 'notNow' && v.suggestion ? 'another' : answer;
+}
+
+/** { carKey: { answer, place } } for an event's vote docs; votes of cars outside the playground are left out. */
+export function answersByCar(votes, keyOf) {
+  const out = {};
+  for (const v of votes) {
+    const key = keyOf.get(v.id);
+    if (key) out[key] = { answer: voteAnswer(v), place: v.suggestion?.name ?? null };
+  }
+  return out;
+}
+
+/** open | pinned | closed: a closed or expired request is closed; a hazard is open until it expires. */
+export function eventStatus(e, now) {
+  if (e.status === 'closed' || (typeof e.expiresAt === 'number' && e.expiresAt <= now)) return 'closed';
+  return e.status === 'pinned' || e.place ? 'pinned' : 'open';
+}
+
+/** A stop request a car may still answer: not closed and not expired (the rules' openStop), from a client snapshot (Timestamps). */
+export function openStopSnapshot(e, now = Date.now()) {
+  const exp = e.expiresAt?.toMillis ? e.expiresAt.toMillis() : e.expiresAt;
+  return e.category === 'stopRequest' && e.status !== 'closed' && !(typeof exp === 'number' && exp <= now);
+}
+
+/** The encoded form of a RouteLine's points for a map (simplified when very long). */
+export const encodeLine = (line) => Polyline.encode(simplifyToFit(line.coordinates, 60_000));
+
