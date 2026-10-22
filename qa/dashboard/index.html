@@ -29,6 +29,7 @@
 }
 /* ?theme=light or ?theme=dark in the address forces one (for screenshots); without it the system decides */
 :root[data-theme=dark] {
+  color-scheme:dark;
     --screen:#000; --card:#1c1c1e; --tile:#2c2c2e; --label:#fff; --secondary:#98989f; --sep:#38383a;
     --accent:#2997ff; --accent-fg:#001a33; --accent-soft:rgba(41,151,255,.18);
     --pos:#30d158; --pos-soft:rgba(48,209,88,.16); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16); --red:#ff453a; --red-soft:rgba(255,69,58,.18);
@@ -36,6 +37,7 @@
     --watch:rgba(255,214,10,.22);
 }
 :root[data-theme=light] {
+  color-scheme:light;
   --screen:#f2f2f7; --card:#fff; --tile:#f2f2f7; --label:#000; --secondary:#6c6c70; --sep:#c6c6c8;
   --accent:#0071e3; --accent-fg:#fff; --accent-soft:rgba(0,113,227,.12);
   --pos:#1f7a35; --pos-soft:rgba(31,122,53,.13); --warn:#c93400; --warn-soft:rgba(201,52,0,.12); --red:#ff3b30; --red-soft:rgba(255,59,48,.12);
@@ -62,6 +64,7 @@ button.on { background:var(--accent); color:var(--accent-fg); box-shadow:none; }
 button:disabled { opacity:.4; cursor:not-allowed; }
 input[type=number], input[type=text], select { font:inherit; font-size:.88rem; color:var(--label); background:var(--tile); border:0; border-radius:var(--r-control); padding:5px 10px; }
 select { padding-right:6px; max-width:8.6em; cursor:pointer; font-weight:600; color:var(--accent); border-radius:999px; }
+select#startKind { max-width:none; }
 input[type=number] { width:4.6em; } input.wide { width:13em; }
 label { white-space:nowrap; }
 input[type=checkbox] { accent-color:var(--accent); }
@@ -102,6 +105,7 @@ input[type=checkbox] { accent-color:var(--accent); }
 /* over the map */
 .maptools { position:absolute; top:12px; right:12px; display:flex; gap:6px; z-index:5; }
 .maptools button { box-shadow:var(--shadow); }
+.maptools button.on { background:var(--accent); color:var(--accent-fg); }
 .hint { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:6; background:var(--label); color:var(--card); padding:9px 16px; border-radius:999px; font-weight:600; box-shadow:var(--shadow); display:flex; gap:12px; align-items:center; max-width:92%; }
 .hint button { background:rgba(128,128,128,.35); color:inherit; box-shadow:none; padding:2px 10px; }
 #prompts { position:absolute; left:12px; top:12px; bottom:12px; width:min(360px, calc(100% - 24px)); z-index:7; display:flex; flex-direction:column; gap:10px; overflow-y:auto; pointer-events:none; }
@@ -152,9 +156,9 @@ pre { background:var(--tile); border-radius:var(--r-control); padding:8px; max-h
 .steps { margin:6px 0 10px; padding-left:1.2em; } .cand { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; border-top:1px solid var(--sep); padding:8px 0; }
 
 /* the plain list (no map) */
-.strip { position:relative; height:118px; margin:10px 8px 6px; }
+.strip { position:relative; height:160px; margin:10px 8px 6px; }
 .strip .road { position:absolute; left:0; right:0; top:50px; height:6px; border-radius:3px; background:var(--sep); }
-.strip .ends { position:absolute; top:104px; font-size:.8rem; color:var(--secondary); } .strip .ends.r { right:0; }
+.strip .ends { position:absolute; top:142px; font-size:.8rem; color:var(--secondary); } .strip .ends.r { right:0; }
 .strip .dot { position:absolute; top:34px; margin-left:-13px; width:26px; height:26px; font-size:.8rem; }
 .strip .name { position:absolute; font-size:.75rem; white-space:nowrap; transform:translateX(-50%); font-weight:600; }
 .strip .ev { position:absolute; top:60px; transform:translateX(-50%); font-size:.85rem; line-height:1; } .strip .ev.done { opacity:.35; } .strip .ev.haz { color:var(--warn); } .strip .ev.stp { color:var(--accent); }
@@ -188,7 +192,7 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
   <div class="mapcol">
     <div id="map"></div>
     <div id="plain" class="hidden"></div>
-    <div class="maptools hidden" id="maptools"><button data-act="fitRoute" class="sm">Whole route</button><button data-act="fitCars" class="sm">Cars</button></div>
+    <div class="maptools hidden" id="maptools"><button data-act="fitRoute" class="sm">Whole route</button><button data-act="fitCars" class="sm">Cars</button><button data-act="follow" class="sm on" id="followBtn" title="Keep the cars in view">Follow</button></div>
     <div id="prompts"></div>
     <div id="hint" class="hint hidden"></div>
   </div>
@@ -202,13 +206,14 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
     <button id="refresh" class="sm">Look for demos again</button>
   </div>
   <div id="prodBanner" class="banner hidden">Runs on the real Firebase project: creates a real trip and anonymous users; the trip is ended at the end.</div>
+  <div id="pgOpenNote" class="note hidden">The playground is open. Close it (top right) to play a demo.</div>
   <div id="list"></div>
 </div></div>
 
 <script type="module">
 import {
   decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, roadKey, placeAtCmd, endingCmd, deviateCmd, voteCmd, prepareStartsCmd, clampWait, endingOrigin,
-  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1,
+  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1, seesStatus,
 } from '/page-logic.mjs';
 
 const $ = (s) => document.querySelector(s);
@@ -268,6 +273,8 @@ async function startMap() {
       mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
     });
     gm = { map, Marker: AdvancedMarkerElement, Route };
+    map.addListener('dragstart', () => setFollow(false)); // the person took the map: stop following
+    $('#map').addEventListener('wheel', () => setFollow(false), { passive: true });
     map.addListener('click', (e) => onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() }));
     $('#maptools').classList.remove('hidden');
     renderAll();
@@ -315,15 +322,32 @@ function syncMap() {
   if (geo?.destination && !layer.dest) layer.dest = marker({ lat: geo.destination.latitude, lng: geo.destination.longitude }, el(`<div class="destmk mk">${esc(geo.destination.name || 'Destination')}</div>`), { title: 'Destination' });
   if (!geo && layer.dest) { layer.dest.map = null; layer.dest = null; }
   syncCars(st); syncPins(st); syncEvents(st); syncPre(st);
+  if (st?.phase === 'ready' && !fittedCars) { fittedCars = true; if (follow) followCars(true); } else followCars(false);
 }
-let fitted = false;
-function fitRoute() { if (!gm || !routeModel) return; const b = new google.maps.LatLngBounds(); routeModel.path.forEach((p) => b.extend(p)); gmap().fitBounds(b, 40); }
+let fitted = false, fittedCars = false, follow = true, lastFit = 0;
+const programmatic = () => { lastFit = Date.now(); };
+function setFollow(on) { follow = on; $('#followBtn')?.classList.toggle('on', on); if (on) followCars(true); }
+function fitRoute() { if (!gm || !routeModel) return; const b = new google.maps.LatLngBounds(); routeModel.path.forEach((p) => b.extend(p)); programmatic(); gmap().fitBounds(b, 40); }
+/** The points worth framing: every car and every pin. */
+function carPoints() {
+  const pts = (pg?.cars ?? []).filter((c) => c.latitude != null).map((c) => ({ lat: c.latitude, lng: c.longitude }));
+  for (const w of Object.values(wantedPins(pg))) if (w.at && !w.leave) pts.push(w.at);
+  return pts;
+}
 function fitCars() {
-  if (!gm || !pg?.cars) return;
-  const pts = pg.cars.filter((c) => c.latitude != null).map((c) => ({ lat: c.latitude, lng: c.longitude }));
-  if (!pts.length) return;
-  const b = new google.maps.LatLngBounds(); pts.forEach((p) => b.extend(p)); gmap().fitBounds(b, 120);
-  if (gmap().getZoom() > 15) gmap().setZoom(15);
+  if (!gm) return;
+  const pts = carPoints(); if (!pts.length) return;
+  const b = new google.maps.LatLngBounds(); pts.forEach((p) => b.extend(p));
+  programmatic(); gmap().fitBounds(b, 120);
+  google.maps.event.addListenerOnce(gmap(), 'idle', () => { if (gmap().getZoom() > 15) gmap().setZoom(15); });
+}
+/** Keeps the cars framed: refits when one has left the view, at most every 4 seconds (and once when the trip is ready). */
+function followCars(force) {
+  if (!gm || !follow || pg?.phase !== 'ready') return;
+  if (!force && Date.now() - lastFit < 4000) return;
+  const view = gmap().getBounds(); if (!view) return;
+  const pts = carPoints();
+  if (force || pts.some((p) => !view.contains(p))) fitCars();
 }
 function syncCars(st) {
   const cars = (st?.cars ?? []).filter((c) => c.latitude != null);
@@ -370,8 +394,8 @@ function syncPins(st) {
     if (!m) {
       const content = w.leave ? el('<div class="leave" style="border-color:' + w.car.color + '"></div>') : el(`<div class="pin" style="border-color:${w.car.color}"><span class="badge"></span><span class="t"></span></div>`);
       m = layer.pins[id] = marker(w.at, content, { drag: movable, z: 10, title: w.leave ? 'Leaves here (drag along the route)' : '' });
-      m.addListener('dragstart', () => { held[id] = Infinity; });
-      m.addListener('dragend', () => { held[id] = Date.now() + 5000; onPinDrag(id, posOf(m)); });
+      m.addEventListener('gmp-dragstart', () => { held[id] = Infinity; });
+      m.addEventListener('gmp-dragend', () => { held[id] = Date.now() + 5000; onPinDrag(id, posOf(m)); });
     }
     m.gmpDraggable = movable;
     if (!w.leave) {
@@ -409,8 +433,8 @@ function syncPre(st) {
     let m = layer.pre[k];
     if (!m) {
       m = layer.pre[k] = marker(w.at, el(`<div class="pin" style="border-color:var(--accent)"><span class="badge" style="background:var(--accent)">${k === 'pre1' ? '1' : '2'}</span><span class="t"></span></div>`), { drag: w.drag, z: 10 });
-      m.addListener('dragstart', () => { held[k] = Infinity; });
-      m.addListener('dragend', () => { held[k] = Date.now() + 500; pgForm[k === 'pre1' ? 's1' : 's2'] = posOf(m); renderPanel(); });
+      m.addEventListener('gmp-dragstart', () => { held[k] = Infinity; });
+      m.addEventListener('gmp-dragend', () => { held[k] = Date.now() + 500; pgForm[k === 'pre1' ? 's1' : 's2'] = posOf(m); renderPanel(); });
     }
     m.content.querySelector('.t').textContent = w.text; m.gmpDraggable = w.drag;
     if (!(held[k] > Date.now())) m.position = w.at;
@@ -431,7 +455,8 @@ async function road(a, b) {
     path = routes?.[0]?.path?.map((p) => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng })) ?? null;
     if (path && path.length < 2) path = null;
   } catch (e) { console.warn('routing', e); }
-  if (!path) { routingDown = true; renderPanel(); }
+  if (!path) { routingDown = true; renderPanel(); return null; } // a failure is not remembered: the next drop tries again
+  routingDown = false;
   roads.set(key, path);
   return path;
 }
@@ -529,13 +554,6 @@ function phaseLine(c) {
     default: return 'Not placed yet';
   }
 }
-function seesLine(c) {
-  if (!c.joined) return { text: c.kind === 'generated' ? 'Joining…' : 'Not joined yet. Join on phone 2 with the code.', warn: false };
-  if (!c.reported) return { text: 'The app has no position for this car yet.', warn: true };
-  const r = c.reported, stale = r.ageSeconds !== null && r.ageSeconds > 60;
-  const off = c.phase === 'onRoute' && r.offset !== null && Math.abs(r.offset - c.offset) > 500;
-  return { text: `The app has this car at ${km1(r.offset)}, ${secs(r.ageSeconds)}${stale ? ' (stale: “Last seen” on the other phones)' : ''}${off ? `. It is not following: it should be at ${km1(c.offset)}.` : ''}`, warn: stale || off };
-}
 function carHtml(c) {
   const f = formFor(c), gen = c.kind === 'generated', pins = c.pins ?? {}, dev = pins.deviation;
   const placed = c.phase && c.phase !== 'parked';
@@ -630,7 +648,7 @@ function drawPanel() {
     let n = have.get(c.key);
     if (!n) { n = document.createElement('div'); n.className = 'car'; n.dataset.key = c.key; sCars.insertBefore(n, sCars.querySelector('.addcar')); }
     patch(n, carHtml(c));
-    const line = n.querySelector('[data-live=line]'), sees = seesLine(c), sl = n.querySelector('[data-live=sees]');
+    const line = n.querySelector('[data-live=line]'), sees = seesStatus(c), sl = n.querySelector('[data-live=sees]');
     if (line) line.textContent = phaseLine(c);
     if (sl) { sl.textContent = sees.text; sl.classList.toggle('warn', sees.warn); }
   });
@@ -711,8 +729,8 @@ function strip(st) {
   const pct = (m) => `${Math.max(0, Math.min(100, ((m - lo) / (hi - lo)) * 100))}%`, inView = (m) => m >= lo - 1 && m <= hi + 1;
   const shown = st.cars.filter((c) => (c.joined || c.kind === 'generated') && c.offset != null && inView(c.offset)).sort((a, b) => a.offset - b.offset);
   const dots = shown.map((c, i) => {
-    const top = c.phase === 'joining' ? 4 : i % 2 ? 4 : 78;
-    return `<span class="${badgeClasses(c)} dot" style="left:${pct(c.offset)};background:${c.color}" title="${esc(c.label)}">${esc(initialOf(c.label))}</span><span class="name" style="left:${pct(c.offset)};top:${top + (i % 2 ? 0 : 0)}px;color:${c.color}">${esc(c.label)}</span>`;
+    const top = [4, 70, 90, 110][i % 4]; // four heights, so neighbours do not overlap
+    return `<span class="${badgeClasses(c)} dot" style="left:${pct(c.offset)};background:${c.color}" title="${esc(c.label)}">${esc(initialOf(c.label))}</span><span class="name" style="left:${pct(c.offset)};top:${top}px;color:${c.color}">${esc(c.label)}</span>`;
   }).join('');
   const evs = st.events.filter((e) => e.offset !== null && inView(e.offset)).map((e) => `<span class="ev ${e.category === 'stopRequest' ? 'stp' : 'haz'} ${e.resolved ? 'done' : ''}" style="left:${pct(e.offset)}" title="${esc(EVLABEL[e.type] || e.type)}">${e.pinned ? '■' : e.category === 'stopRequest' ? '●' : '▲'}</span>`).join('');
   return `<div class="strip"><div class="road"></div>${dots}${evs}<span class="ends">${km1(lo)}</span><span class="ends r">${km1(hi)}</span></div>`;
@@ -761,7 +779,8 @@ document.addEventListener('click', async (ev) => {
     case 'vote': return cmd({ cmd: 'vote', car: k, event: b.dataset.event, answer: b.dataset.answer });
     case 'voteAll': return cmd({ cmd: 'voteAll', event: b.dataset.event });
     case 'focus': { const p = c?.latitude != null && gm; if (p) { gmap().panTo({ lat: c.latitude, lng: c.longitude }); if (gmap().getZoom() < 12) gmap().setZoom(13); } return; }
-    case 'fitRoute': return fitRoute();
+    case 'follow': return setFollow(!follow);
+    case 'fitRoute': setFollow(false); return fitRoute();
     case 'fitCars': return fitCars();
     case 'kmStart': if (f.km !== '') return cmd({ cmd: 'place', car: k, km: Number(f.km) }); return;
     case 'kmEnd': { const p = kmPoint(f.kmEnd); return f.kmEnd !== '' && p ? cmd(endingCmd(k, p)) : undefined; }
@@ -816,6 +835,7 @@ function elapsed(d) {
   return d.tick.t + Math.min(over, 5);
 }
 function renderBackend() {
+  $('#pgOpenNote').classList.toggle('hidden', !(running() && run.interactive));
   $('#backendSwitch').innerHTML = ['emulators', 'production'].map((b) =>
     `<button data-b="${b}" class="${b === backend ? 'on' : ''} ${b === 'production' ? 'prod' : ''}" ${running() ? 'disabled' : ''}>${b === 'emulators' ? 'Emulators' : 'Production'}</button>`).join('');
   $('#prodBanner').classList.toggle('hidden', backend !== 'production');
@@ -896,6 +916,12 @@ document.addEventListener('click', (ev) => {
 document.addEventListener('change', (ev) => { const c = ev.target.closest('[data-o]'); if (c) opts[c.closest('[data-f]').dataset.f][c.dataset.o] = c.checked; });
 
 // ---------------------------------------------------------------- live updates
+/** The server keeps a finished run's last state; the page treats it as gone: nothing from it stays on the map or in the panel. */
+function dropStale() {
+  pg = null; setGeometry(null); for (const k of Object.keys(carForm)) delete carForm[k];
+  fittedCars = false; armed = null; renderHint();
+  if (gm) clearMap();
+}
 function setGeometry(g) {
   geometry = g;
   routeModel = g?.route ? measure(decodePolyline(g.route)) : null;
@@ -905,7 +931,7 @@ function connect() {
   const es = new EventSource('/api/events');
   es.onmessage = (m) => {
     const msg = JSON.parse(m.data);
-    if (msg.k === 'snapshot') { run = msg.run; events = msg.events; log = msg.log; pg = msg.state; setGeometry(msg.geometry); confirming = null; }
+    if (msg.k === 'snapshot') { run = msg.run; events = msg.events; log = msg.log; pg = msg.state; setGeometry(msg.geometry); confirming = null; if (run?.interactive && run.status !== 'running') dropStale(); }
     else if (msg.k === 'state') {
       pg = msg.state;
       if (pendingPrepare && pg.phase === 'setup') { const b = pendingPrepare; pendingPrepare = null; cmd(b); }
@@ -914,7 +940,7 @@ function connect() {
     else if (msg.k === 'geometry') { setGeometry(msg.geometry); renderPanel(); return syncMap(); }
     else if (msg.k === 'ev') events.push(msg.ev);
     else if (msg.k === 'log') { log.push(msg.line); if (log.length > 500) log.shift(); }
-    else if (msg.k === 'run') { run = msg.run; if (run && run.status !== 'running') pendingPrepare = null; }
+    else if (msg.k === 'run') { run = msg.run; if (run && run.status !== 'running') { pendingPrepare = null; if (run.interactive) dropStale(); } }
     if (msg.k === 'ev' || msg.k === 'log') { if (pgRun()) { const pl = $('#plog'); if (pl) { pl.textContent = log.slice(-60).join('\n'); pl.scrollTop = pl.scrollHeight; } } return renderRun(); }
     renderAll();
   };

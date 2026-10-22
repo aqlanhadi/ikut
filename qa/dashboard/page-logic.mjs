@@ -84,7 +84,8 @@ export const roadKey = (a, b) => `${r5(a.lat)},${r5(a.lng)}>${r5(b.lat)},${r5(b.
 /** {lat,lng} to the playground's {latitude, longitude}, and back. */
 export const toCoord = (p) => ({ latitude: p.lat, longitude: p.lng });
 export const fromCoord = (c) => (c ? { lat: c.latitude, lng: c.longitude } : null);
-const toRoad = (path) => (path && path.length >= 2 ? limitPoints(path).map(toCoord) : undefined);
+const r6 = (n) => Math.round(n * 1e6) / 1e6;
+const toRoad = (path) => (path && path.length >= 2 ? limitPoints(path).map((p) => ({ latitude: r6(p.lat), longitude: r6(p.lng) })) : undefined); // 6 decimals is about 10 cm
 
 // ---- commands (shapes: qa/README.md, "Tracks, pins and the command reference")
 
@@ -194,4 +195,27 @@ export function straightDeviation(route, pin, leaveKm) {
   const snapped = snapToRoute(route, pin);
   const rejoin = pointAtOffset(route, Math.max(snapped.offset, leaveKm * 1000) + 1500);
   return { out: [leave, pin], back: [pin, rejoin] };
+}
+
+// ---- what the app has for a car
+
+export const ageText = (s) => (s === null || s === undefined ? '' : s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`);
+
+/**
+ * One line for "what the app has", and whether it needs attention. Judged by where the app has the car on the map (more than 500 m from the playground's)
+ * and how old that is (over 60 s is stale), never by comparing route offsets: a car the app still has joining has no convoy offset yet.
+ */
+export function seesStatus(c) {
+  if (!c.joined) return { text: c.kind === 'generated' ? 'Joining…' : 'Not joined yet. Join on phone 2 with the code.', warn: false };
+  const r = c.reported;
+  if (!r) return { text: 'The app has no position for this car yet.', warn: true };
+  const age = ageText(r.ageSeconds);
+  if (r.ageSeconds !== null && r.ageSeconds > 60) return { text: `The app last heard from this car ${age} (stale: “Last seen” on the other phones).`, warn: true };
+  const g = ghostOf(c);
+  if (g) return { text: `The app has this car ${km1(distance({ lat: c.latitude, lng: c.longitude }, g))} from where it is, ${age}.`, warn: true };
+  if (c.state === 'joining') {
+    const along = typeof c.trackMeters?.at === 'number' ? `, ${km1(c.trackMeters.at)} along its own road` : '';
+    return { text: `The app still has this car joining${along}.`, warn: false };
+  }
+  return { text: `The app has this car at ${km1(r.offset)}, ${age}.`, warn: false };
 }

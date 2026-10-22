@@ -190,3 +190,24 @@ test('straightDeviation: out to the pin, back to the route past it', () => {
   assert.deepEqual(out[1], pin);
   assert.ok(Math.abs(snapToRoute(route, back[1]).offset - 6500) < 20);
 });
+
+import { seesStatus, ageText } from '../dashboard/page-logic.mjs';
+
+test('seesStatus: joining is not a warning, a position gap or an old fix is', () => {
+  const base = { joined: true, kind: 'generated', latitude: 3, longitude: 101, state: 'convoy', offset: 23000, trackMeters: { at: 1400, of: 5000 },
+    reported: { offset: 6300, ageSeconds: 3, latitude: 3.0001, longitude: 101 } };
+  assert.deepEqual(seesStatus(base), { text: 'The app has this car at 6.3 km, 3 s ago.', warn: false }, 'offsets are not compared');
+  assert.deepEqual(seesStatus({ ...base, state: 'joining' }), { text: 'The app still has this car joining, 1.4 km along its own road.', warn: false });
+  const far = seesStatus({ ...base, reported: { ...base.reported, latitude: 3.02 } });
+  assert.equal(far.warn, true); assert.match(far.text, /2\.2 km from where it is/);
+  const stale = seesStatus({ ...base, reported: { ...base.reported, ageSeconds: 75 } });
+  assert.equal(stale.warn, true); assert.match(stale.text, /last heard from this car 75 s ago/);
+  assert.equal(seesStatus({ ...base, reported: null }).warn, true);
+  assert.equal(seesStatus({ ...base, joined: false }).warn, false);
+  assert.equal(ageText(200), '3 min ago');
+});
+
+test('road coordinates go out rounded to 6 decimals', () => {
+  const road = [{ lat: 3.123456789, lng: 101.987654321 }, { lat: 3.2, lng: 101.1 }];
+  assert.deepEqual(placeAtCmd('daniel', road[0], road).road[0], { latitude: 3.123457, longitude: 101.987654 });
+});
