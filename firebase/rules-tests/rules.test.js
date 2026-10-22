@@ -532,6 +532,12 @@ describe('stop requests', () => {
     it('a phone clock a few seconds ahead can still close a stop early', () =>
       assertSucceeds(updateDoc(evRef('mem'), { expiresAt: ts(-5000) })));
     it('two minutes ahead is too far', () => assertFails(updateDoc(evRef('mem'), { expiresAt: ts(-2 * MIN) })));
+    it('the asker cannot reopen an expired stop for 30 seconds', () =>
+      assertFails(updateDoc(evRef('mem', 'stopDone'), { expiresAt: ts(-30 * 1000) })));
+    it('the lead cannot reopen an expired stop for 30 seconds', () =>
+      assertFails(updateDoc(evRef('lead', 'stopDone'), { expiresAt: ts(-30 * 1000) })));
+    it('a stop can still be closed earlier than it was set to expire', () =>
+      assertSucceeds(updateDoc(evRef('lead'), { expiresAt: ts(5 * MIN) })));
     it('the lead cannot push an open stop later', () => assertFails(updateDoc(evRef('lead'), { expiresAt: ts(-31 * MIN) })));
     it('the asker cannot clear expiresAt on an open stop', () => assertFails(updateDoc(evRef('mem'), { expiresAt: null })));
     it('lead cannot clear expiresAt to reopen', () => assertFails(updateDoc(evRef('lead', 'stopDone'), { expiresAt: null })));

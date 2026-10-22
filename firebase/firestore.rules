@@ -178,11 +178,15 @@ service cloud.firestore {
         // A stop request can only be closed earlier by moving expiresAt to now or before, give or take one
         // minute of clock difference between phone and server (the asker, the
         // lead car or the organizer): never cleared, never pushed later, so it cannot be reopened or held
-        // open. The old Release build resolves this way.
+        // open. The old Release build resolves this way. It can only move the expiry earlier than it is now
+        // (else the minute of slack could be used again and again to keep an expired stop open); a stop with
+        // no expiresAt (written before D24) is refused here.
         || ((mine || lead)
           && prev.category == 'stopRequest'
           && expiryOnly
           && next.expiresAt is timestamp
+          && optionalOf(prev, 'expiresAt') != null
+          && next.expiresAt <= prev.expiresAt
           && next.expiresAt <= request.time + duration.value(1, 'm'));
     }
 
