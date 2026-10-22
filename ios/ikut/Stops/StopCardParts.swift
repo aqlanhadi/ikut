@@ -9,6 +9,8 @@ struct StopCardFrame<Content: View, Actions: View>: View {
 
     var title: String
     var subtitle: String?
+    /// The body scrolls past this height (default `maxBodyHeight`).
+    var bodyCap: CGFloat = StopCardFrame.maxBodyHeight
     var onClose: () -> Void
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
@@ -30,15 +32,21 @@ struct StopCardFrame<Content: View, Actions: View>: View {
                 onClose: onClose
             )
             .accessibilityAddTraits(.isHeader)
-            // As tall as the content; past the cap the body scrolls.
             // As tall as the content; past the cap the body scrolls. Nothing else fills the space.
             let natural = body(of: content)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
-            if contentHeight > Self.maxBodyHeight {
+            if contentHeight > bodyCap {
                 ScrollView { natural }
-                    .frame(height: Self.maxBodyHeight)
+                    .frame(height: bodyCap)
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
+                    // The last rows fade out above the actions instead of being cut.
+                    .mask(
+                        VStack(spacing: 0) {
+                            Color.black
+                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 14)
+                        })
             } else {
                 natural
             }
@@ -64,6 +72,21 @@ struct StopCardFrame<Content: View, Actions: View>: View {
     }
 }
 
+/// A place row's trailing cost: "On route", or "+4 min" over "1.5 km off route".
+struct StopCostText: View {
+    var candidate: StopCandidate
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            Text(candidate.costText).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
+            if let off = candidate.offRouteText {
+                Text(off).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .multilineTextAlignment(.trailing)
+    }
+}
+
 /// One button in the card's action area. `.primary` is the main action (50 pt, or `height` when the
 /// driver needs a huge one), `.secondary` a gray capsule, `.positive` the chosen answer, `.ghost` plain text.
 struct StopActionButton: View {
@@ -76,12 +99,18 @@ struct StopActionButton: View {
     var id: String
     var action: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
+        // At accessibility sizes a long title wraps to two lines and the button grows, not truncates.
+        let large = typeSize.isAccessibilitySize
         Button(action: action) {
             Text(title)
                 .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .lineLimit(large ? 2 : 1)
+                .minimumScaleFactor(large ? 1 : 0.8)
+                .multilineTextAlignment(.center)
+                .padding(.vertical, large ? Spacing.s : 0)
                 .frame(maxWidth: .infinity, minHeight: height)
                 .foregroundStyle(foreground)
                 .background(background, in: Capsule())

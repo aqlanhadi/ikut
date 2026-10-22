@@ -336,6 +336,15 @@ struct StopLogicTests {
         StopBoard(requests: states, missed: missed)
     }
 
+    @Test func nextStopSkipsRequestsWithoutAPlace() throws {
+        let unpinned = try tally(stop(by: "c3", author: "u3"))
+        var pinnedEvent = stop(place: place("Shell Tapah", pinned: "u1"))
+        pinnedEvent.id = "stop2"
+        let pinned = try tally(pinnedEvent)
+        #expect(StopLogic.nextStop(board([unpinned, pinned]))?.name == "Shell Tapah")
+        #expect(StopLogic.nextStop(board([unpinned])) == nil)
+    }
+
     @Test func buttonSaysPitStopWithNoStop() {
         let content = StopLogic.buttonContent(for: .empty)
         #expect(content.label == "Pit stop")
@@ -658,7 +667,9 @@ struct StopSuggestionTests {
         #expect(onRoute.whereText == "18 km ahead · about 12 min")
         let off = StopSuggestions.rank([found("B", km: 18, off: 1_500)], route: route, fromOffset: 0)[0]
         #expect(off.costText == "+4 min")
-        #expect(off.whereText.hasSuffix("off route"))
+        #expect(off.whereText == "18 km ahead · about 12 min")
+        #expect(off.offRouteText == "1.5 km off route")
+        #expect(onRoute.offRouteText == nil)
     }
 
     @Test func queriesPerType() {

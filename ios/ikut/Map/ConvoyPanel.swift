@@ -9,6 +9,7 @@ import SwiftUI
 /// presenting the report sheet, and the mock's inset glass card is what this matches.
 struct ConvoyPanel: View {
     var model: TripMapModel
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var expanded: Bool
     var canReport: Bool
     /// The pinned place of the open stop request, for NEXT STOP.
@@ -307,7 +308,11 @@ struct ConvoyPanel: View {
     }
 
     private var buttons: some View {
-        HStack(spacing: Spacing.gap) {
+        // At accessibility sizes Report and Pit stop take a row each; otherwise they share one.
+        let stacked = typeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(spacing: Spacing.gap)) : AnyLayout(HStackLayout(spacing: Spacing.gap))
+        return layout {
             Button(action: onReport) {
                 Label("Report", systemImage: "exclamationmark.triangle")
                     .font(.headline)
@@ -322,11 +327,11 @@ struct ConvoyPanel: View {
                 // button widens over Report instead.
                 Label(stopButton.label, systemImage: stopButton.symbol)
                     .font(.headline)
-                    .lineLimit(1)
+                    .lineLimit(stacked ? 2 : 1)
                     .minimumScaleFactor(0.7)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: !stacked, vertical: false)
                     .padding(.horizontal, Spacing.l)
-                    .frame(minWidth: 146, minHeight: 50)
+                    .frame(minWidth: stacked ? nil : 146, maxWidth: stacked ? .infinity : nil, minHeight: 50)
                     .foregroundStyle(.primary)
                     .background(Color(.systemGray5).opacity(0.7), in: Capsule())
                     .overlay(alignment: .topTrailing) {

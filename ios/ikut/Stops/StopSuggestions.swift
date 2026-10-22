@@ -34,17 +34,21 @@ struct StopCandidate: Sendable, Equatable, Identifiable {
             routeOffset: routeOffset, pinnedBy: nil)
     }
 
-    /// "18 km ahead · about 12 min".
+    /// "18 km ahead · about 12 min", always one line.
     var whereText: String {
         let eta = ConvoyFormat.duration(distanceAhead / StopLogic.assumedSpeed).lowercased()
-        let base = "\(ConvoyFormat.distance(distanceAhead)) ahead · about \(eta)"
-        return offRoute > StopSuggestions.onRouteTolerance ? base + " · \(ConvoyFormat.distance(offRoute)) off route" : base
+        return "\(ConvoyFormat.distance(distanceAhead)) ahead · about \(eta)"
     }
 
-    /// "On route" or the extra drive "+4 min" (there and back at about 50 km/h).
+    /// "On route", or the extra drive and how far off: "+4 min · 1.5 km off route".
     var costText: String {
         guard offRoute > StopSuggestions.onRouteTolerance else { return "On route" }
         return "+\(max(1, Int((2 * offRoute / StopSuggestions.detourSpeed / 60).rounded()))) min"
+    }
+
+    /// The trailing text in a row: "+4 min" over "1.5 km off route", or "On route".
+    var offRouteText: String? {
+        offRoute > StopSuggestions.onRouteTolerance ? "\(ConvoyFormat.distance(offRoute)) off route" : nil
     }
 }
 

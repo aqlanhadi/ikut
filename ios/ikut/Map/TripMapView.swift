@@ -123,7 +123,7 @@ struct TripMapView: View {
                 ZStack(alignment: .bottom) {
                     ConvoyPanel(
                         model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
-                        nextStop: stopBoard.requests.first?.place, stopButton: StopLogic.buttonContent(for: stopBoard),
+                        nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
                         onReport: openReport, onStop: openStopCard)
                         // The glass card is see-through, so the panel fades out under it.
                         .opacity(stopCardOpen ? 0 : 1)
@@ -375,7 +375,7 @@ struct TripMapView: View {
                     }
                 })
             }
-            if let stopPill {
+            if let stopPill, !stopCardOpen {
                 StopPillView(pill: stopPill, onButton: pillTapped)
             }
             if let approach {

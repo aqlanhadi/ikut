@@ -202,6 +202,11 @@ struct StopBoard: Equatable, Sendable {
 }
 
 enum StopLogic {
+    /// NEXT STOP on the panel: the first open request that has a pinned place (not just the first request).
+    static func nextStop(_ board: StopBoard) -> StopPlace? {
+        board.requests.compactMap(\.place).first
+    }
+
     /// Meters per second (90 km/h) used for the ETA to a stop, as in the design's "18 km · 12 min".
     static let assumedSpeed: Double = 25
 

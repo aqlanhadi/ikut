@@ -78,7 +78,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
 4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.
-5. B taps Pit stop, Fuel; the request sends itself. A's Pit stop button shows the stop (the card does not open by itself), cars 3 and 4 vote (car 3 suggests a place if
+5. B taps Pit stop, Fuel, then Ask for this stop. A's Pit stop button shows the stop (the card does not open by itself), cars 3 and 4 vote (car 3 suggests a place if
    B's phone found none), A opens the stop from the Pit stop button and pins it, B's button shows it pinned, A taps Leave now and both buttons are Pit stop again.
 6. B goes back to the lobby and pauses sharing: A's row 2 reads "Paused", `pausedAt` is set; Resume clears both.
 7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
@@ -220,7 +220,7 @@ Timeline (T = seconds after go; the same shape in both, differences marked):
 | 0 | Aisha (phone 1) leads, Daniel and Hafiz behind; Faiz rides in her car (phone 2) | Faiz (phone 2) 800 m behind Aisha, ahead of Daniel and Hafiz |
 | 75 | Faiz (co-pilot) reports Debris from his Report sheet; the scripted cars behind log "approach alert" | Aisha reports Debris from phone 1; phone 2 behind gets the approach alert (about T+90) |
 | 150-270 | Hafiz loses signal; both phones show "Last seen" from about T+210; he comes back | same |
-| 300 | **Highlight.** Hafiz asks for a fuel stop and suggests "R&R Demo" (4 km ahead of the lead); Daniel agrees | **Highlight.** Faiz taps Pit stop > Fuel on phone 2 (the request sends itself); Hafiz suggests "R&R Demo", Daniel agrees |
+| 300 | **Highlight.** Hafiz asks for a fuel stop and suggests "R&R Demo" (4 km ahead of the lead); Daniel agrees | **Highlight.** Faiz taps Pit stop > Fuel on phone 2 (then Ask for this stop sends it); Hafiz suggests "R&R Demo", Daniel agrees |
 | about 320 | Phone 1: Aisha opens the stop from the Pit stop button, then Pin R&R Demo ("the lead car pins a stop for the convoy"); phone 2's button shows it pinned | same; phone 2's button reads "Fuel · N min" |
 | about 400 | The pin has been on the map 75 s; Aisha taps Leave now and the button is Pit stop again on both phones | same |
 | 560 | End; the maps stay open until then | same |
