@@ -64,9 +64,7 @@ struct StopCardFrame<Content: View, Actions: View>: View {
                 .padding(.top, Spacing.tight)
                 .accessibilityHidden(true)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
-        .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
+        .glassSurface()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.card")
     }
