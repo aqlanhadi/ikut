@@ -70,3 +70,15 @@ struct StopMiniMap: View {
         .accessibilityIdentifier("stop.minimap")
     }
 }
+
+#if DEBUG
+#Preview {
+    // From 40 km along the demo route to the Tapah R&R at 52 km.
+    let route = RouteLine(MapDemo.densify(MapDemo.mainWaypoints))
+    if let me = route.coordinate(atOffset: 40_000), let place = route.coordinate(atOffset: 52_000) {
+        StopMiniMap(me: me, place: place, symbol: "fuelpump.fill",
+                    route: StopMapFraming.routeBetween(route, from: 40_000, to: 52_000))
+            .padding(Spacing.l)
+    }
+}
+#endif

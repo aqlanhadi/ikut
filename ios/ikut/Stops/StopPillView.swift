@@ -84,3 +84,25 @@ struct StopPillView: View {
         .accessibilityIdentifier(id)
     }
 }
+
+#if DEBUG
+#Preview("Every pill") {
+    // As the planner picks them on the demo trip, seen from the lead car.
+    let now = Date()
+    @MainActor func pill(_ scene: String, answered: Bool = false) -> StopPill? {
+        let requests = MapDemo.stopBoard(scene, now: now).requests
+        var memory = StopPillMemory()
+        memory.observe(requests, now: now)
+        if answered, let request = requests.first { memory.noteAnswered(request, answer: .yes, now: now) }
+        return StopPillPlanner.current(requests: requests, memory: memory, now: now)
+    }
+    let pills = [pill("lead"), pill("responder"), pill("responder", answered: true), pill("pinned"), pill("asker")]
+        .compactMap { $0 }
+    return VStack(spacing: Spacing.m) {
+        ForEach(pills.indices, id: \.self) { StopPillView(pill: pills[$0]) { _ in } }
+    }
+    .padding(Spacing.m)
+    .frame(maxHeight: .infinity, alignment: .top)
+    .background(Color(.systemGray4))
+}
+#endif

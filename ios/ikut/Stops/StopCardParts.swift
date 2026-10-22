@@ -262,3 +262,73 @@ struct StopTimeline: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+#Preview("Buttons and tiles") {
+    VStack(spacing: Spacing.s) {
+        StopActionButton(title: "Ask for this stop", style: .primary, id: "p") {}
+        StopActionButton(title: "Ask for this stop", style: .primary, height: 72, id: "p-big") {}
+        StopActionButton(title: "Ask for this stop", style: .primary, disabled: true, id: "p-off") {}
+        StopActionButton(title: "Another place", id: "s") {}
+        StopActionButton(title: "You said yes", style: .positive, id: "y") {}
+        StopActionButton(title: "Back", style: .ghost, height: 44, id: "g") {}
+        StopActionButton(title: "Cancel the request", style: .destructive, height: 44, id: "d") {}
+        HStack(spacing: Spacing.m) {
+            StopReasonIcon(symbol: "fuelpump.fill")
+            StopReasonIcon(symbol: "fork.knife", size: 40)
+            StopReasonIcon(symbol: "toilet.fill", size: 34)
+        }
+        StopPlaceTile(name: "Petronas Tapah R&R", detail: "18 km · 12 min", trailing: "On route")
+        StopPlaceTile(name: "Shell Gopeng, Jalan Besar off the old trunk road", detail: "31 km · 22 min", trailing: nil)
+    }
+    .padding(Spacing.l)
+}
+
+#Preview("Voter rows") {
+    func row(_ id: String, _ n: Int, _ color: String, _ name: String, mine: Bool = false,
+             _ status: StopRequestState.VoteStatus, suggestion: String? = nil,
+             arrival: StopRequestState.Arrival? = nil) -> StopRequestState.Row {
+        .init(carId: id, number: n, colorHex: color, name: name, isMine: mine, status: status,
+              suggestion: suggestion.map { StopPlace(name: $0, coordinate: .init(latitude: 4.34, longitude: 101.2),
+                                                       routeOffset: 70_000, pinnedBy: nil) },
+              arrival: arrival)
+    }
+    let rows = [
+        row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true, .agreed),
+        row("c2", 2, "#D9480F", "Wyna’s X70", .waiting),
+        row("c3", 3, "#0F766E", "Hafiz’s Hilux", .notNow),
+        row("c4", 4, "#7C3AED", "Daniel’s City", .suggested, suggestion: "Shell Gopeng"),
+        row("c5", 5, "#BE185D", "Faiz’s car", .agreed, arrival: .here),
+        row("c6", 6, "#CA8A04", "Siti’s Bezza", .agreed, arrival: .minutes(6)),
+    ]
+    return VStack(spacing: Spacing.xs) {
+        ForEach(rows) { StopVoterRow(row: $0) }
+    }
+    .padding(Spacing.l)
+}
+
+#if DEBUG
+#Preview("Timeline") {
+    VStack(spacing: Spacing.m) {
+        if let asked = MapDemo.stopBoard("asker").requests.first { StopTimeline(state: asked) }
+        if let pinned = MapDemo.stopBoard("pinned").requests.first { StopTimeline(state: pinned) }
+    }
+    .padding(Spacing.l)
+}
+#endif
+
+#Preview("Frame") {
+    VStack(spacing: Spacing.m) {
+        StopCardFrame(title: "Asked the convoy", subtitle: "Waiting for the other cars", onClose: {}) {
+            Text("The lead car pins the place once the cars have answered.").foregroundStyle(.secondary)
+        } actions: {}
+        // Taller than the cap: the body scrolls and the actions stay put.
+        StopCardFrame(title: "Another place", subtitle: nil, onClose: {}) {
+            ForEach(1...8, id: \.self) { StopPlaceTile(name: "Place \($0)", detail: "\($0 * 4) km · \($0 * 3) min", trailing: nil) }
+        } actions: {
+            StopActionButton(title: "Back", style: .ghost, height: 44, id: "back") {}
+        }
+    }
+    .padding(Spacing.s)
+    .frame(maxHeight: .infinity, alignment: .bottom)
+    .background(Color(.systemGray4))
+}
