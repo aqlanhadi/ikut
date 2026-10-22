@@ -35,13 +35,15 @@ struct StopCardFrame<Content: View, Actions: View>: View {
                 closeOffset: CGSize(width: Spacing.xs, height: -Spacing.xs), closeIdentifier: "stop.card.close", closeOnGlass: true,
                 onClose: onClose
             )
+            // The header keeps all its lines; when room is short the body gives way, not the title.
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
             // As tall as the content; past the cap the body scrolls. Nothing else fills the space.
             let natural = body(of: content)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             if contentHeight > cap {
                 ScrollView { natural.padding(.bottom, GlassSurface.active ? 14 : 24) }
-                    .frame(height: cap)
+                    .frame(maxHeight: cap)
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
                     // The last rows fade out above the actions instead of being cut.
