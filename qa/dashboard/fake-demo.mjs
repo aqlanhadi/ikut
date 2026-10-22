@@ -5,7 +5,7 @@ const argv = process.argv.slice(2);
 const timeline = [
   { at: 5, text: 'Car 2 falls a bit behind', watch: true, who: 'Sam' },
   { at: 12, text: 'Hazard ahead: stopped car', watch: true, who: 'Aini' },
-  { at: 22, text: 'Rest stop vote starts', watch: true, who: 'Sam' },
+  { at: 22, text: 'Rest stop asked', watch: true, who: 'Sam' },
   { at: 32, text: 'Convoy is back together', watch: false, who: 'script' },
 ];
 const info = {
@@ -40,7 +40,7 @@ for (let t = 0; t <= 40; t++) {
   for (const e of timeline) if (e.at === t) emit({ type: 'event', ...e });
   if (t === 8) emit({ type: 'check', phone: 1, status: 'PASS', name: 'Sees car 2' });
   if (t === 14) emit({ type: 'check', phone: 2, status: 'PASS', name: 'Hazard banner shows' });
-  if (t === 24) emit({ type: 'check', phone: 2, status: argv.includes('--fail') ? 'FAIL' : 'PASS', name: 'Stop vote visible' });
+  if (t === 24) emit({ type: 'check', phone: 2, status: argv.includes('--fail') ? 'FAIL' : 'PASS', name: 'Stop OK visible' });
   if (t === 26 && argv.includes('--fail')) {
     emit({ type: 'error', message: 'Phone 2 lost the trip' });
     emit({ type: 'phase', phase: 'failed', detail: 'a check failed' });

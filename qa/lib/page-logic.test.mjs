@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Polyline } from './route.mjs';
 import {
-  decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, limitPoints, roadKey, distance, placeAtCmd, endingCmd, deviateCmd, voteCmd, prepareStartsCmd,
-  clampWait, endingOrigin, canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName,
+  decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, limitPoints, roadKey, distance, placeAtCmd, endingCmd, deviateCmd, voteCmd, stoppedCmd, prepareStartsCmd,
+  clampWait, endingOrigin, canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner,
 } from '../dashboard/page-logic.mjs';
 
 // a straight 10 km road going east at latitude 3
@@ -66,8 +66,8 @@ test('commands carry road fields only when there is a road', () => {
   assert.equal(d.waitSeconds, 45); assert.equal(d.leaveKm, 8); assert.ok(d.out); assert.equal(d.back, undefined);
   assert.equal(deviateCmd('g3', b).waitSeconds, 30);
   assert.equal(clampWait(9999), 600); assert.equal(clampWait(-4), 0); assert.equal(clampWait('x'), 30);
-  assert.deepEqual(voteCmd('daniel', 'e1', 'notNow', { name: 'Here', lat: 3, lng: 101 }), { cmd: 'vote', car: 'daniel', event: 'e1', answer: 'notNow', place: { name: 'Here', latitude: 3, longitude: 101 } });
-  assert.equal(voteCmd('daniel', 'e1', 'yes').place, undefined);
+  assert.deepEqual(voteCmd('daniel', 'e1'), { cmd: 'vote', car: 'daniel', event: 'e1' });
+  assert.deepEqual(stoppedCmd('e1'), { cmd: 'markStopped', event: 'e1' });
 });
 
 test('prepare starts: phone 2 follows phone 1 when it has no pin', () => {
@@ -120,44 +120,50 @@ const state = () => ({
     { key: 'g4', label: 'Arjun', kind: 'generated', joined: false },
   ],
   events: [
-    { id: 'e1', category: 'stopRequest', type: 'stopFuel', status: 'open', by: 'Phone 1', byKey: 'phone1', offset: 12000, answers: { g3: { answer: 'yes', place: null } }, agree: 1, disagree: 0, suggestions: [] },
-    { id: 'e2', category: 'stopRequest', type: 'stopRest', status: 'closed', by: 'Daniel', byKey: 'daniel', answers: {} },
-    { id: 'e3', category: 'hazard', type: 'debris', status: 'open', by: 'Daniel', byKey: 'daniel', answers: {} },
-    { id: 'e4', category: 'stopRequest', type: 'stopFood', status: 'open', by: 'Daniel', byKey: 'daniel', answers: {}, agree: 0, disagree: 0 },
-    { id: 'e5', category: 'stopRequest', type: 'stopToilet', status: 'pinned', by: 'Daniel', byKey: 'daniel', answers: {} },
+    { id: 'e1', category: 'stopRequest', type: 'stopFuel', status: 'open', by: 'Phone 1', byKey: 'phone1', offset: 12000, message: 'Low on fuel, next R&R please', oks: { g3: true }, ok: 1 },
+    { id: 'e2', category: 'stopRequest', type: 'stopRest', status: 'closed', by: 'Daniel', byKey: 'daniel', oks: {} },
+    { id: 'e3', category: 'hazard', type: 'debris', status: 'open', by: 'Daniel', byKey: 'daniel', oks: {} },
+    { id: 'e4', category: 'stopRequest', type: 'stopFood', status: 'open', by: 'Daniel', byKey: 'daniel', oks: {}, ok: 0 },
   ],
 });
 
-test('stopPrompts: one card per open stop request, rows for joined generated cars', () => {
+test('stopPrompts: one card per open stop request, rows for joined generated cars, OK per car', () => {
   const p = stopPrompts(state());
   assert.deepEqual(p.map((x) => x.id), ['e1', 'e4']);
   const e1 = p[0];
   assert.equal(e1.title, 'Fuel stop'); assert.equal(e1.fromPhone, true);
-  assert.deepEqual(e1.rows.map((r) => [r.key, r.canAnswer, r.answer]), [['daniel', true, null], ['hafiz', false, null], ['g3', false, 'yes']]);
+  assert.equal(e1.message, 'Low on fuel, next R&R please'); assert.equal(e1.okCount, 1);
+  assert.deepEqual(e1.rows.map((r) => [r.key, r.canAnswer, r.ok]), [['daniel', true, false], ['hafiz', false, false], ['g3', false, true]]);
   assert.equal(e1.anyToAnswer, true);
   const e4 = p[1];
-  assert.equal(e4.fromPhone, false);
+  assert.equal(e4.fromPhone, false); assert.equal(e4.message, null);
   assert.deepEqual(e4.rows.map((r) => [r.key, r.asker, r.canAnswer]), [['daniel', true, false], ['hafiz', false, false], ['g3', false, true]]);
   assert.deepEqual(stopPrompts({ cars: [], events: [] }), []);
   assert.deepEqual(stopPrompts(null), []);
 });
 
-test('stopPrompts: the card is gone when the request is no longer open, and Everyone agrees has nothing to do once all answered', () => {
+test("stopPrompts: We've stopped is on the page only when a generated car with signal asked", () => {
+  const p = stopPrompts(state());
+  assert.equal(p[0].canStop, false); // a phone asked: tap it in the app
+  assert.equal(p[1].canStop, true);
+  const s = state();
+  s.cars.find((c) => c.key === 'daniel').offline = true;
+  assert.equal(stopPrompts(s)[1].canStop, false);
+});
+
+test('stopPrompts: the card is gone when the request is no longer open, and Everyone says OK has nothing to do once all did', () => {
   const s = state();
   s.events[0].status = 'closed';
   assert.deepEqual(stopPrompts(s).map((x) => x.id), ['e4']);
-  s.events[3].answers = { g3: { answer: 'notNow', place: null } };
+  s.events[3].oks = { g3: true };
   assert.equal(stopPrompts(s)[0].anyToAnswer, false);
 });
 
 test('answerText says it in plain words', () => {
   assert.equal(answerText({ asker: true }), 'asked');
-  assert.equal(answerText({ offline: true, answer: null }), 'no signal');
-  assert.equal(answerText({ answer: 'yes', place: null }), 'agrees');
-  assert.equal(answerText({ answer: 'yes', place: 'Shell' }), 'agrees, Shell');
-  assert.equal(answerText({ answer: 'another', place: 'R&R Tapah' }), 'suggests R&R Tapah');
-  assert.equal(answerText({ answer: 'notNow' }), 'not now');
-  assert.equal(answerText({ answer: null }), 'has not answered');
+  assert.equal(answerText({ offline: true, ok: false }), 'no signal');
+  assert.equal(answerText({ ok: true }), 'OK');
+  assert.equal(answerText({ ok: false }), 'waiting');
 });
 
 test('badges: initial, ring for phones, dashed while joining, faded with no signal', () => {
@@ -171,7 +177,6 @@ test('problemOwner: a problem right after a command belongs to that car', () => 
   assert.equal(problemOwner({ problem: 'x', problemAt: 10_500 }, { car: 'daniel', at: 10_000 }), 'daniel');
   assert.equal(problemOwner({ problem: 'x', problemAt: 1_000 }, { car: 'daniel', at: 10_000 }), null);
   assert.equal(problemOwner({ problem: null }, { car: 'daniel', at: 0 }), null);
-  assert.equal(pickedPlaceName('Daniel'), 'Daniel’s pick');
   assert.equal(distance({ lat: 3, lng: 101 }, { lat: 3, lng: 101 }), 0);
 });
 

@@ -114,7 +114,7 @@ input[type=checkbox] { accent-color:var(--accent); }
 .prow { display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--sep); flex-wrap:wrap; }
 .pbtn { flex-basis:100%; display:flex; gap:6px; padding-left:32px; }
 .prow .who { font-weight:600; } .prow .says { color:var(--secondary); font-size:.85rem; flex:1; min-width:6em; }
-.prow .says.yes { color:var(--pos); } .prow .says.another { color:var(--accent); }
+.prow .says.yes { color:var(--pos); }
 .prompt .all { margin-top:8px; width:100%; padding:11px; }
 
 /* markers sit on their point by their middle (the map anchors them by the bottom) */
@@ -212,8 +212,8 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
 
 <script type="module">
 import {
-  decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, roadKey, placeAtCmd, endingCmd, deviateCmd, voteCmd, prepareStartsCmd, clampWait, endingOrigin,
-  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1, seesStatus, framePoints, shouldRefit,
+  decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, roadKey, placeAtCmd, endingCmd, deviateCmd, voteCmd, stoppedCmd, prepareStartsCmd, clampWait, endingOrigin,
+  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1, seesStatus, framePoints, shouldRefit,
 } from '/page-logic.mjs';
 
 const $ = (s) => document.querySelector(s);
@@ -404,7 +404,7 @@ function syncPins(st) {
   }
   for (const [id, m] of Object.entries(layer.pins)) if (!want[id]) { m.map = null; delete layer.pins[id]; delete held[id]; }
 }
-const EVMARK = (e) => (e.category === 'stopRequest' ? (e.pinned ? '■' : '●') : '▲');
+const EVMARK = (e) => (e.category === 'stopRequest' ? '●' : '▲');
 function syncEvents(st) {
   const evs = (st?.events ?? []).filter((e) => e.latitude != null);
   const keep = new Set(evs.map((e) => e.id));
@@ -459,7 +459,8 @@ async function road(a, b) {
 const destination = () => (geometry?.destination ? { lat: geometry.destination.latitude, lng: geometry.destination.longitude } : null);
 
 // ---------------------------------------------------------------- pins: arming, clicks, drags
-let armed = null; // { car, kind: 'start'|'end'|'deviation'|'pre1'|'pre2' } or { pick: {event, car} }
+const askMsgs = {}; // what is typed in each car's stop message box, kept across redraws
+let armed = null; // { car, kind: 'start'|'end'|'deviation'|'pre1'|'pre2' }
 function setArmed(a) {
   armed = a; renderPanel(); renderHint();
   if (gm) gmap().setOptions({ draggableCursor: a ? 'crosshair' : null });
@@ -468,8 +469,7 @@ function renderHint() {
   const h = $('#hint');
   if (!armed) return h.classList.add('hidden');
   let text;
-  if (armed.pick) text = `Click the map to pick the place ${carOf(armed.pick.car)?.label ?? 'the car'} suggests`;
-  else if (armed.kind === 'pre1' || armed.kind === 'pre2') text = `Click the map to place phone ${armed.kind === 'pre1' ? 1 : 2}’s start`;
+  if (armed.kind === 'pre1' || armed.kind === 'pre2') text = `Click the map to place phone ${armed.kind === 'pre1' ? 1 : 2}’s start`;
   else text = `Click the map to place ${carOf(armed.car)?.label}’s ${armed.kind === 'deviation' ? 'deviation' : armed.kind}`;
   h.innerHTML = `<span>${esc(text)}</span><button data-act="disarm">Cancel</button>`;
   h.classList.remove('hidden');
@@ -477,7 +477,6 @@ function renderHint() {
 async function onMapClick(p) {
   const a = armed; if (!a) return;
   setArmed(null);
-  if (a.pick) return cmd(voteCmd(a.pick.car, a.pick.event, 'notNow', { name: pickedPlaceName(carOf(a.pick.car)?.label ?? 'Car'), lat: p.lat, lng: p.lng }));
   if (a.kind === 'pre1' || a.kind === 'pre2') { pgForm[a.kind === 'pre1' ? 's1' : 's2'] = p; renderPanel(); return syncPre(pg); }
   return placePin(a.car, a.kind, p);
 }
@@ -569,6 +568,7 @@ function carHtml(c) {
     <div class="ctl"><button data-act="play" data-car="${c.key}" class="${c.playing ? '' : 'primary'}" ${pg.phase === 'ready' ? '' : 'disabled'}>${c.playing ? 'Pause' : 'Play'}</button>
       <label class="small dim">Speed <input type="number" step="5" min="0" max="200" id="sp-${c.key}" data-f="speed" data-car="${c.key}" value="${esc(f.speed)}"> km/h</label>
       ${gen ? `<button data-act="drop" data-car="${c.key}" class="sm ${c.offline ? 'primary' : ''}">${c.offline ? 'Give signal back' : 'Drop signal'}</button>
+        <input type="text" data-askmsg="${c.key}" placeholder="Message for a stop (optional)" maxlength="280" value="${esc(askMsgs[c.key] ?? '')}" style="width:12em" ${c.offline || !c.joined ? 'disabled' : ''}>
         <select data-ask="${c.key}" ${c.offline || !c.joined ? 'disabled' : ''}><option value="">Ask stop ▾</option>${STOPS.map((t) => `<option value="${t}">${EVLABEL[t]}</option>`).join('')}</select>
         <select data-report="${c.key}" ${c.offline || !c.joined ? 'disabled' : ''}><option value="">Report ▾</option>${REPORTS.map((t) => `<option value="${t}">${EVLABEL[t]}</option>`).join('')}</select>` : ''}</div>
     <div class="pins">
@@ -664,10 +664,10 @@ function eventsHtml(st) {
   return `<ul class="feed">${st.events.map((e) => {
     const bits = [];
     if (e.category === 'stopRequest') {
-      bits.push(`${e.agree} agree${e.disagree ? `, ${e.disagree} not now` : ''}`);
-      if (e.suggestions.length) bits.push(`suggested: ${e.suggestions.map(esc).join(', ')}`);
-      if (e.pinned) bits.push(`pinned: ${esc(e.pinned)}`);
-      if (e.resolved) bits.push('everyone has arrived');
+      bits.push(`${e.ok} OK`);
+      if (e.message) bits.push(`“${esc(e.message)}”`);
+      if (e.closedReason === 'stopped') bits.push('we’ve stopped');
+      else if (e.closedReason === 'cancelled') bits.push('cancelled');
       else if (e.status === 'closed') bits.push('closed');
     } else if (e.resolved) bits.push('expired');
     return `<li><b>${esc(EVLABEL[e.type] || e.type)}</b> by ${esc(e.by || 'someone')} at ${km1(e.offset)}${bits.length ? `<div class="evt">${bits.join(' · ')}</div>` : ''}</li>`;
@@ -685,12 +685,12 @@ function promptHtml(p) {
   const where = p.offset != null ? ` at ${km1(p.offset)}` : '';
   const sub = p.fromPhone ? `${esc(p.by)} (the app) asks for ${esc(p.title.toLowerCase())}${where}` : `${esc(p.by)} asks for ${esc(p.title.toLowerCase())}${where}`;
   const rows = p.rows.map((r) => `<div class="prow"><span class="badge sm ${r.offline ? 'offline' : ''}" style="background:${r.color}">${esc(initialOf(r.label))}</span><span class="who">${esc(r.label)}</span>
-      <span class="says ${r.answer === 'yes' ? 'yes' : r.answer === 'another' ? 'another' : ''}">${esc(answerText(r))}</span>
-      ${r.canAnswer ? `<span class="pbtn"><button class="sm primary" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="yes">Agree</button><button class="sm" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="notNow">Not now</button>
-        <button class="sm ${armed?.pick?.event === p.id && armed.pick.car === r.key ? 'on' : ''}" data-act="pick" data-event="${esc(p.id)}" data-car="${r.key}" ${gm ? '' : 'disabled title="Needs the map"'}>Another place</button></span>` : ''}</div>`).join('');
-  return `<h3>${esc(p.title)}</h3><div class="sub">${sub}</div>${p.suggestions.length ? `<div class="sub" style="margin-top:-6px">Suggested: ${p.suggestions.map(esc).join(', ')}</div>` : ''}
+      <span class="says ${r.ok ? 'yes' : ''}">${esc(answerText(r))}</span>
+      ${r.canAnswer ? `<span class="pbtn"><button class="sm primary" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}">OK</button></span>` : ''}</div>`).join('');
+  return `<h3>${esc(p.title)}</h3><div class="sub">${sub}</div>${p.message ? `<div class="sub" style="margin-top:-6px">“${esc(p.message)}”</div>` : ''}
     ${rows || '<div class="dim small">No generated cars in the trip.</div>'}
-    ${p.anyToAnswer ? `<button class="primary all" data-act="voteAll" data-event="${esc(p.id)}">Everyone agrees</button>` : ''}`;
+    ${p.anyToAnswer ? `<button class="primary all" data-act="voteAll" data-event="${esc(p.id)}">Everyone says OK</button>` : ''}
+    ${p.canStop ? `<button class="all" data-act="stopped" data-event="${esc(p.id)}">We’ve stopped</button>` : ''}`;
 }
 function renderPrompts() {
   const box = $('#prompts');
@@ -728,7 +728,7 @@ function strip(st) {
     const top = [4, 70, 90, 110][i % 4]; // four heights, so neighbours do not overlap
     return `<span class="${badgeClasses(c)} dot" style="left:${pct(c.offset)};background:${c.color}" title="${esc(c.label)}">${esc(initialOf(c.label))}</span><span class="name" style="left:${pct(c.offset)};top:${top}px;color:${c.color}">${esc(c.label)}</span>`;
   }).join('');
-  const evs = st.events.filter((e) => e.offset !== null && inView(e.offset)).map((e) => `<span class="ev ${e.category === 'stopRequest' ? 'stp' : 'haz'} ${e.resolved ? 'done' : ''}" style="left:${pct(e.offset)}" title="${esc(EVLABEL[e.type] || e.type)}">${e.pinned ? '■' : e.category === 'stopRequest' ? '●' : '▲'}</span>`).join('');
+  const evs = st.events.filter((e) => e.offset !== null && inView(e.offset)).map((e) => `<span class="ev ${e.category === 'stopRequest' ? 'stp' : 'haz'} ${e.resolved ? 'done' : ''}" style="left:${pct(e.offset)}" title="${esc(EVLABEL[e.type] || e.type)}">${e.category === 'stopRequest' ? '●' : '▲'}</span>`).join('');
   return `<div class="strip"><div class="road"></div>${dots}${evs}<span class="ends">${km1(lo)}</span><span class="ends r">${km1(hi)}</span></div>`;
 }
 
@@ -771,8 +771,8 @@ document.addEventListener('click', async (ev) => {
     case 'cancelDeviation': return cmd({ cmd: 'cancelDeviation', car: k });
     case 'arm': { const kind = b.dataset.kind; return setArmed(armed && armed.kind === kind && armed.car === k ? null : { car: k, kind }); }
     case 'disarm': return setArmed(null);
-    case 'pick': return setArmed({ pick: { event: b.dataset.event, car: k } });
-    case 'vote': return cmd({ cmd: 'vote', car: k, event: b.dataset.event, answer: b.dataset.answer });
+    case 'vote': return cmd(voteCmd(k, b.dataset.event));
+    case 'stopped': return cmd(stoppedCmd(b.dataset.event));
     case 'voteAll': return cmd({ cmd: 'voteAll', event: b.dataset.event });
     case 'focus': { const p = c?.latitude != null && gm; if (p) { gmap().panTo({ lat: c.latitude, lng: c.longitude }); if (gmap().getZoom() < 12) gmap().setZoom(13); } return; }
     case 'follow': return setFollow(!follow);
@@ -794,10 +794,11 @@ document.addEventListener('input', (ev) => {
   if (t.dataset.f) formFor({ key: t.dataset.car })[t.dataset.f] = t.value;
   if (t.dataset.pgf && t.type === 'text') pgForm[t.dataset.pgf] = t.value;
 });
+document.addEventListener('input', (ev) => { const k = ev.target.dataset?.askmsg; if (k) askMsgs[k] = ev.target.value; });
 document.addEventListener('change', (ev) => {
   const t = ev.target;
   if (t.dataset.pgf) { pgForm[t.dataset.pgf] = t.type === 'checkbox' ? t.checked : t.value; t.blur(); if (t.dataset.pgf === 'startKind') setArmed(null); renderPanel(); syncPre(pg); return; }
-  if (t.dataset.ask) { const v = t.value; t.value = ''; t.blur(); return v && cmd({ cmd: 'askStop', car: t.dataset.ask, type: v }); }
+  if (t.dataset.ask) { const v = t.value, message = (askMsgs[t.dataset.ask] ?? '').trim(); t.value = ''; t.blur(); delete askMsgs[t.dataset.ask]; return v && cmd({ cmd: 'askStop', car: t.dataset.ask, type: v, ...(message && { message }) }); }
   if (t.dataset.report) { const v = t.value; t.value = ''; t.blur(); return v && cmd({ cmd: 'report', car: t.dataset.report, type: v }); }
   if (t.dataset.f === 'speed') return cmd({ cmd: 'speed', car: t.dataset.car, kmh: Number(t.value) });
   if (t.dataset.f === 'wait') t.value = clampWait(t.value);

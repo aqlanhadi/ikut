@@ -3,7 +3,7 @@ import XCTest
 /// The phones of the two live demos (`qa/demo.mjs`, `qa/demo-two-cars.mjs`; see qa/README.md, "Live demo").
 /// A phone is the organizer:
 ///   DemoOrganizerUITests  phone 1 in both demos: Aisha creates the trip, starts it, and then does whatever the script
-///                         asks through marker files (report debris, pin the stop from the card, Leave now)
+///                         asks through marker files (report debris, OK on the stop, We've stopped)
 ///   DemoPassengerUITests  phone 2 of the organizer demo: Faiz joins Aisha's car as a passenger (co-pilot)
 ///   DemoOwnCarUITests     phone 2 of the two-cars demo: Faiz joins as "A new car" and drives behind Aisha
 ///
@@ -11,7 +11,7 @@ import XCTest
 /// script's markers `code`, `cars.joined`, `report.a`, `report.b`, `stop.b`, `agree`, `arrive`, `end`. After setup the
 /// tests only follow the script and hold the map open until `end` (or TEST_RUNNER_IKUT_HOLD_SECONDS). Cosmetic checks
 /// are logged ("QA CHECK: NOTE ...") and never fail the demo; a failed core step (a tap that does the demo's job, the
-/// pin showing up) is logged as FAIL and fails the test at the end, after the demo has played out.
+/// request showing up) is logged as FAIL and fails the test at the end, after the demo has played out.
 @MainActor
 class DemoBase: TwoPhoneConvoyBase {
     var coreFailures: [String] = []
@@ -138,18 +138,49 @@ class DemoBase: TwoPhoneConvoyBase {
         shot("debris-marker")
     }
 
-    /// Waits for the lead car's pin to show on this phone's Pit stop button ("Fuel · 12 min").
-    func watchPin() {
-        let seen = soft("the lead car's pin shows on this phone's Pit stop button", timeout: 120, core: true) {
-            stopButton.label.contains("pinned at")
+    /// Pit stop > Fuel > Add a message > Inform the convoy: Faiz asks with a passenger's message.
+    func requestFuelStop() {
+        let pitStop = stopButton
+        guard soft("Pit stop button", timeout: 20, core: true, {
+            // The "Get road alerts?" question can still be up over the map.
+            if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
+            return pitStop.exists && pitStop.isHittable
+        }) else { return }
+        pitStop.tap()
+        let fuel = app.buttons["stop.reason.stopFuel"]
+        guard fuel.waitForExistence(timeout: 10) else { note("the stop card opened", false, core: true); return }
+        shot("pit-stop-tiles")
+        fuel.tap()
+        let addMessage = app.buttons["stop.addMessage"]
+        guard soft("Add a message is ready", timeout: 30, core: true, { addMessage.exists && addMessage.isHittable }) else { return }
+        shot("pit-stop-fuel")
+        addMessage.tap()
+        // A moving phone asks "Are you a passenger?" before the message field.
+        if app.buttons["stop.passenger"].waitForExistence(timeout: 5) {
+            shot("pit-stop-passenger")
+            app.buttons["stop.passenger"].tap()
         }
-        shot("stop-pinned")
-        if seen { mark("b.sawPin") } else { mark("b.sawPin", "missing") }
+        let field = element("stop.messageField")
+        guard soft("the message field", timeout: 15, core: true, { field.exists }) else { return }
+        field.tap()
+        field.typeText("Low on fuel, next R&R please")
+        shot("pit-stop-message")
+        app.buttons["stop.messageDone"].tap()
+        let send = app.buttons["stop.send"]
+        guard soft("Inform the convoy is ready", timeout: 30, core: true, { send.exists && send.isEnabled }) else { return }
+        send.tap()
+        soft("the request is sent and the card shows the message", timeout: 90, core: true) { element("stop.message").exists }
+        shot("stop-requested")
+        app.buttons["stop.card.close"].tap()
+        soft("Faiz's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }
+        mark("b.stopRequested")
     }
 
-    func watchResolved() {
-        soft("the button is Pit stop again after Leave now", timeout: 60) { stopButton.label == "Pit stop" }
-        shot("stop-resolved")
+    /// Waits for the lead car's We've stopped: the request closes and the button is Pit stop again.
+    func watchStopped() {
+        soft("the button is Pit stop again after We've stopped", timeout: 120, core: true) { stopButton.label == "Pit stop" }
+        shot("stop-closed")
+        mark("b.sawStopped")
     }
 }
 
@@ -194,7 +225,7 @@ final class DemoOrganizerUITests: DemoBase {
             mark("a.map")
         }
 
-        follow([("report.a", reportDebris), ("agree", agreeAndPin), ("arrive", arrived)])
+        follow([("report.a", reportDebris), ("agree", okOnTheStop), ("arrive", weHaveStopped)])
         if env["IKUT_END_TRIP"] == "1" { endTrip() }
         finish()
     }
@@ -207,32 +238,36 @@ final class DemoOrganizerUITests: DemoBase {
         soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share Recap"].exists }
     }
 
-    /// The organizer's Pit stop button shows the stop; a tap opens the card, and the pin button pins the place.
-    func agreeAndPin() {
+    /// The organizer's Pit stop button shows the stop. If her car is asked, she taps OK on the pill (or the card);
+    /// the card then stays open so the OKs can be watched coming in.
+    func okOnTheStop() {
         guard soft("the Pit stop button shows the stop on phone 1", timeout: 90, core: true, { stopButton.label.hasPrefix("Fuel stop") })
         else { return }
         shot("stop-button")
+        let pillOK = app.buttons["stop.pill.button"]
+        if pillOK.exists {
+            shot("stop-pill")
+            pillOK.tap()
+        }
         stopButton.tap()
-        // A moving phone shows the card read only until "I'm a passenger".
-        if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
-        let pin = app.buttons["stop.pin"]
-        guard soft("a pin button shows on the stop card", timeout: 30, core: true, { pin.exists }) else { return }
-        shot("stop-pin-buttons")
-        pin.tap()
-        let pinned = soft("the stop is pinned for everyone", timeout: 30, core: true) { app.buttons["stop.leave"].exists }
-        shot("stop-pinned")
-        if pinned { mark("a.pinned") }
+        guard soft("the stop card shows the request", timeout: 30, core: true, { element("stop.message").exists }) else { return }
+        let ok = app.buttons["stop.ok"]
+        // Her own car asked (the passenger demo), or the pill already said OK: nothing to tap.
+        if ok.exists, ok.label == "OK" { ok.tap() }
+        shot("stop-card-oks")
+        mark("a.ok")
     }
 
-    func arrived() {
-        let leave = app.buttons["stop.leave"]
-        guard soft("Leave now is there", timeout: 20, core: true, { leave.exists }) else { return }
-        leave.tap()
+    /// Everyone has pulled in: We've stopped closes the request on every phone.
+    func weHaveStopped() {
+        let stopped = app.buttons["stop.stopped"]
+        guard soft("We've stopped is on the card", timeout: 30, core: true, { stopped.exists }) else { return }
+        stopped.tap()
         soft("the card closes and the button is Pit stop again on phone 1", timeout: 60, core: true) {
             !element("stop.card").exists && stopButton.label == "Pit stop"
         }
-        shot("stop-resolved")
-        mark("a.resolved")
+        shot("stop-closed")
+        mark("a.stopped")
     }
 }
 
@@ -259,7 +294,7 @@ final class DemoPassengerUITests: DemoBase {
             mark("b.map")
         }
 
-        follow([("report.b", reportDebris), ("a.pinned", watchPin), ("a.resolved", watchResolved)])
+        follow([("report.b", reportDebris), ("stop.b", requestFuelStop), ("a.stopped", watchStopped)])
         finish()
     }
 }
@@ -287,7 +322,7 @@ final class DemoOwnCarUITests: DemoBase {
             mark("b.map")
         }
 
-        follow([("report.a", watchDebris), ("stop.b", requestFuelStop), ("a.pinned", watchPin), ("a.resolved", watchResolved)])
+        follow([("report.a", watchDebris), ("stop.b", requestFuelStop), ("a.stopped", watchStopped)])
         finish()
     }
 
@@ -299,28 +334,5 @@ final class DemoOwnCarUITests: DemoBase {
         Thread.sleep(forTimeInterval: 1.5)
         shot("approach-alert")
         Thread.sleep(forTimeInterval: 3)
-    }
-
-    /// Pit stop > Fuel; the card finds a place ahead (or none) and sends with "Ask for this stop".
-    func requestFuelStop() {
-        let pitStop = stopButton
-        guard soft("Pit stop button", timeout: 20, core: true, {
-            // The "Get road alerts?" question can still be up over the map.
-            if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
-            return pitStop.exists && pitStop.isHittable
-        }) else { return }
-        pitStop.tap()
-        let fuel = app.buttons["stop.reason.stopFuel"]
-        guard fuel.waitForExistence(timeout: 10) else { note("the stop card opened", false, core: true); return }
-        fuel.tap()
-        let send = app.buttons["stop.send"]
-        guard soft("Ask for this stop is ready", timeout: 60, core: true, { send.exists && send.isEnabled }) else { return }
-        shot("pit-stop-card")
-        send.tap()
-        soft("the request is sent and the card shows the timeline", timeout: 90, core: true) { element("stop.timeline").exists || element("stop.readOnlyNote").exists }
-        app.buttons["stop.card.close"].tap()
-        soft("Faiz's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }
-        shot("stop-requested")
-        mark("b.stopRequested")
     }
 }

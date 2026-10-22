@@ -11,8 +11,8 @@ import XCTest
 /// Phone A (organizer, car 1) and phone B (joiner, car 2):
 ///   A creates the trip, B joins with the code, both lobbies show 4 cars once the script joins cars 3 and 4,
 ///   both open the map; convoy order 1, 3, 2, 4 on both; A reports debris, B sees the marker and gets the
-///   approach alert; car 3 (scripted) reports an accident, both see it; B asks for a fuel stop, A agrees,
-///   pins and resolves it; B pauses and resumes sharing (A sees "Paused"), leaves (A sees the car go),
+///   approach alert; car 3 (scripted) reports an accident, both see it; B asks for a fuel stop with a message,
+///   A taps OK on the pill, cars 3 and 4 say OK, A (the lead) taps We've stopped; B pauses and resumes sharing (A sees "Paused"), leaves (A sees the car go),
 ///   rejoins as a new car, A ends the trip and B's lobby says "Trip ended".
 @MainActor
 class TwoPhoneConvoyBase: ConvoyUITestCase {
@@ -204,39 +204,49 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             mark("a.sawAccident")
         }
 
-        try step("6. B's pit stop: button, votes, pin, leave") {
+        try step("6. B's pit stop: button and pill, OK, We've stopped") {
             try waitMark("b.stopRequested", timeout: 240)
-            // A request never opens the card by itself: the Pit stop button shows it, with a badge.
+            // A request never opens the card by itself: the Pit stop button shows it, with a badge, and
+            // the pill asks for one OK.
             let stopButton = app.buttons["stop.button"]
             try waitFor("A's Pit stop button shows the stop", timeout: 60) { stopButton.label.hasPrefix("Fuel stop") }
             XCTAssertFalse(element("stop.card").exists, "the stop card must not open by itself")
             shot("07-stop-button")
-            stopButton.tap()
-            // The phones drive at 90 km/h, so the card is read only until "I'm a passenger".
-            if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
-            let pin = app.buttons["stop.pin"]
-            try waitFor("the stop card on A, with a pin button", timeout: 30) { pin.exists }
-            shot("07b-stop-card")
-            try waitMark("cars.voted", timeout: 120)
-            try waitFor("votes from at least three of four cars", timeout: 60) {
-                // The panel (and its button) is hidden under the open card: count the agreed cars on the card.
-                app.descendants(matching: .any)
-                    .matching(NSPredicate(format: "identifier BEGINSWITH 'stop.voter.' AND label ENDSWITH ', agreed'")).count >= 3
+            // The pill says who and what; the pill's OK is the one tap. If the pill has already gone quiet
+            // (20 s), the card has the same OK.
+            let pillOK = app.buttons["stop.pill.button"]
+            if pillOK.waitForExistence(timeout: 20) {
+                shot("07a-stop-pill")
+                pillOK.tap()
+                try waitFor("You said OK on the pill", timeout: 15) { element("stop.pill.confirm").exists }
+                shot("07b-stop-pill-ok")
+            } else {
+                stopButton.tap()
+                let ok = app.buttons["stop.ok"]
+                try waitFor("OK on A's stop card", timeout: 30) { ok.exists }
+                ok.tap()
+                app.buttons["stop.card.close"].tap()
             }
-            shot("08-stop-votes")
-            pin.tap()
-            let leave = app.buttons["stop.leave"]
-            try waitFor("stop pinned for everyone: Leave now", timeout: 30) { leave.exists }
-            shot("09-stop-pinned")
-            mark("a.pinned")
-            try waitMark("b.sawPin", timeout: 120)
-            leave.tap()
+            mark("a.ok")
+            try waitMark("cars.voted", timeout: 120)
+            stopButton.tap()
+            let stopped = app.buttons["stop.stopped"]
+            try waitFor("the stop card on A, with We've stopped", timeout: 30) { stopped.exists }
+            try waitFor("OK from all four cars (the asking car counts)", timeout: 60) {
+                // The panel (and its button) is hidden under the open card: count the OK cars on the card.
+                app.descendants(matching: .any)
+                    .matching(NSPredicate(format: "identifier BEGINSWITH 'stop.voter.' AND label ENDSWITH ', OK'")).count >= 4
+            }
+            // B's passenger message is on the card in full.
+            XCTAssertTrue(element("stop.message").exists, "the passenger's message is not on the card")
+            shot("08-stop-card-oks")
+            stopped.tap()
             try waitFor("the card closes by itself and the button is Pit stop again", timeout: 60) {
                 !element("stop.card").exists && stopButton.label == "Pit stop"
             }
             try waitFor("convoy list back on A", timeout: 30) { convoyOrder().count == 4 }
-            shot("10-stop-resolved")
-            mark("a.resolved")
+            shot("10-stop-closed")
+            mark("a.stopped")
         }
 
         try step("7. sees B paused, then sharing again") {
@@ -334,7 +344,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             mark("b.sawAccident")
         }
 
-        try step("6. asks for a fuel stop from the stop card") {
+        try step("6. asks for a fuel stop with a message from the stop card") {
             try waitMark("a.sawAccident", timeout: 120)
             let pitStop = app.buttons["stop.button"]
             try waitFor("Pit stop button", timeout: 20) { pitStop.exists && pitStop.isHittable }
@@ -342,28 +352,43 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             let fuel = app.buttons["stop.reason.stopFuel"]
             XCTAssertTrue(fuel.waitForExistence(timeout: 10), "the stop card didn't open")
             fuel.tap()
-            // It finds a place ahead (or none); nothing is sent until the explicit "Ask for this stop".
-            let send = app.buttons["stop.send"]
-            try waitFor("Ask for this stop is ready", timeout: 60) { send.exists && send.isEnabled }
+            // Nothing is sent until the explicit "Inform the convoy". The phone drives at 90 km/h, so a
+            // message asks "Are you a passenger?" first.
+            let addMessage = app.buttons["stop.addMessage"]
+            try waitFor("Add a message is ready", timeout: 30) { addMessage.exists && addMessage.isHittable }
             shot("08-stop-card-ask")
+            addMessage.tap()
+            if app.buttons["stop.passenger"].waitForExistence(timeout: 5) {
+                shot("08a-passenger-check")
+                app.buttons["stop.passenger"].tap()
+            }
+            let field = element("stop.messageField")
+            try waitFor("the message field", timeout: 15) { field.exists }
+            field.tap()
+            field.typeText("Need fuel, next R and R please")
+            shot("08b-message-typed")
+            app.buttons["stop.messageDone"].tap()
+            let send = app.buttons["stop.send"]
+            try waitFor("Inform the convoy is ready", timeout: 30) { send.exists && send.isEnabled }
             send.tap()
-            // The card then shows the asker's timeline.
-            try waitFor("request sent: the timeline (or the read-only status while the phone drives)", timeout: 90) { element("stop.timeline").exists || element("stop.readOnlyNote").exists }
+            // The card then shows the request with a row per car.
+            try waitFor("request sent: the card shows the request", timeout: 90) { element("stop.message").exists || app.buttons["stop.cancel"].exists }
             shot("09-stop-requested")
             app.buttons["stop.card.close"].tap()
             try waitFor("B's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }
             mark("b.stopRequested")
         }
 
-        try step("7. sees the lead's pin, then the stop resolved") {
-            try waitMark("a.pinned", timeout: 240)
+        try step("7. sees the OKs, then the stop closed by the lead") {
+            try waitMark("a.ok", timeout: 240)
             let stopButton = app.buttons["stop.button"]
-            try waitFor("the pinned stop on B's button", timeout: 60) { stopButton.label.contains("pinned at") }
-            shot("10-stop-pinned")
-            mark("b.sawPin")
-            try waitMark("a.resolved", timeout: 120)
+            try waitFor("the OKs on B's button (its own car, A, cars 3 and 4)", timeout: 60) {
+                stopButton.label.contains("4 of 4 cars said OK")
+            }
+            shot("10-stop-oks")
+            try waitMark("a.stopped", timeout: 120)
             try waitFor("the button is Pit stop again on B", timeout: 60) { stopButton.label == "Pit stop" }
-            shot("11-stop-resolved")
+            shot("11-stop-closed")
         }
 
         try step("8. pauses sharing in the lobby, then resumes") {

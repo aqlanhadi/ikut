@@ -96,7 +96,8 @@ export const deviateCmd = (car, pin, { out, back, waitSeconds = 30, leaveKm } = 
   cmd: 'deviate', car, pin: toCoord(pin), waitSeconds: clampWait(waitSeconds),
   ...(toRoad(out) && { out: toRoad(out) }), ...(toRoad(back) && { back: toRoad(back) }), ...(Number.isFinite(leaveKm) && { leaveKm: round(leaveKm, 3) }),
 });
-export const voteCmd = (car, event, answer, place) => ({ cmd: 'vote', car, event, answer, ...(place && { place: { name: place.name, latitude: place.lat, longitude: place.lng } }) });
+export const voteCmd = (car, event) => ({ cmd: 'vote', car, event });
+export const stoppedCmd = (event) => ({ cmd: 'markStopped', event });
 export const prepareStartsCmd = (phone1, phone2, extra = {}) => ({ cmd: 'prepare', starts: { phone1: toCoord(phone1), phone2: toCoord(phone2 ?? phone1) }, ...extra });
 const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
 export const clampWait = (s) => { const n = Number(s); return Number.isFinite(n) ? Math.max(0, Math.min(600, Math.round(n))) : 30; };
@@ -136,36 +137,33 @@ export const stopTitle = (type) => PLACE_TITLE[type] ?? 'Stop';
 
 /**
  * The cards to show over the map: one per open stop request. `who` is the asker (a generated car, a phone or another car); each generated car that
- * can still answer gets a row: `answer` null while it has not, `canAnswer` false for the asker, a car with no signal or one that has answered.
+ * can still say OK gets a row: `ok` true once it has, `canAnswer` false for the asker, a car with no signal or one that has said OK. `canStop`:
+ * We've stopped can be written from the page only when a generated car asked (the author may close it as stopped); a phone's request is closed in the app.
  */
 export function stopPrompts(state) {
   if (!state?.events) return [];
   const gen = state.cars.filter((c) => c.kind === 'generated' && c.joined);
   return state.events.filter((e) => e.category === 'stopRequest' && e.status === 'open').map((e) => {
     const rows = gen.map((c) => {
-      const a = e.answers?.[c.key] ?? null;
+      const ok = Boolean(e.oks?.[c.key]);
       const asker = e.byKey === c.key;
-      return { key: c.key, label: c.label, color: c.color, asker, offline: c.offline, answer: a?.answer ?? null, place: a?.place ?? null, canAnswer: !asker && !c.offline && !a };
+      return { key: c.key, label: c.label, color: c.color, asker, offline: c.offline, ok, canAnswer: !asker && !c.offline && !ok };
     });
+    const askerCar = gen.find((c) => c.key === e.byKey);
     return {
       id: e.id, type: e.type, title: stopTitle(e.type), by: e.by || 'Someone', byKey: e.byKey, offset: e.offset, latitude: e.latitude, longitude: e.longitude,
-      agree: e.agree, disagree: e.disagree, suggestions: e.suggestions ?? [], rows, anyToAnswer: rows.some((r) => r.canAnswer), fromPhone: !gen.some((c) => c.key === e.byKey),
+      message: e.message ?? null, okCount: e.ok ?? 0, rows, anyToAnswer: rows.some((r) => r.canAnswer), fromPhone: !askerCar, canStop: Boolean(askerCar) && !askerCar.offline,
     };
   });
 }
 
-/** Words for one car's answer on a card. */
+/** Words for one car's OK on a card. */
 export function answerText(r) {
   if (r.asker) return 'asked';
-  if (r.offline && !r.answer) return 'no signal';
-  if (r.answer === 'yes') return r.place ? `agrees, ${r.place}` : 'agrees';
-  if (r.answer === 'another') return r.place ? `suggests ${r.place}` : 'suggests another place';
-  if (r.answer === 'notNow') return 'not now';
-  return 'has not answered';
+  if (r.ok) return 'OK';
+  if (r.offline) return 'no signal';
+  return 'waiting';
 }
-
-/** A name for a place picked on the map, as the vote carries it ("1 to 100 characters"). */
-export const pickedPlaceName = (car, n) => `${car}’s pick${n ? ' ' + n : ''}`.slice(0, 100);
 
 // ---- cars
 

@@ -11,7 +11,7 @@
 //   2. Prints the trip code (`TRIP CODE: ...`) so a simulator can join as the fifth car.
 //   3. Plays qa/gpx/car{1..4}.gpx on a scenario clock (1 Hz fixes), turning each fix into a position document
 //      with the app's own pipeline (PositionBuilder -> PositionPublisher -> Firestore setDoc).
-//   4. At the scripted times (lib/scenario.mjs TIMELINE) posts a hazard, a stop request, votes, a pin, a resolve.
+//   4. At the scripted times (lib/scenario.mjs TIMELINE) posts a hazard, a stop request with a message, two OKs, We've stopped.
 //   5. Car 2's GPX has a 3-minute gap. That is played as the network dropping (disableNetwork), which is what
 //      makes a real phone go stale: the SDK keeps one write queued and flushes it on reconnect.
 //   6. Sim cars listen to events like phones do and report when ApproachMonitor would announce the hazard.
@@ -63,7 +63,7 @@ function parseArgs(argv) {
     else if (a === '--wait-timeout') o.waitTimeout = Number(next());
     else if (a === '--deadline') o.deadline = Number(next());
     else if (a === '--end-trip') o.endTrip = true;
-    else if (a === '--expect-app-vote') o.expectAppVote = true;
+    else if (a === '--expect-app-ok') o.expectAppOk = true;
     else if (a === '--setup-only') o.setupOnly = true;
     else if (a === '--state-file') o.state = next();
     else if (a === '--results-file') o.results = next();
@@ -85,7 +85,7 @@ if (opts.help) {
   --start-in S      without --wait-app: seconds between setup and go (default 5)
   --wait-timeout S  with --wait-app: give up waiting after S seconds (default 900)
   --deadline S      stop with RESULT: ABORT after S seconds (default: the wait, the scenario at --speed, and 300)
-  --expect-app-vote check that the phone's car voted on the stop request (the UI test taps Agree)
+  --expect-app-ok   check that the phone's car said OK to the stop request (the UI test taps OK)
   --end-trip        end the trip when the scenario finishes (default: leave it active)
   --setup-only      create the trip and cars, print the code, write positions as a heartbeat and wait (Ctrl-C to stop)
   --host H          emulator host (default 127.0.0.1)
@@ -322,7 +322,7 @@ class Phone {
   }
 
   // ---- EventService.report (ios/ikut/Events/EventService.swift)
-  async reportEvent(type, category, severity, expirySeconds) {
+  async reportEvent(type, category, severity, expirySeconds, message = null) {
     const fix = this.lastFix;
     const here = { latitude: fix.latitude, longitude: fix.longitude };
     const prev = this.lastPosition.routeOffset;
@@ -335,22 +335,20 @@ class Phone {
       authorId: this.uid, carId: this.carId, createdAt: Timestamp.fromDate(createdAt),
     };
     if (expirySeconds) data.expiresAt = Timestamp.fromMillis(createdAt.getTime() + expirySeconds * 1000);
+    if (message) data.message = message;
     const ref = doc(collection(this.db, `trips/${this.tripId}/events`));
     await setDoc(ref, data);
     return { id: ref.id, data, here, routeOffset };
   }
 
-  // ---- StopService.vote / pin / resolve (ios/ikut/Stops/StopService.swift)
-  async vote(eventId, agree, suggestion = null) {
-    const data = { userId: this.uid, agree, at: serverTimestamp() };
-    if (suggestion) data.suggestion = suggestion;
-    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), data);
+  // ---- StopService.ok / close (ios/ikut/Stops/StopService.swift)
+  async ok(eventId) {
+    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), { userId: this.uid, at: serverTimestamp() });
   }
-  async pin(eventId, place) {
-    await updateDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}`), { place: { ...place, pinnedBy: this.uid } });
-  }
-  async resolve(eventId) {
-    await updateDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}`), { expiresAt: Timestamp.now() });
+  async markStopped(eventId) {
+    await updateDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}`), {
+      status: 'closed', closedReason: 'stopped', closedBy: this.uid, expiresAt: Timestamp.now(),
+    });
   }
 
   async close() {
@@ -521,6 +519,8 @@ async function main() {
 
 // ---------------------------------------------------------------- timeline actions
 
+const STOP_LIFETIME_SECONDS = 30 * 60; // EventCategory.stopRequest.defaultExpiry
+
 async function runTimeline(ev, ctx) {
   const p = ctx.phones.get(ev.car);
   if (ev.do === 'hazard') {
@@ -530,25 +530,17 @@ async function runTimeline(ev, ctx) {
     ctx.hazardAt = clock.T;
     log(`${p.key} reports ${ev.type} at ${r.routeOffset.toFixed(0)} m (${r.here.latitude.toFixed(5)}, ${r.here.longitude.toFixed(5)}), event ${r.id}`);
   } else if (ev.do === 'stopRequest') {
-    const r = await p.reportEvent(ev.type, 'stopRequest', 'medium', null); // stop requests have no expiry
+    // EventCategory.stopRequest: severity medium, closes itself 30 minutes after it was asked.
+    const r = await p.reportEvent(ev.type, 'stopRequest', 'medium', STOP_LIFETIME_SECONDS, ev.message);
     ctx.stopEvent = r;
-    const front = Math.max(...[...ctx.phones.values()].map((x) => x.lastPosition?.convoyOffset ?? 0));
-    const offset = front + ev.placeAheadOfFront;
-    const c = mainRoute.coordinateAtOffset(offset);
-    ctx.place = { name: ev.placeName, coordinate: new GeoPoint(c.latitude, c.longitude), routeOffset: offset };
-    // StopService.request: the requester's proposal goes in as an agreeing vote carrying the place.
-    await p.vote(r.id, true, ctx.place);
-    log(`${p.key} requests a stop (${ev.type}) and proposes "${ev.placeName}" at ${offset.toFixed(0)} m, event ${r.id}`);
-  } else if (ev.do === 'pinStop') {
-    await p.pin(ctx.stopEvent.id, ctx.place);
-    log(`${p.key} (lead) pins "${ctx.place.name}"`);
-  } else if (ev.do === 'vote') {
-    await p.vote(ctx.stopEvent.id, ev.agree);
-    log(`${p.key} votes ${ev.agree ? 'yes' : 'no'}`);
-  } else if (ev.do === 'resolveStop') {
-    await p.resolve(ctx.stopEvent.id);
+    log(`${p.key} asks for a stop (${ev.type}) with the message "${ev.message}", event ${r.id}`);
+  } else if (ev.do === 'ok') {
+    await p.ok(ctx.stopEvent.id);
+    log(`${p.key} says OK`);
+  } else if (ev.do === 'markStopped') {
+    await p.markStopped(ctx.stopEvent.id);
     ctx.stopResolvedAt = clock.T;
-    log(`${p.key} (lead) resolves the stop request`);
+    log(`${p.key} (lead) says we've stopped`);
   }
 }
 
@@ -721,19 +713,21 @@ function scheduleChecks({ phones, tripId, organizer }) {
         const se = ctx.stopEvent;
         if (!se) return check('stop request posted', false, 'not posted');
         const ev = (await getDoc(doc(organizer.db, `trips/${tripId}/events/${se.id}`))).data();
-        check('stop request open with pinned place', ev.category === 'stopRequest' && ev.expiresAt === undefined && ev.place?.name === ctx.place.name && ev.place?.pinnedBy === phones.get('car1').uid, JSON.stringify(ev.place));
+        const life = ev.expiresAt ? ev.expiresAt.toMillis() - ev.createdAt.toMillis() : null;
+        check('stop request open, with its message, no place, closing itself after 30 min', ev.category === 'stopRequest' && ev.message === 'Low on fuel, next R&R please' && ev.place === undefined && ev.status === undefined && life === STOP_LIFETIME_SECONDS * 1000, JSON.stringify({ message: ev.message, place: ev.place, status: ev.status, life }));
         const votes = await getDocs(collection(organizer.db, `trips/${tripId}/events/${se.id}/votes`));
         const byCar = new Map(votes.docs.map((v) => [v.id, v.data()]));
-        check('stop votes: requester (with suggestion), car2, car4', byCar.size >= 3 && byCar.get(phones.get('car3').carId)?.suggestion?.name === ctx.place.name && byCar.get(phones.get('car2').carId)?.agree === true && byCar.get(phones.get('car4').carId)?.agree === true, `${byCar.size} votes`);
+        const shape = (v) => v && Object.keys(v).sort().join(',') === 'at,userId';
+        check('stop OKs: car 2 and car 4, one vote per car, nothing but userId and at', byCar.size >= 2 && shape(byCar.get(phones.get('car2').carId)) && shape(byCar.get(phones.get('car4').carId)), `${byCar.size} votes`);
       },
     },
     {
-      at: 790, name: 'phone car votes on the stop request',
+      at: 790, name: 'phone car says OK to the stop request',
       async run(ctx) {
         const appCarId = readAppCarId();
-        if (!opts.expectAppVote || !appCarId || !ctx.stopEvent) return skip('phone car voted on the stop request', 'no phone, or --expect-app-vote not given');
+        if (!opts.expectAppOk || !appCarId || !ctx.stopEvent) return skip('phone car said OK to the stop request', 'no phone, or --expect-app-ok not given');
         const v = await getDoc(doc(organizer.db, `trips/${tripId}/events/${ctx.stopEvent.id}/votes/${appCarId}`));
-        check('phone car voted yes on the stop request', v.exists() && v.data().agree === true, v.exists() ? JSON.stringify({ agree: v.data().agree, userId: v.data().userId }) : 'no vote document');
+        check('phone car said OK to the stop request', v.exists(), v.exists() ? JSON.stringify({ userId: v.data().userId }) : 'no vote document');
       },
     },
   ];
@@ -744,10 +738,10 @@ async function finalChecks(ctx, appCarId) {
   clock.label = 'final';
   const T = DURATION;
 
-  // Stop resolved.
+  // We've stopped: the lead car closed it.
   if (ctx.stopEvent) {
     const ev = (await getDoc(doc(organizer.db, `trips/${tripId}/events/${ctx.stopEvent.id}`))).data();
-    check('stop request resolved (expiresAt set by the lead)', ev.expiresAt !== undefined && ev.expiresAt.toMillis() <= Date.now(), '');
+    check("stop request closed as stopped by the lead car (We've stopped)", ev.status === 'closed' && ev.closedReason === 'stopped' && ev.closedBy === phones.get('car1').uid && ev.expiresAt !== undefined && ev.expiresAt.toMillis() <= Date.now(), JSON.stringify({ status: ev.status, closedReason: ev.closedReason }));
   }
 
   // Approach alerts: who should hear about the hazard, and when.

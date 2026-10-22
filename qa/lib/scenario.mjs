@@ -36,9 +36,8 @@ export const WOBBLE_PERIOD = 90; // s
 /** Scripted happenings, in scenario seconds. `car` is a CARS key. */
 export const TIMELINE = [
   { at: 520, car: 'car1', do: 'hazard', type: 'debris' },
-  { at: 700, car: 'car3', do: 'stopRequest', type: 'stopFuel', placeName: 'Petronas Tapah R&R', placeAheadOfFront: 5000 },
-  { at: 715, car: 'car1', do: 'pinStop' },
-  { at: 730, car: 'car2', do: 'vote', agree: true },
-  { at: 735, car: 'car4', do: 'vote', agree: true },
-  { at: 800, car: 'car1', do: 'resolveStop' },
+  { at: 700, car: 'car3', do: 'stopRequest', type: 'stopFuel', message: 'Low on fuel, next R&R please' },
+  { at: 730, car: 'car2', do: 'ok' },
+  { at: 735, car: 'car4', do: 'ok' },
+  { at: 800, car: 'car1', do: 'markStopped' },
 ];
