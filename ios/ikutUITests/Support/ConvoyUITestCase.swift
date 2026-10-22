@@ -94,10 +94,18 @@ class ConvoyUITestCase: XCTestCase {
 
     // MARK: Shared flows
 
+    /// Clears the field (a delete for every character it holds, more than once if the first pass leaves
+    /// some), types `text` and checks the field now holds exactly that. A field that is empty reports its
+    /// placeholder as its value, which is not text to delete.
     func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
-        let current = field.value as? String ?? ""
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + text)
+        for _ in 0..<3 {
+            let current = field.value as? String ?? ""
+            if current.isEmpty || current == field.placeholderValue { break }
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        }
+        field.typeText(text)
+        XCTAssertEqual(field.value as? String, text, "the field should hold exactly what was typed")
     }
 
     /// Fills the "Your name" sheet when it comes up (signed out), then taps the app so the interruption
@@ -131,8 +139,17 @@ class ConvoyUITestCase: XCTestCase {
         return code
     }
 
+    /// A phone that still holds an earlier trip opens in its lobby or map, not Home: say so instead of
+    /// letting the next step report a field it cannot find.
+    func failIfAlreadyInATrip() {
+        if lobbyActionButton.waitForExistence(timeout: 3) {
+            XCTFail("This phone is already in a trip (its lobby or map is open) and should start from Home: it holds an earlier session. Uninstall the app first (qa/run-convoy2.mjs does).")
+        }
+    }
+
     /// Welcome or Home to the join form with `code` typed in (the name sheet comes first when signed out).
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
+        failIfAlreadyInATrip()
         let joinButton = app.buttons
             .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn't show Join Trip")
