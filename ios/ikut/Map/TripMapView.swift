@@ -39,6 +39,7 @@ struct TripMapView: View {
     @State private var stopBoard = StopBoard.empty
     /// The stop card is on top of the convoy panel only after a tap on the Pit stop button.
     @State private var stopCardOpen = false
+    @Namespace private var bottomSurface
     /// What the pill at the top has shown and when, so each question goes quiet after 20 seconds.
     @State private var pillMemory = StopPillMemory()
     @State private var pillNow = Date()
@@ -129,17 +130,7 @@ struct TripMapView: View {
             .overlay(alignment: .bottom) {
                 // The stop card is one more layer in the same stack: on top of the panel, same inset
                 // and radius, opened only by a tap on the Pit stop button.
-                ZStack(alignment: .bottom) {
-                    ConvoyPanel(
-                        model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
-                        nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
-                        onReport: openReport, onStop: openStopCard)
-                        // The glass card is see-through, so the panel fades out under it.
-                        .opacity(stopCardOpen ? 0 : 1)
-                        .allowsHitTesting(!stopCardOpen)
-                        .accessibilityHidden(stopCardOpen)
-                    stopCard
-                }
+                bottomStack
                 .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { panelMinY = $0 }
                 .frame(maxHeight: maxBottomHeight, alignment: .bottom)
             }
@@ -529,21 +520,42 @@ struct TripMapView: View {
         withAnimation(.snappy) { stopCardOpen = false }
     }
 
-    /// The card, on top of the panel, only while it is open.
-    @ViewBuilder
-    private var stopCard: some View {
-        if stopCardOpen, let context = stopContext {
-            StopCard(
-                board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
-                service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
-                onClose: closeStopCard
-            )
-            .padding(.horizontal, Spacing.s)
-            .padding(.bottom, Spacing.s)
-            // Above the panel for the whole of its exit too, or it would slide away behind it.
-            .zIndex(1)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+    /// The panel and the stop card. The card slides up over the panel, and the panel, with everything
+    /// on it, sinks and fades out in the same moment, so no button stays put under the moving card
+    /// (a glass or frosted card is see-through). Closing runs the same way backwards.
+    private var bottomStack: some View {
+        ZStack(alignment: .bottom) {
+            panel
+                .offset(y: stopCardOpen ? 40 : 0)
+                .opacity(stopCardOpen ? 0 : 1)
+                // Gone in a blink, so it never shows through the card on its way up.
+                .animation(.easeOut(duration: 0.12), value: stopCardOpen)
+                .allowsHitTesting(!stopCardOpen)
+                .accessibilityHidden(stopCardOpen)
+            if stopCardOpen, let context = stopContext {
+                stopCard(context)
+                    // Above the panel for the whole of its exit too, or it would slide away behind it.
+                    .zIndex(1)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+    }
+
+    private var panel: some View {
+        ConvoyPanel(
+            model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
+            nextStop: StopLogic.nextStop(stopBoard), stopButton: StopLogic.buttonContent(for: stopBoard),
+            onReport: openReport, onStop: openStopCard)
+    }
+
+    private func stopCard(_ context: StopContext) -> some View {
+        StopCard(
+            board: stopBoard, context: context, driving: driving.isDriving, actions: stopActions(context),
+            service: stopService, searcher: placeSearcher, demoScreen: demoScreen,
+            onClose: closeStopCard
+        )
+        .padding(.horizontal, Spacing.s)
+        .padding(.bottom, Spacing.s)
     }
 
     /// Live actions that also tell the pill what happened (a tap on Yes is confirmed there for a few seconds).
