@@ -137,6 +137,12 @@ for (const udid of [o.aUdid, o.bUdid]) {
   if (!line.includes('(Booted)')) { say(`booting ${udid}`); simctl('boot', udid); }
   simctl('bootstatus', udid, '-b');
   // --ask-location: phone B answers the system location prompt in the UI instead (first-run path).
+  // Known starting state for both phones (Q9): the app is uninstalled so no earlier session, trip or setting
+  // survives (Backend.dropUserFromOtherBackend signs out the Keychain user once UserDefaults is gone), and the
+  // text size is the default (a leftover accessibility size from a screenshot session breaks taps).
+  simctl('terminate', udid, 'dev.aqlan.ikut');
+  simctl('uninstall', udid, 'dev.aqlan.ikut');
+  simctl('ui', udid, 'content_size', 'large');
   if (o.askLocation && udid === o.bUdid) simctl('privacy', udid, 'reset', 'location', 'dev.aqlan.ikut');
   else simctl('privacy', udid, 'grant', 'location-always', 'dev.aqlan.ikut');
   simctl('location', udid, 'set', `${START.latitude},${START.longitude}`);

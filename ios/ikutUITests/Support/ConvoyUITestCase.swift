@@ -94,10 +94,28 @@ class ConvoyUITestCase: XCTestCase {
 
     // MARK: Shared flows
 
+    /// Clears the field, types `text` and checks the field now holds exactly that. A tap puts the cursor where
+    /// it hit and a delete only removes what is before it, so a prefilled name was left in front of the typed
+    /// one ("FaizAisha"): select everything (long press, Select All) and delete it in one go instead; if the
+    /// menu does not come up, move the cursor to the end with a second tap and delete every character.
     func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
         let current = field.value as? String ?? ""
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + text)
+        if !current.isEmpty, current != field.placeholderValue {
+            field.press(forDuration: 1.2)
+            let selectAll = app.menuItems["Select All"]
+            if selectAll.waitForExistence(timeout: 2) {
+                selectAll.tap()
+                field.typeText(XCUIKeyboardKey.delete.rawValue)
+            } else {
+                field.tap()
+                field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
+            }
+        }
+        field.typeText(text)
+        if field.exists, let held = field.value as? String {
+            XCTAssertEqual(held, text, "the field should hold exactly what was typed")
+        }
     }
 
     /// Fills the "Your name" sheet when it comes up (signed out), then taps the app so the interruption
@@ -131,8 +149,17 @@ class ConvoyUITestCase: XCTestCase {
         return code
     }
 
+    /// A phone that still holds an earlier trip opens in its lobby or map, not Home: say so instead of
+    /// letting the next step report a field it cannot find.
+    func failIfAlreadyInATrip() {
+        if lobbyActionButton.waitForExistence(timeout: 3) {
+            XCTFail("This phone is already in a trip (its lobby or map is open) and should start from Home: it holds an earlier session. Uninstall the app first (qa/run-convoy2.mjs does).")
+        }
+    }
+
     /// Welcome or Home to the join form with `code` typed in (the name sheet comes first when signed out).
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
+        failIfAlreadyInATrip()
         let joinButton = app.buttons
             .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn't show Join Trip")
