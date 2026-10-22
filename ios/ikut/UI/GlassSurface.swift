@@ -153,3 +153,15 @@ extension Color {
     /// How much a stale car's row is dimmed: less on glass, where 0.6 went thin.
     static var staleRowOpacity: Double { GlassSurface.active ? 0.78 : 0.6 }
 }
+
+extension Color {
+    /// The accent colour for an icon on a glass surface: a lifted blue in dark, where the system blue
+    /// goes faint over the map; the usual accent in light and off glass.
+    static var surfaceAccent: Color {
+        guard GlassSurface.active else { return MapPalette.accent }
+        return Color(UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.42, green: 0.70, blue: 1.0, alpha: 1) : UIColor(MapPalette.accent)
+        })
+    }
+}

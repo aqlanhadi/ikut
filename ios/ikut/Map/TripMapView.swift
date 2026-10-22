@@ -125,7 +125,7 @@ struct TripMapView: View {
                 // the stack keeps between its own items. Before the stack is measured: its top
                 // padding, the 56 pt pill and the gap.
                 MapModeControl(mode: $model.mode)
-                    .padding(.top, topHeight > 0 ? topHeight + Spacing.s : Spacing.xs + 56 + Spacing.s)
+                    .padding(.top, viewButtonsTop)
                     .padding(.trailing, Spacing.m)
                     .animation(.snappy, value: topHeight)
             }
@@ -319,6 +319,19 @@ struct TripMapView: View {
     /// A stop request is announced by the pill at the top (and spoken), never by a banner.
     private var bannerHiding: Set<EventCategory> { [.stopRequest] }
 
+    /// Where the view buttons start: one `Spacing.s` below the last thing showing in the top stack,
+    /// the gap the stack keeps between its own items. The stack's height ends with a spacing after
+    /// its always-present, zero-height banner slot when nothing shows below it, so that is taken off.
+    private var viewButtonsTop: CGFloat {
+        guard topHeight > 0 else { return Spacing.xs + 56 + Spacing.s }
+        var bannerSlotEmpty = true
+        if let alert = alerts.current { bannerSlotEmpty = bannerHiding.contains(alert.category) || alert.id == approach?.id }
+        var toastHidden = false
+        if case .hidden = toast.state { toastHidden = true }
+        let nothingBelowSlot = bannerSlotEmpty && passedText == nil && toastHidden && stopError == nil
+        return nothingBelowSlot ? topHeight : topHeight + Spacing.s
+    }
+
     private var bannerShowing: Bool {
         if approach != nil || passedText != nil { return true }
         guard let alert = alerts.current else { return false }
@@ -425,7 +438,7 @@ struct TripMapView: View {
                     pillSubtitle(withCode: false)
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.surfaceSecondary)
                 .lineLimit(1)
                 .accessibilityIdentifier("trip.pill.status")
             }
@@ -450,6 +463,7 @@ struct TripMapView: View {
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
             }
+            .tint(GlassSurface.active ? Color.surfaceAccent : nil)
             .disabled(isWorking)
             .accessibilityLabel("Trip menu")
         }
@@ -815,7 +829,7 @@ struct MapModeControl: View {
         Button { mode = target } label: {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(mode == target ? MapPalette.accent : Color.primary)
+                .foregroundStyle(mode == target ? Color.surfaceAccent : Color.primary)
                 .frame(width: 44, height: 46)
         }
         .accessibilityLabel(label)
