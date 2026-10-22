@@ -219,3 +219,33 @@ export function seesStatus(c) {
   }
   return { text: `The app has this car at ${km1(r.offset)}, ${age}.`, warn: false };
 }
+
+// ---- keeping the cars in view
+
+/** The points worth framing: every car, plus only the pins still ahead of it (an ending, a deviation not yet driven back). Not start pins, not the destination. */
+export function framePoints(state) {
+  const pts = [];
+  for (const c of state?.cars ?? []) {
+    if (c.latitude != null) pts.push({ lat: c.latitude, lng: c.longitude });
+    const pins = c.pins ?? {};
+    if (pins.end && c.phase !== 'arrived') pts.push(fromCoord(pins.end));
+    if (pins.deviation && c.phase !== 'back') pts.push(fromCoord(pins.deviation.pin));
+  }
+  return pts;
+}
+
+/**
+ * Should the map refit to the cars? `view` is {north, south, east, west}, `zoom` and `maxZoom` the map's. Yes when a point has left the view,
+ * or when the points take up less than a quarter of the view in both directions (zoom back in), unless the zoom is already at its cap;
+ * never within `minGap` ms of the last fit unless `force`.
+ */
+export function shouldRefit(points, view, { zoom, maxZoom = 15, lastFit = 0, now = Date.now(), minGap = 4000, force = false } = {}) {
+  if (!points.length || !view) return false;
+  if (force) return true;
+  if (now - lastFit < minGap) return false;
+  const lats = points.map((p) => p.lat), lngs = points.map((p) => p.lng);
+  const outside = points.some((p) => p.lat > view.north || p.lat < view.south || p.lng > view.east || p.lng < view.west);
+  if (outside) return true;
+  const small = (Math.max(...lats) - Math.min(...lats)) < 0.25 * (view.north - view.south) && (Math.max(...lngs) - Math.min(...lngs)) < 0.25 * (view.east - view.west);
+  return small && !(zoom >= maxZoom);
+}

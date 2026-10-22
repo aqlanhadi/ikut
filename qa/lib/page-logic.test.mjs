@@ -211,3 +211,34 @@ test('road coordinates go out rounded to 6 decimals', () => {
   const road = [{ lat: 3.123456789, lng: 101.987654321 }, { lat: 3.2, lng: 101.1 }];
   assert.deepEqual(placeAtCmd('daniel', road[0], road).road[0], { latitude: 3.123457, longitude: 101.987654 });
 });
+
+import { framePoints, shouldRefit } from '../dashboard/page-logic.mjs';
+
+test('framePoints: the cars and the pins still ahead, never start pins', () => {
+  const st = { cars: [
+    { key: 'a', latitude: 3, longitude: 101, phase: 'onRoute', pins: { start: { latitude: 9, longitude: 9 }, end: null, deviation: null } },
+    { key: 'b', latitude: 3.1, longitude: 101.1, phase: 'out', pins: { start: null, end: { latitude: 3.3, longitude: 101.3 }, deviation: { pin: { latitude: 3.2, longitude: 101.2 } } } },
+    { key: 'c', latitude: 3.4, longitude: 101.4, phase: 'back', pins: { deviation: { pin: { latitude: 8, longitude: 8 } } } },
+    { key: 'd', latitude: 3.5, longitude: 101.5, phase: 'arrived', pins: { end: { latitude: 3.5, longitude: 101.5 } } },
+    { key: 'e', latitude: null, phase: null, pins: {} },
+  ] };
+  const pts = framePoints(st);
+  assert.deepEqual(pts.map((p) => [p.lat, p.lng]), [[3, 101], [3.1, 101.1], [3.3, 101.3], [3.2, 101.2], [3.4, 101.4], [3.5, 101.5]]);
+  assert.ok(!pts.some((p) => p.lat >= 8), 'no start pin, no driven-back deviation pin');
+  assert.deepEqual(framePoints(null), []);
+});
+
+test('shouldRefit: when a point is out of view, or the points are small in it, at most every 4 s, within the zoom cap', () => {
+  const view = { north: 4, south: 3, east: 102, west: 101 };
+  const inside = [{ lat: 3.4, lng: 101.4 }, { lat: 3.8, lng: 101.9 }];
+  const o = { zoom: 10, now: 100_000, lastFit: 0 };
+  assert.equal(shouldRefit(inside, view, o), false, 'in view and big enough');
+  assert.equal(shouldRefit([...inside, { lat: 5, lng: 101.5 }], view, o), true, 'one has left');
+  const blob = [{ lat: 3.5, lng: 101.5 }, { lat: 3.52, lng: 101.52 }];
+  assert.equal(shouldRefit(blob, view, o), true, 'a quarter of the view or less: zoom back in');
+  assert.equal(shouldRefit(blob, view, { ...o, zoom: 15 }), false, 'already at the zoom cap');
+  assert.equal(shouldRefit(blob, view, { ...o, lastFit: 98_000 }), false, 'fit 2 s ago');
+  assert.equal(shouldRefit(blob, view, { ...o, lastFit: 98_000, force: true }), true);
+  assert.equal(shouldRefit([], view, o), false);
+  assert.equal(shouldRefit(blob, null, o), false);
+});

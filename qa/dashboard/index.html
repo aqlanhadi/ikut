@@ -213,7 +213,7 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
 <script type="module">
 import {
   decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, roadKey, placeAtCmd, endingCmd, deviateCmd, voteCmd, prepareStartsCmd, clampWait, endingOrigin,
-  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1, seesStatus,
+  canMovePin, ghostOf, geometryChanges, stopPrompts, answerText, initialOf, badgeClasses, problemOwner, pickedPlaceName, defaultLeaveKm, straightDeviation, fromCoord, toCoord, km1, seesStatus, framePoints, shouldRefit,
 } from '/page-logic.mjs';
 
 const $ = (s) => document.querySelector(s);
@@ -328,26 +328,22 @@ let fitted = false, fittedCars = false, follow = true, lastFit = 0;
 const programmatic = () => { lastFit = Date.now(); };
 function setFollow(on) { follow = on; $('#followBtn')?.classList.toggle('on', on); if (on) followCars(true); }
 function fitRoute() { if (!gm || !routeModel) return; const b = new google.maps.LatLngBounds(); routeModel.path.forEach((p) => b.extend(p)); programmatic(); gmap().fitBounds(b, 40); }
-/** The points worth framing: every car and every pin. */
-function carPoints() {
-  const pts = (pg?.cars ?? []).filter((c) => c.latitude != null).map((c) => ({ lat: c.latitude, lng: c.longitude }));
-  for (const w of Object.values(wantedPins(pg))) if (w.at && !w.leave) pts.push(w.at);
-  return pts;
-}
 function fitCars() {
   if (!gm) return;
-  const pts = carPoints(); if (!pts.length) return;
+  const pts = framePoints(pg); if (!pts.length) return;
   const b = new google.maps.LatLngBounds(); pts.forEach((p) => b.extend(p));
   programmatic(); gmap().fitBounds(b, 120);
-  google.maps.event.addListenerOnce(gmap(), 'idle', () => { if (gmap().getZoom() > 15) gmap().setZoom(15); });
+  google.maps.event.addListenerOnce(gmap(), 'idle', () => { if (gmap().getZoom() > MAXZOOM) gmap().setZoom(MAXZOOM); });
 }
-/** Keeps the cars framed: refits when one has left the view, at most every 4 seconds (and once when the trip is ready). */
+const MAXZOOM = 15;
+/** Keeps the cars framed: refits when one has left the view or they have become small in it, at most every 4 seconds (and once when the trip is ready). */
 function followCars(force) {
   if (!gm || !follow || pg?.phase !== 'ready') return;
-  if (!force && Date.now() - lastFit < 4000) return;
-  const view = gmap().getBounds(); if (!view) return;
-  const pts = carPoints();
-  if (force || pts.some((p) => !view.contains(p))) fitCars();
+  if (force) return fitCars(); // no need to know the view to frame the cars
+  const v = gmap().getBounds(); if (!v) return;
+  const ne = v.getNorthEast(), sw = v.getSouthWest();
+  const view = { north: ne.lat(), south: sw.lat(), east: ne.lng(), west: sw.lng() };
+  if (shouldRefit(framePoints(pg), view, { zoom: gmap().getZoom(), maxZoom: MAXZOOM, lastFit, force })) fitCars();
 }
 function syncCars(st) {
   const cars = (st?.cars ?? []).filter((c) => c.latitude != null);
