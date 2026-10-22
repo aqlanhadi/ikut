@@ -3,7 +3,7 @@ import XCTest
 /// The phones of the two live demos (`qa/demo.mjs`, `qa/demo-two-cars.mjs`; see qa/README.md, "Live demo").
 /// A phone is the organizer:
 ///   DemoOrganizerUITests  phone 1 in both demos: Aisha creates the trip, starts it, and then does whatever the script
-///                         asks through marker files (report debris, agree to the stop and pin it, Everyone has arrived)
+///                         asks through marker files (report debris, pin the stop from the card, Leave now)
 ///   DemoPassengerUITests  phone 2 of the organizer demo: Faiz joins Aisha's car as a passenger (co-pilot)
 ///   DemoOwnCarUITests     phone 2 of the two-cars demo: Faiz joins as "A new car" and drives behind Aisha
 ///
@@ -18,7 +18,7 @@ class DemoBase: TwoPhoneConvoyBase {
     var holdUntil = Date()
     let env = ProcessInfo.processInfo.environment
     var demoName: String { env["IKUT_DEMO_NAME"] ?? "Aisha" }
-    var stopChip: XCUIElement { app.buttons["stopChip"] }
+    var stopButton: XCUIElement { app.buttons["stop.button"] }
 
     func startDemo(as who: String) throws {
         try launch(as: who)
@@ -138,22 +138,17 @@ class DemoBase: TwoPhoneConvoyBase {
         shot("debris-marker")
     }
 
-    /// Waits for the lead car's pin to show on this phone's card. The requester's card starts folded: open it if needed.
+    /// Waits for the lead car's pin to show on this phone's Pit stop button ("Fuel · 12 min").
     func watchPin() {
-        var opened = false
-        let seen = soft("the lead car's pin shows on this phone", timeout: 120, core: true) {
-            if labelled("label CONTAINS %@", "pinned by the lead car").exists || button(beginningWith: "Agreed · Pinned").exists { return true }
-            if !opened, stopChip.exists, stopChip.isHittable { opened = true; stopChip.tap() }
-            return false
+        let seen = soft("the lead car's pin shows on this phone's Pit stop button", timeout: 120, core: true) {
+            stopButton.label.contains("pinned at")
         }
         shot("stop-pinned")
         if seen { mark("b.sawPin") } else { mark("b.sawPin", "missing") }
     }
 
     func watchResolved() {
-        soft("stop card gone after Everyone has arrived", timeout: 60) {
-            !app.buttons["Agree to Stop"].exists && !stopChip.exists && !button(beginningWith: "Agreed").exists
-        }
+        soft("the button is Pit stop again after Leave now", timeout: 60) { stopButton.label == "Pit stop" }
         shot("stop-resolved")
     }
 }
@@ -212,42 +207,29 @@ final class DemoOrganizerUITests: DemoBase {
         soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share Recap"].exists }
     }
 
-    /// The organizer sees the stop card: Agree to Stop, then pin the place ("Pin R&R Demo", else "Pin this stop").
+    /// The organizer's Pit stop button shows the stop; a tap opens the card, and the pin button pins the place.
     func agreeAndPin() {
-        let agree = app.buttons["Agree to Stop"]
-        guard soft("the stop card shows on phone 1", timeout: 90, core: true, { agree.exists }) else { return }
-        shot("stop-card")
-        agree.tap()
-        // Agreeing folds the card into its chip; a tap opens it again.
-        if soft("the card folds into its chip after agreeing", timeout: 15, { stopChip.exists && !agree.exists }) { stopChip.tap() }
-        let pin = pinButton()
-        guard soft("a pin button shows", timeout: 30, core: true, { pin().exists }) else { return }
+        guard soft("the Pit stop button shows the stop on phone 1", timeout: 90, core: true, { stopButton.label.hasPrefix("Fuel stop") })
+        else { return }
+        shot("stop-button")
+        stopButton.tap()
+        // A moving phone shows the card read only until "I'm a passenger".
+        if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
+        let pin = app.buttons["stop.pin"]
+        guard soft("a pin button shows on the stop card", timeout: 30, core: true, { pin.exists }) else { return }
         shot("stop-pin-buttons")
-        pin().tap()
-        let pinned = soft("the stop is pinned for everyone", timeout: 30, core: true) {
-            button(beginningWith: "Agreed · Pinned").exists || labelled("label CONTAINS %@", "pinned by the lead car").exists
-        }
+        pin.tap()
+        let pinned = soft("the stop is pinned for everyone", timeout: 30, core: true) { app.buttons["stop.leave"].exists }
         shot("stop-pinned")
         if pinned { mark("a.pinned") }
     }
 
-    func pinButton() -> () -> XCUIElement {
-        {
-            for prefix in ["Pin R&R Demo", "Pin this stop", "Pin "] {
-                let b = self.button(beginningWith: prefix)
-                if b.exists { return b }
-            }
-            return self.button(beginningWith: "Pin ")
-        }
-    }
-
     func arrived() {
-        let done = app.buttons["Everyone has arrived"]
-        if !done.exists, stopChip.exists { stopChip.tap() }
-        guard soft("Everyone has arrived is there", timeout: 20, core: true, { done.exists }) else { return }
-        done.tap()
-        soft("the stop card is gone on phone 1", timeout: 60, core: true) {
-            !button(beginningWith: "Agreed").exists && !app.buttons["Agree to Stop"].exists && !stopChip.exists
+        let leave = app.buttons["stop.leave"]
+        guard soft("Leave now is there", timeout: 20, core: true, { leave.exists }) else { return }
+        leave.tap()
+        soft("the card closes and the button is Pit stop again on phone 1", timeout: 60, core: true) {
+            !element("stop.card").exists && stopButton.label == "Pit stop"
         }
         shot("stop-resolved")
         mark("a.resolved")
@@ -319,24 +301,25 @@ final class DemoOwnCarUITests: DemoBase {
         Thread.sleep(forTimeInterval: 3)
     }
 
-    /// Pit stop > Fuel; the request sheet finds a place ahead (or none) and sends by itself after a short countdown.
+    /// Pit stop > Fuel; the card finds a place ahead (or none) and sends with "Ask for this stop".
     func requestFuelStop() {
-        let pitStop = app.buttons["Pit stop"]
+        let pitStop = stopButton
         guard soft("Pit stop button", timeout: 20, core: true, {
             // The "Get road alerts?" question can still be up over the map.
             if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
-            // The approach folds the convoy list (and Pit stop with it) until the hazard is passed: open it again.
-            if !(pitStop.exists && pitStop.isHittable), app.buttons["Expand convoy list"].exists { app.buttons["Expand convoy list"].tap(); Thread.sleep(forTimeInterval: 1) }
             return pitStop.exists && pitStop.isHittable
         }) else { return }
         pitStop.tap()
-        let fuel = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Fuel'")).firstMatch
-        guard fuel.waitForExistence(timeout: 10) else { note("Pit stop sheet opened", false, core: true); return }
+        let fuel = app.buttons["stop.reason.stopFuel"]
+        guard fuel.waitForExistence(timeout: 10) else { note("the stop card opened", false, core: true); return }
         fuel.tap()
-        Thread.sleep(forTimeInterval: 1)
-        shot("pit-stop-sheet")
-        soft("the request is sent and the sheet closes", timeout: 90, core: true) { !app.staticTexts["Need gas"].exists }
-        soft("Faiz's own request chip", timeout: 30) { stopChip.exists }
+        let send = app.buttons["stop.send"]
+        guard soft("Ask for this stop is ready", timeout: 60, core: true, { send.exists && send.isEnabled }) else { return }
+        shot("pit-stop-card")
+        send.tap()
+        soft("the request is sent and the card shows the timeline", timeout: 90, core: true) { element("stop.timeline").exists || element("stop.readOnlyNote").exists }
+        app.buttons["stop.card.close"].tap()
+        soft("Faiz's own request on the button", timeout: 30) { pitStop.label.hasPrefix("Fuel stop") }
         shot("stop-requested")
         mark("b.stopRequested")
     }

@@ -163,7 +163,15 @@ struct AlertWordingTests {
 
     @Test func stopsStatusesAndMessages() {
         #expect(alert(alertEvent(.stopToilet, id: "1", ago: 120)).body == "Aqlan’s car needs a toilet break · 2 min ago")
-        #expect(alert(alertEvent(.stopFuel, id: "1")).spoken == "Aqlan’s car wants to stop for fuel.")
+        // Spoken once, and it says what to do; voice answers are not built, so it never says "say yes".
+        #expect(alert(alertEvent(.stopFuel, id: "1")).spoken == "Aqlan needs fuel. Tap yes.")
+        #expect(alert(alertEvent(.stopFood, id: "1"), name: nil).spoken == "Another car needs food. Tap yes.")
+        #expect(alert(alertEvent(.stopToilet, id: "1")).spoken == "Aqlan needs a toilet break. Tap yes.")
+        #expect(AlertWording.alert(
+            for: alertEvent(.stopRest, id: "1"), tripId: "t", authorName: "Aqlan", now: alertT0,
+            stopReply: "Tap pin this stop.").spoken == "Aqlan needs a rest. Tap pin this stop.")
+        // The banner and notification keep their own wording.
+        #expect(alert(alertEvent(.stopFuel, id: "1")).body == "Aqlan’s car wants to stop for fuel · just now")
         #expect(alert(alertEvent(.carTrouble, id: "1")).spoken == "Aqlan’s car has car trouble.")
         #expect(alert(alertEvent(.runningLate, id: "1"), name: nil).spoken == "Another car is running late.")
         let m = alert(alertEvent(.message, id: "1", message: "Makan dulu?"))

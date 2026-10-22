@@ -311,6 +311,10 @@ struct DeviceFix: Equatable, Sendable {
     var coordinate: MapCoordinate
     /// Degrees clockwise from north; negative when unknown.
     var course: Double
+    /// Meters per second; negative when unknown (CoreLocation's own convention).
+    var speed: Double = -1
+    /// When CoreLocation took the fix; nil when unknown.
+    var at: Date? = nil
 }
 
 enum MapReportSnapshot {
@@ -396,6 +400,38 @@ extension TripMapModel {
             tripId: tripId, userId: userId, carId: carId, isOrganizer: isOrganizer,
             snapshot: { [weak self] in self?.reportSnapshot() },
             mainRoute: mainRoute,
-            frontOffset: { [weak self] in self?.convoy.convoy.first?.convoyOffset })
+            frontOffset: { [weak self] in self?.convoy.convoy.first?.convoyOffset },
+            carFixes: { [weak self] in self?.stopCarFixes() ?? [:] })
+    }
+
+    /// Where every car is, from the positions the phone already has: the convoy's cars on the main
+    /// route (joining cars are not included). A car whose position is older than a minute is left out,
+    /// so it never reads as "Here" from where it used to be.
+    func stopCarFixes(now: Date = Date()) -> [String: StopCarFix] {
+        var fixes: [String: StopCarFix] = [:]
+        for entry in convoy.convoy where HazardLogic.isFresh(entry.position, now: now, config: .default) {
+            fixes[entry.id] = StopCarFix(
+                latitude: entry.position.location.latitude, longitude: entry.position.location.longitude,
+                offset: entry.convoyOffset)
+        }
+        return fixes
+    }
+
+    /// This phone's own speed in m/s, or nil while it is unknown or old. The tracker's phone is its
+    /// car's position (the fixes the tracker writes); any other phone uses its own location.
+    static let phoneFixMaxAge: TimeInterval = 10
+    func phoneSpeed(now: Date = Date()) -> Double? {
+        if isTracker {
+            guard let carId = myCarId, let position = carPosition(carId),
+                  HazardLogic.isFresh(position, now: now, config: .default) else { return nil }
+            return position.speed
+        }
+        guard let device, device.speed >= 0 else { return nil }
+        // A fix older than about 10 s says nothing about how fast the car moves now, unless it was
+        // already slow: a stream that stops just after the car slows must still confirm "stopped"
+        // (`DrivingDetector.holdFor` is also 10 s), so an old fix at or under the 15 km/h line counts.
+        if let at = device.at, now.timeIntervalSince(at) > Self.phoneFixMaxAge,
+           device.speed > DrivingDetector.speed { return nil }
+        return device.speed
     }
 }

@@ -457,6 +457,35 @@ struct TripMapModelTests {
         #expect(model.cameraTarget == nil)
     }
 
+    @Test func stopCarFixesLeaveOutStaleCars() {
+        let model = fixedModel()
+        let cars = [car("a", lead: true), car("b", name: "Wyna’s X70", number: 2)]
+        model.apply(
+            trip: trip(), myCar: cars[0], myCarId: "a",
+            positions: ["a": position(offset: 5500, age: 5), "b": position(offset: 4000, age: 120)], isTracker: true)
+        model.setCars(cars)
+        #expect(Set(model.stopCarFixes(now: t0).keys) == ["a"])
+    }
+
+    @Test func oldDeviceFixDoesNotGiveASpeed() {
+        let model = fixedModel()
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-30))
+        #expect(model.phoneSpeed(now: t0) == nil)
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-3))
+        #expect(model.phoneSpeed(now: t0) == 25)
+        // Exactly at the cut-off still counts; just past it does not (when fast).
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-10))
+        #expect(model.phoneSpeed(now: t0) == 25)
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-10.5))
+        #expect(model.phoneSpeed(now: t0) == nil)
+        // An old fix that was already slow still confirms "stopped".
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 1, at: t0.addingTimeInterval(-60))
+        #expect(model.phoneSpeed(now: t0) == 1)
+        // No timestamp: taken as current.
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25)
+        #expect(model.phoneSpeed(now: t0) == 25)
+    }
+
     @Test func mergedCarDropsItsOverlay() {
         let model = fixedModel()
         let own = Polyline.encode(ownCoordinates)

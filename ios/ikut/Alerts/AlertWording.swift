@@ -23,7 +23,7 @@ enum AlertWording {
 
     static func alert(
         for event: TripEvent, tripId: String, distance: Double? = nil, authorName: String?,
-        now: Date
+        now: Date, stopReply: String = defaultStopReply
     ) -> TripAlert {
         let car = carPhrase(authorName)
         let ago = relativeTime(since: event.createdAt, now: now)
@@ -34,7 +34,19 @@ enum AlertWording {
             severity: event.severity, distance: distance,
             title: title(for: event, distance: distance),
             body: "\(lead) · \(ago)",
-            spoken: spoken(for: event, car: car, distance: distance))
+            spoken: spoken(for: event, car: car, distance: distance, authorName: authorName, stopReply: stopReply))
+    }
+
+    /// What a stop request tells the listener to do. Voice answers are not built yet, so it never
+    /// says "say yes".
+    static let defaultStopReply = "Tap yes."
+
+    /// "Wyna needs fuel. Tap yes." The place is not in it: it is written a moment after the request.
+    static func spokenStopRequest(for type: EventType, authorName: String?, stopReply: String) -> String {
+        let trimmed = authorName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let who = trimmed.isEmpty ? "Another car" : trimmed
+        let need = StopRequestState.need(for: type)
+        return "\(who) \(need). \(stopReply)"
     }
 
     /// "Stop pinned: Petronas Tapah", for a stop request whose place was just pinned.
@@ -124,13 +136,17 @@ enum AlertWording {
         }
     }
 
-    private static func spoken(for event: TripEvent, car: String, distance: Double?) -> String {
+    private static func spoken(
+        for event: TripEvent, car: String, distance: Double?, authorName: String?, stopReply: String
+    ) -> String {
         switch event.category {
         case .hazard, .condition:
             let what = label(for: event.type)
             if let distance { return "\(what) ahead in \(distanceText(distance)), reported by \(car)." }
             return "\(what) reported by \(car)."
-        case .stopRequest, .status:
+        case .stopRequest:
+            return spokenStopRequest(for: event.type, authorName: authorName, stopReply: stopReply)
+        case .status:
             return "\(capitalized(car)) \(statement(for: event.type))."
         case .message:
             if let text = event.message { return "Message from \(car): \(text)" }

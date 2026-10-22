@@ -111,6 +111,28 @@ export interface TripEvent {
   message?: string;
   /** The pinned stop; only ever set on stop requests. */
   place?: StopPlace;
+  /** Stop requests only. Absent (an old event) reads as open. */
+  status?: StopStatus;
+  /** Set only when a stop request closes, with closedBy (a user id) and expiresAt = now. */
+  closedReason?: StopClosedReason;
+  closedBy?: string;
+}
+
+export type StopStatus = 'open' | 'pinned' | 'closed';
+export type StopClosedReason = 'left' | 'cancelled' | 'noAnswer';
+
+export type StopAnswer = 'yes' | 'notNow';
+
+/** trips/{tripId}/events/{eventId}/votes/{carId}: one vote per car. */
+export interface StopVote {
+  userId: string;
+  /** true for yes, false for not now; kept so old builds still count the vote. */
+  agree: boolean;
+  /** Absent on votes from old builds. */
+  answer?: StopAnswer;
+  at: Timestamp;
+  /** Another place this car would rather stop at; the requesting car proposes its place this way. */
+  suggestion?: Omit<StopPlace, 'pinnedBy'>;
 }
 
 /** previewTrip callable result: what a non-member may see before joining. */

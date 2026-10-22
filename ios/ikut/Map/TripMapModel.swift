@@ -34,7 +34,7 @@ final class TripMapModel {
     /// I am the tracker of my car, so my phone is what reports its position.
     private(set) var isTracker = false
     /// The phone's own fix, while it is being streamed (not the tracker).
-    private(set) var device: DeviceFix?
+    var device: DeviceFix?  // set by the location stream; tests set it directly
     private(set) var isEnded = false
 
     @ObservationIgnored private let session: TripSession?
@@ -204,6 +204,9 @@ final class TripMapModel {
             all: markers.map(\.coordinate) + hazardPoints, fallback: fallbackPoints, focus: focus)
     }
 
+    /// The latest position written for a car, if any.
+    func carPosition(_ carId: String) -> Position? { positions[carId] }
+
     var separationWarning: String? { SeparationWarning.text(convoy.snapshot.separatedGaps) }
 
     // MARK: Hazards
@@ -334,7 +337,9 @@ final class TripMapModel {
             for try await update in CLLocationUpdate.liveUpdates() {
                 if Task.isCancelled { break }
                 guard let location = update.location, location.horizontalAccuracy >= 0 else { continue }
-                device = DeviceFix(coordinate: MapCoordinate(location.coordinate), course: location.course)
+                device = DeviceFix(
+                    coordinate: MapCoordinate(location.coordinate), course: location.course, speed: location.speed,
+                    at: location.timestamp)
             }
         } catch {
             // The stream ended; the map keeps the last fix.

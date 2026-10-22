@@ -591,7 +591,7 @@ export async function stopStory(d, { byPhone }) {
   await cars.daniel.vote(eventId, true);
   say('Daniel agrees');
   await sleep(4000);
-  sync.mark('agree'); // phone 1: Agree to Stop, then Pin this stop / Pin R&R Demo
+  sync.mark('agree'); // phone 1: opens the stop from the Pit stop button, then Pin R&R Demo
   await sync.wait('a.pinned', 120);
   const ref = doc(cars.hafiz.db, `trips/${d.tripId}/events/${eventId}`);
   const pinned = (await getDoc(ref)).data();
@@ -599,8 +599,8 @@ export async function stopStory(d, { byPhone }) {
   await sync.wait('b.sawPin', 120);
   say(`the pin is on both phones; it stays for ${PIN_VISIBLE_S} s so it can be watched on the map`);
   await sleep(PIN_VISIBLE_S * 1000);
-  sync.mark('arrive'); // phone 1 taps Everyone has arrived
+  sync.mark('arrive'); // phone 1 taps Leave now
   await sync.wait('a.resolved', 90);
   const resolved = (await getDoc(ref)).data();
-  d.check('Everyone has arrived resolved the stop (expiresAt set)', Boolean(resolved?.expiresAt) && resolved.expiresAt.toMillis() <= Date.now() + 1000);
+  d.check('Leave now closed the stop (expiresAt set, status closed, reason left)', Boolean(resolved?.expiresAt) && resolved.expiresAt.toMillis() <= Date.now() + 1000 && resolved.status === 'closed' && resolved.closedReason === 'left', JSON.stringify({ status: resolved?.status, closedReason: resolved?.closedReason }));
 }

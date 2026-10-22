@@ -104,20 +104,29 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             shot("07-hazard-cleared")
         }
 
-        try step("8. Stop request: card with the pinned place, agree, then resolved") {
-            let agree = app.buttons["Agree to Stop"]
-            try waitFor("stop card", timeout: 100 / speed + 60) { agree.exists }
-            try waitFor("pinned place on the card", timeout: 40 / speed + 30) {
+        try step("8. Stop request: the button shows it, the card has the place, yes, then resolved") {
+            let stopButton = app.buttons["stop.button"]
+            try waitFor("the Pit stop button shows the stop", timeout: 100 / speed + 60) { stopButton.label.hasPrefix("Fuel stop") }
+            XCTAssertFalse(element("stop.card").exists, "the stop card must not open by itself")
+            // A tap on the stop the button shows opens the card.
+            stopButton.tap()
+            let yes = app.buttons["stop.yes"]
+            try waitFor("the stop card", timeout: 20) { element("stop.card").exists }
+            // The phone drives at highway speed: the card is read only until "I'm a passenger".
+            if app.buttons["stop.passenger"].waitForExistence(timeout: 5) { app.buttons["stop.passenger"].tap() }
+            try waitFor("the place on the card", timeout: 40 / speed + 30) {
                 app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Petronas Tapah R&R'")).firstMatch.exists
             }
-            // Let the card's entrance and the panel's collapse finish before capturing.
             Thread.sleep(forTimeInterval: 1)
             shot("08-stop-request")
-            agree.tap()
-            try waitFor("agreement shown", timeout: 15) {
-                app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Agreed'")).firstMatch.exists
+            // The scripted lead may have pinned already, and then there is nothing left to answer.
+            if yes.exists {
+                yes.tap()
+                try waitFor("the yes is shown", timeout: 15) { app.buttons["stop.yes"].label.hasPrefix("Said yes") }
             }
-            try waitFor("stop card gone after the lead resolves it", timeout: 120 / speed + 60) { !agree.exists && !app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Agreed'")).firstMatch.exists }
+            try waitFor("the card closes by itself after the lead resolves it", timeout: 120 / speed + 60) {
+                !element("stop.card").exists && stopButton.label == "Pit stop"
+            }
             try waitFor("convoy list back", timeout: 20) { convoyOrder().count == 5 }
             shot("09-after-stop")
         }
