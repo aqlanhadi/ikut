@@ -269,7 +269,7 @@ its own route offset).
 
 ### The page (map and side panel)
 
-Playground tab: a full-height Google map on the left (the trip code, the car list and a live feed in a panel on the right; under the map on a narrow window), in ikut's own colours and car badges, light and dark following the system.
+Playground tab: a full-height Google map on the left (the trip code, the car list and a live feed in a panel on the right; under the map on a narrow window), in ikut's own colours and car badges, light and dark following the system (`?theme=light` or `?theme=dark` in the address forces one, for screenshots; `#demos` opens the other tab).
 The **Scripted demos** tab is the old list (Play, Stop, timeline, checks, log). The page's logic that can be tested without a browser lives in `dashboard/page-logic.mjs` (tests: `lib/page-logic.test.mjs`).
 
 - **Key.** The map needs `GOOGLE_MAPS_API_KEY` in `qa/dashboard/.env` (see `.env.example`; never committed, never printed). `GOOGLE_MAPS_MAP_ID` defaults to `DEMO_MAP_ID`,
