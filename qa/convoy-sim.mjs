@@ -18,6 +18,9 @@
 //   7. Reads everything back as a member and prints PASS / FAIL per check.
 //
 // Source of each piece of logic is cited in lib/route.mjs and lib/tracking.mjs.
+//
+// The output always ends in one `RESULT: PASS|FAIL|ABORT` line, also when it stops early or runs past --deadline
+// (default: the wait for the phone, the scenario and 300 s; none with --setup-only).
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -35,6 +38,7 @@ import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
 import { CARS, DURATION, FIX_HZ, TIMELINE, TRIP } from './lib/scenario.mjs';
 import { loadRoutes } from './generate-gpx.mjs';
+import { endsWithResult } from './lib/shell.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ID = 'ikut-b1083';
@@ -43,7 +47,7 @@ const REGION = 'asia-southeast1';
 // ---------------------------------------------------------------- CLI
 
 function parseArgs(argv) {
-  const o = { speed: 1, host: '127.0.0.1', waitApp: false, startIn: 5, goDelay: 5, waitTimeout: 900, endTrip: false, setupOnly: false, state: path.join(os.tmpdir(), 'ikut-qa', 'state.json'), results: path.join(os.tmpdir(), 'ikut-qa', 'results.json'), help: false };
+  const o = { speed: 1, host: '127.0.0.1', waitApp: false, startIn: 5, goDelay: 5, waitTimeout: 900, deadline: null, endTrip: false, setupOnly: false, state: path.join(os.tmpdir(), 'ikut-qa', 'state.json'), results: path.join(os.tmpdir(), 'ikut-qa', 'results.json'), help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -53,6 +57,7 @@ function parseArgs(argv) {
     else if (a === '--start-in') o.startIn = Number(next());
     else if (a === '--go-delay') o.goDelay = Number(next());
     else if (a === '--wait-timeout') o.waitTimeout = Number(next());
+    else if (a === '--deadline') o.deadline = Number(next());
     else if (a === '--end-trip') o.endTrip = true;
     else if (a === '--expect-app-vote') o.expectAppVote = true;
     else if (a === '--setup-only') o.setupOnly = true;
@@ -73,6 +78,7 @@ if (opts.help) {
   --go-delay S      with --wait-app: seconds between the phone's first position and go (default 5)
   --start-in S      without --wait-app: seconds between setup and go (default 5)
   --wait-timeout S  with --wait-app: give up waiting after S seconds (default 900)
+  --deadline S      stop with RESULT: ABORT after S seconds (default: the wait, the scenario at --speed, and 300)
   --expect-app-vote check that the phone's car voted on the stop request (the UI test taps Agree)
   --end-trip        end the trip when the scenario finishes (default: leave it active)
   --setup-only      create the trip and cars, print the code, write positions as a heartbeat and wait (Ctrl-C to stop)
@@ -81,6 +87,10 @@ if (opts.help) {
   --results-file F  JSON with the check results`);
   process.exit(0);
 }
+const end = endsWithResult({
+  deadlineS: opts.setupOnly ? 0 : opts.deadline ?? (opts.waitApp ? opts.waitTimeout : opts.startIn) + DURATION / opts.speed + 300,
+  signals: true,
+});
 
 // ---------------------------------------------------------------- logging, clock, checks
 
@@ -487,6 +497,7 @@ async function main() {
   fs.writeFileSync(opts.results, JSON.stringify({ code, tripId, speed: opts.speed, results }, null, 2));
   writeState({ phase: 'done' });
   for (const p of phones.values()) await p.close();
+  end.result(!failed.length);
   process.exit(failed.length ? 1 : 0);
 }
 

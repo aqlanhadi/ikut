@@ -14,12 +14,31 @@ node run-ui.mjs --speed 1            # everything, with the app on simulator C0A
 `run-ui.mjs` boots the simulator, grants location, starts `convoy-sim.mjs --wait-app`, runs
 `ConvoyScenarioUITests` (`ios/ikutUITests`) with `TEST_RUNNER_IKUT_JOIN_CODE`, and feeds
 `gpx/car5-app.gpx` to the simulator with `xcrun simctl location start`. Options: `--speed N`, `--skip-build`,
-`--udid`, `--derived-data` (default `/tmp/ikut-dd-q1`, seed it from another derived-data folder's `SourcePackages`).
+`--udid`, `--derived-data` (default `/tmp/ikut-dd-q1`, seed it from another derived-data folder's `SourcePackages`),
+`--deadline S`.
 Screenshots land in `qa/screens/`, logs in `$TMPDIR/ikut-qa/`.
 
 To join by hand instead: `node convoy-sim.mjs --wait-app`, join with the printed code from any simulator or phone, and
 feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
 `node convoy-sim.mjs --help` lists the other flags.
+
+## Waiting on a run
+
+Every runner (`convoy-sim`, `run-ui`, `run-convoy2`, `demo`, `demo-two-cars`, `prod-smoke`) ends its output with
+one `RESULT: PASS`, `RESULT: FAIL` or `RESULT: ABORT (why)` line, also when it exits early, crashes, is stopped, or runs
+past its `--deadline` (seconds; each has a default sized to its build and scenario, and kills its xcodebuild and
+`convoy-sim` children when it stops). So:
+
+- **Agents start a run in the background** (`run_in_background`, output to a log) and wait for the notice that it
+  exited, then read the `RESULT` line and the lines above it. No `until …; do sleep …; done` loops, and no
+  `pgrep -f <script>` to see whether a run is still going: the polling shell's own command line contains the
+  pattern, so it matches itself and never ends.
+- **The simulators are locked while a run drives them.** `run-ui`, `run-convoy2`, the demos and `drive-trip` hold the
+  simulators they use through `simlock.sh` (a `lockf` on `/tmp/ikut-sim-<udid>.lock`). A second run prints who has the
+  simulator and waits up to 30 minutes, then ends with `RESULT: ABORT (simulator … busy …)`. The lock goes with the
+  process, so a killed run never leaves it held. Wrap any other screen-driving command the same way:
+  `qa/simlock.sh <udid> -- xcodebuild test … -only-testing:ikutUITests/CreateTripUITests`. Builds and unit tests
+  don't take the lock.
 
 ## Drive one trip by hand
 
@@ -83,7 +102,8 @@ its suite finishes; the script takes the suite's result and kills it after 60 s.
 | `convoy-sim.mjs` | The scenario driver. |
 | `lib/route.mjs`, `lib/tracking.mjs` | JS ports of the Swift logic, each function annotated with its source file. |
 | `lib/scenario.mjs` | The script: cars, speeds, gap, timeline. |
-| `lib/shell.mjs`, `lib/firebase-config.mjs` | `run`/`simctl`/`sleep`/`makeSay` for the scripts that drive simulators; the production client config read from the app's plist. |
+| `lib/shell.mjs`, `lib/firebase-config.mjs` | `run`/`simctl`/`sleep`/`makeSay`, `endsWithResult` (the `RESULT` line and `--deadline`) and `holdSimulators` (the simulator lock) for the scripts that drive simulators; the production client config read from the app's plist. |
+| `simlock.sh` | Holds one or more simulators while a command runs, see Waiting on a run. |
 | `run-ui.mjs` | One-command orchestrator with the app in the loop. |
 | `run-convoy2.mjs` | Two simulators (organizer and joiner) plus two scripted cars, see Two-phone convoy. |
 

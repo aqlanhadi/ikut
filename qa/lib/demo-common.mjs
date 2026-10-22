@@ -35,7 +35,7 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './route.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher } from './tracking.mjs';
 import { productionFirebaseConfig } from './firebase-config.mjs';
-import { simctl, sleep } from './shell.mjs';
+import { endsWithResult, simctl, sleep } from './shell.mjs';
 import { loadRoutes } from '../generate-gpx.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -58,6 +58,7 @@ export function parseArgs(argv, usage = '') {
     derivedData: '/tmp/ikut-dd-q4', skipBuild: false, dryRun: false, host: '127.0.0.1',
     backend: 'emulators', // or 'production': the real Firebase project, config from the app's GoogleService-Info.plist
     endTrip: false, // the trip stays active afterwards so it can be looked at; --end-trip ends it
+    deadline: null, // --deadline S: stop with RESULT: ABORT after S s (default: the build, the show and 900 s)
     logs: path.join(os.tmpdir(), 'ikut-qa'),
   };
   for (let i = 2; i < argv.length; i++) {
@@ -72,6 +73,7 @@ export function parseArgs(argv, usage = '') {
     else if (a === '--end-trip') o.endTrip = true;
     else if (a === '--backend') o.backend = next();
     else if (a === '--describe') o.describe = true;
+    else if (a === '--deadline') o.deadline = Number(next());
     else if (a === '-h' || a === '--help') { console.log(usage); process.exit(0); }
     else { console.error(`unknown option ${a}`); process.exit(64); }
   }
@@ -396,6 +398,8 @@ async function runDemoInner(config, o) {
   }
 
   // ---- the real thing
+  // Its SIGINT/SIGTERM handler (below) cleans up; the deadline goes through it too.
+  const end = endsWithResult({ deadlineS: o.deadline ?? (o.skipBuild ? 0 : 1800) + config.endAt + 900 });
   setLogLevel('error');
   emit({ type: 'phase', phase: 'building', detail: o.skipBuild ? 'reusing the build' : 'xcodebuild build-for-testing' });
   const tag = config.tag;
@@ -546,7 +550,7 @@ async function runDemoInner(config, o) {
   for (const r of results) console.log(`QA CHECK ${r.pass ? 'PASS' : 'FAIL'} script: ${r.name}${r.detail ? ` (${r.detail})` : ''}`);
   for (const t of tests) console.log(`${t.label}: ${t.result ?? `suite ${t.suite ?? 'unfinished'}, exit ${t.code}`}, log ${t.logPath}`);
   const ok = !scriptError && results.every((r) => r.pass) && tests.every((t) => t.ok);
-  console.log(ok ? '\nRESULT: PASS' : '\nRESULT: FAIL');
+  end.result(ok);
   emit({ type: 'phase', phase: ok ? 'ended' : 'failed', detail: ok ? 'all checks passed' : 'see the QA CHECK lines' });
   return ok ? 0 : 1;
 }

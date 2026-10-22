@@ -23,7 +23,9 @@
 //
 // Options: --kmh N (default 90), --a-udid, --b-udid, --derived-data (default /tmp/ikut-dd-convoy2), --skip-build,
 // --host (emulators, default 127.0.0.1), --ask-location (phone B starts without location permission and answers
-// the system prompt in the UI). Screenshots: qa/screens/convoy2/. Logs: $TMPDIR/ikut-qa/convoy2-*.log.
+// the system prompt in the UI), --deadline S (stop with RESULT: ABORT after S s; default 1800, plus 1800 for a
+// build). Screenshots: qa/screens/convoy2/. Logs: $TMPDIR/ikut-qa/convoy2-*.log. It holds both simulators while it
+// runs (qa/simlock.sh), and the log always ends in one `RESULT: PASS|FAIL|ABORT` line.
 
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -39,7 +41,7 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
-import { makeSay, run, simctl, sleep } from './lib/shell.mjs';
+import { endsWithResult, holdSimulators, makeSay, run, simctl, sleep } from './lib/shell.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.dirname(here);
@@ -66,9 +68,13 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a === '--skip-build') o.skipBuild = true;
   else if (a === '--host') o.host = next();
   else if (a === '--ask-location') o.askLocation = true;
-  else if (a === '-h' || a === '--help') { console.log(spawnSync('sed', ['-n', '2,26p', process.argv[1]], { encoding: 'utf8' }).stdout); process.exit(0); }
+  else if (a === '--deadline') o.deadline = Number(next());
+  else if (a === '-h' || a === '--help') { console.log(spawnSync('sed', ['-n', '2,28p', process.argv[1]], { encoding: 'utf8' }).stdout); process.exit(0); }
   else { console.error(`unknown option ${a}`); process.exit(64); }
 }
+await holdSimulators([o.aUdid, o.bUdid]);
+const end = endsWithResult({ deadlineS: o.deadline ?? (o.skipBuild ? 0 : 1800) + 1800, signals: true });
+process.on('exit', () => { for (const udid of [o.aUdid, o.bUdid]) simctl('location', udid, 'clear'); });
 
 // Where the trip starts (A's simulated location when it picks the destination): the E1 northbound just
 // south of Bidor, the start of qa/data/osrm-main.json. Ipoh is about 65 km up the road.
@@ -125,9 +131,6 @@ function deviceLine(pred) {
 // Never create or erase simulators here (CLAUDE.md): both phones must already exist (checked below).
 say(`phone A ${o.aUdid}, phone B ${o.bUdid}`);
 
-// Another test run on the shared simulator (the map-centring check uses /tmp/ikut-dd-map) would collide.
-while (run('pgrep', ['-f', 'ikut-dd-map']).stdout.trim()) { say('waiting for another UI test on the shared simulator to finish'); await sleep(15_000); }
-
 for (const udid of [o.aUdid, o.bUdid]) {
   const line = deviceLine((l) => l.includes(udid));
   if (!line) { console.error(`simulator ${udid} not found`); process.exit(1); }
@@ -159,10 +162,10 @@ function startTest(who, udid, only) {
   const log = fs.createWriteStream(logPath);
   const bundle = path.join(o.logs, `convoy2-${who}.xcresult`);
   fs.rmSync(bundle, { recursive: true, force: true });
-  const xc = spawn('xcodebuild', ['test-without-building', ...common, '-destination', `platform=iOS Simulator,id=${udid}`,
+  const xc = end.track(spawn('xcodebuild', ['test-without-building', ...common, '-destination', `platform=iOS Simulator,id=${udid}`,
     `-only-testing:ikutUITests/${only}`, '-resultBundlePath', bundle, '-collect-test-diagnostics', 'never'], {
     env: { ...process.env, TEST_RUNNER_IKUT_SYNC_DIR: syncDir, TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
-  });
+  }));
   const t = { who, logPath, checks: [], result: null };
   let buf = '';
   const onData = (d) => {
@@ -462,6 +465,6 @@ if (scenarioError) console.log(`script stopped: ${scenarioError.message}`);
 for (const t of tests) console.log(`phone ${t.who}: ${t.result ?? `suite ${t.suite ?? 'unfinished'}, exit ${t.code}`}, log ${t.logPath}`);
 console.log(`screenshots ${o.screens}`);
 const ok = !scenarioError && results.every((r) => r.pass) && tests.every((t) => t.ok);
-console.log(ok ? '\nRESULT: PASS' : '\nRESULT: FAIL');
 fs.writeFileSync(path.join(o.logs, 'convoy2-results.json'), JSON.stringify({ code, tripId, results, phones: tests.map((t) => ({ who: t.who, ok: t.ok, suite: t.suite, checks: t.checks })) }, null, 2));
+end.result(ok);
 process.exit(ok ? 0 : 1);

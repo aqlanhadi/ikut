@@ -18,8 +18,11 @@
 // then Aisha taps Everyone has arrived and the card goes on both phones.
 
 import { PIN_VISIBLE_S, parseArgs, runDemo, stopStory } from './lib/demo-common.mjs';
+import { holdSimulators } from './lib/shell.mjs';
 
 const o = parseArgs(process.argv, 'See the header of demo.mjs (qa/README.md, "Live demo").');
+// Both phones are held while the show runs (qa/simlock.sh): a second demo or UI test waits for it.
+if (!o.dryRun && !o.describe) await holdSimulators([o.udid, o.udid2]);
 
 const REPORT_AT = 75;
 const DROP = { from: 150, to: 270 };

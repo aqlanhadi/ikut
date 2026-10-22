@@ -12,7 +12,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { writeGpx } from './lib/gpx.mjs';
-import { simctl } from './lib/shell.mjs';
+import { holdSimulators, simctl } from './lib/shell.mjs';
 import { Polyline, haversine } from './lib/route.mjs';
 
 const o = { udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', kmh: 90, speed: 1, from: 0, host: '127.0.0.1', code: null, gpx: null, route: null };
@@ -91,6 +91,8 @@ if (o.gpx) {
 }
 
 // ---- play it on the simulator
+// Held while it plays (qa/simlock.sh), so a UI test or demo doesn't drive the same simulator meanwhile.
+await holdSimulators([o.udid]);
 // `simctl location start` drifts and can stall (qa/README.md), so restart it every RESYNC s from where the car
 // should be by now, as run-ui.mjs does.
 if (!simctl('list', 'devices').stdout.split('\n').some((l) => l.includes(o.udid) && l.includes('(Booted)'))) {

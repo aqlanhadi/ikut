@@ -80,5 +80,5 @@ for (const c of [guest, org]) {
   await deleteUser(c.auth.currentUser).catch(() => {});
   await deleteApp(c.app);
 }
-console.log(failures ? `${failures} check(s) failed` : 'RESULT: PASS');
+console.log(failures ? `\nRESULT: FAIL (${failures} check(s) failed)` : '\nRESULT: PASS');
 process.exit(failures ? 1 : 0);

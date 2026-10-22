@@ -4,6 +4,7 @@
 //   node run-ui.mjs                      # real time, simulator C0A40D2A (iPhone 17 #1)
 //   node run-ui.mjs --speed 2            # 2x (the signal-drop check needs <= 2.5x)
 //   node run-ui.mjs --skip-build         # reuse a build in --derived-data
+//   node run-ui.mjs --deadline 3600      # give up (RESULT: ABORT) after 3600 s; default 2100 s + the scenario
 //
 // 1. boots the simulator, grants location (xcrun simctl privacy), parks it at the start of qa/gpx/car5-app.gpx
 // 2. starts convoy-sim.mjs --wait-app (4 simulated cars) and reads the trip code from it
@@ -11,6 +12,9 @@
 // 4. when the sim prints @@GO (the phone has joined and is tracking) it feeds car5-app.gpx to the simulator with
 //    xcrun simctl location start, at the GPX's speed times --speed
 // 5. waits for both to finish and prints their verdicts. Exit code 0 only if the sim checks and the UI test passed.
+//
+// It holds the simulator while it runs (qa/simlock.sh): a second run waits for it. The log always ends in one
+// `RESULT: PASS|FAIL|ABORT` line, also when it stops early or runs past --deadline.
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -18,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readGpx } from './lib/gpx.mjs';
-import { makeSay, run, simctl } from './lib/shell.mjs';
+import { endsWithResult, holdSimulators, makeSay, simctl } from './lib/shell.mjs';
 import { haversine } from './lib/route.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +37,7 @@ const o = {
   screens: path.join(here, 'screens'),
   logs: path.join(os.tmpdir(), 'ikut-qa'),
   only: 'ikutUITests/ConvoyScenarioUITests',
+  deadline: null,
 };
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -44,8 +49,13 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a === '--name') o.name = next();
   else if (a === '--screens') o.screens = next();
   else if (a === '--logs') o.logs = next();
+  else if (a === '--deadline') o.deadline = Number(next());
   else { console.error(`unknown option ${a}`); process.exit(64); }
 }
+await holdSimulators([o.udid]);
+// The sim waits up to 1500 s for the phone to join (the build included), then plays its 900 s scenario.
+const end = endsWithResult({ deadlineS: o.deadline ?? 1500 + 900 / o.speed + 600, signals: true });
+process.on('exit', () => simctl('location', o.udid, 'clear'));
 fs.mkdirSync(o.logs, { recursive: true });
 fs.mkdirSync(o.screens, { recursive: true });
 
@@ -67,7 +77,7 @@ simctl('location', o.udid, 'set', `${track[0].latitude},${track[0].longitude}`);
 
 // ---- sim
 const simLog = fs.createWriteStream(path.join(o.logs, 'sim.log'));
-const sim = spawn('node', [path.join(here, 'convoy-sim.mjs'), '--speed', String(o.speed), '--wait-app', '--wait-timeout', '1500', '--expect-app-vote'], { cwd: here });
+const sim = end.track(spawn('node', [path.join(here, 'convoy-sim.mjs'), '--speed', String(o.speed), '--wait-app', '--wait-timeout', '1500', '--expect-app-vote'], { cwd: here }));
 let simCode = null;
 let simGo = false;
 let simDone = null;
@@ -104,9 +114,9 @@ const args = ['test', '-project', path.join(ios, 'ikut.xcodeproj'), '-scheme', '
 if (o.skipBuild) args[0] = 'test-without-building';
 const xcLogPath = path.join(o.logs, 'xcodebuild.log');
 const xcLog = fs.createWriteStream(xcLogPath);
-const xc = spawn('xcodebuild', args, {
+const xc = end.track(spawn('xcodebuild', args, {
   env: { ...process.env, TEST_RUNNER_IKUT_JOIN_CODE: simCode, TEST_RUNNER_IKUT_JOIN_NAME: o.name, TEST_RUNNER_IKUT_QA_SPEED: String(o.speed), TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
-});
+}));
 let xcResult = null;
 let xcBuf = '';
 const onXc = (d) => {
@@ -169,5 +179,5 @@ const simCode2 = await Promise.race([simExit, new Promise((r) => setTimeout(() =
 if (simCode2 === 'timeout') sim.kill('SIGKILL');
 say(`sim exited ${simCode2}: ${simDone ?? 'no @@DONE line'}`);
 const ok = xcCode === 0 && simCode2 === 0;
-console.log(ok ? '\nRESULT: PASS' : '\nRESULT: FAIL');
+end.result(ok);
 process.exit(ok ? 0 : 1);
