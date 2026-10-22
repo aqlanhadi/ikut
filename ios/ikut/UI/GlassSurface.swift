@@ -18,13 +18,30 @@ enum GlassSurface {
         case sheet
         /// Inset card floating over the map, with a plain Radius.panel rectangle.
         case floating
+        /// The trip pill at the top of the map: a capsule with a lighter shadow.
+        case pill
+        /// The map's view buttons: a small rounded rectangle with the same lighter shadow.
+        case control
     }
 }
 
 private struct GlassSurfaceModifier: ViewModifier {
     var kind: GlassSurface.Kind
 
-    private var plain: RoundedRectangle { RoundedRectangle(cornerRadius: Radius.panel, style: .continuous) }
+    private var plain: AnyShape {
+        switch kind {
+        case .sheet, .floating: AnyShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+        case .pill: AnyShape(Capsule())
+        case .control: AnyShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        }
+    }
+
+    private var shadow: (opacity: Double, radius: CGFloat, y: CGFloat) {
+        switch kind {
+        case .sheet, .floating: (0.16, 20, 10)
+        case .pill, .control: (0.12, 12, 6)
+        }
+    }
 
     func body(content: Content) -> some View {
         // Clipped to the same shape: a ScrollView draws on under the safe area and past the rounded
@@ -32,13 +49,13 @@ private struct GlassSurfaceModifier: ViewModifier {
         if kind == .sheet, #available(iOS 26, *) {
             let shape = ConcentricRectangle(corners: .concentric(minimum: .fixed(Radius.panel)), isUniform: false)
             content.clipShape(shape).glassEffect(.regular, in: shape)
-        } else if kind == .floating, GlassSurface.useGlass, #available(iOS 26, *) {
+        } else if kind != .sheet, GlassSurface.useGlass, #available(iOS 26, *) {
             content.clipShape(plain).glassEffect(.regular, in: plain)
         } else {
             content
                 .clipShape(plain)
                 .background(.regularMaterial, in: plain)
-                .shadow(color: .black.opacity(0.16), radius: 20, y: 10)
+                .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, y: shadow.y)
         }
     }
 }

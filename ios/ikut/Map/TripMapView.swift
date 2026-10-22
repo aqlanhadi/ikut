@@ -457,8 +457,7 @@ struct TripMapView: View {
         .padding(.trailing, Spacing.xs)
         .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
-        .background(.regularMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .glassSurface(.pill)
     }
 
     /// The convoy's motion ("On the move", "Arrived", ...), shown first in the pill.
@@ -806,8 +805,7 @@ struct MapModeControl: View {
             button(.fit, symbol: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", label: "Fit whole convoy")
         }
         .frame(width: 44)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .glassSurface(.control)
         .sensoryFeedback(.selection, trigger: mode)
     }
 
