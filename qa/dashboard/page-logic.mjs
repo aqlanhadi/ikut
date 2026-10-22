@@ -100,9 +100,10 @@ export const prepareStartsCmd = (phone1, phone2, extra = {}) => ({ cmd: 'prepare
 const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
 export const clampWait = (s) => { const n = Number(s); return Number.isFinite(n) ? Math.max(0, Math.min(600, Math.round(n))) : 30; };
 
-/** Where a car's road for an ending begins when no leave point was picked: the car's own spot if it is on the shared route, else the route at its offset. */
+/** Where a car's road for an ending begins when no leave point was picked: the car's own spot if it is on the shared route, where it merges while it is joining, else the route at its offset. */
 export function endingOrigin(car, route) {
   if (car.phase === 'onRoute' && car.latitude != null) return { lat: car.latitude, lng: car.longitude };
+  if (car.phase === 'joining' && typeof car.mergeKm === 'number') return pointAtOffset(route, car.mergeKm * 1000); // the road starts where it merges
   return pointAtOffset(route, car.offset ?? 0);
 }
 
@@ -167,7 +168,7 @@ export const pickedPlaceName = (car, n) => `${car}’s pick${n ? ' ' + n : ''}`.
 
 // ---- cars
 
-export const initialOf = (label) => (String(label ?? '?').trim()[0] ?? '?').toUpperCase();
+export const initialOf = (label) => { const t = String(label ?? '?').trim(); return /^Phone\s*(\d)/i.exec(t)?.[1] ?? (t[0] ?? '?').toUpperCase(); }; // the phones are "Phone 1" and "Phone 2": their number, not two P's
 export const km1 = (m) => (typeof m === 'number' && Number.isFinite(m) ? (m / 1000).toFixed(1) + ' km' : '–');
 
 /** How a car looks on the map: ringed for a phone, dashed while joining, faded with no signal. */

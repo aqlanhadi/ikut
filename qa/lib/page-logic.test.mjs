@@ -79,8 +79,10 @@ test('prepare starts: phone 2 follows phone 1 when it has no pin', () => {
 
 test('endingOrigin: the car when on the route, the route at its offset otherwise', () => {
   assert.deepEqual(endingOrigin({ phase: 'onRoute', latitude: 3.0001, longitude: 101.02 }, route), { lat: 3.0001, lng: 101.02 });
-  const p = endingOrigin({ phase: 'joining', latitude: 3.5, longitude: 101.5, offset: 2000 }, route);
+  const p = endingOrigin({ phase: 'out', latitude: 3.5, longitude: 101.5, offset: 2000 }, route);
   assert.ok(Math.abs(snapToRoute(route, p).offset - 2000) < 1);
+  const j = endingOrigin({ phase: 'joining', latitude: 3.5, longitude: 101.5, offset: 0, mergeKm: 6 }, route);
+  assert.ok(Math.abs(snapToRoute(route, j).offset - 6000) < 1, 'where it merges');
 });
 
 test('canMovePin: an ending is fixed once the car is on it, a deviation once the car has left the route', () => {
@@ -159,7 +161,7 @@ test('answerText says it in plain words', () => {
 });
 
 test('badges: initial, ring for phones, dashed while joining, faded with no signal', () => {
-  assert.equal(initialOf('daniel'), 'D'); assert.equal(initialOf(''), '?');
+  assert.equal(initialOf('Phone 2'), '2'); assert.equal(initialOf('daniel'), 'D'); assert.equal(initialOf(''), '?');
   assert.equal(badgeClasses({ kind: 'phone', phase: 'onRoute' }), 'badge phone');
   assert.equal(badgeClasses({ kind: 'generated', phase: 'joining', offline: true }), 'badge joining offline');
   assert.equal(badgeClasses({ kind: 'generated', phase: 'onRoute' }), 'badge');

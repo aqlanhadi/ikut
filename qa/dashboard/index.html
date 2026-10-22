@@ -27,6 +27,23 @@
     --watch:rgba(255,214,10,.22);
   }
 }
+/* ?theme=light or ?theme=dark in the address forces one (for screenshots); without it the system decides */
+:root[data-theme=dark] {
+    --screen:#000; --card:#1c1c1e; --tile:#2c2c2e; --label:#fff; --secondary:#98989f; --sep:#38383a;
+    --accent:#2997ff; --accent-fg:#001a33; --accent-soft:rgba(41,151,255,.18);
+    --pos:#30d158; --pos-soft:rgba(48,209,88,.16); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16); --red:#ff453a; --red-soft:rgba(255,69,58,.18);
+    --shadow:0 6px 24px rgba(0,0,0,.6);
+    --watch:rgba(255,214,10,.22);
+}
+:root[data-theme=light] {
+  --screen:#f2f2f7; --card:#fff; --tile:#f2f2f7; --label:#000; --secondary:#6c6c70; --sep:#c6c6c8;
+  --accent:#0071e3; --accent-fg:#fff; --accent-soft:rgba(0,113,227,.12);
+  --pos:#1f7a35; --pos-soft:rgba(31,122,53,.13); --warn:#c93400; --warn-soft:rgba(201,52,0,.12); --red:#ff3b30; --red-soft:rgba(255,59,48,.12);
+  --shadow:0 6px 24px rgba(0,0,0,.14);
+  --r-card:24px; --r-control:14px; --r-tile:22px;
+  --badge-font:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --watch:rgba(255,204,0,.28);
+}
 * { box-sizing:border-box; }
 html, body { height:100%; }
 body { margin:0; background:var(--screen); color:var(--label); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; display:flex; flex-direction:column; -webkit-font-smoothing:antialiased; }
@@ -44,9 +61,10 @@ button.sm { padding:3px 10px; font-size:.82rem; }
 button.on { background:var(--accent); color:var(--accent-fg); box-shadow:none; }
 button:disabled { opacity:.4; cursor:not-allowed; }
 input[type=number], input[type=text], select { font:inherit; font-size:.88rem; color:var(--label); background:var(--tile); border:0; border-radius:var(--r-control); padding:5px 10px; }
-select { padding-right:6px; cursor:pointer; font-weight:600; color:var(--accent); border-radius:999px; }
+select { padding-right:6px; max-width:8.6em; cursor:pointer; font-weight:600; color:var(--accent); border-radius:999px; }
 input[type=number] { width:4.6em; } input.wide { width:13em; }
 label { white-space:nowrap; }
+input[type=checkbox] { accent-color:var(--accent); }
 .row { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
 .pill { display:inline-flex; align-items:center; gap:6px; padding:3px 11px; border-radius:999px; font-weight:600; font-size:.82rem; background:var(--tile); }
 .pill::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.9; }
@@ -90,6 +108,7 @@ label { white-space:nowrap; }
 .prompt { pointer-events:auto; background:var(--card); border-radius:28px; padding:14px 14px 12px; box-shadow:var(--shadow); }
 .prompt h3 { margin:0; font-size:1.05rem; } .prompt .sub { color:var(--secondary); font-size:.88rem; margin-bottom:8px; }
 .prow { display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--sep); flex-wrap:wrap; }
+.pbtn { flex-basis:100%; display:flex; gap:6px; padding-left:32px; }
 .prow .who { font-weight:600; } .prow .says { color:var(--secondary); font-size:.85rem; flex:1; min-width:6em; }
 .prow .says.yes { color:var(--pos); } .prow .says.another { color:var(--accent); }
 .prompt .all { margin-top:8px; width:100%; padding:11px; }
@@ -103,7 +122,7 @@ label { white-space:nowrap; }
 .badge.phone { box-shadow:0 0 0 3px var(--label); }
 .badge.joining { border:2px dashed #fff; }
 .badge.offline { opacity:.4; }
-.mk .badge { box-shadow:0 0 0 2px var(--card), 0 2px 6px rgba(0,0,0,.4); } .mk .badge.phone { box-shadow:0 0 0 2px var(--card), 0 0 0 5px var(--label), 0 2px 6px rgba(0,0,0,.4); }
+.mk .badge { box-shadow:0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.45); } .mk .badge.phone { box-shadow:0 0 0 2px #fff, 0 0 0 5px #111, 0 0 0 7px #fff, 0 2px 6px rgba(0,0,0,.45); }
 .ghost .badge { background:transparent !important; border:2px dashed currentColor; box-shadow:none; opacity:.8; } 
 .pin { display:flex; align-items:center; gap:5px; padding:3px 9px 3px 3px; border-radius:999px; background:var(--card); color:var(--label); font:600 12px system-ui; box-shadow:0 2px 8px rgba(0,0,0,.35); border:2px solid; white-space:nowrap; cursor:grab; }
 .pin .badge { width:20px; height:20px; font-size:11px; border:0; box-shadow:none; }
@@ -197,6 +216,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 const secs = (s) => (s === null || s === undefined ? '' : s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`);
+const forcedTheme = new URLSearchParams(location.search).get('theme');
+if (forcedTheme === 'light' || forcedTheme === 'dark') document.documentElement.dataset.theme = forcedTheme;
 const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 let demos = [], backends = {}, backend = store.get('ikut-backend') === 'production' ? 'production' : 'emulators';
@@ -208,7 +229,7 @@ const pgRun = () => (run?.interactive ? run : null);
 const carOf = (k) => pg?.cars?.find((c) => c.key === k);
 
 // ---------------------------------------------------------------- tabs
-let tab = store.get('ikut-tab') === 'demos' ? 'demos' : 'pg';
+let tab = location.hash === '#demos' || (location.hash !== '#playground' && store.get('ikut-tab') === 'demos') ? 'demos' : 'pg';
 function showTab() {
   $('#tabPg').classList.toggle('hidden', tab !== 'pg');
   $('#tabDemos').classList.toggle('hidden', tab !== 'demos');
@@ -243,7 +264,7 @@ async function startMap() {
     bootstrapMaps(config.mapsKey);
     const [{ Map }, { AdvancedMarkerElement }, { Route }] = await Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker'), google.maps.importLibrary('routes')]);
     const map = new Map($('#map'), {
-      center: { lat: 3.9, lng: 101.7 }, zoom: 8, mapId: config.mapId || 'DEMO_MAP_ID', colorScheme: google.maps.ColorScheme.FOLLOW_SYSTEM,
+      center: { lat: 3.9, lng: 101.7 }, zoom: 8, mapId: config.mapId || 'DEMO_MAP_ID', colorScheme: forcedTheme === 'dark' ? google.maps.ColorScheme.DARK : forcedTheme === 'light' ? google.maps.ColorScheme.LIGHT : google.maps.ColorScheme.FOLLOW_SYSTEM,
       mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
     });
     gm = { map, Marker: AdvancedMarkerElement, Route };
@@ -277,11 +298,11 @@ const posOf = (m) => { const p = m.position; return { lat: typeof p.lat === 'fun
 
 function drawRoute() {
   if (layer.route) layer.route.setMap(null);
-  layer.route = routeModel && new google.maps.Polyline({ map: gmap(), path: routeModel.path, strokeColor: css('--accent'), strokeOpacity: .9, strokeWeight: 6, zIndex: 1 });
+  layer.route = routeModel && new google.maps.Polyline({ map: gmap(), path: routeModel.path, strokeColor: css('--accent'), strokeOpacity: .9, strokeWeight: 6, zIndex: 1, clickable: false });
 }
 function drawLegs(key, g, color) {
   for (const p of [].concat(layer.legs[key] ?? [])) p.setMap(null);
-  layer.legs[key] = (g?.legs ?? []).map((leg) => new google.maps.Polyline({ map: gmap(), path: decodePolyline(leg.polyline), strokeColor: color, strokeOpacity: leg.role === 'start' ? .65 : .95, strokeWeight: 4, zIndex: 2 }));
+  layer.legs[key] = (g?.legs ?? []).map((leg) => new google.maps.Polyline({ map: gmap(), path: decodePolyline(leg.polyline), strokeColor: color, strokeOpacity: leg.role === 'start' ? .65 : .95, strokeWeight: 4, zIndex: 2, clickable: false }));
 }
 function syncMap() {
   if (!gm) return;
@@ -528,7 +549,7 @@ function carHtml(c) {
   const devChip = dev ? `<span>Waits ${dev.waitSeconds} s at the pin</span> <button class="sm" data-act="cancelDeviation" data-car="${c.key}">Cancel</button>` : '';
   const noMapStart = mk ? `<input type="number" step="0.1" min="0" id="km-${c.key}" data-f="km" data-car="${c.key}" value="${esc(f.km)}" placeholder="km"> <button class="sm" data-act="kmStart" data-car="${c.key}">Place</button>` : '';
   return `<div class="head"><span class="badge ${c.kind === 'phone' ? 'phone' : ''}" style="background:${c.color}">${esc(initialOf(c.label))}</span>
-      <span style="flex:1;min-width:0">${nm}${gen ? '' : `<span class="tag">phone ${c.key === 'phone1' ? 1 : 2}</span>`}${c.phase === 'joining' ? '<span class="tag joining">joining</span>' : c.joined && c.phase ? '<span class="tag convoy">in the convoy</span>' : ''}${c.offline ? '<span class="tag off">no signal</span>' : ''}</span>
+      <span style="flex:1;min-width:0">${nm}${gen ? '' : `<span class="tag">phone ${c.key === 'phone1' ? 1 : 2}</span>`}${c.phase === 'joining' ? '<span class="tag joining">joining</span>' : c.joined && c.phase === 'onRoute' ? '<span class="tag convoy">in the convoy</span>' : ''}${c.offline ? '<span class="tag off">no signal</span>' : ''}</span>
       ${gen && editing !== c.key ? `<button class="quiet sm" data-act="rename" data-car="${c.key}" title="Rename">Rename</button><button class="quiet sm" data-act="remove" data-car="${c.key}" title="Remove this car" style="color:var(--red)">Remove</button>` : ''}</div>
     <div class="line" data-live="line"></div><div class="line" data-live="sees"></div>
     <div class="ctl"><button data-act="play" data-car="${c.key}" class="${c.playing ? '' : 'primary'}" ${pg.phase === 'ready' ? '' : 'disabled'}>${c.playing ? 'Pause' : 'Play'}</button>
@@ -651,8 +672,8 @@ function promptHtml(p) {
   const sub = p.fromPhone ? `${esc(p.by)} (the app) asks for ${esc(p.title.toLowerCase())}${where}` : `${esc(p.by)} asks for ${esc(p.title.toLowerCase())}${where}`;
   const rows = p.rows.map((r) => `<div class="prow"><span class="badge sm ${r.offline ? 'offline' : ''}" style="background:${r.color}">${esc(initialOf(r.label))}</span><span class="who">${esc(r.label)}</span>
       <span class="says ${r.answer === 'yes' ? 'yes' : r.answer === 'another' ? 'another' : ''}">${esc(answerText(r))}</span>
-      ${r.canAnswer ? `<button class="sm primary" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="yes">Agree</button><button class="sm" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="notNow">Not now</button>
-        <button class="sm ${armed?.pick?.event === p.id && armed.pick.car === r.key ? 'on' : ''}" data-act="pick" data-event="${esc(p.id)}" data-car="${r.key}" ${gm ? '' : 'disabled title="Needs the map"'}>Another place</button>` : ''}</div>`).join('');
+      ${r.canAnswer ? `<span class="pbtn"><button class="sm primary" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="yes">Agree</button><button class="sm" data-act="vote" data-event="${esc(p.id)}" data-car="${r.key}" data-answer="notNow">Not now</button>
+        <button class="sm ${armed?.pick?.event === p.id && armed.pick.car === r.key ? 'on' : ''}" data-act="pick" data-event="${esc(p.id)}" data-car="${r.key}" ${gm ? '' : 'disabled title="Needs the map"'}>Another place</button></span>` : ''}</div>`).join('');
   return `<h3>${esc(p.title)}</h3><div class="sub">${sub}</div>${p.suggestions.length ? `<div class="sub" style="margin-top:-6px">Suggested: ${p.suggestions.map(esc).join(', ')}</div>` : ''}
     ${rows || '<div class="dim small">No generated cars in the trip.</div>'}
     ${p.anyToAnswer ? `<button class="primary all" data-act="voteAll" data-event="${esc(p.id)}">Everyone agrees</button>` : ''}`;
