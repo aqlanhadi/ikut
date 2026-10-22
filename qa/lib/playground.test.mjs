@@ -5,7 +5,7 @@ import { loadRoutes } from '../generate-gpx.mjs';
 import {
   advanceOffset, clampKmh, decodeDoc, destinationPoint, feedPoints, isOpenStop, nudged, offRouteCoords, parseStart,
   pendingVotes, suggestionAhead, ageSeconds, UserError, numberIn, startFrom, validDerivedData, shouldPark, autoPick,
-  MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, answersByCar, buildTrack, carNameFor, composeTrack, coordIn, coordsIn,
+  MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, answersByCar, buildTrack, carNameFor, carryState, composeTrack, coordIn, coordsIn,
   divergeOffset, eventKindIn, eventStatus, fallbackStartRoad, locate, mainDistance, mainLeg, nameIn, newCarState, nextCar, nextWait, openStopSnapshot,
   optionalCoords, ownLeg, placeOnRoute, planDeviation, planEnding, planStart, relocate, sideRoad, sliceFrom, stepTrack, straightRoad, trackFeedPoints,
   trackFromOffset, trackHeading, trackLength, trackPoint, voteAnswer, waitLeg,
@@ -493,4 +493,23 @@ test('a synthetic side road leaves the route where asked', () => {
   assert.ok(route.project(r.at(-1)).distance > 900);
   const right = sideRoad(route, 5000, 1000, { side: 90 });
   assert.ok(haversine(r.at(-1), right.at(-1)) > 1900, 'the other side');
+});
+
+test('a second deviation on the same car waits again', () => {
+  const mk = (leave, id) => {
+    const out = sideRoad(route, leave, 800);
+    const back = [out.at(-1), ...sideRoad(route, leave + 1500, 800).reverse(), route.coordinateAtOffset(leave + 1900)];
+    return { ...planDeviation(route, { leaveKm: leave / 1000, pin: out.at(-1), out, back }), waitSeconds: 10, id };
+  };
+  const one = composeTrack(route, { startOffset: 1000, deviation: mk(4000, 1) });
+  let st = newCarState();
+  for (let i = 0; i < 400 && !(st.served.has('wait1')); i++) st = stepTrack(one, st, 200, 1, true);
+  assert.ok(st.served.has('wait1'), 'the first wait was served');
+  for (let i = 0; i < 400 && locate(one, st.d, {}).phase !== 'onRoute'; i++) st = stepTrack(one, st, 200, 1, true);
+  const two = composeTrack(route, { startOffset: 1000, deviation: mk(9000, 2) }); // the first deviation is over and cleared
+  st = carryState(one, st, two);
+  assert.equal(st.served.size, 0, 'the old wait is gone with its leg');
+  assert.equal(nextWait(two, st).id, 'wait2');
+  for (let i = 0; i < 400 && !st.waiting; i++) st = stepTrack(two, st, 200, 1, true);
+  assert.equal(st.waiting.id, 'wait2', 'it stops and waits at the second pin');
 });

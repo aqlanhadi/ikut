@@ -310,6 +310,18 @@ export function relocate(oldTrack, d, waitingId, newTrack) {
 }
 
 /**
+ * A car's state when its track changes to `newTrack`: the same place (see relocate), else `fallbackOffset` on the shared route,
+ * else `nearestOffset`; waits already served or in progress are kept only while their leg is still on the new track.
+ */
+export function carryState(oldTrack, st, newTrack, { fallbackOffset = null, nearestOffset = 0 } = {}) {
+  let d = relocate(oldTrack, st.d, st.waiting?.id ?? null, newTrack);
+  if (d === null && fallbackOffset !== null) d = mainDistance(newTrack, fallbackOffset);
+  if (d === null) d = mainDistance(newTrack, nearestOffset) ?? 0;
+  const ids = new Set(newTrack.legs.map((l) => l.id));
+  return { d, waiting: st.waiting && ids.has(st.waiting.id) ? st.waiting : null, served: new Set([...st.served].filter((id) => ids.has(id))) };
+}
+
+/**
  * The points a simulator plays from track distance `d`: every `step` meters up to `ahead` meters on, or up to `stopAt`
  * (the next wait). Two waypoints at least while there is track left (simctl needs two).
  */
@@ -498,7 +510,8 @@ export function composeTrack(main, { startOffset = 0, start = null, deviation = 
   if (deviation) {
     const leave = leaveAfter(deviation.leaveOffset, start ? 'The deviation leaves the route before the car has joined it.' : 'The deviation leaves the route behind where the car starts.');
     if (deviation.mergeMain < leave) throw new UserError('The way back joins the route behind the point where the car leaves it.');
-    legs.push(mainLeg(cursor, leave), ownLeg('out', deviation.out), waitLeg(deviation.waitSeconds, deviation.pin), ownLeg('back', deviation.back));
+    const tag = deviation.id ?? 0; // each deviation has its own leg ids, so a second one waits again
+    legs.push(mainLeg(cursor, leave), ownLeg('out', deviation.out, `out${tag}`), waitLeg(deviation.waitSeconds, deviation.pin, `wait${tag}`), ownLeg('back', deviation.back, `back${tag}`));
     cursor = deviation.mergeMain;
   }
   if (ending && ending.kind === 'onRoute') legs.push(mainLeg(cursor, Math.max(cursor, ending.parkOffset), { park: true }));

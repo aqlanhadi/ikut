@@ -27,8 +27,8 @@ import { loadRoutes } from './generate-gpx.mjs';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
-  MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, answersByCar, autoPick, carNameFor, composeTrack, coordIn, decodeDoc,
-  encodeLine, eventKindIn, eventStatus, locate, mainDistance, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
+  MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, answersByCar, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
+  encodeLine, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
   openStopSnapshot, optionalCoords, pendingVotes, placeOnRoute, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
   stepTrack, suggestionAhead, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
 } from './lib/playground.mjs';
@@ -90,6 +90,7 @@ const failedTrips = new Set(); // trips the generated cars could not join: not o
 const touched = new Set(); // simulators this run has put something on: only those are cleared when it closes
 let geomVersion = 0;
 let geomDirty = false;
+let deviationNo = 0; // each deviation's legs have their own ids
 let nextKeyNo = 3; // generated car keys: daniel, hafiz, g3, g4... never reused
 
 /** Everyone in the playground, by key (insertion order is the order on the page). */
@@ -249,19 +250,10 @@ function refreshLoc(c) {
  */
 function applyTrack(c, track, { keep = true, fallbackOffset = null } = {}) {
   const old = c.track;
-  let d = 0;
-  let waiting = null;
-  let served = new Set();
-  if (old && keep) {
-    d = relocate(old, c.st.d, c.st.waiting?.id ?? null, track);
-    if (d === null) d = fallbackOffset !== null ? mainDistance(track, fallbackOffset) : null;
-    if (d === null) d = mainDistance(track, S.route.project(refreshLoc(c).point)?.offset ?? 0) ?? 0;
-    const ids = new Set(track.legs.map((l) => l.id));
-    served = new Set([...c.st.served].filter((id) => ids.has(id)));
-    if (c.st.waiting && ids.has(c.st.waiting.id)) waiting = c.st.waiting;
-  }
+  let st = newCarState();
+  if (old && keep) st = carryState(old, c.st, track, { fallbackOffset, nearestOffset: S.route.project(refreshLoc(c).point)?.offset ?? 0 });
   c.track = track;
-  c.st = { d, waiting, served };
+  c.st = st;
   c.legsVersion += 1;
   geomDirty = true;
   refreshLoc(c);
@@ -398,8 +390,15 @@ async function tickCar(c) {
   c.moving = c.st.d > before.d + 1e-6;
   if (before.waiting && !c.st.waiting) say(`${c.label} has waited and drives back`);
   else if (!before.waiting && c.st.waiting) say(`${c.label} reached its pin and waits ${c.st.waiting.left} s`);
+  if (c.deviation && ['out', 'waiting', 'back'].includes(loc.phase)) c.devSeen = true;
+  const g0 = c.kind === 'generated' && c.car?.publisher ? groupOf(loc) : null;
+  if (c.deviation && c.devSeen && loc.phase === 'onRoute') { // merged back: the deviation is over, its pin and roads leave the map
+    c.devSeen = false;
+    try { changePieces(c, { deviation: null }); } catch (e) { say(`${c.label}: ${e.message}`); }
+    say(`${c.label} is back on the route; its deviation is over`);
+  }
   if (c.kind === 'generated' && c.car?.publisher) {
-    const g = groupOf(loc);
+    const g = g0;
     if (g !== c.group) enterGroup(c, g);
     c.car.onFix(fixFor(c), 0.8);
     c.car.publisher.tick();
@@ -644,6 +643,7 @@ function openStopFor(c, eventId) {
 const suggestionOf = (place) => place && { name: place.name, coordinate: new GeoPoint(place.latitude, place.longitude), routeOffset: place.routeOffset };
 
 async function addCar(m) {
+  if (S.ended) throw new UserError('The trip has ended, so no more cars can join.');
   if (S.phase === 'joining') throw new UserError('The generated cars are still joining. Try again in a moment.');
   if (generatedCars().length >= MAX_GENERATED) throw new UserError(`The playground has ${MAX_GENERATED} generated cars already, the most it can hold.`);
   const counter = nextKeyNo;
@@ -651,7 +651,7 @@ async function addCar(m) {
   const label = m.name === undefined || m.name === null ? next.label : nameIn(m.name);
   const key = `g${nextKeyNo++}`;
   const offsets = allCars().map((x) => (x.loc?.onMain ? x.loc.mainOffset : x.base.kind === 'main' ? x.base.offset : null)).filter((x) => x !== null);
-  const c = makeCar(key, 'generated', { label, name: carNameFor(label, counter), color: next.color, place: `${label}’s pick`, offset: Math.max(0, Math.min(...offsets, 3000) - BACK_OF_CONVOY) });
+  const c = makeCar(key, 'generated', { label, name: carNameFor(label, counter), color: next.color, place: `${label}’s pick`, offset: Math.max(0, (offsets.length ? Math.min(...offsets) : 3000) - BACK_OF_CONVOY) });
   say(`${c.label} added (${key}, ${c.name}), ${(c.base.offset / 1000).toFixed(1)} km`);
   if (S.route && !S.ended && S.phase === 'ready') {
     try {
@@ -778,7 +778,7 @@ async function command(m) {
       const leaveKm = m.leaveKm === undefined || m.leaveKm === null ? (loc.mainOffset + Math.max(100, (c.speed / 3.6) * 5)) / 1000 : numberIn(m.leaveKm, 0, 1000, 'The leave point');
       if (leaveKm * 1000 < loc.mainOffset - 1) throw new UserError(`${c.label} has already passed that point. Pick a spot ahead of it.`);
       const dev = planDeviation(S.route, { leaveKm, pin, out, back });
-      changePieces(c, { deviation: { ...dev, waitSeconds } });
+      changePieces(c, { deviation: { ...dev, waitSeconds, id: ++deviationNo } });
       say(`${c.label} will leave the route at ${(dev.leaveOffset / 1000).toFixed(1)} km, wait ${waitSeconds} s at the pin and rejoin at ${(dev.mergeMain / 1000).toFixed(1)} km`);
       return c.kind === 'phone' ? feedPhone(c) : undefined;
     }
