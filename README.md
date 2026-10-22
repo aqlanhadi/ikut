@@ -10,6 +10,7 @@ An iOS app that keeps a group of cars traveling together in sync: a live convoy 
 | `firebase/` | Firestore rules and indexes, Cloud Functions, emulator config (project `ikut-b1083`, asia-southeast1) |
 | `design/` | Screen designs from the design canvas (`.dc.html` source files) |
 | `qa/` | Simulated convoy drives, live demos and the battery watch ([`qa/README.md`](qa/README.md)) |
+| `tools/` | Helpers for working on tasks: start and finish a task, status, test summaries, emulators (`CLAUDE.md`, *Tools*) |
 
 ## Local backend
 
