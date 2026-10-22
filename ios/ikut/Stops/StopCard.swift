@@ -68,7 +68,9 @@ struct StopCard: View {
 
     @State private var model: StopCardModel
     /// One place row's real height, so the place list's scroll area ends on a whole row.
-    @State private var placeRowHeight: CGFloat = 60
+    @State private var placeRowHeights: [String: CGFloat] = [:]
+    @State private var searchBoxHeight: CGFloat = 44
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(
         board: StopBoard, context: StopContext, driving: Bool, actions: StopRequestActions,
@@ -258,7 +260,7 @@ struct StopCard: View {
 
     /// The place list for a new ask: a search box, then places; picking one goes back to the map confirm.
     private var askPlacesScreen: some View {
-        StopCardFrame(title: "Another place", subtitle: nil, bodyCap: placeListCap, onClose: onClose) {
+        StopCardFrame(title: "Another place", subtitle: nil, bodyCap: placeListCap(model.ask), onClose: onClose) {
             placeList(model.ask) { candidate in
                 model.ask.picked = candidate.id
                 model.screen = .home
@@ -298,6 +300,7 @@ struct StopCard: View {
         }
         .padding(.horizontal, Spacing.m)
         .frame(minHeight: 44)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { searchBoxHeight = $0 }
         .ikutSurface(.quaternary, radius: Radius.control)
         switch list.search {
         case .idle, .loading:
@@ -316,8 +319,19 @@ struct StopCard: View {
         }
     }
 
-    /// The search box and three whole rows; a fourth is reached by scrolling, never half shown.
-    private var placeListCap: CGFloat { 44 + 3 * (placeRowHeight + Spacing.gap) }
+    /// The search box and the first three rows as they really measure (they grow with the text size);
+    /// a fourth is reached by scrolling, never half shown.
+    private func placeListCap(_ list: RequestStopModel) -> CGFloat {
+        // Whole rows only, up to three, and no taller than the card can be at big text sizes
+        // (at least one row).
+        var total = searchBoxHeight
+        for (index, candidate) in list.candidates.prefix(3).enumerated() {
+            let next = total + (placeRowHeights[candidate.id] ?? 60) + Spacing.gap
+            if index > 0, next > 380 { break }
+            total = next
+        }
+        return total
+    }
 
     private func note(_ text: String) -> some View {
         Text(text)
@@ -335,17 +349,23 @@ struct StopCard: View {
         return Button { onPick(candidate) } label: {
             HStack(spacing: Spacing.m) {
                 IconTile(symbol: list.reason?.symbol ?? "mappin", color: .orange, size: 34, radius: Radius.iconLarge)
+                    .fixedSize()
+                // At accessibility sizes the cost goes under the name and distance and the name wraps;
+                // otherwise the name keeps its room before the cost column.
+                let big = typeSize.isAccessibilitySize
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(candidate.name).font(.body.weight(.semibold)).lineLimit(1)
-                    Text(candidate.whereText).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                    Text(candidate.name).font(.body.weight(.semibold)).lineLimit(big ? 2 : 1)
+                        .layoutPriority(1)
+                    Text(candidate.whereText).font(.footnote).foregroundStyle(.secondary).lineLimit(big ? 2 : 1)
+                    if big { StopCostText(candidate: candidate, stacked: true) }
                 }
                 Spacer(minLength: 4)
-                StopCostText(candidate: candidate)
+                if !big { StopCostText(candidate: candidate) }
             }
             .padding(.horizontal, Spacing.m)
             .padding(.vertical, Spacing.gap)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { placeRowHeight = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { placeRowHeights[candidate.id] = $0 }
             .background(
                 selected ? Color.accentColor.opacity(0.12) : Color(.secondarySystemBackground),
                 in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous)
@@ -593,7 +613,7 @@ struct StopCard: View {
             StopCardFrame(
                 title: "Another place",
                 subtitle: state.canPin ? "Pick the place to pin." : "Pick a place ahead. The lead car pins the final stop.",
-                bodyCap: placeListCap,
+                bodyCap: placeListCap(list),
                 onClose: onClose
             ) {
                 placeList(list) { list.picked = $0.id }

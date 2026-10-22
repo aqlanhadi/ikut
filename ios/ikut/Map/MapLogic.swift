@@ -427,8 +427,11 @@ extension TripMapModel {
             return position.speed
         }
         guard let device, device.speed >= 0 else { return nil }
-        // A fix older than about 10 s says nothing about how fast the car moves now.
-        if let at = device.at, now.timeIntervalSince(at) > Self.phoneFixMaxAge { return nil }
+        // A fix older than about 10 s says nothing about how fast the car moves now, unless it was
+        // already slow: a stream that stops just after the car slows must still confirm "stopped"
+        // (`DrivingDetector.holdFor` is also 10 s), so an old fix at or under the 15 km/h line counts.
+        if let at = device.at, now.timeIntervalSince(at) > Self.phoneFixMaxAge,
+           device.speed > DrivingDetector.speed { return nil }
         return device.speed
     }
 }

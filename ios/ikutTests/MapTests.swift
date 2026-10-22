@@ -473,6 +473,17 @@ struct TripMapModelTests {
         #expect(model.phoneSpeed(now: t0) == nil)
         model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-3))
         #expect(model.phoneSpeed(now: t0) == 25)
+        // Exactly at the cut-off still counts; just past it does not (when fast).
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-10))
+        #expect(model.phoneSpeed(now: t0) == 25)
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25, at: t0.addingTimeInterval(-10.5))
+        #expect(model.phoneSpeed(now: t0) == nil)
+        // An old fix that was already slow still confirms "stopped".
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 1, at: t0.addingTimeInterval(-60))
+        #expect(model.phoneSpeed(now: t0) == 1)
+        // No timestamp: taken as current.
+        model.device = DeviceFix(coordinate: MapCoordinate(latitude: 0, longitude: 100), course: 0, speed: 25)
+        #expect(model.phoneSpeed(now: t0) == 25)
     }
 
     @Test func mergedCarDropsItsOverlay() {

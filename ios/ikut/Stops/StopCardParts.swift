@@ -45,7 +45,7 @@ struct StopCardFrame<Content: View, Actions: View>: View {
                         VStack(spacing: 0) {
                             Color.black
                             LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 14)
+                                .frame(height: 24)
                         })
             } else {
                 natural
@@ -75,15 +75,18 @@ struct StopCardFrame<Content: View, Actions: View>: View {
 /// A place row's trailing cost: "On route", or "+4 min" over "1.5 km off route".
 struct StopCostText: View {
     var candidate: StopCandidate
+    /// Leading-aligned under the name (accessibility sizes) instead of a trailing column.
+    var stacked = false
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 1) {
+        VStack(alignment: stacked ? .leading : .trailing, spacing: 1) {
             Text(candidate.costText).font(.footnote.weight(.semibold)).foregroundStyle(Color.ikutPositive)
             if let off = candidate.offRouteText {
                 Text(off).font(.caption2).foregroundStyle(.secondary)
             }
         }
-        .multilineTextAlignment(.trailing)
+        .multilineTextAlignment(stacked ? .leading : .trailing)
+        .fixedSize(horizontal: !stacked, vertical: false)
     }
 }
 
@@ -111,6 +114,7 @@ struct StopActionButton: View {
                 .minimumScaleFactor(large ? 1 : 0.8)
                 .multilineTextAlignment(.center)
                 .padding(.vertical, large ? Spacing.s : 0)
+                .padding(.horizontal, large ? Spacing.l : 0)
                 .frame(maxWidth: .infinity, minHeight: height)
                 .foregroundStyle(foreground)
                 .background(background, in: Capsule())
