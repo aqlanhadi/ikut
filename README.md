@@ -9,6 +9,7 @@ An iOS app that keeps a group of cars traveling together in sync: a live convoy 
 | `ios/` | SwiftUI app (iOS 17+), bundle ID `dev.aqlan.ikut` |
 | `firebase/` | Firestore rules and indexes, Cloud Functions, emulator config (project `ikut-b1083`, asia-southeast1) |
 | `design/` | Screen designs from the design canvas (`.dc.html` source files) |
+| `qa/` | Simulated convoy drives, live demos and the battery watch ([`qa/README.md`](qa/README.md)) |
 
 ## Local backend
 

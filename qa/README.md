@@ -20,30 +20,25 @@ drop, the one stretch that has to last in real seconds (see Things to know). Wit
 `ConvoyScenarioUITests` (`ios/ikutUITests`) with `TEST_RUNNER_IKUT_JOIN_CODE`, and feeds
 `gpx/car5-app.gpx` to the simulator with `xcrun simctl location start`. Options: `--speed N`, `--skip-build`,
 `--udid`, `--derived-data` (default `/tmp/ikut-dd-q1`, seed it from another derived-data folder's `SourcePackages`),
-`--deadline S`.
-Screenshots land in `qa/screens/`, logs in `$TMPDIR/ikut-qa/`.
+`--deadline S`. Screenshots land in `qa/screens/`, logs in `$TMPDIR/ikut-qa/`.
 
-To join by hand instead: `node convoy-sim.mjs --speed 1 --wait-app`, join with the printed code from any simulator or phone, and
-feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
+To join by hand instead: `node convoy-sim.mjs --speed 1 --wait-app`, join with the printed code from any simulator or
+phone, and feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
 `node convoy-sim.mjs --help` lists the other flags.
 
 ## Waiting on a run
 
-Every runner (`convoy-sim`, `run-ui`, `run-convoy2`, `demo`, `demo-two-cars`, `prod-smoke`) ends its output with
-one `RESULT: PASS`, `RESULT: FAIL` or `RESULT: ABORT (why)` line, also when it exits early, crashes, is stopped, or runs
-past its `--deadline` (seconds; each has a default sized to its build and scenario, and kills its xcodebuild and
-`convoy-sim` children when it stops). So:
+- **Every runner** (`convoy-sim`, `run-ui`, `run-convoy2`, `demo`, `demo-two-cars`, `prod-smoke`) ends its output
+  with one `RESULT: PASS`, `RESULT: FAIL` or `RESULT: ABORT (why)` line, also when it exits early, crashes, is
+  stopped, or runs past its `--deadline` (seconds; the default fits its build and scenario). Stopping kills its
+  xcodebuild and `convoy-sim` children.
+- **The simulators are locked while a run drives them.** `run-ui`, `run-convoy2`, the demos and `drive-trip` hold
+  theirs through `simlock.sh` (a `lockf` on `/tmp/ikut-sim-<udid>.lock`). A second run prints who has the simulator
+  and waits up to 30 minutes, then ends with `RESULT: ABORT (simulator … busy …)`. The lock goes with the process,
+  so a killed run never leaves it held. Wrap other screen-driving commands the same way:
+  `qa/simlock.sh <udid> -- xcodebuild test … -only-testing:ikutUITests/CreateTripUITests`.
 
-- **Agents start a run in the background** (`run_in_background`, output to a log) and wait for the notice that it
-  exited, then read the `RESULT` line and the lines above it. No `until …; do sleep …; done` loops, and no
-  `pgrep -f <script>` to see whether a run is still going: the polling shell's own command line contains the
-  pattern, so it matches itself and never ends.
-- **The simulators are locked while a run drives them.** `run-ui`, `run-convoy2`, the demos and `drive-trip` hold the
-  simulators they use through `simlock.sh` (a `lockf` on `/tmp/ikut-sim-<udid>.lock`). A second run prints who has the
-  simulator and waits up to 30 minutes, then ends with `RESULT: ABORT (simulator … busy …)`. The lock goes with the
-  process, so a killed run never leaves it held. Wrap any other screen-driving command the same way:
-  `qa/simlock.sh <udid> -- xcodebuild test … -only-testing:ikutUITests/CreateTripUITests`. Builds and unit tests
-  don't take the lock.
+How agents wait on a run is in `CLAUDE.md`, *Long runs and waiting*.
 
 ## Drive one trip by hand
 
@@ -91,7 +86,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
 
 Screenshots: `qa/screens/convoy2/A-*.png`, `B-*.png`. Logs: `$TMPDIR/ikut-qa/convoy2-A.log`, `convoy2-B.log` (and the
 `.xcresult` bundles next to them). To watch, open Xcode > Window > Devices and Simulators (or the Simulator app with both
-devices shown) while it runs. The script waits while another run on the shared simulator (`/tmp/ikut-dd-map`) is going.
+devices shown) while it runs. It holds both simulators while it runs (see Waiting on a run).
 
 Not covered: the hazard marker clearing after everyone passes and the signal-drop/stale case (both in `run-ui.mjs`);
 the drive is short, so nobody reaches the destination. xcodebuild on the second simulator sometimes doesn't exit after
