@@ -16,9 +16,9 @@ struct StopArrivalCard: View {
     /// The viewer is the trip's organizer (the lead car's tracker is read from the cars).
     var isOrganizer = false
     /// Taps Leave for the stop; true once the write is sent. Nil in demos.
-    var leave: (@MainActor (String) async -> StopLeave.Result)?
+    var leave: (@MainActor @Sendable (String) async -> StopLeave.Result)?
     /// Says the viewer's car is skipping (true) or stopping after all (false); the result of the write. Nil in demos.
-    var skip: (@MainActor (String, Bool) async -> StopLeave.Result)?
+    var skip: (@MainActor @Sendable (String, Bool) async -> StopLeave.Result)?
     /// Listens to the stop's answers (live cards). The demo gives `initialAnswers` instead.
     var listensToAnswers = false
     var initialAnswers: [StopAnswer] = []
@@ -52,7 +52,7 @@ struct StopArrivalCard: View {
                 answers, among: Set((model.convoy.convoy.map(\.id) + model.convoy.joining.map(\.id))))
             let tally = StopArrival.tally(
                 target: target, convoy: model.convoy.convoy, joining: model.convoy.joining, pace: model.stopPace(), now: now,
-                skipping: skippers)
+                skipping: skippers, cars: model.cars)
             let mine = tally.rows.first { $0.id == model.myCarId }
             StopCardFrame(title: stop.name, subtitle: subtitle(stop), onClose: onClose) {
                 if let mine { me(mine.status, stop: stop) }
@@ -99,7 +99,7 @@ struct StopArrivalCard: View {
 
     /// "Daniel’s car is skipping R&R Tapah", one line per skipping car (a count past two), for everyone.
     @ViewBuilder private func skippingLines(_ tally: StopArrival.Tally, stop: PlannedStop) -> some View {
-        let lines = SkipAnswers.lines(skippingCars: tally.rows.filter(\.skipping).map(\.car), stopName: stop.name)
+        let lines = SkipAnswers.lines(skippingCars: tally.rows.filter(\.skipping).map(\.car), stopName: stop.name, meeting: stop.isMeeting, viewerCarId: model.myCarId)
         if !lines.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 ForEach(lines, id: \.self) { line in
@@ -137,7 +137,7 @@ struct StopArrivalCard: View {
                     }
                     .disabled(skipping)
                 } else {
-                    StopActionButton(title: "We’ll skip this stop", style: .secondary, height: 52, id: "stop.skip") {
+                    StopActionButton(title: stop.isMeeting ? "We’ll meet you along the way" : "We’ll skip this stop", style: .secondary, height: 52, id: "stop.skip") {
                         sendSkip(stop, skipping: true)
                     }
                     .disabled(skipping)

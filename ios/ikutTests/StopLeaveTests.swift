@@ -100,7 +100,7 @@ struct StopLeaveTests {
         let meet = stop("m", at: 0, kind: .meet, leftAt: t0)
         #expect(NextStop.joiningCell(stops: [meet], distance: 5_000, seconds: 300) == nil)
         // And a car cannot be offered the skip button on it.
-        #expect(!SkipAnswers.canSkip(stop: left, isLeadCar: false, carOffset: 1_000, tripStarted: true))
+        #expect(!SkipAnswers.canSkip(stop: left, isLeadCar: false, carOffset: 1_000, tripStarted: true, isJoining: false))
         // No approach pill for it.
         var watch = StopApproach()
         #expect(watch.check(stops: [left], myOffset: 9_000).isEmpty)

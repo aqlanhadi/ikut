@@ -34,7 +34,7 @@ export function status(car, target, { pace = null } = {}) {
 
 /** Every car once, by badge number then id: {rows: [{id, status, skipping}], here, total, title: "3 of 4 here"}.
  *  `options.skipping` is the set of car ids that said they are skipping the stop: they stay as rows but are not
- *  counted in `here` or `total`. (A convoy car with no position yet is not in the app's convoy list at all, so a caller leaves it out.) */
+ *  counted in `here` or `total`. (A car with no position yet is a row with status unknown and counts; the caller passes every trip car.) */
 export function tally(target, cars, options = {}) {
   const skipping = options.skipping ?? new Set();
   const rows = [...cars]

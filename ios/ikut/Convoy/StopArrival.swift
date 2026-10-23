@@ -56,7 +56,8 @@ enum StopArrival {
     struct Tally: Equatable, Sendable {
         var rows: [Row]
         /// Skipping cars leave the count: "3 of 3 here" with a fourth car skipping. A car with no position yet still
-        /// counts (the convoy is waiting for it; its row says "Waiting for location").
+        /// counts: it has a row of its own ("Waiting for location") because `tally` adds one for every trip car in
+        /// neither list.
         var counted: [Row] { rows.filter { !$0.skipping } }
         var here: Int { counted.filter(\.isHere).count }
         var total: Int { counted.count }
@@ -101,7 +102,7 @@ enum StopArrival {
     /// Every car in the trip once, convoy and joining, by badge number.
     static func tally(
         target: Target, convoy: [ConvoyEntry], joining: [JoiningEntry], pace: Double?, now: Date,
-        skipping: Set<String> = []
+        skipping: Set<String> = [], cars: [Car] = []
     ) -> Tally {
         var rows: [Row] = convoy.map {
             Row(id: $0.id, car: $0.car, status: status(
@@ -111,6 +112,12 @@ enum StopArrival {
             Row(id: $0.id, car: $0.car, status: status(
                 position: $0.position, offset: nil, target: target, pace: pace, speed: $0.speed,
                 timeToMerge: $0.timeToMerge, now: now))
+        }
+        // A convoy car that has not reported yet is in neither list: it still counts, waited for, with no position.
+        let listed = Set(rows.map(\.id))
+        rows += cars.compactMap { car in
+            guard let id = car.id, !listed.contains(id) else { return nil }
+            return Row(id: id, car: car, status: .unknown)
         }
         for i in rows.indices where skipping.contains(rows[i].id) { rows[i].skipping = true }
         rows.sort { a, b in
@@ -157,22 +164,36 @@ enum SkipAnswers {
     /// The viewer's car may say "we'll skip": it is not the lead car, the stop is not skipped for everyone, and
     /// the car is still more than the here-radius short of it (the rules check the same, from the car's last
     /// reported place: exactly 150 m short is already there). `carOffset` is its place on the main route, nil
-    /// before it has merged. A meeting point takes it only from a joining car (`isJoining`): a car with no way in
-    /// of its own has nothing to skip (#215; the rules check the car's state).
+    /// before it has merged. A meeting point takes it from a joining car and no other (`isJoining`, #215; the rules
+    /// check the car's state).
     static func canSkip(
-        stop: PlannedStop, isLeadCar: Bool, carOffset: Double?, tripStarted: Bool, isJoining: Bool = true
+        stop: PlannedStop, isLeadCar: Bool, carOffset: Double?, tripStarted: Bool, isJoining: Bool
     ) -> Bool {
         guard tripStarted, !isLeadCar, stop.isOpen else { return false }
-        if stop.isMeeting, !isJoining { return false }
+        // A meeting point is decided by the car's state alone (the offset of a car with no way in of its own is
+        // about 0, the meet's own offset).
+        if stop.isMeeting { return isJoining }
         guard let carOffset else { return true }
         return carOffset < stop.routeOffset - NextStop.hereRadius
     }
 
-    /// What everyone reads about the cars skipping: "Daniel’s car is skipping R&R Tapah", one line per car up to
-    /// two; with more, one line: "3 cars are skipping R&R Tapah".
-    static func lines(skippingCars cars: [Car], stopName: String) -> [String] {
+    /// What everyone reads about the cars skipping, one line per car up to two; with more, one line.
+    /// "Daniel’s car is skipping R&R Tapah"; a car with no owner name in its name: "Myvi is skipping R&R Tapah";
+    /// the viewer's own: "You’re skipping R&R Tapah". At a meeting point (`meeting`): "Daniel will meet you along
+    /// the way", "You’ll meet the convoy along the way", "3 cars will meet you along the way".
+    static func lines(skippingCars cars: [Car], stopName: String, meeting: Bool = false, viewerCarId: String? = nil) -> [String] {
         let sorted = cars.sorted { ($0.number ?? Int.max, $0.id ?? "") < ($1.number ?? Int.max, $1.id ?? "") }
-        if sorted.count > 2 { return ["\(sorted.count) cars are skipping \(stopName)"] }
-        return sorted.map { "\(StopLeave.ownerWord($0))’s car is skipping \(stopName)" }
+        if sorted.count > 2 {
+            return [meeting ? "\(sorted.count) cars will meet you along the way" : "\(sorted.count) cars are skipping \(stopName)"]
+        }
+        return sorted.map { car in
+            if car.id != nil, car.id == viewerCarId {
+                return meeting ? "You’ll meet the convoy along the way" : "You’re skipping \(stopName)"
+            }
+            let word = StopLeave.ownerWord(car)
+            let owned = word != car.name
+            if meeting { return "\(word) will meet you along the way" }
+            return owned ? "\(word)’s car is skipping \(stopName)" : "\(word) is skipping \(stopName)"
+        }
     }
 }

@@ -42,17 +42,22 @@ struct StopAnswerTests {
     }
 
     @Test func exactly150MetersShortIsAlreadyThere() {
-        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_850, tripStarted: true))
-        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_849.5, tripStarted: true))
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_850, tripStarted: true, isJoining: false))
+        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_849.5, tripStarted: true, isJoining: false))
     }
 
-    @Test func aMeetingPointTakesASkipOnlyFromAJoiningCar() {
-        let meet = PlannedStop(
-            id: "m", name: "Petronas", coordinate: GeoPoint(latitude: 3.2, longitude: 101.6), routeOffset: 5_000,
-            kind: .meet, minutes: nil, order: 0)
-        #expect(SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
-        #expect(!SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
-        // Any other stop does not ask.
+    @Test func aMeetingPointIsDecidedByTheCarsStateAlone() {
+        func meet(_ offset: Double) -> PlannedStop {
+            PlannedStop(
+                id: "m", name: "Petronas", coordinate: GeoPoint(latitude: 3.2, longitude: 101.6), routeOffset: offset,
+                kind: .meet, minutes: nil, order: 0)
+        }
+        // A car with no way in of its own sits at offset about 0, the meeting point's own offset: joining still skips.
+        #expect(SkipAnswers.canSkip(stop: meet(0), isLeadCar: false, carOffset: 0, tripStarted: true, isJoining: true))
+        #expect(!SkipAnswers.canSkip(stop: meet(0), isLeadCar: false, carOffset: 0, tripStarted: true, isJoining: false))
+        #expect(SkipAnswers.canSkip(stop: meet(5_000), isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
+        #expect(!SkipAnswers.canSkip(stop: meet(5_000), isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
+        // Any other stop goes by the offset, whatever the state.
         #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
     }
 
@@ -67,6 +72,13 @@ struct StopAnswerTests {
         #expect(SkipAnswers.lines(skippingCars: [b, a], stopName: "R&R Tapah")
             == ["Daniel’s car is skipping R&R Tapah", "Wyna’s car is skipping R&R Tapah"])
         #expect(SkipAnswers.lines(skippingCars: [a, b, c], stopName: "R&R Tapah") == ["3 cars are skipping R&R Tapah"])
+        // No owner name: the car's own name. The viewer's own car: "You’re skipping".
+        let myvi = car("d", "Myvi", 5)
+        #expect(SkipAnswers.lines(skippingCars: [myvi], stopName: "R&R Tapah") == ["Myvi is skipping R&R Tapah"])
+        #expect(SkipAnswers.lines(skippingCars: [a], stopName: "R&R Tapah", viewerCarId: "a") == ["You’re skipping R&R Tapah"])
+        // At a meeting point.
+        #expect(SkipAnswers.lines(skippingCars: [a], stopName: "Petronas", meeting: true) == ["Daniel will meet you along the way"])
+        #expect(SkipAnswers.lines(skippingCars: [a, b, c], stopName: "Petronas", meeting: true) == ["3 cars will meet you along the way"])
     }
 
     @Test func theCarsSkippingAreTheOnesWhoAnswered() {
@@ -84,23 +96,23 @@ struct StopAnswerTests {
     }
 
     @Test func aCarCanSkipBeforeItIsAtTheStop() {
-        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 30_000, tripStarted: true))
+        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 30_000, tripStarted: true, isJoining: false))
         // Not merged onto the main route yet: nothing reached.
-        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: nil, tripStarted: true))
+        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: false))
         // Just outside the 150 m "here" radius.
-        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_849, tripStarted: true))
+        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_849, tripStarted: true, isJoining: false))
     }
 
     @Test func aCarCannotSkipOnceAtOrPastTheStop() {
-        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_851, tripStarted: true))
-        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 62_000, tripStarted: true))
-        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 70_000, tripStarted: true))
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_851, tripStarted: true, isJoining: false))
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 62_000, tripStarted: true, isJoining: false))
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 70_000, tripStarted: true, isJoining: false))
     }
 
     @Test func theLeadCarAFinishedTripStartOrASkippedStopGetNoSkip() {
-        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: true, carOffset: 1_000, tripStarted: true))
-        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 1_000, tripStarted: false))
-        #expect(!SkipAnswers.canSkip(stop: stop(skipped: true), isLeadCar: false, carOffset: 1_000, tripStarted: true))
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: true, carOffset: 1_000, tripStarted: true, isJoining: false))
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 1_000, tripStarted: false, isJoining: false))
+        #expect(!SkipAnswers.canSkip(stop: stop(skipped: true), isLeadCar: false, carOffset: 1_000, tripStarted: true, isJoining: false))
     }
 }
 
@@ -163,7 +175,7 @@ struct StopAnswerEmulatorTests {
         // A second phone in the car says it again: still one answer.
         try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
 
-        // Nobody answers for another car; the lead car's (the organizer's) takes none.
+        // Nobody answers for another car.
         await #expect(throws: (any Error).self) {
             try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: trip.carId, userId: joiner)
         }
@@ -178,5 +190,46 @@ struct StopAnswerEmulatorTests {
         // Undo with nothing there is harmless; and the car can change its mind again.
         try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
         try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+    }
+
+    private func tripWithStop(_ name: String) async throws -> EmulatorTrip {
+        let trip = try await EmulatorTrip.make(name: name, route: Fixtures.longRoute)
+        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
+        let tapah = PlannedStop(
+            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
+            kind: .fuel, minutes: 20, order: 0)
+        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
+        return trip
+    }
+
+    /// The organizer's own (lead) car takes no skip answer, on a started trip.
+    @Test func theLeadCarCannotSkipOnAStartedTrip() async throws {
+        let trip = try await tripWithStop("Lead")
+        await TripService.markStarted(tripId: trip.tripId)
+        await #expect(throws: (any Error).self) {
+            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: trip.carId, userId: trip.uid)
+        }
+    }
+
+    /// A listener the rules refuse (a non-member's) ends its stream instead of waiting forever.
+    @Test func listenFinishesWhenTheRulesRefuseIt() async throws {
+        let trip = try await tripWithStop("Listen")
+        try Auth.auth().signOut()
+        try await Auth.auth().signInAnonymously()
+        let stream = StopAnswerService.listen(tripId: trip.tripId, stopId: "tapah")
+        let finished = await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                for await _ in stream {}
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(15))
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+        #expect(finished)
     }
 }

@@ -175,16 +175,19 @@ struct StopArrivalTests {
         #expect(StopLeave.waitingLine(tally([]).rows, leaving: "c1") != nil)
     }
 
-    @Test func aCarPastTheStopReadsDrovePastAndACarNotReportedYetIsLeftOut() {
+    @Test func aCarPastTheStopReadsDrovePastAndACarNotReportedYetStillCounts() {
         #expect(status(stopOffset + 151) == .passed)
         #expect(StopArrival.words(status(stopOffset + 151)) == "Drove past")
         #expect(status(stopOffset + 150) == .here)
         let cars = [car("c1", number: 1), car("c2", number: 2)]
         let snapshot = ConvoyOrdering.order(cars: cars, positions: ["c1": position(offset: stopOffset)], now: now)
-        let tally = StopArrival.tally(target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now)
-        // A convoy car that has not reported a position yet is not in the convoy list, so it is not counted or
-        // waited for (3b follow-up #7): "1 of 1 here" until its first fix.
-        #expect(tally.title == "1 of 1 here")
-        #expect(tally.rows.count == 1)
+        // The tally is given the trip's cars: c2 has no position, is in neither list, and gets a row of its own.
+        let tally = StopArrival.tally(
+            target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now, cars: cars)
+        #expect(tally.title == "1 of 2 here" && !tally.allHere)
+        #expect(tally.rows.last?.status == .unknown)
+        #expect(StopArrival.words(tally.rows[1]) == "Waiting for location")
+        // Leave names it instead of saying everyone is here.
+        #expect(StopLeave.waitingLine(tally.rows, leaving: "c1") == "No location from Car 2 yet")
     }
 }

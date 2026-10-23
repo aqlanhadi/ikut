@@ -134,13 +134,15 @@ service cloud.firestore {
         || get(pos).data.convoyOffset < stop.routeOffset - 150;
     }
 
-    // The car may say "we'll skip" this stop (one read of the stop, passed in). A meeting point only takes it from a
-    // car that is still joining: a car with no way in of its own projects onto the main route and would read as
-    // past it, so it could never skip the meet; a car on the main route (state 'convoy') is not heading for it.
+    // The car may say "we'll skip" this stop (one read of the stop, passed in). A meeting point is decided by the
+    // car's state alone: only a car still joining (on its own way in) may skip it, wherever its offset is. A car with
+    // no way in of its own writes an offset of about 0, the meeting point's routeOffset, so the offset says nothing.
+    // Any other stop: the car is still short of it (carNotThereYet).
     function carMaySkip(tripId, carId, stop) {
       return stopTakesAnswers(stop)
-        && carNotThereYet(tripId, carId, stop)
-        && (stop.kind != 'meet' || get(carPath(tripId, carId)).data.get('state', null) == 'joining');
+        && (stop.kind == 'meet'
+          ? get(carPath(tripId, carId)).data.get('state', null) == 'joining'
+          : carNotThereYet(tripId, carId, stop));
     }
 
     function tripNotStarted(tripId) {
