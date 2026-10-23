@@ -16,30 +16,3 @@ struct StopAnswer: Codable, Sendable, Equatable, Identifiable {
     var userId: String
     @ServerTimestamp var at: Date?
 }
-
-/// Reading a stop's answers. Pure; 5b wires it into the arrival count and Leave.
-enum SkipAnswers {
-    /// The car ids that said they are skipping this stop. Pass `among` (the cars still in the trip) to leave out
-    /// answers from cars that are gone, or nil to take every answer as it is.
-    static func skipping(_ answers: [StopAnswer], among carIds: Set<String>? = nil) -> Set<String> {
-        Set(answers.compactMap { answer in
-            guard answer.answer == .skip, let id = answer.id else { return nil }
-            if let carIds, !carIds.contains(id) { return nil }
-            return id
-        })
-    }
-
-    /// Whether the car has said it is skipping.
-    static func isSkipping(carId: String, in answers: [StopAnswer]) -> Bool {
-        skipping(answers).contains(carId)
-    }
-
-    /// The viewer's car may say "we'll skip": it is not the lead car, the stop is not skipped for everyone, and
-    /// the car is still more than the here-radius short of it (the rules check the same, from the car's last
-    /// reported place). `carOffset` is its place on the main route, nil before it has merged.
-    static func canSkip(stop: PlannedStop, isLeadCar: Bool, carOffset: Double?, tripStarted: Bool) -> Bool {
-        guard tripStarted, !isLeadCar, stop.isOpen else { return false }
-        guard let carOffset else { return true }
-        return carOffset < stop.routeOffset - NextStop.hereRadius
-    }
-}

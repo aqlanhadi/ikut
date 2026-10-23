@@ -41,6 +41,34 @@ struct StopAnswerTests {
         #expect(FirestorePaths.answer(tripId: "t", stopId: "s1", carId: "carB") == "trips/t/stops/s1/answers/carB")
     }
 
+    @Test func exactly150MetersShortIsAlreadyThere() {
+        #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_850, tripStarted: true))
+        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_849.5, tripStarted: true))
+    }
+
+    @Test func aMeetingPointTakesASkipOnlyFromAJoiningCar() {
+        let meet = PlannedStop(
+            id: "m", name: "Petronas", coordinate: GeoPoint(latitude: 3.2, longitude: 101.6), routeOffset: 5_000,
+            kind: .meet, minutes: nil, order: 0)
+        #expect(SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
+        #expect(!SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
+        // Any other stop does not ask.
+        #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
+    }
+
+    @Test func skippingCarsAreNamedOneLineEachUpToTwo() {
+        func car(_ id: String, _ name: String, _ n: Int) -> Car {
+            Car(id: id, name: name, color: "#2563EB", trackerUserId: nil, isLead: false, route: nil, mergeOffset: nil,
+                state: .convoy, number: n)
+        }
+        let a = car("a", "Daniel’s Myvi", 2), b = car("b", "Wyna’s X70", 3), c = car("c", "Hafiz’s Axia", 4)
+        #expect(SkipAnswers.lines(skippingCars: [], stopName: "R&R Tapah").isEmpty)
+        #expect(SkipAnswers.lines(skippingCars: [a], stopName: "R&R Tapah") == ["Daniel’s car is skipping R&R Tapah"])
+        #expect(SkipAnswers.lines(skippingCars: [b, a], stopName: "R&R Tapah")
+            == ["Daniel’s car is skipping R&R Tapah", "Wyna’s car is skipping R&R Tapah"])
+        #expect(SkipAnswers.lines(skippingCars: [a, b, c], stopName: "R&R Tapah") == ["3 cars are skipping R&R Tapah"])
+    }
+
     @Test func theCarsSkippingAreTheOnesWhoAnswered() {
         #expect(SkipAnswers.skipping([]).isEmpty)
         #expect(SkipAnswers.skipping([answer("a"), answer("b")]) == ["a", "b"])
@@ -113,24 +141,21 @@ struct StopAnswerEmulatorTests {
             kind: .fuel, minutes: 20, order: 0)
         try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
 
-        // Before the trip starts nobody can answer.
-        await #expect(throws: (any Error).self) {
-            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: trip.carId, userId: trip.uid)
-        }
-        await TripService.markStarted(tripId: trip.tripId)
-        // The lead car (the organizer's) cannot skip.
-        await #expect(throws: (any Error).self) {
-            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: trip.carId, userId: trip.uid)
-        }
-
         try Auth.auth().signOut()
         try await Auth.auth().signInAnonymously()
         let joiner = try #require(Auth.auth().currentUser?.uid)
         let joined = try await LiveJoinAPI().join(
             code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+
+        // Before the trip starts nobody can answer, the joiner's own car included.
+        await #expect(throws: (any Error).self) {
+            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        }
+        await TripService.markStarted(tripId: trip.tripId)
         let stream = StopAnswerService.listen(tripId: trip.tripId, stopId: "tapah")
 
-        try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        let sent = try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        #expect(sent)
         let said = try await firstValue(stream) { $0.count == 1 && $0[0].at != nil }
         #expect(SkipAnswers.skipping(said) == [joined.carId])
         #expect(said[0].userId == joiner)
@@ -138,7 +163,7 @@ struct StopAnswerEmulatorTests {
         // A second phone in the car says it again: still one answer.
         try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
 
-        // Nobody answers for another car.
+        // Nobody answers for another car; the lead car's (the organizer's) takes none.
         await #expect(throws: (any Error).self) {
             try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: trip.carId, userId: joiner)
         }
@@ -146,7 +171,8 @@ struct StopAnswerEmulatorTests {
             try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: trip.carId)
         }
 
-        try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
+        let undone = try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
+        #expect(undone)
         let gone = try await firstValue(stream) { $0.isEmpty }
         #expect(SkipAnswers.skipping(gone).isEmpty)
         // Undo with nothing there is harmless; and the car can change its mind again.

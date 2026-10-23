@@ -3,22 +3,32 @@ import FirebaseFirestore
 import SwiftUI
 
 /// The "who is here" card on its own (`IKUT_SCREEN=road-arrival`, `road-arrival-all`, `road-arrival-meet`; with
-/// Leave, D25 4a: `road-leave` (lead car or organizer, "Leaving at 12:40"), `road-leave-confirm` (after tapping
+/// Skip, D25 5b: `road-skip` (a car 4 km short: "We'll skip this stop"), `road-skip-mine` (its car skipping:
+/// "We'll stop after all"), `road-skip-others` (two cars skipping, the viewer's is not), `road-skip-lead` (the lead
+/// car: three cars skipping read as a count, no button). With Leave, D25 4a: `road-leave` (lead car or organizer, "Leaving at 12:40"), `road-leave-confirm` (after tapping
 /// Leave), `road-leave-other` (another car: no button), `road-leave-meet` (meeting point, "Leaving at 9:00");
 /// RoadStops.dc.html), over the demo convoy. The clock is fixed, so the cars never go stale while it is looked at.
 struct StopArrivalDemo: View {
-    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting }
+    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting, skip, skipMine, skipOthers, skipLead }
 
     var scene: Scene
     @State private var map: TripMapModel
     @State private var now = Date()
     private let stopId: String
+    private let answers: [StopAnswer]
 
     init(_ scene: Scene) {
         self.scene = scene
         let built = Self.build(scene)
         _map = State(initialValue: built.model)
         stopId = built.stopId
+        let said: [String] = switch scene {
+        case .skipMine: ["c4"]
+        case .skipOthers: ["c2", "c3"]
+        case .skipLead: ["c2", "c3", "c4"]
+        default: []
+        }
+        answers = said.map { StopAnswer(id: $0, answer: .skip, userId: "u-\($0)", at: nil) }
     }
 
     static func build(_ scene: Scene) -> (model: TripMapModel, stopId: String) {
@@ -40,7 +50,7 @@ struct StopArrivalDemo: View {
         cars.sort { ($0.number ?? 99) < ($1.number ?? 99) }
         var positions: [String: Position] = [:]
         switch scene {
-        case .someHere, .leave, .leaveConfirm, .leaveOther:
+        case .someHere, .leave, .leaveConfirm, .leaveOther, .skip, .skipMine, .skipOthers, .skipLead:
             positions = ["c1": fix(stopOffset, joining: false), "c2": fix(stopOffset - 80, joining: false),
                          "c4": fix(stopOffset - 4_000, joining: false), "c3": fix(stopOffset - 12_000, joining: true)]
         case .allHere:
@@ -63,8 +73,8 @@ struct StopArrivalDemo: View {
         if leaveScene, !meets { stop.arrivedAt = Calendar.current.date(bySettingHour: 12, minute: 20, second: 0, of: now) }
         model.setStops([stop])
         model.setCars(cars)
-        model.tripStarted = leaveScene
-        let viewer = scene == .leaveOther ? "c2" : "c1"
+        model.tripStarted = leaveScene || [.skip, .skipMine, .skipOthers, .skipLead].contains(scene)
+        let viewer = scene == .leaveOther ? "c2" : [.skip, .skipMine, .skipOthers].contains(scene) ? "c4" : "c1"
         model.apply(trip: nil, myCar: cars.first { $0.id == viewer }, myCarId: viewer, positions: positions, isTracker: true)
         return (model, "s1")
     }
@@ -73,8 +83,8 @@ struct StopArrivalDemo: View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
             StopArrivalCard(
-                model: map, stopId: stopId, frozenNow: now, isOrganizer: scene != .leaveOther, leave: nil,
-                onClose: {}, startConfirming: scene == .leaveConfirm)
+                model: map, stopId: stopId, frozenNow: now, isOrganizer: ![.leaveOther, .skip, .skipMine, .skipOthers].contains(scene), leave: nil,
+                skip: nil, initialAnswers: answers, onClose: {}, startConfirming: scene == .leaveConfirm)
                 .padding(.horizontal, Spacing.s)
                 .padding(.bottom, Spacing.s)
         }

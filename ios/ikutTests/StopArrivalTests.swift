@@ -156,4 +156,35 @@ struct StopArrivalTests {
         s.id = "m"
         #expect(StopArrival.target(stopId: "m", in: [s])?.isMeeting == true)
     }
+
+    @Test func aSkippingCarLeavesTheCountAndStaysInTheList() {
+        let cars = [car("c1", number: 1), car("c2", number: 2), car("c3", number: 3)]
+        let positions = ["c1": position(offset: stopOffset), "c2": position(offset: stopOffset - 100),
+                         "c3": position(offset: stopOffset - 9_000)]
+        let snapshot = ConvoyOrdering.order(cars: cars, positions: positions, now: now)
+        func tally(_ skipping: Set<String>) -> StopArrival.Tally {
+            StopArrival.tally(target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now, skipping: skipping)
+        }
+        #expect(tally([]).title == "2 of 3 here")
+        let skipped = tally(["c3"])
+        #expect(skipped.title == "2 of 2 here" && skipped.allHere)
+        #expect(skipped.rows.count == 3 && skipped.rows.first { $0.id == "c3" }?.skipping == true)
+        #expect(StopArrival.words(skipped.rows[2]) == "Skipping")
+        // Leave does not wait for it.
+        #expect(StopLeave.waitingLine(skipped.rows, leaving: "c1") == nil)
+        #expect(StopLeave.waitingLine(tally([]).rows, leaving: "c1") != nil)
+    }
+
+    @Test func aCarPastTheStopReadsDrovePastAndACarNotReportedYetIsLeftOut() {
+        #expect(status(stopOffset + 151) == .passed)
+        #expect(StopArrival.words(status(stopOffset + 151)) == "Drove past")
+        #expect(status(stopOffset + 150) == .here)
+        let cars = [car("c1", number: 1), car("c2", number: 2)]
+        let snapshot = ConvoyOrdering.order(cars: cars, positions: ["c1": position(offset: stopOffset)], now: now)
+        let tally = StopArrival.tally(target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now)
+        // A convoy car that has not reported a position yet is not in the convoy list, so it is not counted or
+        // waited for (3b follow-up #7): "1 of 1 here" until its first fix.
+        #expect(tally.title == "1 of 1 here")
+        #expect(tally.rows.count == 1)
+    }
 }

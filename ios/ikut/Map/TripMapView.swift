@@ -571,8 +571,10 @@ struct TripMapView: View {
                 .accessibilityHidden(panelAside)
             if arrivalOpen, !stopCardOpen, let id = arrivalStopId {
                 StopArrivalCard(
-                    model: model, stopId: id, frozenNow: nil, isOrganizer: session.isOrganizer,
-                    leave: liveServices ? { @MainActor stopId in await leaveStop(stopId) } : nil
+                    model: model, stopId: id, tripId: session.tripId, frozenNow: nil, isOrganizer: session.isOrganizer,
+                    leave: liveServices ? { @MainActor stopId in await leaveStop(stopId) } : nil,
+                    skip: liveServices ? { @MainActor stopId, skipping in await answerStop(stopId, skipping: skipping) } : nil,
+                    listensToAnswers: liveServices
                 ) {
                     withAnimation(.snappy) { arrivalStopId = nil }
                 }
@@ -603,6 +605,17 @@ struct TripMapView: View {
     private func leaveStop(_ stopId: String) async -> StopLeave.Result {
         do {
             let sent = try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            return sent ? .sent : .queued
+        } catch { return .refused }
+    }
+
+    /// "We'll skip this stop" / "We'll stop after all" on the who-is-here card (D25 5b), same three outcomes as Leave.
+    private func answerStop(_ stopId: String, skipping: Bool) async -> StopLeave.Result {
+        guard let carId = model.myCarId else { return .refused }
+        do {
+            let sent = skipping
+                ? try await StopAnswerService.skip(tripId: session.tripId, stopId: stopId, carId: carId, userId: session.userId)
+                : try await StopAnswerService.undo(tripId: session.tripId, stopId: stopId, carId: carId)
             return sent ? .sent : .queued
         } catch { return .refused }
     }
