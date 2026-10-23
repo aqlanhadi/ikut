@@ -75,6 +75,7 @@
 		584A3D742D1E46142E1B6A44 /* CarRouteLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4365C32AF91E6D4FEA8C34F4 /* CarRouteLogic.swift */; };
 		591D0BEAD1974F23903F13DC /* ApproachPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */; };
 		5A3DA96314D84E3905601EC8 /* TripServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B60214D010449BFA91F229 /* TripServiceTests.swift */; };
+		5C5315B337B1E03783D95E49 /* StopAnswerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB09C76879DEECF2EC83A0D /* StopAnswerService.swift */; };
 		5E0572F32C4E89743D919B29 /* AuthEmulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */; };
 		5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881F14A69E038A11FD750DD0 /* Theme.swift */; };
 		61C105833954508E604F390C /* RecapLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E56E0C2FFCC41474FCCA759 /* RecapLogic.swift */; };
@@ -94,11 +95,13 @@
 		7555E494FCA3E97B96F8F4C8 /* StopPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE38EDF4446EB6024A65E6A /* StopPillView.swift */; };
 		7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */; };
 		7B2B2622524DCA230BA33FC3 /* DeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */; };
+		7CB4DED2FB0CD3F34170BACE /* StopAnswerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */; };
 		7D38CD66489208EA7A56D806 /* RecapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00D2E21B9C9E2428BB8B757 /* RecapContent.swift */; };
 		7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C963869E69413A0E655BFED4 /* SpeechQueue.swift */; };
 		7F0F1E9387E6DF47B36D0E2D /* NextStop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B30BE299BB81EFCED8F1A8 /* NextStop.swift */; };
 		7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26B2BCA0CDF418B0CA82119 /* FirestorePaths.swift */; };
 		80D285211412E053AE968E46 /* CarRouteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22B87A46A5250E86D1E67E5D /* CarRouteService.swift */; };
+		843411F16EA0BC70B57A05EB /* StopAnswer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CD4811E9FF9FE7940656C0 /* StopAnswer.swift */; };
 		896F02208FFDCCBE93C739BF /* StopCardDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8874DCFA37C43892F53DB83 /* StopCardDemo.swift */; };
 		8AD641712731A68B8D09EEF5 /* LobbyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */; };
 		8CC56385CA269B6E337E6858 /* RecapMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7817F4C6CB269ADF3664EA9E /* RecapMapView.swift */; };
@@ -238,6 +241,7 @@
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
 		3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometryTests.swift; sourceTree = "<group>"; };
 		3D43EA449C4A10B16261D617 /* HazardMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardMapContent.swift; sourceTree = "<group>"; };
+		3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswerTests.swift; sourceTree = "<group>"; };
 		3EA475AFBE5E8DF067171FDC /* Member.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Member.swift; sourceTree = "<group>"; };
 		3F6CFFB42E42435BAB445863 /* JoinTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTripView.swift; sourceTree = "<group>"; };
 		409F2A2E1542D39038AFC98D /* AlwaysLocationExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysLocationExplainerView.swift; sourceTree = "<group>"; };
@@ -280,11 +284,13 @@
 		7CAC79F1BB254D2FFA7FF24B /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7DC390858FBBDA52C3ED0823 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7EB09C76879DEECF2EC83A0D /* StopAnswerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswerService.swift; sourceTree = "<group>"; };
 		7F504AF6A067112D2A409082 /* ETARefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ETARefresh.swift; sourceTree = "<group>"; };
 		7F7DC3EDEBB7871FAFC1771F /* TripAsks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAsks.swift; sourceTree = "<group>"; };
 		81A21A541DABA60F6378B1D9 /* PastTripsMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastTripsMapTests.swift; sourceTree = "<group>"; };
 		82641AA014018A19F3AFFE90 /* StopRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopRouting.swift; sourceTree = "<group>"; };
 		826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkBanner.swift; sourceTree = "<group>"; };
+		84CD4811E9FF9FE7940656C0 /* StopAnswer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswer.swift; sourceTree = "<group>"; };
 		85031A857FFEE9A7F7CEE986 /* StopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopService.swift; sourceTree = "<group>"; };
 		881F14A69E038A11FD750DD0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		89911FBE6E40CB98D46C337F /* Polyline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polyline.swift; sourceTree = "<group>"; };
@@ -637,6 +643,7 @@
 		D75868DAA8171C1E85F5A772 /* Stops */ = {
 			isa = PBXGroup;
 			children = (
+				7EB09C76879DEECF2EC83A0D /* StopAnswerService.swift */,
 				0C1B7CE38A043F2B0EBAC9A5 /* StopAskModel.swift */,
 				B77B691B643EBE1FA3B334FE /* StopCard.swift */,
 				B8874DCFA37C43892F53DB83 /* StopCardDemo.swift */,
@@ -679,6 +686,7 @@
 				3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */,
 				2392E5A1D08103853E77C151 /* ServerWriteTests.swift */,
 				1AD72135383C0C50AA7ECE9D /* SessionTests.swift */,
+				3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */,
 				2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */,
 				13A17502ECF89C7385935BA5 /* StopRouteTests.swift */,
 				644401FB5F0CAB8C10EF3B3B /* StopTests.swift */,
@@ -758,6 +766,7 @@
 				8D9BE33E452EA67593E95E26 /* PlannedStop.swift */,
 				89911FBE6E40CB98D46C337F /* Polyline.swift */,
 				BCE6A468C2B522F5226FFC78 /* Position.swift */,
+				84CD4811E9FF9FE7940656C0 /* StopAnswer.swift */,
 				2CD43B7DF7793A412F23CD58 /* Trip.swift */,
 				17EB484B1F7FD361B7EB9E11 /* TripEvent.swift */,
 			);
@@ -976,6 +985,8 @@
 				182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */,
 				57A2D5C5D587F6AECCC286A4 /* SheetDrag.swift in Sources */,
 				7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */,
+				843411F16EA0BC70B57A05EB /* StopAnswer.swift in Sources */,
+				5C5315B337B1E03783D95E49 /* StopAnswerService.swift in Sources */,
 				4CDFCFA89CBE14EB3CE2D9F7 /* StopApproach.swift in Sources */,
 				FD0670372EDB335CD4F4D390 /* StopApproachDemo.swift in Sources */,
 				3C240B4486DA232F9E1504AA /* StopAskModel.swift in Sources */,
@@ -1056,6 +1067,7 @@
 				E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */,
 				16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */,
 				EDBF46FA09C4587FEFC09278 /* SessionTests.swift in Sources */,
+				7CB4DED2FB0CD3F34170BACE /* StopAnswerTests.swift in Sources */,
 				D4CA5EDCC3B15AAA09EEE71E /* StopApproachTests.swift in Sources */,
 				7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
