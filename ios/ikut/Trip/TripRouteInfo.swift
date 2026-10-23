@@ -16,24 +16,26 @@ final class TripRouteInfo {
 
     @ObservationIgnored private var loadedRoute: String?
 
-    /// No-op when `route` is the one already loaded.
-    func load(route: String) async {
+    /// No-op when `route` is the one already loaded. `routeSeconds` is the drive time the trip stored: with it
+    /// MapKit isn't asked for the time, which it could only answer for the direct drive, not through stops.
+    /// `needsRoadName` is false for a route through stops, which has no single road to name.
+    func load(route: String, routeSeconds: Double? = nil, needsRoadName: Bool = true) async {
         guard route != loadedRoute else { return }
         loadedRoute = route
         let coords = Polyline.decode(route)
         coordinates = coords
         distance = coords.count > 1 ? RouteLine(coords).length : nil
         originName = nil
-        travelTime = nil
+        travelTime = routeSeconds
         roadName = nil
         guard let first = coords.first, let last = coords.last, coords.count > 1 else { return }
         async let name = RouteBuilder.placeName(at: first)
-        let drive = try? await RouteBuilder.drive(from: first, to: last)
+        let drive = routeSeconds != nil && !needsRoadName ? nil : try? await RouteBuilder.drive(from: first, to: last)
         let origin = await name
         // A newer route may have started loading while these were in flight.
         guard loadedRoute == route else { return }
         originName = origin
-        travelTime = drive?.travelTime
-        roadName = drive?.name
+        travelTime = routeSeconds ?? drive?.travelTime
+        roadName = needsRoadName ? drive?.name : nil
     }
 }

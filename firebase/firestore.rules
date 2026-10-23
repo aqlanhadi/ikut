@@ -71,10 +71,13 @@ service cloud.firestore {
 
     function validTripShape(d) {
       return d.keys().hasOnly(['name', 'code', 'organizerId', 'route', 'destination',
-                               'status', 'createdAt', 'lastActivityAt', 'endedAt', 'startedAt'])
+                               'status', 'createdAt', 'lastActivityAt', 'endedAt', 'startedAt',
+                               'routeSeconds', 'stopCount'])
         && d.keys().hasAll(['name', 'code', 'organizerId', 'route', 'destination', 'status', 'createdAt'])
         && d.name is string
         && d.route is string
+        && (optionalOf(d, 'routeSeconds') == null || (d.routeSeconds is number && d.routeSeconds >= 0))
+        && (optionalOf(d, 'stopCount') == null || (d.stopCount is int && d.stopCount >= 0 && d.stopCount <= 20))
         && validDestination(d.destination);
     }
 
@@ -94,6 +97,30 @@ service cloud.firestore {
         && (optionalOf(d, 'mergeOffset') == null || d.mergeOffset is number)
         && (optionalOf(d, 'number') == null
             || (d.number is int && d.number >= 1 && d.number <= 99));
+    }
+
+    // A planned stop as the organizer writes it before the start. Not skipped yet; a meeting point is the
+    // first stop, has no length, and is the only kind that carries a time.
+    function validStop(d) {
+      return d.keys().hasOnly(['name', 'coordinate', 'routeOffset', 'kind', 'minutes', 'meetAt', 'note',
+                               'order', 'skipped', 'skippedBy', 'skippedAt'])
+        && d.keys().hasAll(['name', 'coordinate', 'routeOffset', 'kind', 'order'])
+        && isString(d.name, 1, 120)
+        && d.coordinate is latlng
+        && d.routeOffset is number && d.routeOffset >= 0
+        && d.kind in ['meet', 'fuel', 'food', 'rest', 'toilet', 'sight']
+        && d.order is int && d.order >= 0 && d.order < 20
+        && (d.kind != 'meet' || (d.order == 0 && optionalOf(d, 'minutes') == null))
+        && (optionalOf(d, 'minutes') == null || (d.minutes is int && d.minutes >= 1 && d.minutes <= 720))
+        && (optionalOf(d, 'meetAt') == null || (d.kind == 'meet' && d.meetAt is timestamp))
+        && (optionalOf(d, 'note') == null || isString(d.note, 0, 280))
+        && optionalOf(d, 'skipped') != true
+        && optionalOf(d, 'skippedBy') == null
+        && optionalOf(d, 'skippedAt') == null;
+    }
+
+    function tripNotStarted(tripId) {
+      return trip(tripId).get('startedAt', null) == null;
     }
 
     function validPosition(d) {
@@ -211,7 +238,15 @@ service cloud.firestore {
         && resource.data.organizerId == request.auth.uid
         && resource.data.status == 'active'
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['name', 'destination', 'route', 'status', 'lastActivityAt', 'endedAt'])
+             .hasOnly(['name', 'destination', 'route', 'routeSeconds', 'stopCount', 'status',
+                       'lastActivityAt', 'endedAt'])
+        // Once the trip has started, a trip with planned stops keeps its route and destination: the stops sit at
+        // offsets on that route and are locked too. Rules cannot list the stops, so the trip counts them
+        // (stopCount, written in the same batch as the stops).
+        && (resource.data.get('startedAt', null) == null
+            || resource.data.get('stopCount', 0) == 0
+            || !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['route', 'destination', 'routeSeconds', 'stopCount']))
         && validTripShape(request.resource.data)
         && (request.resource.data.status == 'active'
             || (request.resource.data.status == 'ended'
@@ -305,6 +340,34 @@ service cloud.firestore {
           );
 
         allow delete: if isOrganizer(tripId) && tripActive(tripId);
+      }
+
+      // Planned stops (D25): members read. The organizer writes them in the lobby, before the trip has
+      // started. After that only a skip changes: skipped, skippedBy, skippedAt, never added, moved or removed.
+      match /stops/{stopId} {
+        allow read: if isMember(tripId);
+
+        allow create: if isOrganizer(tripId)
+          && tripActive(tripId)
+          && tripNotStarted(tripId)
+          && validStop(request.resource.data);
+
+        allow update: if isOrganizer(tripId)
+          && tripActive(tripId)
+          && (
+            (tripNotStarted(tripId) && validStop(request.resource.data))
+            || (!tripNotStarted(tripId)
+              && resource.data.get('skipped', null) != true
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['skipped', 'skippedBy', 'skippedAt'])
+              && request.resource.data.skipped == true
+              && request.resource.data.skippedBy == request.auth.uid
+              && request.resource.data.skippedAt == request.time)
+          );
+
+        allow delete: if isOrganizer(tripId)
+          && tripActive(tripId)
+          && tripNotStarted(tripId);
       }
 
       // Positions: only the car's current tracker writes, only while trip is active.

@@ -10,6 +10,9 @@ enum FirestorePaths {
     static func members(tripId: String) -> String { "\(trip(tripId))/members" }
     static func member(tripId: String, userId: String) -> String { "\(members(tripId: tripId))/\(userId)" }
 
+    static func stops(tripId: String) -> String { "\(trip(tripId))/stops" }
+    static func stop(tripId: String, stopId: String) -> String { "\(stops(tripId: tripId))/\(stopId)" }
+
     static func positions(tripId: String) -> String { "\(trip(tripId))/positions" }
     /// One position document per car, keyed by car id and overwritten on each update.
     static func position(tripId: String, carId: String) -> String { "\(positions(tripId: tripId))/\(carId)" }

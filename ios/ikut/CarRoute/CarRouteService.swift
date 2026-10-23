@@ -89,6 +89,8 @@ final class CarRouteService {
     private let carId: String
     private let main: RouteLine
     private let destination: CLLocationCoordinate2D
+    /// The trip's meeting point, when it has one: a car that is still joining routes here, not to the destination.
+    private let meetingPoint: CLLocationCoordinate2D?
     private let directions: CarRouteDirections
     private let writer: CarRouteWriting
 
@@ -107,7 +109,7 @@ final class CarRouteService {
 
     init(
         tripId: String, carId: String, mainRoute: String, destination: CLLocationCoordinate2D,
-        route: String? = nil, state: CarState = .joining,
+        meetingPoint: CLLocationCoordinate2D? = nil, route: String? = nil, state: CarState = .joining,
         directions: CarRouteDirections = MapKitCarRouteDirections(),
         writer: CarRouteWriting = FirestoreCarRouteWriter(),
         detector: OffRouteDetector = OffRouteDetector()
@@ -118,13 +120,14 @@ final class CarRouteService {
         self.carId = carId
         self.main = main
         self.destination = destination
+        self.meetingPoint = meetingPoint
         self.directions = directions
         self.writer = writer
         self.detector = detector
         self.state = state
         if let route, case let own = RouteLine(Polyline.decode(route)), !own.isEmpty {
             routeLine = own
-            ownMergeOffset = main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance)?.otherOffset
+            ownMergeOffset = mergeOffset(of: own)?.otherOffset
         }
     }
 
@@ -136,8 +139,10 @@ final class CarRouteService {
         if let onMain = CarRouteLogic.planIfOnMain(location: location, main: main) {
             plan = onMain
         } else {
-            let computed = try await directions.route(from: location, to: destination)
-            guard let own = CarRouteLogic.makePlan(computed: computed, main: main) else {
+            let computed = try await directions.route(from: location, to: target)
+            guard let own = CarRouteLogic.makePlan(
+                computed: computed, main: main, toMeetingPoint: meetingPoint != nil && state == .joining)
+            else {
                 throw CarRouteError.unusableRoute
             }
             plan = own
@@ -145,6 +150,14 @@ final class CarRouteService {
         try await writer.write(plan, tripId: tripId, carId: carId)
         adopt(plan)
         return plan
+    }
+
+    /// Where the car's own route goes. With a meeting point, a car still joining goes there (the main route starts
+    /// there, so its own route ends where the main route begins and it merges on arrival); once it has merged, a
+    /// car that leaves the route for a while is sent to the destination as before.
+    private var target: CLLocationCoordinate2D {
+        if let meetingPoint, state == .joining { return meetingPoint }
+        return destination
     }
 
     /// Processes one fix: marks the merge, or recomputes when the car has left its route.
@@ -183,6 +196,13 @@ final class CarRouteService {
 
     // MARK: Private
 
+    /// Where `own` joins the main route. With a meeting point, a route that ends at the main route's start joins
+    /// there, on arrival; any other route, and every trip without a meeting point, as before.
+    private func mergeOffset(of own: RouteLine) -> (otherOffset: CLLocationDistance, mainOffset: CLLocationDistance)? {
+        if meetingPoint != nil, let meet = main.meetingMerge(of: own, tolerance: CarRouteLogic.mergeTolerance) { return meet }
+        return main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance)
+    }
+
     private func projectMainDistance(_ c: CLLocationCoordinate2D) -> CLLocationDistance {
         let p = main.project(c, hint: mainHint)
         mainHint = p?.segmentIndex
@@ -211,7 +231,7 @@ final class CarRouteService {
         if let route = plan.route {
             let own = RouteLine(Polyline.decode(route))
             routeLine = own
-            ownMergeOffset = main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance)?.otherOffset
+            ownMergeOffset = mergeOffset(of: own)?.otherOffset
         } else {
             routeLine = nil
             ownMergeOffset = nil

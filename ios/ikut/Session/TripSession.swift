@@ -16,6 +16,8 @@ final class TripSession {
     private(set) var trip: Trip?
     private(set) var member: Member?
     private(set) var car: Car?
+    /// The planned stops, in driving order.
+    private(set) var stops: [PlannedStop] = []
     /// Latest position per car id.
     private(set) var positions: [String: Position] = [:]
     private(set) var errorMessage: String?
@@ -43,6 +45,7 @@ final class TripSession {
     @ObservationIgnored private var memberListener: ListenerRegistration?
     @ObservationIgnored private var carListener: ListenerRegistration?
     @ObservationIgnored private var positionsListener: ListenerRegistration?
+    @ObservationIgnored private var stopsListener: ListenerRegistration?
     @ObservationIgnored private var listeningCarId: String?
     /// The tracking session in progress (same car and main route); nil when not the tracker.
     @ObservationIgnored private var sessionKey: SessionKey?
@@ -70,12 +73,14 @@ final class TripSession {
     private struct SessionKey: Equatable {
         var carId: String
         var tripRoute: String
+        /// Latitude and longitude of the meeting point; nil without one.
+        var meetingPoint: [Double]?
     }
 
     init(
         tripId: String, userId: String, tracker: TrackingControlling? = nil, db: Firestore? = nil,
         carRouteFactory: @escaping CarRouteFactory = {
-            try TripSessionLogic.makeCarRouteService(tripId: $0, carId: $1, trip: $2, car: $3)
+            try TripSessionLogic.makeCarRouteService(tripId: $0, carId: $1, trip: $2, car: $3, meetingPoint: $4)
         },
         ensureTimeout: Duration = .seconds(8),
         clock: @escaping () -> Date = { Date() },
@@ -124,6 +129,20 @@ final class TripSession {
                     guard let self else { return }
                     if let message { self.errorMessage = message }
                     if let exists { self.applyMember(exists ? member : nil) }
+                }
+            }
+
+        stopsListener = db.collection(FirestorePaths.stops(tripId: tripId))
+            .addSnapshotListener { [weak self] snapshot, error in
+                let stops = snapshot?.decoded(PlannedStop.self)
+                let message = error?.localizedDescription
+                Task { @MainActor in
+                    guard let self else { return }
+                    if let stops {
+                        self.stops = stops.sorted { $0.order < $1.order }
+                        self.reevaluate()
+                    }
+                    if let message { self.errorMessage = message }
                 }
             }
 
@@ -260,8 +279,9 @@ final class TripSession {
     }
 
     /// Test seam: feeds the state the listeners would, without Firestore.
-    func applyForTesting(trip: Trip?, member: Member?, car: Car?) {
+    func applyForTesting(trip: Trip?, member: Member?, car: Car?, stops: [PlannedStop] = []) {
         self.trip = trip
+        self.stops = stops
         self.member = member
         membershipLost = member == nil
         self.car = car
@@ -335,10 +355,15 @@ final class TripSession {
             isTracking = tracker.isTracking
             return
         }
-        let key = SessionKey(carId: carId, tripRoute: trip.route)
+        let meetingPoint = TripSessionLogic.meetingPoint(in: stops)
+        let key = SessionKey(
+            carId: carId, tripRoute: trip.route, meetingPoint: meetingPoint.map { [$0.latitude, $0.longitude] })
         if key != sessionKey {
             stopTrackingNow()
-            beginSession(key, trip: trip, car: car)
+            beginSession(
+                key, trip: trip,
+                car: TripSessionLogic.carForNewSession(car, hasMeetingPoint: meetingPoint != nil, tripStarted: trip.startedAt != nil),
+                meetingPoint: meetingPoint)
         } else if tracker.isTracking {
             let docRoute = TripSessionLogic.routeLine(from: car.route)
             if TripSessionLogic.signature(of: docRoute) != trackedCarRoute {
@@ -358,13 +383,13 @@ final class TripSession {
 
     /// Becoming the tracker: one fix, then `ensureRoute`, then tracking with the own route.
     /// Tracking never waits on the network for long: `ensureRoute` is abandoned after `ensureTimeout`.
-    private func beginSession(_ key: SessionKey, trip: Trip, car: Car) {
+    private func beginSession(_ key: SessionKey, trip: Trip, car: Car, meetingPoint: CLLocationCoordinate2D?) {
         sessionKey = key
         sessionGeneration += 1
         let generation = sessionGeneration
         let service: CarRouteControlling?
         do {
-            service = try carRouteFactory(tripId, key.carId, trip, car)
+            service = try carRouteFactory(tripId, key.carId, trip, car, meetingPoint)
         } catch {
             log.error("car route service unavailable: \(error.localizedDescription, privacy: .public)")
             service = nil
@@ -446,10 +471,12 @@ final class TripSession {
         memberListener?.remove()
         carListener?.remove()
         positionsListener?.remove()
+        stopsListener?.remove()
         tripListener = nil
         memberListener = nil
         carListener = nil
         positionsListener = nil
+        stopsListener = nil
         listeningCarId = nil
     }
 }

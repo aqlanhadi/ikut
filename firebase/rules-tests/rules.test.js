@@ -34,14 +34,17 @@ async function assertFails(promise) {
 const here = dirname(fileURLToPath(import.meta.url));
 const T = 'trip1';
 let env;
+// emulators:exec says where its emulator is; the default is the usual local one.
+const [emulatorHost, emulatorPortText] = (process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':');
+const emulatorPort = Number(emulatorPortText);
 
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-ikut-rules',
     firestore: {
       rules: readFileSync(join(here, '../firestore.rules'), 'utf8'),
-      host: '127.0.0.1',
-      port: 8080,
+      host: emulatorHost,
+      port: emulatorPort,
     },
   });
 });
@@ -550,5 +553,159 @@ describe('stop requests', () => {
       });
       await assertFails(updateDoc(evRef('mem'), { expiresAt: ts() }));
     });
+  });
+});
+
+describe('planned stops', () => {
+  const stopDoc = (over = {}) => {
+    const d = { name: 'R&R Tapah', coordinate: pt, routeOffset: 62000, kind: 'fuel', minutes: 20, order: 0, ...over };
+    for (const k of Object.keys(d)) if (d[k] === undefined) delete d[k];
+    return d;
+  };
+  const stopPath = (id = 's1') => `trips/${T}/stops/${id}`;
+  const seedStops = async ({ started = false } = {}) => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const f = ctx.firestore();
+      if (started) await setDoc(doc(f, `trips/${T}`), tripDoc({ startedAt: ts(60000) }));
+      await setDoc(doc(f, stopPath('s1')), stopDoc());
+      await setDoc(doc(f, stopPath('s2')), stopDoc({ name: 'Kopitiam', kind: 'food', order: 1, minutes: undefined }));
+    });
+  };
+
+  describe('before the trip starts', () => {
+    beforeEach(() => seedStops());
+    it('a member can read a stop and list them', async () => {
+      await assertSucceeds(getDoc(doc(db('mem'), stopPath())));
+      await assertSucceeds(getDocs(collection(db('mem'), `trips/${T}/stops`)));
+    });
+    it('a non-member cannot read stops', async () => {
+      await assertFails(getDoc(doc(db('stranger'), stopPath())));
+      await assertFails(getDocs(collection(db('stranger'), `trips/${T}/stops`)));
+    });
+    it('the organizer adds a stop', () => assertSucceeds(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2 }))));
+    it('the organizer adds a meeting point as the first stop, with a time and no length', () =>
+      assertSucceeds(setDoc(doc(db('org'), stopPath('m')), stopDoc({
+        kind: 'meet', minutes: undefined, meetAt: Timestamp.fromMillis(Date.now() + 3600000), order: 0,
+      }))));
+    it('a meeting point is refused anywhere but first', () =>
+      assertFails(setDoc(doc(db('org'), stopPath('m')), stopDoc({ kind: 'meet', minutes: undefined, order: 1 }))));
+    it('a meeting point has no length', () =>
+      assertFails(setDoc(doc(db('org'), stopPath('m')), stopDoc({ kind: 'meet', minutes: 10, order: 0 }))));
+    it('a time on a stop that is not a meeting point is refused', () =>
+      assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ meetAt: Timestamp.now(), order: 2 }))));
+    it('a member who is not the organizer cannot add a stop', () =>
+      assertFails(setDoc(doc(db('mem'), stopPath('s3')), stopDoc({ order: 2 }))));
+    it('a stranger cannot add a stop', () =>
+      assertFails(setDoc(doc(db('stranger'), stopPath('s3')), stopDoc({ order: 2 }))));
+    it('an unknown kind is refused', () =>
+      assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ kind: 'spa', order: 2 }))));
+    it('a stop with no name or a made-up field is refused', async () => {
+      await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ name: '', order: 2 })));
+      await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2, hacked: true })));
+    });
+    it('a stop that is already skipped cannot be created', () =>
+      assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2, skipped: true }))));
+    it('the organizer reorders and edits stops', async () => {
+      await assertSucceeds(updateDoc(doc(db('org'), stopPath('s1')), { order: 1 }));
+      await assertSucceeds(updateDoc(doc(db('org'), stopPath('s1')), { minutes: 30, kind: 'rest', routeOffset: 70000 }));
+    });
+    it('a member who is not the organizer cannot reorder', () =>
+      assertFails(updateDoc(doc(db('mem'), stopPath('s1')), { order: 1 })));
+    it('the organizer removes a stop', () => assertSucceeds(deleteDoc(doc(db('org'), stopPath('s1')))));
+    it('a member who is not the organizer cannot remove a stop', () =>
+      assertFails(deleteDoc(doc(db('mem'), stopPath('s1')))));
+    it('the route and its stops go in one batch', async () => {
+      const f = db('org');
+      const b = writeBatch(f);
+      b.update(doc(f, `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC', routeSeconds: 9600 });
+      b.set(doc(f, stopPath('s1')), stopDoc({ order: 0 }));
+      b.set(doc(f, stopPath('s3')), stopDoc({ name: 'Bidor', order: 1 }));
+      b.delete(doc(f, stopPath('s2')));
+      await assertSucceeds(b.commit());
+    });
+    it('the drive time on the trip must be a number', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { routeSeconds: 'long' })));
+    it('nobody but the organizer can set the drive time', () =>
+      assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { routeSeconds: 100 })));
+    it('a stop on an ended trip cannot be added', async () => {
+      await seed({ ended: true });
+      await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2 })));
+    });
+    it('the organizer cannot skip before the start', () =>
+      assertFails(updateDoc(doc(db('org'), stopPath('s1')), {
+        skipped: true, skippedBy: 'org', skippedAt: serverTimestamp(),
+      })));
+  });
+
+  describe('after the trip has started', () => {
+    beforeEach(() => seedStops({ started: true }));
+    const skip = (over = {}) => ({ skipped: true, skippedBy: 'org', skippedAt: serverTimestamp(), ...over });
+    it('the organizer skips a stop', () => assertSucceeds(updateDoc(doc(db('org'), stopPath('s1')), skip())));
+    it('a member who is not the organizer cannot skip', () =>
+      assertFails(updateDoc(doc(db('mem'), stopPath('s1')), skip({ skippedBy: 'mem' }))));
+    it('the skip must name the organizer and use server time', async () => {
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ skippedBy: 'mem' })));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ skippedAt: ts() })));
+    });
+    it('a skip cannot be undone', async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), stopPath('s1')), { skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { skipped: false }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip()));
+    });
+    it('a skip cannot carry other changes', async () => {
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ order: 5 })));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ routeOffset: 1 })));
+    });
+    it('nothing but a skip can change', async () => {
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { order: 1 }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { name: 'Elsewhere' }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { minutes: 5 }));
+    });
+    it('no stop can be added or removed', async () => {
+      await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2 })));
+      await assertFails(deleteDoc(doc(db('org'), stopPath('s1'))));
+    });
+    it('a member can still read the stops', () => assertSucceeds(getDoc(doc(db('mem'), stopPath()))));
+  });
+});
+
+describe('a trip with stops keeps its route once it has started', () => {
+  const seedTrip = async (over) => {
+    await seed();
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc(over)));
+  };
+  const newDestination = { name: 'Ipoh', coordinate: new GeoPoint(4.6, 101.1) };
+  describe('started, with stops', () => {
+    beforeEach(() => seedTrip({ startedAt: ts(60000), stopCount: 2 }));
+    it('the organizer cannot change the route', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC', routeSeconds: 100 })));
+    it('the organizer cannot change the destination', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination })));
+    it('the organizer cannot change the stop count', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { stopCount: 0 })));
+    it('the organizer can still rename and end the trip', async () => {
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'New name' }));
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() }));
+    });
+  });
+  describe('started, without stops', () => {
+    it('the destination can still change (stopCount 0 or absent)', async () => {
+      await seedTrip({ startedAt: ts(60000), stopCount: 0 });
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination, route: '_p~iF~ps|U_ulLnnqC' }));
+      await seedTrip({ startedAt: ts(60000) });
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination }));
+    });
+  });
+  describe('not started, with stops', () => {
+    beforeEach(() => seedTrip({ stopCount: 2 }));
+    it('the route, destination and stop count can change', async () => {
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination, route: '_p~iF~ps|U_ulLnnqC', stopCount: 3 }));
+    });
+    it('the stop count must be a whole number', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { stopCount: 'two' })));
+    it('a member who is not the organizer cannot set it', () =>
+      assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { stopCount: 0 })));
   });
 });

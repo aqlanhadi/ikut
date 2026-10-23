@@ -17,6 +17,9 @@ final class CreateTripModel {
     private(set) var origin: CLLocationCoordinate2D?
     private(set) var originName: String?
 
+    /// The route a stop would be added to: results then read how far along it they are ("62 km", "40 min along").
+    var along: AlongRoute?
+
     @ObservationIgnored private var searchTask: Task<Void, Never>?
 
     var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -62,6 +65,12 @@ final class CreateTripModel {
         return "≈\(RouteFormat.distance(meters))"
     }
 
+    /// How far along the route a result is, from where it falls on the line: "62 km" when it is on the route,
+    /// "≈65 km" when the road only passes near it, and "40 min along" of the drive.
+    func alongText(_ result: DestinationResult) -> (distance: String, time: String?)? {
+        along?.text(for: result.coordinate)
+    }
+
     /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.
     func use(_ result: DestinationResult, finish: (BuiltRoute) async throws -> Void) async -> Bool {
         guard working == nil else { return false }
@@ -72,6 +81,28 @@ final class CreateTripModel {
             let route = try await RouteBuilder.buildRoute(to: result.coordinate)
             try await finish(route)
             return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Like `use`, for a trip that has planned stops: the route goes through them to the new destination.
+    func use(
+        _ result: DestinationResult, through stops: [StopDraft],
+        finish: (BuiltRoute, [StopDraft]) async throws -> Void
+    ) async -> Bool {
+        guard working == nil else { return false }
+        working = result.id
+        errorMessage = nil
+        defer { working = nil }
+        do {
+            let built = try await StopPlanner.build(items: stops, destination: result.coordinate, fallbackStart: nil)
+            try await finish(built.route, built.items)
+            return true
+        } catch let failure as LegFailure {
+            errorMessage = failure.reason.localizedDescription
+            return false
         } catch {
             errorMessage = error.localizedDescription
             return false
@@ -89,6 +120,35 @@ final class CreateTripModel {
     #endif
 }
 
+/// The trip's route as a search sees it when adding a stop: the line and how long it takes to drive.
+struct AlongRoute {
+    var line: RouteLine
+    /// Seconds for the whole route; nil until MapKit answered.
+    var seconds: Double?
+
+    /// A result closer than this to the route counts as on it.
+    static let onRouteDistance: CLLocationDistance = 300
+
+    init(coordinates: [CLLocationCoordinate2D], seconds: Double?) {
+        line = RouteLine(coordinates)
+        self.seconds = seconds
+    }
+
+    func text(for coordinate: CLLocationCoordinate2D) -> (distance: String, time: String?)? {
+        guard line.segmentCount > 0, let p = line.project(coordinate) else { return nil }
+        let km = StopFormat.along(meters: p.offset)
+        let distance = p.distance <= Self.onRouteDistance ? km : "≈\(km)"
+        guard let seconds, line.length > 0 else { return (distance, nil) }
+        return (distance, "\(StopFormat.length(minutes: max(1, Int((seconds * p.offset / line.length / 60).rounded())))) along")
+    }
+
+    /// "62 km along your route"; "near your start" for the first few kilometers.
+    func place(for coordinate: CLLocationCoordinate2D) -> String? {
+        guard line.segmentCount > 0, let p = line.project(coordinate) else { return nil }
+        return p.offset < 3_000 ? "near your start" : "\(StopFormat.along(meters: p.offset)) along your route"
+    }
+}
+
 /// Where to? (LocationSearch.dc.html): FROM your location, TO a search field, then results.
 /// Picking a result creates the trip and goes to its lobby. With `changingTripId` it instead
 /// re-points that trip and calls `onDone` with the same id.
@@ -97,16 +157,20 @@ struct CreateTripView: View {
     @State private var model = CreateTripModel()
     @FocusState private var searchFocused: Bool
     var changingTripId: String?
+    /// The trip's planned stops when changing its destination: the new route goes through them.
+    var keepingStops: [StopDraft]
     var onDone: (String) -> Void
 
-    init(changingTripId: String? = nil, onDone: @escaping (String) -> Void) {
+    init(changingTripId: String? = nil, keepingStops: [StopDraft] = [], onDone: @escaping (String) -> Void) {
         self.changingTripId = changingTripId
+        self.keepingStops = keepingStops
         self.onDone = onDone
     }
 
     init(model: CreateTripModel, changingTripId: String? = nil, onDone: @escaping (String) -> Void) {
         _model = State(initialValue: model)
         self.changingTripId = changingTripId
+        keepingStops = []
         self.onDone = onDone
     }
 
@@ -228,43 +292,30 @@ struct CreateTripView: View {
     }
 
     private func resultRow(_ result: DestinationResult) -> some View {
-        let kind = PlaceKind(result)
-        return Button { pick(result) } label: {
-            HStack(spacing: Spacing.m) {
-                Image(systemName: kind.symbol)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(kind.color, in: Circle())
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(result.name).foregroundStyle(.primary).lineLimit(1)
-                    if !result.subtitle.isEmpty {
-                        Text(result.subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if model.working == result.id {
-                    ProgressView().accessibilityLabel(changingTripId == nil ? "Creating trip" : "Updating trip")
-                } else if let distance = model.distanceText(result) {
-                    Text(distance)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                }
+        PlaceResultRow(result: result, disabled: model.isWorking, action: { pick(result) }) {
+            if model.working == result.id {
+                ProgressView().accessibilityLabel(changingTripId == nil ? "Creating trip" : "Updating trip")
+            } else if let distance = model.distanceText(result) {
+                Text(distance)
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
             }
-            .padding(.horizontal, Spacing.l)
-            .frame(minHeight: 58)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(model.isWorking)
-        .accessibilityLabel([result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
     private func pick(_ result: DestinationResult) {
         searchFocused = false
         Task {
+            if let tripId = changingTripId, !keepingStops.isEmpty {
+                let ok = await model.use(result, through: keepingStops) { route, stops in
+                    try await TripService.changeDestination(
+                        tripId: tripId, to: result, route: route,
+                        stops: stops.enumerated().map { $1.planned(order: $0) })
+                }
+                if ok { onDone(tripId) }
+                return
+            }
             if let tripId = changingTripId {
                 let ok = await model.use(result) { route in
                     try await TripService.changeDestination(tripId: tripId, to: result, route: route)
@@ -286,9 +337,46 @@ struct CreateTripView: View {
     }
 }
 
+/// One search result: its kind's icon, name and subtitle, then whatever `trailing` says (a distance, a spinner).
+/// Shared by Where to? and the add-a-stop sheet.
+struct PlaceResultRow<Trailing: View>: View {
+    var result: DestinationResult
+    var disabled = false
+    var action: () -> Void
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        let kind = PlaceKind(result)
+        Button(action: action) {
+            HStack(spacing: Spacing.m) {
+                Image(systemName: kind.symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(kind.color, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(result.name).foregroundStyle(.primary).lineLimit(1)
+                    if !result.subtitle.isEmpty {
+                        Text(result.subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                trailing
+            }
+            .padding(.horizontal, Spacing.l)
+            .frame(minHeight: 58)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .accessibilityLabel([result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+    }
+}
+
 /// Icon and tile color for a search result, after LocationSearch.dc.html: towns red, transit
 /// purple, nature green, everything else an orange pin.
-private struct PlaceKind {
+struct PlaceKind {
     var symbol: String
     var color: Color
 

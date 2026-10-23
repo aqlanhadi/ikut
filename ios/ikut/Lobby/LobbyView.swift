@@ -9,9 +9,12 @@ struct LobbyView: View {
     /// The trip ended (by the organizer or the server): show the recap.
     var onEnded: (String) -> Void = { _ in }
     @Environment(LocationPermission.self) private var location
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var model: LobbyModel
     @State private var session: TripSession
     @State private var routeInfo = TripRouteInfo()
+    @State private var planner: StopPlanner
+    @State private var showAddStop = false
     @State private var renaming = false
     @State private var renameText = ""
     @State private var showChangeDestination = false
@@ -24,6 +27,8 @@ struct LobbyView: View {
     @State private var startedHere = false
     /// Shows `model` as given: nothing is loaded, started or remembered.
     private var isSample = false
+    /// In a sample lobby: whether to show the organizer's card.
+    private var sampleOrganizer = true
 
     init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
@@ -31,6 +36,7 @@ struct LobbyView: View {
         _model = State(initialValue: LobbyModel(tripId: tripId))
         _session = State(initialValue: TripSession(
             tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
+        _planner = State(initialValue: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
     }
 
     #if DEBUG
@@ -39,11 +45,21 @@ struct LobbyView: View {
         onExit = {}
         _model = State(initialValue: model)
         _session = State(initialValue: TripSession(tripId: model.tripId, userId: ""))
+        _planner = State(initialValue: StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in }))
         isSample = true
+    }
+
+    /// A lobby on sample data with the planner in a given state, for previews and screenshots: `organizer` shows the
+    /// organizer's card (editable) rather than a member's.
+    init(sample model: LobbyModel, planner: StopPlanner, organizer: Bool) {
+        self.init(sample: model)
+        _planner = State(initialValue: planner)
+        sampleOrganizer = organizer
     }
     #endif
 
     private var isOrganizer: Bool {
+        if isSample { return sampleOrganizer }
         guard let trip = model.trip else { return false }
         return trip.organizerId == Auth.auth().currentUser?.uid
     }
@@ -63,44 +79,66 @@ struct LobbyView: View {
                          others: names.isEmpty ? nil : PastTrips.others(from: names, excluding: currentUserId))
     }
 
+    /// Hands the planner what Firestore says about the trip and its stops.
+    private func syncPlanner() {
+        guard !isSample else { return }
+        planner.sync(trip: model.trip, stops: model.stops)
+    }
+
     private var canLeave: Bool { session.isLiveMember }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
     private var canEdit: Bool { isOrganizer && canLeave }
+    /// Change destination: not on a started trip that has stops.
+    private var canChangeDestination: Bool {
+        LobbyLogic.canChangeDestination(canEdit: canEdit, started: isStarted, hasStops: !model.stops.isEmpty)
+    }
+    /// Add, move and remove stops: the organizer, before the trip has started.
+    private var canEditStops: Bool { canEdit && !isStarted }
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
     private var canPause: Bool { (session.isTracking || session.isPaused) && canLeave }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                statusBanner
-                if session.isPaused && !session.isEnded && !session.membershipLost {
-                    PausedBanner(session: session, onError: { actionError = $0 })
-                        .padding(.bottom, Spacing.xs)
-                }
-                if let trip = model.trip {
-                    tripCard(trip)
-                    inviteCard(trip.code)
-                        .padding(.top, Spacing.m)
-                    carsHeader
-                    carsCard
-                    if let actionError {
-                        InlineNote(actionError, tone: .alert)
-                            .padding(.top, Spacing.m)
-                    }
-                } else if let message = model.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
-                } else {
-                    ProgressView().padding(.top, 40)
-                }
+        // A List, not a ScrollView of cards: the stops need its drag to reorder and swipe to remove. Each block of
+        // the lobby is a row; the route card is several rows drawn as one card.
+        List {
+            statusBanner
+                .lobbyRow()
+            if session.isPaused && !session.isEnded && !session.membershipLost {
+                PausedBanner(session: session, onError: { actionError = $0 })
+                    .padding(.bottom, Spacing.xs)
+                    .lobbyRow()
             }
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.m)
-            .padding(.bottom, Spacing.l)
+            if let trip = model.trip {
+                tripCardRows(trip)
+                inviteCard(trip.code)
+                    .padding(.top, Spacing.m)
+                    .lobbyRow()
+                carsHeader
+                    .lobbyRow()
+                carsCard
+                    .lobbyRow()
+                if let actionError {
+                    InlineNote(actionError, tone: .alert)
+                        .padding(.top, Spacing.m)
+                        .lobbyRow()
+                }
+            } else if let message = model.errorMessage {
+                Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
+                    .lobbyRow()
+            } else {
+                ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                    .lobbyRow()
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .listRowSpacing(0)
+        .environment(\.defaultMinListRowHeight, 1)
+        .contentMargins(.top, Spacing.m, for: .scrollContent)
+        .contentMargins(.bottom, Spacing.l, for: .scrollContent)
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            let catchUp = LobbyLogic.catchUpLine(model.groupedCars)
             let started = isStarted
             Button {
                 if !started {
@@ -109,16 +147,9 @@ struct LobbyView: View {
                 }
                 showMap = true
             } label: {
-                VStack(spacing: 0) {
-                    Text(started ? "Back to Map" : "Start Trip")
-                    if let catchUp, !started {
-                        Text(catchUp).font(.caption).opacity(0.85)
-                    }
-                }
+                Text(started ? "Back to Map" : "Start Trip")
             }
             .buttonStyle(PillButtonStyle())
-            .accessibilityLabel(started ? "Back to Map" : "Start Trip")
-            .accessibilityHint(started ? "" : (catchUp ?? ""))
             .ikutBottomBar()
         }
         // The map shares this lobby's session; the lobby stays on the stack underneath it.
@@ -126,17 +157,29 @@ struct LobbyView: View {
             TripMapView(session: session, onExit: onExit, onEnded: { onEnded(model.tripId) })
         }
         .navigationDestination(isPresented: $showChangeDestination) {
-            CreateTripView(changingTripId: model.trip?.id) { _ in showChangeDestination = false }
+            CreateTripView(changingTripId: model.trip?.id, keepingStops: planner.items) { _ in showChangeDestination = false }
         }
         .navigationTitle("Trip Lobby")
         .onChange(of: session.isEnded, initial: true) { _, ended in
             if ended { onEnded(model.tripId) }
         }
-        .onChange(of: model.trip, initial: true) { _, _ in recordPastTrip() }
+        .onChange(of: model.trip, initial: true) { _, _ in
+            recordPastTrip()
+            syncPlanner()
+        }
+        .onChange(of: model.stops) { _, _ in syncPlanner() }
+        .sheet(isPresented: $showAddStop) {
+            AddStopSheet(
+                along: routeInfo.coordinates.count > 1
+                    ? AlongRoute(coordinates: routeInfo.coordinates, seconds: routeInfo.travelTime) : nil,
+                canMeet: StopListLogic.canMeet(among: planner.items),
+                onAdd: { planner.add($0) })
+        }
         .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.trip?.route) {
-            if let route = model.trip?.route { await routeInfo.load(route: route) }
+            guard let trip = model.trip else { return }
+            await routeInfo.load(route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty)
         }
         .alert("Trip name", isPresented: $renaming) {
             TextField("Trip name", text: $renameText)
@@ -274,55 +317,182 @@ struct LobbyView: View {
         .padding(.bottom, Spacing.s)
     }
 
-    /// Route preview, name, FROM → TO and the distance, drive and road stats.
-    private func tripCard(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            routePreview
-                .frame(height: 104)
-                .overlay(alignment: .topLeading) {
-                    if canEdit {
-                        Button { showChangeDestination = true } label: {
-                            Label("Change destination", systemImage: "magnifyingglass")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Color.ikutAccent)
-                                .padding(.horizontal, 11)
-                                .frame(minHeight: 30)
-                                .background(.regularMaterial, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(Spacing.gap)
-                    }
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if isStarted {
-                        StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
-                            .padding(Spacing.gap)
-                    } else if !session.isEnded {
-                        StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
-                            .padding(Spacing.gap)
-                    }
-                }
-            VStack(alignment: .leading, spacing: Spacing.gap) {
-                Text(trip.name)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                RouteEnds(from: routeInfo.originName, to: trip.destination.name)
-                    .padding(.top, -6)
-                StatGrid([
-                    .init("Distance", routeInfo.distance.map(RouteFormat.distance)),
-                    .init("Drive", routeInfo.travelTime.map(RouteFormat.shortDuration)),
-                    .init("Via", routeInfo.roadName.flatMap { $0.isEmpty ? nil : $0 }),
-                ], background: Color.ikutScreen)
-            }
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.m)
-            .padding(.bottom, Spacing.cozy)
-        }
-        .ikutCard()
-        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+    /// The stops as shown: the organizer's own edits while they are being built, else what the trip says.
+    private var shownStops: [StopDraft] {
+        canEditStops ? planner.items : model.stops.sorted { $0.order < $1.order }.map(StopDraft.init)
     }
 
-    private var routePreview: some View {
+    private var failure: StopPlanner.Failure? {
+        if case .failed(let failure) = planner.status, canEditStops { return failure }
+        return nil
+    }
+
+    /// Route preview, name, FROM → TO, the stops, and the total: rows of one white card.
+    @ViewBuilder
+    private func tripCardRows(_ trip: Trip) -> some View {
+        let stops = shownStops
+        let showStops = canEditStops || !stops.isEmpty
+        routePreview(stops: stops)
+            .frame(height: 104)
+            .overlay(alignment: .topLeading) {
+                if canEdit {
+                    HStack(spacing: Spacing.tight) {
+                        if canChangeDestination {
+                            Button { showChangeDestination = true } label: {
+                                pill("Change destination", systemImage: "magnifyingglass")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if canEditStops {
+                            Button { showAddStop = true } label: {
+                                pill("Add a stop", systemImage: "plus")
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!StopListLogic.canAdd(among: stops))
+                            .accessibilityIdentifier("stops.add")
+                        }
+                    }
+                    .padding(Spacing.gap)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if isStarted {
+                    StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
+                        .padding(Spacing.gap)
+                } else if !session.isEnded {
+                    StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
+                        .padding(Spacing.gap)
+                }
+            }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: Radius.card, topTrailingRadius: Radius.card, style: .continuous))
+            .cardSlice(top: true)
+            .lobbyRow()
+
+        VStack(alignment: .leading, spacing: Spacing.gap) {
+            Text(trip.name)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            RouteEnds(from: routeInfo.originName, to: trip.destination.name)
+                .padding(.top, -6)
+        }
+        .padding(.horizontal, Spacing.l)
+        .padding(.top, Spacing.m)
+        .padding(.bottom, showStops ? 0 : Spacing.gap)
+        .cardSlice()
+        .lobbyRow()
+
+        if showStops {
+            let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
+            layout {
+                Text("STOPS ON THE WAY").font(.caption.weight(.semibold)).tracking(0.6).accessibilityAddTraits(.isHeader)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
+                if planner.isBuilding && canEditStops {
+                    ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
+                } else if canEditStops, stops.count > 1 {
+                    Text("Hold and drag to reorder").font(.footnote)
+                }
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.m).padding(.bottom, Spacing.tight)
+            .cardSlice()
+            .lobbyRow()
+
+            if stops.isEmpty {
+                Text("No stops yet. Tap Add a stop for petrol, lunch, or a place to meet.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+                    .cardSlice()
+                    .lobbyRow()
+            }
+            ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
+                stopRow(stop, index: index, stops: stops)
+            }
+            .onMove(perform: canEditStops ? { planner.move(from: $0, to: $1) } : nil)
+            if let failure, failure.place.stopId == nil {
+                StopNote(
+                    tone: .failure,
+                    title: StopNoteText.failureTitle(failure, stopName: nil, destinationName: trip.destination.name),
+                    detail: StopNoteText.failureDetail(failure), retry: { planner.retry() })
+                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                    .cardSlice()
+                    .lobbyRow()
+            }
+        }
+
+        if planner.queued && canEditStops {
+            StopNote(tone: .warning, title: StopNoteText.queuedTitle, detail: StopNoteText.queuedDetail)
+                .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                .cardSlice()
+                .lobbyRow()
+        }
+
+        routeTotal(trip, stops: stops)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, showStops ? Spacing.gap : 0).padding(.bottom, Spacing.cozy)
+            .cardSlice(bottom: true)
+            .lobbyRow()
+    }
+
+    private func pill(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.ikutAccent)
+            .padding(.horizontal, 11)
+            .frame(minHeight: 30)
+            .background(.regularMaterial, in: Capsule())
+    }
+
+    @ViewBuilder
+    private func stopRow(_ stop: StopDraft, index: Int, stops: [StopDraft]) -> some View {
+        let failedHere = failure?.place == .stop(stop.id)
+        StopRow(
+            stop: stop, editable: canEditStops, first: index == 0,
+            turnBack: canEditStops && !planner.isBuilding ? planner.turnBacks[stop.id] : nil,
+            failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() })
+            .cardSlice()
+            .lobbyRow()
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                if canEditStops {
+                    Button(role: .destructive) { planner.remove(id: stop.id) } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                }
+            }
+            .accessibilityActions {
+                if canEditStops {
+                    if index > 0 {
+                        Button("Move up") { planner.move(from: IndexSet(integer: index), to: index - 1) }
+                    }
+                    if index < stops.count - 1 {
+                        Button("Move down") { planner.move(from: IndexSet(integer: index), to: index + 2) }
+                    }
+                    Button("Remove") { planner.remove(id: stop.id) }
+                }
+            }
+    }
+
+    /// "205 km · 2 h 40 + 35 min of stops" (or "Route not ready" while a stop has no road).
+    @ViewBuilder
+    private func routeTotal(_ trip: Trip, stops: [StopDraft]) -> some View {
+        if failure != nil {
+            RouteTotalLine(content: .notReady)
+        } else if let distance = routeInfo.distance, let seconds = routeInfo.travelTime {
+            let caption = StopListLogic.plannedMinutes(stops) > 0
+                ? "Drive time and planned stops"
+                : (stops.isEmpty ? (routeInfo.roadName.flatMap { $0.isEmpty ? nil : "via \($0)" } ?? "Drive time") : "Drive time")
+            RouteTotalLine(
+                content: .total(
+                    StopFormat.total(distance: distance, driveSeconds: seconds, stopMinutes: StopListLogic.plannedMinutes(stops)),
+                    caption: caption),
+                dimmed: planner.isBuilding && canEditStops)
+        } else {
+            RouteTotalLine(content: .loading)
+        }
+    }
+
+    private func routePreview(stops: [StopDraft]) -> some View {
         let coords = routeInfo.coordinates
         return Map(initialPosition: .automatic, interactionModes: []) {
             if coords.count > 1 {
@@ -337,6 +507,12 @@ struct LobbyView: View {
                 Annotation("", coordinate: coords[coords.count - 1], anchor: .center) {
                     Circle().fill(Color.blue).frame(width: 12, height: 12)
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                }
+                ForEach(stops.filter { !$0.isMeeting }) { stop in
+                    Annotation("", coordinate: stop.coordinate, anchor: .center) {
+                        Circle().fill(Color.ikutAccent).frame(width: 12, height: 12)
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                    }
                 }
             }
         }
@@ -480,20 +656,6 @@ extension LobbyLogic {
     static func displayCode(_ code: String) -> String {
         guard code.count == 6 else { return code }
         return "\(code.prefix(3)) \(code.suffix(3))"
-    }
-
-    /// Under Start Trip while some cars have no tracker: "Daniel can catch up on the road",
-    /// "Daniel and Siti can…", "3 cars can…". Nil when every car is tracked.
-    static func catchUpLine(_ cars: [LobbyCar]) -> String? {
-        let waiting = cars.filter { !$0.hasTracker }
-        guard !waiting.isEmpty else { return nil }
-        let names = waiting.map { $0.members.first?.displayName ?? $0.car.name }
-        let who = switch names.count {
-        case 1: names[0]
-        case 2: "\(names[0]) and \(names[1])"
-        default: "\(names.count) cars"
-        }
-        return "\(who) can catch up on the road"
     }
 
     /// "You (organizer, tracker) · Siti", "Wyna (tracker) · 3 others", "Daniel · no tracker yet".

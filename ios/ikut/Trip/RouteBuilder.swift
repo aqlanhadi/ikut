@@ -46,6 +46,37 @@ enum RouteError: LocalizedError, Equatable {
     }
 }
 
+/// One MapKit request for a leg, no retry.
+struct MapKitDirectionsRouter: LegRouting {
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        try await RouteBuilder.requestLeg(from: from, to: to)
+    }
+}
+
+/// Asks `base` again, once, after `wait`, when it answers that MapKit is throttling (about 50 requests a minute).
+/// A second throttle is passed on. The wait is injectable so tests don't sit through it.
+struct ThrottleRetryRouter: LegRouting {
+    var base: LegRouting
+    var wait: Duration = RouteBuilder.throttleWait
+    var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        do {
+            return try await base.leg(from: from, to: to)
+        } catch let error as MKError where error.code == .loadingThrottled {
+            try await sleep(wait)
+            return try await base.leg(from: from, to: to)
+        }
+    }
+}
+
+/// The real leg router: a MapKit request, retried once when throttled.
+struct MapKitLegRouter: LegRouting {
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        try await ThrottleRetryRouter(base: MapKitDirectionsRouter()).leg(from: from, to: to)
+    }
+}
+
 /// Destination search and main-route building on top of MapKit.
 ///
 /// Never asks for location permission; the caller is expected to have done that.
@@ -77,9 +108,31 @@ enum RouteBuilder {
     /// forever without one (indoors, before GPS locks, a simulator with no location set).
     @MainActor
     static func buildRoute(to destination: CLLocationCoordinate2D) async throws -> BuiltRoute {
-        let here = try await currentLocation()
+        let here: CLLocationCoordinate2D
+        do {
+            here = try await currentLocation()
+        } catch let error as RouteError {
+            throw error
+        } catch let error as NSError where isLocationError(error) {
+            throw RouteError.locationUnavailable
+        }
+        let leg = try await leg(from: here, to: destination)
+        return BuiltRoute(distance: leg.distance, travelTime: leg.travelTime, name: leg.name, polyline: Polyline.encode(leg.coordinates))
+    }
+
+    /// One driving leg from `source` to `destination`: the MapKit request, with the timeout every request here gets,
+    /// and one more try after a wait when MapKit says it is throttling (`ThrottleRetryRouter`).
+    @MainActor
+    static func leg(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> RouteLeg {
+        try await MapKitLegRouter().leg(from: source, to: destination)
+    }
+
+    static let throttleWait: Duration = .seconds(4)
+
+    @MainActor
+    static func requestLeg(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> RouteLeg {
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: here))
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
         request.transportType = .automobile
         request.requestsAlternateRoutes = false
@@ -89,12 +142,9 @@ enum RouteBuilder {
             return try await withTimeout(directionsTimeout, error: RouteError.timedOut) {
                 let response = try await directions.calculate()
                 guard let route = response.routes.first else { throw RouteError.noRoute }
-                return BuiltRoute(
-                    distance: route.distance,
-                    travelTime: route.expectedTravelTime,
-                    name: route.name,
-                    polyline: Polyline.encode(coordinates(of: route.polyline))
-                )
+                return RouteLeg(
+                    coordinates: coordinates(of: route.polyline), distance: route.distance,
+                    travelTime: route.expectedTravelTime, name: route.name)
             } onTimeout: {
                 directions.cancel()
             }
@@ -102,6 +152,8 @@ enum RouteBuilder {
             throw error
         } catch let error as MKError where error.code == .directionsNotFound {
             throw RouteError.noRoute
+        } catch let error as MKError where error.code == .loadingThrottled {
+            throw error
         } catch let error as NSError where isLocationError(error) {
             throw RouteError.locationUnavailable
         } catch {

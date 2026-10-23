@@ -13,6 +13,20 @@ struct IkutApp: App {
 
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            if let name = ProcessInfo.processInfo.environment["IKUT_SCREEN"], let demo = DemoScreens.view(name) {
+                demo
+            } else {
+                root
+            }
+            #else
+            root
+            #endif
+        }
+    }
+
+    private var root: some View {
+        Group {
             ContentView(pendingJoinCode: $pendingJoinCode)
                 .environment(auth)
                 .environment(location)

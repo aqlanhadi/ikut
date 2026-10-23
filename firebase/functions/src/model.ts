@@ -36,12 +36,41 @@ export interface Trip {
   organizerId: string;
   route: string;
   destination: Destination;
+  /** Driving time in seconds along `route`, the legs added up when it goes through stops; absent on older trips. */
+  routeSeconds?: number;
+  /** How many planned stops the trip has (the stops subcollection can't be counted in rules). Absent means none. */
+  stopCount?: number;
   status: TripStatus;
   createdAt: Timestamp;
   lastActivityAt?: Timestamp;
   /** First Start Trip by any member; absent until the trip is underway. */
   startedAt?: Timestamp;
   endedAt?: Timestamp;
+}
+
+export type PlannedStopKind = "meet" | "fuel" | "food" | "rest" | "toilet" | "sight";
+
+/**
+ * trips/{tripId}/stops/{stopId}: a place on the main route that cars arrive at and leave.
+ * The organizer writes them before `startedAt`; afterwards only `skipped`, `skippedBy`, `skippedAt` change.
+ * A stop chosen mid-trip (D4) is meant to be a document of the same shape.
+ */
+export interface PlannedStop {
+  name: string;
+  coordinate: GeoPoint;
+  /** Meters along the trip's main route. */
+  routeOffset: number;
+  kind: PlannedStopKind;
+  /** Planned length in minutes; never on a meeting point. */
+  minutes?: number;
+  /** When to meet; only on a `meet` stop. */
+  meetAt?: Timestamp;
+  note?: string;
+  /** 0-based place in the list; a `meet` stop is always 0. */
+  order: number;
+  skipped?: boolean;
+  skippedBy?: string;
+  skippedAt?: Timestamp;
 }
 
 /** trips/{tripId}/cars/{carId} */
