@@ -37,6 +37,8 @@ struct TripMapView: View {
     @State private var stopBoard = StopBoard.empty
     /// The stop card is on top of the convoy panel only after a tap on the Pit stop button.
     @State private var stopCardOpen = false
+    /// The planned stop whose "who is here" card is open (D25 piece 3b), from the panel's Next stop cell.
+    @State private var arrivalStopId: String?
     @Environment(\.dynamicTypeSize) private var typeSize
     /// What the pill at the top has shown and when, so each question goes quiet after 20 seconds.
     @State private var pillMemory = StopPillMemory()
@@ -550,7 +552,12 @@ struct TripMapView: View {
     /// At accessibility text sizes the stop pill alone is taller than the room above even a folded panel,
     /// so the panel steps aside while the pill is up (at most 20 seconds) instead of covering its OK.
     private var panelAside: Bool {
-        stopCardOpen || (typeSize.isAccessibilitySize && stopPill != nil)
+        stopCardOpen || arrivalOpen || (typeSize.isAccessibilitySize && stopPill != nil)
+    }
+
+    /// The arrival card is up: its stop is still on (a stop skipped while it is open closes it).
+    private var arrivalOpen: Bool {
+        arrivalStopId.map { StopArrival.target(stopId: $0, in: model.stops) != nil } ?? false
     }
 
     private var bottomStack: some View {
@@ -562,6 +569,15 @@ struct TripMapView: View {
                 .animation(.easeOut(duration: 0.12), value: panelAside)
                 .allowsHitTesting(!panelAside)
                 .accessibilityHidden(panelAside)
+            if arrivalOpen, !stopCardOpen, let id = arrivalStopId {
+                StopArrivalCard(model: model, stopId: id, frozenNow: nil) {
+                    withAnimation(.snappy) { arrivalStopId = nil }
+                }
+                .padding(.horizontal, Spacing.s)
+                .padding(.bottom, Spacing.s)
+                .zIndex(1)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if stopCardOpen, let context = stopContext {
                 stopCard(context)
                     // Above the panel for the whole of its exit too, or it would slide away behind it.
@@ -575,7 +591,8 @@ struct TripMapView: View {
         ConvoyPanel(
             model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
             stopButton: StopLogic.buttonContent(for: stopBoard),
-            onReport: openReport, onStop: openStopCard)
+            onReport: openReport, onStop: openStopCard,
+            onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } })
     }
 
     private func stopCard(_ context: StopContext) -> some View {

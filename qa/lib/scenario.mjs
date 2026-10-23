@@ -65,17 +65,29 @@ export const PARKED_TIMELINE = [
   { at: 800, car: 'car1', do: 'markStopped' },
 ];
 
-export const SCENARIOS = ['drive', 'parked'];
+/**
+ * The planned-stop scenario (D25 piece 3b, `--scenario stop` on convoy-sim.mjs): cars 1-4 drive as in the default
+ * scenario, but each pulls in at the planned stop R&R Tapah, 20 km along the main route, and parks there (car i
+ * 20 m short of car i-1, all within the 150 m "here" radius). Car 1 arrives about T=532, car 2 about 565, car 4
+ * (merged at 408) about 598, car 3 about 616. The organizer writes the stop before the start, like the lobby; car 1's
+ * phone model (lib/stoparrival.mjs) reads everyone's positions and counts who is here. No phone: no `app` car, so
+ * `--wait-app` and run-ui do not take this scenario. The tracks are `car<N>-stop.gpx`.
+ */
+export const STOP = { name: 'R&R Tapah', kind: 'fuel', minutes: 20, offset: 20_000 };
+export const STOP_CARS = CARS.filter((c) => c.kind !== 'app').map((c, i) => ({ ...c, gpx: `${c.key}-stop`, stopAt: STOP.offset - 20 * i }));
+
+export const SCENARIOS = ['drive', 'parked', 'stop'];
 
 /** The cars of a scenario: 'drive' (the default) or 'parked'. */
 export function scenarioCars(name = 'drive') {
   if (name === 'drive') return CARS;
   if (name === 'parked') return [...CARS.filter((c) => c.kind !== 'app'), ...PARKED_CARS];
+  if (name === 'stop') return STOP_CARS;
   throw new Error(`unknown scenario ${name} (${SCENARIOS.join(' or ')})`);
 }
 
 /** The scripted happenings of a scenario. */
-export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : TIMELINE);
+export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : name === 'stop' ? [] : TIMELINE);
 
 /** The phone's track in a scenario. */
-export const appKey = (name = 'drive') => scenarioCars(name).find((c) => c.kind === 'app').key;
+export const appKey = (name = 'drive') => scenarioCars(name).find((c) => c.kind === 'app')?.key;

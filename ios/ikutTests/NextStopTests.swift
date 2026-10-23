@@ -58,4 +58,21 @@ struct NextStopTests {
         #expect(NextStop.pace(travelTimeToGo: 30, remaining: 300, speed: 20) == 0.05)
         #expect(NextStop.pace(travelTimeToGo: nil, remaining: 1_000, speed: nil) == nil)
     }
+
+    @Test func aJoiningCarSeesTheMeetingPointOnly() throws {
+        var meet = stop("Petronas Sungai Buloh", 0)
+        meet.kind = .meet
+        let stops = [meet, stop("Tapah", 60_000)]
+        let cell = try #require(NextStop.joiningCell(stops: stops, distance: 9_000, seconds: 420))
+        #expect(cell.name == "Petronas Sungai Buloh")
+        #expect(cell.stopId == "Petronas Sungai Buloh")
+        #expect(cell.detail == "9.0 km · 7 min")
+        #expect(NextStop.joiningCell(stops: stops, distance: 100, seconds: 5)?.detail == "Here")
+        // No meeting point, a skipped one, or an unknown distance: no cell.
+        #expect(NextStop.joiningCell(stops: [stop("Tapah", 60_000)], distance: 9_000, seconds: 420) == nil)
+        var skipped = meet
+        skipped.skipped = true
+        #expect(NextStop.joiningCell(stops: [skipped], distance: 9_000, seconds: 420) == nil)
+        #expect(NextStop.joiningCell(stops: stops, distance: nil, seconds: nil) == nil)
+    }
 }
