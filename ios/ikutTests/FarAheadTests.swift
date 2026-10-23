@@ -208,6 +208,44 @@ struct FarAheadTests {
         #expect(abs((eta.calls.from.first?.longitude ?? 0) - Self.origin.longitude) < 0.001)
     }
 
+    /// The town lookup for a parked far car: once over many refreshes, again after a move of more than
+    /// 2 km, and a lookup that found nothing is tried again after 60 s.
+    @MainActor @Test func townLookupOnceAgainAfterAMoveAndRetriedAfterAMinute() async {
+        final class Namer {
+            var answers: [String?]
+            var calls: [CLLocationCoordinate2D] = []
+            init(_ answers: [String?]) { self.answers = answers }
+            func name(_ c: CLLocationCoordinate2D) -> String? {
+                calls.append(c)
+                return answers.isEmpty ? nil : answers.removeFirst()
+            }
+        }
+        var clock = Self.now
+        let namer = Namer([nil, "Rawang", "Rasa"])
+        let m = ConvoyModel(
+            provider: FixedETA(), locale: Self.gb, timeZone: Self.utc, clock: { clock }, placeNamer: { namer.name($0) })
+        m.setMainRoute(Self.main)
+        m.myCarId = "1"
+        let cars = [aisha, daniel]
+        func at(_ danielAt: Double, after seconds: TimeInterval) async {
+            clock = Self.now.addingTimeInterval(seconds)
+            m.update(cars: cars, positions: ["1": pos(0, age: -seconds), "3": pos(danielAt, speed: 0, age: -seconds)])
+            await m.waitForPlaceNames()
+        }
+        await at(38_000, after: 0)
+        #expect(namer.calls.count == 1)                 // found nothing
+        await at(38_000, after: 30)
+        #expect(namer.calls.count == 1)                 // not before a minute
+        await at(38_000, after: 61)
+        #expect(namer.calls.count == 2)                 // retried: Rawang
+        #expect(m.convoyRows.first?.subtitle == "38 km ahead · parked near Rawang")
+        for s in [70.0, 80, 90, 100] { await at(38_300, after: s) } // 300 m of wander
+        #expect(namer.calls.count == 2)
+        await at(41_000, after: 110)                    // moved 3 km and parked again
+        #expect(namer.calls.count == 3)
+        #expect(m.convoyRows.first?.subtitle == "41 km ahead · parked near Rasa")
+    }
+
     @MainActor @Test func farMovingCarsRowSaysOnlyHowFar() async {
         let m = await model([aisha, daniel], ["1": pos(0), "3": pos(38_000, speed: 25)], me: "1")
         #expect(m.convoyRows.first?.subtitle == "38 km ahead")
@@ -252,6 +290,37 @@ struct FarAheadTests {
         #expect(due?.distance == 2_900)
         #expect(check(36_000) == nil)        // once
         #expect(check(37_000, me: "1") == nil) // Aisha's phone hears nothing
+    }
+
+    /// Once per stop (owner, #180): Daniel waits at R&R Rawang (km 38) and hears it; he drives on with
+    /// the convoy, waits again at the Tapah toll (km 90), and hears it again. Never twice at one stop.
+    @Test func headsUpOncePerStopAndAgainAfterDrivingOn() {
+        var watch = CatchUpHeadsUp()
+        let cars = [aisha, wyna, daniel]
+        func check(aisha: Double, daniel: Double, danielSpeed: Double = 0) -> CatchUpHeadsUp.Due? {
+            watch.check(order(cars, ["1": pos(aisha), "2": pos(aisha - 200), "3": pos(daniel, speed: danielSpeed)]),
+                        tripId: "t", myCarId: "3")
+        }
+        // Stop 1.
+        #expect(check(aisha: 20_000, daniel: 38_000) == nil)
+        #expect(check(aisha: 35_100, daniel: 38_000)?.carId == "1")
+        #expect(check(aisha: 36_000, daniel: 38_000) == nil)
+        // Still parked as the convoy pulls in (GPS wander of 300 m is not driving on): quiet.
+        #expect(check(aisha: 37_800, daniel: 38_300) == nil)
+        #expect(check(aisha: 37_900, daniel: 38_000) == nil)
+        // Daniel drives on with the convoy, more than 1 km: re-armed, but nobody is far behind.
+        #expect(check(aisha: 40_000, daniel: 40_200, danielSpeed: 25) == nil)
+        #expect(check(aisha: 60_000, daniel: 60_200, danielSpeed: 25) == nil)
+        // Stop 2: he parks at km 90; the convoy, 15 km back, comes up.
+        #expect(check(aisha: 75_000, daniel: 90_000) == nil)
+        let second = check(aisha: 87_100, daniel: 90_000)
+        #expect(second?.carId == "1")
+        #expect(second?.stop == 2)
+        #expect(check(aisha: 88_000, daniel: 90_000) == nil)
+        // Its own alert id, so the alert center announces it although it announced stop 1.
+        let first = CatchUpHeadsUp.Due(carId: "1", carPhrase: "Aisha’s car", distance: 2_900, seconds: 116)
+        #expect(AlertWording.catchUp(tripId: "t", myCarId: "3", due: first).id
+            != AlertWording.catchUp(tripId: "t", myCarId: "3", due: second ?? first).id)
     }
 
     @Test func headsUpNeverForCarsThatStartTogether() {

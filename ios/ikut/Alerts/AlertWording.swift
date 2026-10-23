@@ -64,7 +64,7 @@ enum AlertWording {
     static func catchUp(tripId: String, myCarId: String, due: CatchUpHeadsUp.Due) -> TripAlert {
         let distance = distanceText(due.distance)
         return TripAlert(
-            id: "\(myCarId)@catchup", eventId: due.carId, tripId: tripId, type: .other("catchUp"),
+            id: due.stop == 1 ? "\(myCarId)@catchup" : "\(myCarId)@catchup\(due.stop)", eventId: due.carId, tripId: tripId, type: .other("catchUp"),
             category: .status, severity: .medium, distance: due.distance,
             title: "\(due.carPhrase) is behind you",
             body: "\(distance) · about \(ConvoyFormat.duration(due.seconds)) away",

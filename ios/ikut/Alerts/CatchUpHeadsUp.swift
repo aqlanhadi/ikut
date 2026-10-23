@@ -5,10 +5,15 @@ import Foundation
 /// car's smoothed speed (`ConvoyEntry.movingSpeed`, not the floored one).
 ///
 /// It fires only after this phone has seen that car more than `leadTime` away, so cars that start
-/// together, or a relaunch with the convoy already close, stay quiet. Once per car per trip. Pure
-/// apart from what it remembers, which lasts as long as the value (the map's model).
+/// together, or a relaunch with the convoy already close, stay quiet. Once per stop: after it fires,
+/// it is quiet until my car has driven on more than `rearmDistance` along the route from where it
+/// fired, then a later stop ahead of the convoy can fire it again. Pure apart from what it remembers,
+/// which lasts as long as the value (the map's model).
 struct CatchUpHeadsUp: Sendable {
     static let leadTime: TimeInterval = 120
+    /// How far my car drives on from where it heard the heads-up before the next stop can fire it again:
+    /// well past GPS wander in a car park, well short of the next R&R or toll.
+    static let rearmDistance: Double = 1_000
 
     /// What the pill and the spoken line are about.
     struct Due: Equatable, Sendable {
@@ -20,12 +25,17 @@ struct CatchUpHeadsUp: Sendable {
         var distance: Double
         /// Seconds until it reaches my car.
         var seconds: TimeInterval
+        /// Which heads-up this is for my car on this trip (1 at the first stop), so each stop's alert
+        /// is announced on its own.
+        var stop = 1
     }
 
     /// Cars behind seen more than `leadTime` away, by "trip/myCar/theirs".
     private var seenFar: Set<String> = []
-    /// "trip/myCar" once it has fired.
-    private var fired: Set<String> = []
+    /// My car's route offset when it fired, by "trip/myCar"; gone once it drives on.
+    private var firedAt: [String: Double] = [:]
+    /// How many times it has fired, by "trip/myCar".
+    private var stops: [String: Int] = [:]
 
     init() {}
 
@@ -48,20 +58,29 @@ struct CatchUpHeadsUp: Sendable {
             seconds: distance / behind.movingSpeed)
     }
 
-    /// The heads-up the first time it is due for my car on this trip, else nil.
+    /// The heads-up the first time it is due for my car at this stop, else nil.
     mutating func check(
         _ snapshot: ConvoySnapshot, tripId: String, myCarId: String, config: ConvoyOrdering.Config = .default
     ) -> Due? {
         let mine = "\(tripId)/\(myCarId)"
-        guard !fired.contains(mine), let due = Self.nearestBehind(snapshot, myCarId: myCarId, config: config)
-        else { return nil }
+        if let at = firedAt[mine] {
+            // Re-arm once my car has driven on; it then has to see a car far behind again.
+            guard let me = snapshot.convoy.first(where: { $0.id == myCarId }),
+                  me.convoyOffset - at > Self.rearmDistance else { return nil }
+            firedAt[mine] = nil
+            seenFar = seenFar.filter { !$0.hasPrefix("\(mine)/") }
+        }
+        guard var due = Self.nearestBehind(snapshot, myCarId: myCarId, config: config) else { return nil }
         let pair = "\(mine)/\(due.carId)"
         guard due.seconds <= Self.leadTime else {
             seenFar.insert(pair)
             return nil
         }
-        guard seenFar.contains(pair) else { return nil }
-        fired.insert(mine)
+        guard seenFar.contains(pair),
+              let me = snapshot.convoy.first(where: { $0.id == myCarId }) else { return nil }
+        firedAt[mine] = me.convoyOffset
+        due.stop = (stops[mine] ?? 0) + 1
+        stops[mine] = due.stop
         return due
     }
 

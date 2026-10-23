@@ -70,6 +70,18 @@ test('heads-up: once, about 2 minutes before the next moving car reaches the par
   assert.equal(h.check(at(38_000 - 2000), 'Daniel'), null); // once
 });
 
+test('heads-up: once per stop, again after driving on', () => {
+  const h = new CatchUpHeadsUp();
+  const at = (aisha, d, speed = 0) => entries([car('Daniel', d, speed), car('Aisha', aisha, 25, { isLead: true }), car('Wyna', aisha - 200, 25)]);
+  assert.equal(h.check(at(20_000, 38_000), 'Daniel'), null);
+  assert.equal(h.check(at(35_100, 38_000), 'Daniel')?.stop, 1);
+  assert.equal(h.check(at(37_900, 38_300), 'Daniel'), null); // GPS wander at the stop
+  assert.equal(h.check(at(40_000, 40_200, 25), 'Daniel'), null); // drives on: re-armed
+  assert.equal(h.check(at(75_000, 90_000), 'Daniel'), null);
+  assert.equal(h.check(at(87_100, 90_000), 'Daniel')?.stop, 2);
+  assert.equal(h.check(at(88_000, 90_000), 'Daniel'), null);
+});
+
 test('heads-up: quiet when the car behind was never seen far, or my car is moving', () => {
   const h = new CatchUpHeadsUp();
   assert.equal(h.check(entries([daniel(), car('Aisha', 38_000 - 1000, 27.8)]), 'Daniel'), null);

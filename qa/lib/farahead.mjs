@@ -25,6 +25,7 @@ export const CONFIG = {
   parkedSpeed: 20 / 3.6, // m/s
 };
 export const LEAD_TIME = 120; // CatchUpHeadsUp.leadTime, s
+export const REARM_DISTANCE = 1000; // CatchUpHeadsUp.rearmDistance, m
 
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
@@ -134,11 +135,15 @@ export function carPhrase(carName) {
 /** AlertWording.catchUp spoken line. */
 export const catchUpSpoken = (due) => `${due.carPhrase} is ${distanceText(due.distance)} behind you.`;
 
-/** CatchUpHeadsUp: once per car per trip, after the car behind was seen more than LEAD_TIME away. */
+/**
+ * CatchUpHeadsUp: once per stop, after the car behind was seen more than LEAD_TIME away; re-armed once my car
+ * has driven on more than REARM_DISTANCE from where it fired. One instance per phone (my car, one trip).
+ */
 export class CatchUpHeadsUp {
   constructor() {
     this.seenFar = new Set();
-    this.fired = false;
+    this.firedAt = null;
+    this.stops = 0;
   }
 
   /** CatchUpHeadsUp.nearestBehind. */
@@ -154,7 +159,12 @@ export class CatchUpHeadsUp {
   }
 
   check(convoy, myCarId, config = CONFIG) {
-    if (this.fired) return null;
+    if (this.firedAt !== null) {
+      const me = convoy.find((e) => e.id === myCarId);
+      if (!me || me.offset - this.firedAt <= REARM_DISTANCE) return null;
+      this.firedAt = null;
+      this.seenFar.clear();
+    }
     const due = CatchUpHeadsUp.nearestBehind(convoy, myCarId, config);
     if (!due) return null;
     if (due.seconds > LEAD_TIME) {
@@ -162,7 +172,8 @@ export class CatchUpHeadsUp {
       return null;
     }
     if (!this.seenFar.has(due.carId)) return null;
-    this.fired = true;
-    return due;
+    this.firedAt = convoy.find((e) => e.id === myCarId).offset;
+    this.stops += 1;
+    return { ...due, stop: this.stops };
   }
 }
