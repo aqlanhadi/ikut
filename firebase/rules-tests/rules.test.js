@@ -692,6 +692,17 @@ describe('planned stops', () => {
     });
     it('a member who is not the organizer cannot move a stop', () =>
       assertFails(rebuild('mem', { s1: { routeOffset: 40000 } })));
+    it("the lead car's tracker, who may mark a stop reached or left, cannot move its offset", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const f = ctx.firestore();
+        await setDoc(doc(f, `trips/${T}/members/lead`), memberDoc({ displayName: 'Lead', carId: 'carL' }));
+        await setDoc(doc(f, `trips/${T}/cars/carL`), carDoc({ name: 'Car L', isLead: true, trackerUserId: 'lead' }));
+      });
+      await assertFails(rebuild('lead', { s1: { routeOffset: 40000 } }));
+      await assertFails(rebuild('lead', { s1: { routeOffset: 40000 } }, null));
+      await assertFails(rebuild('lead', { s1: { routeOffset: 40000, arrivedAt: serverTimestamp() } }, null));
+      await assertSucceeds(rebuild('lead', { s1: { arrivedAt: serverTimestamp() } }, null));
+    });
     it('only the offset moves: nothing else on the stop changes with it', async () => {
       await assertFails(rebuild('org', { s1: { routeOffset: 40000, name: 'Elsewhere' } }));
       await assertFails(rebuild('org', { s1: { routeOffset: 40000, order: 1 } }));
