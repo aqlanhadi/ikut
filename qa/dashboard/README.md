@@ -41,3 +41,7 @@ Developing the script without simulators: `IKUT_PLAYGROUND_NO_SIM=1 node qa/dash
 
 POSTs (`/api/start`, `/api/stop`, `/api/command`) and `GET /api/config` need `Content-Type: application/json` and a Host (and Origin, when a browser sends one) of
 `127.0.0.1` or `localhost` on the server's own port; anything else gets a 403 (a GET has no content type to check). With curl add `-H 'content-type: application/json'`.
+
+**Screens tab** (`screens.mjs`): `GET /api/screens` returns `{simulators, groups}` (the `case "…":` names in `enum DemoScreens`, parsed at request time, grouped by prefix).
+`POST /api/screen {sim: "1"|"2", screen}` boots the simulator if it is shut down, then runs `SIMCTL_CHILD_IKUT_SCREEN=<screen> xcrun simctl launch --terminate-running-process <udid> dev.aqlan.ikut` (execFile, no shell).
+The simulator comes from a fixed list and the name must be one the parser found (404 otherwise); a simulator held through `qa/simlock.sh` answers 409 with its holder text (`/tmp/ikut-sim-<udid>.holder`); an app that is not installed answers 409 with the build and install command. Same POST checks as above.
