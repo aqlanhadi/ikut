@@ -5,6 +5,8 @@
 //   node run-ui.mjs --speed 1            # real time, before a field test
 //   node run-ui.mjs --skip-build         # reuse a build in --derived-data
 //   node run-ui.mjs --deadline 3600      # give up (RESULT: ABORT) after 3600 s; default 2100 s + the scenario
+//   node run-ui.mjs --scenario parked    # the phone is parked on the route far ahead of the convoy (D26): the far
+//                                        # stop request, the heads-up pill, then drives on (qa/gpx/car5-parked.gpx)
 //
 // 1. boots the simulator, grants location (xcrun simctl privacy), parks it at the start of qa/gpx/car5-app.gpx
 // 2. starts convoy-sim.mjs --wait-app (4 simulated cars) and reads the trip code from it
@@ -24,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { readGpx } from './lib/gpx.mjs';
 import { endsWithResult, holdSimulators, makeSay, simctl } from './lib/shell.mjs';
 import { haversine } from './lib/route.mjs';
+import { appKey } from './lib/scenario.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.dirname(here);
@@ -36,8 +39,9 @@ const o = {
   name: 'Faiz',
   screens: path.join(here, 'screens'),
   logs: path.join(os.tmpdir(), 'ikut-qa'),
-  only: 'ikutUITests/ConvoyScenarioUITests',
+  only: null,
   deadline: null,
+  scenario: 'drive',
 };
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -50,8 +54,13 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a === '--screens') o.screens = next();
   else if (a === '--logs') o.logs = next();
   else if (a === '--deadline') o.deadline = Number(next());
+  else if (a === '--scenario') o.scenario = next();
   else { console.error(`unknown option ${a}`); process.exit(64); }
 }
+if (!['drive', 'parked'].includes(o.scenario)) { console.error(`unknown scenario ${o.scenario} (drive or parked)`); process.exit(64); }
+o.only ??= o.scenario === 'parked'
+  ? 'ikutUITests/ConvoyScenarioUITests/testParkedAheadOfTheConvoy'
+  : 'ikutUITests/ConvoyScenarioUITests/testFifthCarInSimulatedConvoy';
 await holdSimulators([o.udid]);
 // The sim waits up to 1500 s for the phone to join (the build included), then plays its 900 s scenario.
 const end = endsWithResult({ deadlineS: o.deadline ?? 1500 + 900 / o.speed + 600, signals: true });
@@ -71,13 +80,15 @@ if (!line.includes('(Booted)')) {
   simctl('boot', o.udid);
   simctl('bootstatus', o.udid, '-b');
 }
-const track = readGpx(path.join(here, 'gpx', 'car5-app.gpx'));
+const track = readGpx(path.join(here, 'gpx', `${appKey(o.scenario)}.gpx`));
 simctl('privacy', o.udid, 'grant', 'location', 'dev.aqlan.ikut');
 simctl('location', o.udid, 'set', `${track[0].latitude},${track[0].longitude}`);
 
 // ---- sim
 const simLog = fs.createWriteStream(path.join(o.logs, 'sim.log'));
-const sim = end.track(spawn('node', [path.join(here, 'convoy-sim.mjs'), '--speed', String(o.speed), '--wait-app', '--wait-timeout', '1500', '--expect-app-ok'], { cwd: here }));
+// Both UI tests say OK to the stop request: from the card (drive) or the pill (parked).
+const simArgs = [path.join(here, 'convoy-sim.mjs'), '--speed', String(o.speed), '--wait-app', '--wait-timeout', '1500', '--expect-app-ok', '--scenario', o.scenario];
+const sim = end.track(spawn('node', simArgs, { cwd: here }));
 let simCode = null;
 let simGo = false;
 let simDone = null;
@@ -115,7 +126,7 @@ if (o.skipBuild) args[0] = 'test-without-building';
 const xcLogPath = path.join(o.logs, 'xcodebuild.log');
 const xcLog = fs.createWriteStream(xcLogPath);
 const xc = end.track(spawn('xcodebuild', args, {
-  env: { ...process.env, TEST_RUNNER_IKUT_JOIN_CODE: simCode, TEST_RUNNER_IKUT_JOIN_NAME: o.name, TEST_RUNNER_IKUT_QA_SPEED: String(o.speed), TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
+  env: { ...process.env, TEST_RUNNER_IKUT_JOIN_CODE: simCode, TEST_RUNNER_IKUT_JOIN_NAME: o.name, TEST_RUNNER_IKUT_QA_SPEED: String(o.speed), TEST_RUNNER_IKUT_QA_SCREENS: o.screens, TEST_RUNNER_IKUT_QA_SCENARIO: o.scenario },
 }));
 let xcResult = null;
 let xcBuf = '';
@@ -140,14 +151,22 @@ const xcExit = new Promise((r) => xc.on('exit', (c) => r(c)));
 // the point the GPX says the car should be at, which keeps the phone within a few seconds of its track.
 await new Promise((r) => (simGo ? r() : goWaiters.push(r)));
 const goAt = Date.now();
+// Played at the track's speed while it moves; a parked stretch (the parked scenario) is held with location set.
 let meters = 0;
-for (let i = 1; i < track.length; i++) meters += haversine(track[i - 1], track[i]);
-const mps = (meters / (track[track.length - 1].t - track[0].t)) * o.speed;
+let moving = 0;
+const parkedAt = (i) => i + 1 < track.length && haversine(track[i], track[i + 1]) < 0.01;
+for (let i = 1; i < track.length; i++) {
+  const d = haversine(track[i - 1], track[i]);
+  meters += d;
+  if (d >= 0.01) moving += track[i].t - track[i - 1].t;
+}
+const mps = (meters / moving) * o.speed;
 const RESYNC = 20;
 let feeder = null;
 const feed = () => {
   const T = ((Date.now() - goAt) / 1000) * o.speed;
   const from = Math.max(0, track.findIndex((p) => p.t >= T));
+  if (parkedAt(from)) { simctl('location', o.udid, 'set', `${track[from].latitude},${track[from].longitude}`); return; }
   const pts = track.filter((p, i) => i >= from && (i % 4 === 0 || i === track.length - 1)).map((p) => `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`);
   if (pts.length < 2) return;
   const loc = spawn('xcrun', ['simctl', 'location', o.udid, 'start', `--speed=${mps.toFixed(2)}`, '--interval=1', '-']);
