@@ -1,5 +1,6 @@
 import {
   Timestamp,
+  FieldValue,
   type Firestore,
   type Query,
   type QueryDocumentSnapshot,
@@ -39,6 +40,10 @@ export function eventExpiryCutoff(now: Date): Timestamp {
 export interface PurgeResult {
   /** Ended trips that had positions or events deleted this run. */
   trips: number;
+  /** Planned stops of ended trips that had arrivedAt, leftAt or leftBy cleared. */
+  stopsCleared: number;
+  /** Skip answers (stops/{s}/answers/{carId}: user id and time) deleted from ended trips. */
+  answers: number;
   /** Ended trips that failed part-way; the next run retries them. */
   failed: number;
   positions: number;
@@ -62,12 +67,37 @@ async function deleteInBatches(db: Firestore, base: Query): Promise<number> {
   }
 }
 
+/** The stop fields that say when the lead car got there and who left; cleared with the positions. */
+export const STOP_PRIVATE_FIELDS = ["arrivedAt", "leftAt", "leftBy"] as const;
+
 /**
- * Retention sweep. Deletes positions and events of ended trips older than POSITION_RETENTION_MS
- * (the trip docs stay), then every event past its expiresAt grace period, in any trip.
+ * Clears arrivedAt, leftAt and leftBy on every stop of a trip (the stop docs, names and kinds stay for the
+ * past-trip view) and deletes the skip answers under each stop. Stops with none of the fields are not written.
+ */
+async function purgeStopTraces(db: Firestore, tripRef: FirebaseFirestore.DocumentReference): Promise<{ stops: number; answers: number }> {
+  const stops = await tripRef.collection("stops").get();
+  let cleared = 0;
+  let batch = db.batch();
+  let pending = 0;
+  for (const d of stops.docs) {
+    const data = d.data();
+    if (!STOP_PRIVATE_FIELDS.some((f) => f in data)) continue;
+    batch.update(d.ref, Object.fromEntries(STOP_PRIVATE_FIELDS.map((f) => [f, FieldValue.delete()])));
+    cleared++;
+    if (++pending === BATCH_SIZE) { await batch.commit(); batch = db.batch(); pending = 0; }
+  }
+  if (pending > 0) await batch.commit();
+  let answers = 0;
+  for (const d of stops.docs) answers += await deleteInBatches(db, d.ref.collection("answers"));
+  return { stops: cleared, answers };
+}
+
+/**
+ * Retention sweep. Deletes positions and events of ended trips older than POSITION_RETENTION_MS,
+ * clears arrivedAt/leftAt/leftBy on their stops and deletes the skip answers (the trip and stop docs stay), then every event past its expiresAt grace period, in any trip.
  */
 export async function purgeTripData(db: Firestore, now: Date = new Date()): Promise<PurgeResult> {
-  const result: PurgeResult = { trips: 0, failed: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
+  const result: PurgeResult = { trips: 0, failed: 0, stopsCleared: 0, answers: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
   const endedBefore = Timestamp.fromMillis(now.getTime() - POSITION_RETENTION_MS);
   let cursor: QueryDocumentSnapshot | undefined;
 
@@ -89,10 +119,13 @@ export async function purgeTripData(db: Firestore, now: Date = new Date()): Prom
       try {
         const positions = await deleteInBatches(db, doc.ref.collection("positions"));
         const events = await deleteInBatches(db, doc.ref.collection("events"));
+        const traces = await purgeStopTraces(db, doc.ref);
         result.positions += positions;
         result.endedTripEvents += events;
+        result.stopsCleared += traces.stops;
+        result.answers += traces.answers;
         // Purged trips stay in the query, so only count those that had something to delete.
-        if (positions + events > 0) result.trips++;
+        if (positions + events + traces.stops + traces.answers > 0) result.trips++;
       } catch (err) {
         result.failed++;
         logger.error("purgeTripData: trip purge failed", { tripId: doc.id, err: String(err) });
