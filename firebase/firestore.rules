@@ -119,10 +119,9 @@ service cloud.firestore {
         && optionalOf(d, 'skippedAt') == null;
     }
 
-    // A stop that cars can still answer: not skipped for everyone. 4a (Leave) adds its "the convoy has left"
-    // fields here, so a stop that was left stops taking answers.
+    // A stop that cars can still answer: not skipped for everyone and not left (D25 4a Leave).
     function stopTakesAnswers(stop) {
-      return stop.get('skipped', null) != true;
+      return stop.get('skipped', null) != true && stop.get('leftAt', null) == null;
     }
 
     // The car is still short of the stop: its last reported place on the main route (convoyOffset) is more than
@@ -359,7 +358,12 @@ service cloud.firestore {
       }
 
       // Planned stops (D25): members read. The organizer writes them in the lobby, before the trip has
-      // started. After that only a skip changes: skipped, skippedBy, skippedAt, never added, moved or removed.
+      // started. After that a stop is never added, moved or removed; only these change, each once:
+      //  - skipped, skippedBy, skippedAt: the organizer skips it for everyone,
+      //  - leftAt, leftBy: the lead car's tracker or the organizer taps Leave (a stop skipped for everyone is
+      //    not left, a stop that was left is not skipped),
+      //  - arrivedAt: the lead car's tracker, or the organizer, marks when the lead car first counted itself at
+      //    the stop; the start of "Leaving at 12:40", so every phone shows the same time.
       match /stops/{stopId} {
         allow read: if isMember(tripId);
 
@@ -374,11 +378,29 @@ service cloud.firestore {
             (tripNotStarted(tripId) && validStop(request.resource.data))
             || (!tripNotStarted(tripId)
               && resource.data.get('skipped', null) != true
+              && resource.data.get('leftAt', null) == null
               && request.resource.data.diff(resource.data).affectedKeys()
                    .hasOnly(['skipped', 'skippedBy', 'skippedAt'])
               && request.resource.data.skipped == true
               && request.resource.data.skippedBy == request.auth.uid
               && request.resource.data.skippedAt == request.time)
+          );
+
+        allow update: if isLeadOrOrganizer(tripId)
+          && tripActive(tripId)
+          && !tripNotStarted(tripId)
+          && resource.data.get('skipped', null) != true
+          && resource.data.get('leftAt', null) == null
+          && (
+            // Leave
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt', 'leftBy'])
+              && request.resource.data.keys().hasAll(['leftAt', 'leftBy'])
+              && request.resource.data.leftBy == request.auth.uid
+              && request.resource.data.leftAt == request.time)
+            // The lead car is at the stop (once)
+            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['arrivedAt'])
+              && resource.data.get('arrivedAt', null) == null
+              && request.resource.data.arrivedAt == request.time)
           );
 
         allow delete: if isOrganizer(tripId)
