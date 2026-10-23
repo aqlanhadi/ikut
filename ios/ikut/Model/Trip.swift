@@ -21,6 +21,9 @@ struct Trip: Codable, Sendable, Equatable, Identifiable {
     /// Main route as an encoded polyline (precision 5).
     var route: String
     var destination: Destination
+    /// Driving time in seconds along `route` (the legs added up when it goes through stops); nil on trips
+    /// made before it was stored, which then ask MapKit for the time.
+    var routeSeconds: Double?
     var status: TripStatus
     @ServerTimestamp var createdAt: Date?
     /// Bumped on activity; trips idle for 12 hours are ended.
