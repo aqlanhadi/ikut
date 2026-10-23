@@ -14,6 +14,7 @@ import { dirname, join, basename } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { connect } from 'node:net';
+import { readScreens, groupScreens, launchScreen, SIMULATORS } from './screens.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const QA = join(here, '..');
@@ -21,6 +22,7 @@ const PAGE = join(here, 'index.html');
 const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : undefined; };
 const PORT = Number(arg('--port') || process.env.PORT) || 4322;
 const DEMOS = arg('--demos') || process.env.DEMOS || QA;
+const DEMO_SCREENS = join(QA, '..', 'ios/ikut/Lobby/LobbyDemo.swift'); // the Debug launch states, read on every request
 const LOG_LINES = 500;
 const MAX_BODY = 2 * 1024 * 1024; // a command body: a few Google roads of up to ~20,000 points each
 const KILL_AFTER_MS = 90_000; // a production demo waits up to 60 s for phone 1 to end the real trip
@@ -182,6 +184,10 @@ createServer(async (req, res) => {
       if (url.searchParams.has('refresh')) await discover();
       return send(res, 200, { demos, running: isRunning(), backends: await backends() });
     }
+    if (req.method === 'GET' && p === '/api/screens') {
+      const names = await readScreens(DEMO_SCREENS).catch(() => []);
+      return send(res, 200, { simulators: SIMULATORS, groups: groupScreens(names) });
+    }
     if (req.method === 'GET' && p === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write(`data: ${JSON.stringify(snapshot())}\n\n`);
@@ -205,6 +211,12 @@ createServer(async (req, res) => {
       const body = await readJson(req);
       run.child.stdin.write(`CMD ${JSON.stringify(body)}\n`);
       return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && p === '/api/screen') {
+      const body = await readJson(req);
+      const names = await readScreens(DEMO_SCREENS).catch(() => []);
+      const { code, ...result } = await launchScreen({ sim: body.sim, screen: body.screen }, { names });
+      return send(res, code, result);
     }
     if (req.method === 'POST' && p === '/api/stop') {
       if (!isRunning()) return send(res, 409, { error: 'Nothing is running.' });

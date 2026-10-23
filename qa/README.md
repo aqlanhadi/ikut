@@ -370,4 +370,4 @@ their lengths and merge points; `node --test 'lib/*.test.mjs'` covers every pure
 
 ## Dashboard
 
-`node qa/dashboard/server.mjs` opens http://localhost:4322: the Playground tab (above), and the Scripted demos tab, where you pick a live demo, press Play (emulators or production), watch its timeline, checks and log, and Stop it. Details in `qa/dashboard/README.md`.
+`node qa/dashboard/server.mjs` opens http://localhost:4322: the Playground tab (above), and the Scripted demos tab, where you pick a live demo, press Play (emulators or production), watch its timeline, checks and log, and Stop it, and the Screens tab: one button per Debug launch state (`IKUT_SCREEN`, read from `DemoScreens` in `LobbyDemo.swift` on every load) that opens the app on iPhone 17 #1 or #2 straight into that screen (busy or not-installed answers say so in words). Details in `qa/dashboard/README.md`.

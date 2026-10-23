@@ -182,7 +182,7 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
 <body>
 <header class="top">
   <div class="brand">ikut <span>demos</span></div>
-  <nav class="tabs" id="tabs"><button data-tab="pg" class="on">Playground</button><button data-tab="demos">Scripted demos</button></nav>
+  <nav class="tabs" id="tabs"><button data-tab="pg" class="on">Playground</button><button data-tab="demos">Scripted demos</button><button data-tab="screens">Screens</button></nav>
   <div class="grow"></div>
   <div id="topStatus" class="row"></div>
 </header>
@@ -210,6 +210,12 @@ ul.tl { list-style:none; margin:8px 0 0; padding:0; }
   <div id="list"></div>
 </div></div>
 
+<div id="tabScreens" class="hidden"><div class="demos">
+  <div class="row" style="margin-bottom:12px"><span>Open on</span><span class="seg" id="simSwitch"></span><button id="screensRefresh" class="sm">Look again</button></div>
+  <div id="screenMsg" class="note hidden"></div>
+  <div id="screenList"></div>
+</div></div>
+
 <script type="module">
 import {
   decodePolyline, measure, snapToRoute, pointAtOffset, sidePoint, roadKey, placeAtCmd, endingCmd, deviateCmd, voteCmd, stoppedCmd, prepareStartsCmd, clampWait, endingOrigin,
@@ -217,6 +223,28 @@ import {
 } from '/page-logic.mjs';
 
 const $ = (s) => document.querySelector(s);
+// ---------------------------------------------------------------- screens tab: one button per Debug launch state (IKUT_SCREEN)
+let screensInfo = null, sim = '1';
+async function loadScreens() {
+  try { screensInfo = await (await fetch('/api/screens')).json(); } catch { screensInfo = null; }
+  $('#simSwitch').innerHTML = (screensInfo?.simulators ?? []).map((s) => `<button data-sim="${s.id}" class="${s.id === sim ? 'on' : ''}">${esc(s.name)}</button>`).join('');
+  $('#screenList').innerHTML = !screensInfo ? '<p>The page could not reach the dashboard.</p>' : !screensInfo.groups.length ? '<p>No screens found in the app code.</p>'
+    : screensInfo.groups.map((g) => `<div class="dcard"><b>${esc(g.prefix)}</b><div class="row" style="flex-wrap:wrap;margin-top:8px">${g.names.map((n) => `<button data-screen="${esc(n)}" class="sm">${esc(n)}</button>`).join('')}</div></div>`).join('');
+}
+function screenMessage(text, hint) { const m = $('#screenMsg'); m.classList.toggle('hidden', !text); m.textContent = text ?? ''; if (hint) { const c = document.createElement('code'); c.textContent = hint; m.append(document.createElement('br'), c); } }
+document.addEventListener('click', async (e) => {
+  const sw = e.target.closest('#simSwitch button'), b = e.target.closest('#screenList button'), r = e.target.closest('#screensRefresh');
+  if (sw) { sim = sw.dataset.sim; return loadScreens(); }
+  if (r) return loadScreens();
+  if (!b) return;
+  screenMessage('Opening…');
+  try {
+    const out = await (await fetch('/api/screen', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sim, screen: b.dataset.screen }) })).json();
+    screenMessage(out.message ?? out.error, out.hint);
+    if (out.ok && out.build) screenMessage(`${out.message} Installed build from ${new Date(out.build).toLocaleString()}.`);
+  } catch { screenMessage('The page could not reach the dashboard.'); }
+});
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
@@ -234,10 +262,13 @@ const pgRun = () => (run?.interactive ? run : null);
 const carOf = (k) => pg?.cars?.find((c) => c.key === k);
 
 // ---------------------------------------------------------------- tabs
-let tab = location.hash === '#demos' || (location.hash !== '#playground' && store.get('ikut-tab') === 'demos') ? 'demos' : 'pg';
+const tabNow = location.hash === '#screens' ? 'screens' : location.hash === '#demos' ? 'demos' : location.hash === '#playground' ? 'pg' : store.get('ikut-tab');
+let tab = ['demos', 'screens'].includes(tabNow) ? tabNow : 'pg';
 function showTab() {
   $('#tabPg').classList.toggle('hidden', tab !== 'pg');
   $('#tabDemos').classList.toggle('hidden', tab !== 'demos');
+  $('#tabScreens').classList.toggle('hidden', tab !== 'screens');
+  if (tab === 'screens') loadScreens();
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   if (tab === 'pg' && gm) setTimeout(() => google.maps.event.trigger(gm.map, 'resize'), 50);
 }
