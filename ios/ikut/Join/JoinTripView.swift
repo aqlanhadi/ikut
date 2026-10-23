@@ -254,6 +254,7 @@ struct JoinTripView: View {
             .padding(.top, Spacing.gap)
             .padding(.bottom, Spacing.cozy)
         }
+        .animation(.easeOut, value: model.ticketDrive)
         .ikutCard()
         // The code field stays in the view tree (hidden) so "Change" can clear it and type again.
         .background { codeField.opacity(0).allowsHitTesting(false) }

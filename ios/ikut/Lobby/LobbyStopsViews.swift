@@ -149,6 +149,8 @@ struct RouteTotalLine: View {
         case total(String, caption: String)
         case notReady
         case loading
+        /// Nothing to total yet, and why: one quiet line.
+        case pending(String)
     }
     var content: Content
     var dimmed = false
@@ -163,6 +165,8 @@ struct RouteTotalLine: View {
                 Text("Route not ready").font(.system(.headline, design: .rounded))
                 Text("The total shows once every stop has a road").font(.caption).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+            case .pending(let text):
+                Text(text).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
             case .loading:
                 ProgressView().accessibilityLabel("Getting the route")
             }

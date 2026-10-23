@@ -22,18 +22,25 @@ enum OwnWayLogic {
     /// How the car meets the convoy and how far its own route runs before that; nil before its route is known
     /// (the tracker has no fix yet). Reads only the car doc: `CarRouteLogic` stored `route` (nil on the main route)
     /// and `mergeOffset`.
-    static func join(car: Car?, main: RouteLine) -> (join: OwnWayJoin, ownToJoin: Double, own: RouteLine?)? {
+    /// `hasMeetingPoint`: the trip's first stop is a meeting point, so (as `CarRouteService` does) a route that ends
+    /// at the main route's start joins there, on arrival, and `viaMeeting` is true: the drive is to the meeting point.
+    static func join(
+        car: Car?, main: RouteLine, hasMeetingPoint: Bool = false
+    ) -> (join: OwnWayJoin, ownToJoin: Double, own: RouteLine?, viaMeeting: Bool)? {
         guard let car, !main.isEmpty else { return nil }
         guard let encoded = car.route, !encoded.isEmpty else {
             guard let offset = car.mergeOffset else { return nil }
-            return (offset < startsWithin ? .startsWithConvoy : .onRoute(offset: offset), 0, nil)
+            return (offset < startsWithin ? .startsWithConvoy : .onRoute(offset: offset), 0, nil, false)
         }
         let own = RouteLine(Polyline.decode(encoded))
         guard own.coordinates.count > 1 else { return nil }
-        if let merge = main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance) {
-            return (.merges(offset: car.mergeOffset ?? merge.mainOffset), merge.otherOffset, own)
+        if hasMeetingPoint, let meet = main.meetingMerge(of: own, tolerance: CarRouteLogic.mergeTolerance) {
+            return (.merges(offset: meet.mainOffset), meet.otherOffset, own, true)
         }
-        return (.meetsAtDestination, own.length, own)
+        if let merge = main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance) {
+            return (.merges(offset: car.mergeOffset ?? merge.mainOffset), merge.otherOffset, own, false)
+        }
+        return (.meetsAtDestination, own.length, own, false)
     }
 
     /// The viewer's own start: the first point of the car's own route, else the phone's location; nil when neither
@@ -48,7 +55,7 @@ enum OwnWayLogic {
         switch join {
         case nil: return nil
         case .startsWithConvoy: return "Starts with the convoy"
-        case .onRoute: return place.map { "On the route near \($0)" } ?? "On the route"
+        case .onRoute: return place.map { "Joins the convoy near \($0)" } ?? "Joins the convoy"
         case .merges: return place.map { "Joins the convoy near \($0)" } ?? "Joins the convoy"
         case .meetsAtDestination: return "Meets the convoy in \(destination)"
         }
@@ -92,6 +99,23 @@ final class OwnWayInfo {
     private(set) var joinCoordinate: CLLocationCoordinate2D?
     private(set) var destinationName = ""
 
+    /// What the total line under the route shows.
+    enum TotalState: Equatable {
+        case loading
+        case full(distance: Double, seconds: Double, roadName: String)
+        /// The drive didn't come back (no location, MapKit unreachable): what is known, "185 km".
+        case distanceOnly(Double)
+        case unknown
+    }
+
+    private(set) var settled = false
+
+    var totalState: TotalState {
+        if let distance, let drive { return .full(distance: distance, seconds: drive.travelTime, roadName: drive.roadName) }
+        guard settled else { return .loading }
+        return distance.map { .distanceOnly($0) } ?? .unknown
+    }
+
     var joinLine: String? { OwnWayLogic.joinLine(join, place: joinPlace, destination: destinationName) }
 
     @ObservationIgnored private let driveRequest: DriveRequest
@@ -110,32 +134,50 @@ final class OwnWayInfo {
     }
 
     /// Works out the viewer's trip from their car doc; `phone` is asked only when the car has no route of its own.
-    /// No-op for a car route it already loaded. A newer call wins over one still in flight.
+    /// No-op for a car route it already loaded. A newer call wins over one still in flight; one that is cancelled or
+    /// ends without a drive time is forgotten, so the next appearance asks again.
+    /// `meetingPoint`/`routeSeconds`: on a trip with a meeting point the car drives to it, and the time is that drive
+    /// plus the trip's stored time from the meeting point on.
     func load(
         main: RouteLine, destination: CLLocationCoordinate2D, destinationName: String, car: Car?,
+        meetingPoint: CLLocationCoordinate2D? = nil, routeSeconds: Double? = nil,
         phone: @MainActor () async -> CLLocationCoordinate2D?
     ) async {
-        let key = "\(car?.route ?? "-")|\(car?.mergeOffset.map { String($0) } ?? "-")|\(main.length)"
+        let key = "\(car?.route ?? "-")|\(car?.mergeOffset.map { String($0) } ?? "-")|\(main.length)|\(meetingPoint != nil)"
         guard key != loadedKey else { return }
         loadedKey = key
         self.destinationName = destinationName
-        let found = OwnWayLogic.join(car: car, main: main)
+        let found = OwnWayLogic.join(car: car, main: main, hasMeetingPoint: meetingPoint != nil)
         join = found?.join
         ownRoute = found?.own?.coordinates ?? []
         joinCoordinate = OwnWayLogic.joinCoordinate(found?.join, main: main)
         var start = OwnWayLogic.start(car: car, phone: found?.own == nil ? await phone() : nil)
         // A car on the main route with no fix on this phone: the route's own point at its offset stands in.
         if start == nil, let found, found.own == nil { start = joinCoordinate }
-        guard loadedKey == key else { return }
+        guard loadedKey == key, !Task.isCancelled else {
+            if loadedKey == key { loadedKey = nil }
+            return
+        }
         let joinAt = joinCoordinate
+        let viaMeeting = found?.viaMeeting == true
         async let from = town(at: start)
         async let place = town(at: joinAt)
-        async let driven = driving(from: start, to: destination)
-        let (fromTown, joinTown, drove) = await (from, place, driven)
-        guard loadedKey == key else { return }
+        async let driven = driving(from: start, to: viaMeeting ? meetingPoint ?? destination : destination)
+        let (fromTown, joinTown, toTarget) = await (from, place, driven)
+        guard loadedKey == key, !Task.isCancelled else {
+            if loadedKey == key { loadedKey = nil }
+            return
+        }
+        var drove = toTarget
+        if viaMeeting, let toTarget, let routeSeconds {
+            drove = Drive(distance: toTarget.distance, travelTime: toTarget.travelTime + routeSeconds, roadName: "")
+        }
         fromName = fromTown ?? "Your location"
         joinPlace = joinTown
         drive = drove
+        settled = true
+        // No drive time: keep what is known, and ask again the next time the lobby appears.
+        if drove == nil { loadedKey = nil }
         if let found {
             distance = OwnWayLogic.distance(join: found.join, ownToJoin: found.ownToJoin, mainLength: main.length)
         } else {
@@ -158,6 +200,7 @@ final class OwnWayInfo {
     func showForDemo(
         car: Car?, main: RouteLine, destinationName: String, from: String, place: String?, drive: Drive?
     ) {
+        settled = true
         let found = OwnWayLogic.join(car: car, main: main)
         join = found?.join
         ownRoute = found?.own?.coordinates ?? []

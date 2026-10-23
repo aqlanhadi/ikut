@@ -71,7 +71,7 @@ struct OwnWayTests {
     @Test func carParkedFarAlongTheMainRouteIsOnTheRoute() throws {
         let found = try #require(OwnWayLogic.join(car: car(route: nil, mergeOffset: 38_000, state: .convoy), main: main))
         #expect(found.join == .onRoute(offset: 38_000))
-        #expect(OwnWayLogic.joinLine(found.join, place: "Rawang", destination: "Ipoh") == "On the route near Rawang")
+        #expect(OwnWayLogic.joinLine(found.join, place: "Rawang", destination: "Ipoh") == "Joins the convoy near Rawang")
     }
 
     @Test func carFromTheFarSideMeetsTheConvoyAtTheDestination() throws {
@@ -158,8 +158,69 @@ struct OwnWayTests {
         let own = OwnWayInfo(drive: { f, _ in from = f; return .init(distance: 73_000, travelTime: 3000, roadName: "E1") }, place: { _ in "Rawang" })
         await own.load(main: main, destination: destination, destinationName: "Ipoh", car: car(route: nil, mergeOffset: 38_000, state: .convoy), phone: { nil })
         #expect(abs((from?.latitude ?? 0) - main.coordinate(atOffset: 38_000)!.latitude) < 0.0001)
-        #expect(own.joinLine == "On the route near Rawang")
+        #expect(own.joinLine == "Joins the convoy near Rawang")
         #expect(abs((own.distance ?? 0) - (main.length - 38_000)) < 1)
+    }
+
+    // MARK: Drive that does not come back
+
+    @Test func aFailedDriveLeavesWhatIsKnownAndAsksAgainNextTime() async {
+        var asked = 0
+        let own = OwnWayInfo(drive: { _, _ in asked += 1; throw RouteError.noRoute }, place: { _ in "Rawang" })
+        #expect(own.totalState == .loading)
+        await own.load(main: main, destination: destination, destinationName: "Ipoh", car: mergingCar(), phone: { nil })
+        guard case .distanceOnly(let km) = own.totalState else { Issue.record("state \(own.totalState)"); return }
+        #expect(km > 100_000)
+        #expect(own.joinLine == "Joins the convoy near Rawang")
+        await own.load(main: main, destination: destination, destinationName: "Ipoh", car: mergingCar(), phone: { nil })
+        #expect(asked == 2)
+    }
+
+    @Test func nothingKnownSaysSoInsteadOfSpinning() async {
+        let own = OwnWayInfo(drive: { _, _ in throw RouteError.noRoute }, place: { _ in nil })
+        await own.load(main: main, destination: destination, destinationName: "Ipoh", car: car(route: nil, mergeOffset: nil), phone: { nil })
+        #expect(own.totalState == .unknown)
+    }
+
+    @Test func aCancelledLoadStoresNothingAndRetries() async {
+        var asked = 0
+        let own = OwnWayInfo(drive: { _, _ in asked += 1; return .init(distance: 1, travelTime: 1, roadName: "") }, place: { _ in "X" })
+        let task = Task { @MainActor in
+            await own.load(main: main, destination: destination, destinationName: "Ipoh", car: mergingCar(),
+                           phone: { try? await Task.sleep(for: .milliseconds(50)); return nil })
+        }
+        task.cancel()
+        await task.value
+        #expect(own.drive == nil && !own.settled)
+        await own.load(main: main, destination: destination, destinationName: "Ipoh", car: mergingCar(), phone: { nil })
+        #expect(own.drive != nil && asked == 1)
+    }
+
+    // MARK: Meeting point
+
+    @Test func meetingPointCarJoinsAtTheStartAndDrivesToTheMeetingPoint() async throws {
+        // Rawang (55 km along) back south along the main route to the meeting point at its start.
+        let rawang = main.coordinate(atOffset: 55_000)!
+        let meet = mainCoords[0]
+        let own = car(route: MapDemo.densify([rawang, meet]), mergeOffset: 0)
+        let found = try #require(OwnWayLogic.join(car: own, main: main, hasMeetingPoint: true))
+        #expect(found.viaMeeting)
+        #expect(found.join == .merges(offset: 0))
+        #expect(abs(found.ownToJoin - 55_000) < 300)
+        let total = OwnWayLogic.distance(join: found.join, ownToJoin: found.ownToJoin, mainLength: main.length)
+        #expect(abs(total - (55_000 + main.length)) < 300)
+        // Without a meeting point the same route is read as before.
+        #expect(OwnWayLogic.join(car: own, main: main)?.viaMeeting == false)
+
+        var target: CLLocationCoordinate2D?
+        var asked = 0
+        let info = OwnWayInfo(drive: { _, to in asked += 1; target = to; return .init(distance: 55_000, travelTime: 1_000, roadName: "E1") }, place: { _ in "X" })
+        await info.load(main: main, destination: destination, destinationName: "Ipoh", car: own,
+                        meetingPoint: meet, routeSeconds: 5_000, phone: { nil })
+        #expect(asked == 1)
+        #expect(target?.latitude == meet.latitude)
+        #expect(info.drive?.travelTime == 6_000)
+        #expect(abs((info.distance ?? 0) - (55_000 + main.length)) < 300)
     }
 
     // MARK: Join ticket

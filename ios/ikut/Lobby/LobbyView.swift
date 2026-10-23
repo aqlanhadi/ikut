@@ -188,13 +188,14 @@ struct LobbyView: View {
                 route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty, ownTrip: !isOrganizer)
         }
         // A participant's own way in, once their car doc has loaded (its route arrives from the car's tracker).
-        .task(id: OwnWayTaskKey(route: model.trip?.route, carRoute: session.car?.route, mergeOffset: session.car?.mergeOffset, loaded: session.car != nil)) {
+        .task(id: OwnWayTaskKey(route: model.trip?.route, carRoute: session.car?.route, mergeOffset: session.car?.mergeOffset, loaded: session.car != nil, granted: locationGranted)) {
             guard !isSample, !isOrganizer, let trip = model.trip, let car = session.car else { return }
-            let granted = location.status == .whenInUse || location.status == .always
+            let granted = locationGranted
             await ownWay.load(
                 main: RouteLine(Polyline.decode(trip.route)),
                 destination: CLLocationCoordinate2D(latitude: trip.destination.coordinate.latitude, longitude: trip.destination.coordinate.longitude),
                 destinationName: trip.destination.name, car: car,
+                meetingPoint: TripSessionLogic.meetingPoint(in: model.stops), routeSeconds: trip.routeSeconds,
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
         .alert("Trip name", isPresented: $renaming) {
@@ -499,6 +500,10 @@ struct LobbyView: View {
     private func routeTotal(_ trip: Trip, stops: [StopDraft]) -> some View {
         if failure != nil {
             RouteTotalLine(content: .notReady)
+        } else if !isOrganizer, case .distanceOnly(let distance) = ownWay.totalState {
+            RouteTotalLine(content: .total(RouteFormat.distance(distance), caption: "No drive time yet"))
+        } else if !isOrganizer, case .unknown = ownWay.totalState {
+            RouteTotalLine(content: .pending("Shows once your car shares where it is"))
         } else if let distance = isOrganizer ? routeInfo.distance : ownWay.distance,
             let seconds = isOrganizer ? routeInfo.travelTime : ownWay.drive?.travelTime
         {
@@ -558,6 +563,8 @@ struct LobbyView: View {
     }
 
     /// The viewer's car colour for their own route on the map preview.
+    private var locationGranted: Bool { location.status == .whenInUse || location.status == .always }
+
     private var ownCarColor: String { session.car?.color ?? sampleCarColor }
 
     private func inviteCard(_ code: String) -> some View {
@@ -743,4 +750,5 @@ private struct OwnWayTaskKey: Equatable {
     var carRoute: String?
     var mergeOffset: Double?
     var loaded: Bool
+    var granted: Bool
 }
