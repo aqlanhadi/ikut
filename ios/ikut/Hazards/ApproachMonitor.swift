@@ -6,6 +6,9 @@ import Foundation
 protocol AlertAnnouncing: AnyObject {
     /// Announces `event` with its distance ahead in meters. Returns whether anything was announced.
     func announce(event: TripEvent, distance: Double?) async -> Bool
+    /// Announces an alert that isn't about a trip event ("Aisha’s car is 3.3 km behind you"), once per alert id.
+    @discardableResult
+    func announce(alert: TripAlert) -> Bool
 }
 
 extension AlertCenter: AlertAnnouncing {}

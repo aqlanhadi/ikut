@@ -12,6 +12,15 @@ import XCTest
 ///   4. hazard: the marker appears, an approach alert is announced, the marker goes once everyone has passed
 ///   5. stop request: the card has the message, this car taps OK, the card goes when the lead taps We've stopped
 ///
+/// `testParkedAheadOfTheConvoy` is the parked scenario (D26, `node run-ui.mjs --scenario parked`): this phone is
+/// parked on the route 24 km along (`qa/gpx/car5-parked.gpx`), far ahead of the convoy, and so is car 6 (Mei) at 28 km.
+/// Both are in the convoy all along:
+///
+///   1. the convoy list is Mei, this car, then cars 1, 2, 3; Mei's row says how far ahead she is and that she is parked
+///   2. car 3 asks for a fuel stop 13 km behind: the pill says how far ("· 13 km behind"); this car taps OK
+///   3. about 2 minutes before the lead reaches this car: "Aisha’s car is behind you"
+///   4. this car drives on behind the lead: the pill goes
+///
 /// Skipped unless a code is given:
 ///
 ///     TEST_RUNNER_IKUT_JOIN_CODE=ABC123 TEST_RUNNER_IKUT_QA_SPEED=1 xcodebuild test ... -only-testing:ikutUITests/ConvoyScenarioUITests
@@ -24,12 +33,15 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
 
     override var pollInterval: TimeInterval { 2 }
 
-    func testFifthCarInSimulatedConvoy() throws {
+    /// Reads the run's settings and launches the app; skips the test unless qa/run-ui.mjs started it for `scenario`.
+    private func launch(scenario: String) throws -> (code: String, name: String) {
         let env = ProcessInfo.processInfo.environment
         guard let code = env["IKUT_JOIN_CODE"] else {
             throw XCTSkip("Set TEST_RUNNER_IKUT_JOIN_CODE to the code printed by qa/convoy-sim.mjs")
         }
-        let name = env["IKUT_JOIN_NAME"] ?? "Faiz"
+        guard (env["IKUT_QA_SCENARIO"] ?? "drive") == scenario else {
+            throw XCTSkip("This test is for qa/run-ui.mjs --scenario \(scenario)")
+        }
         speed = Double(env["IKUT_QA_SPEED"] ?? "") ?? 1
         screens = env["IKUT_QA_SCREENS"]
             ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -39,6 +51,11 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
         app = XCUIApplication()
         allowPermissionPrompts()
         app.launch()
+        return (code, env["IKUT_JOIN_NAME"] ?? "Faiz")
+    }
+
+    func testFifthCarInSimulatedConvoy() throws {
+        let (code, name) = try launch(scenario: "drive")
 
         try step("Join the trip as a new car, open the map") { try joinAndOpenMap(code: code, name: name) }
 
@@ -125,6 +142,59 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             }
             try waitFor("convoy list back", timeout: 20) { convoyOrder().count == 5 }
             shot("09-after-stop")
+        }
+    }
+
+    func testParkedAheadOfTheConvoy() throws {
+        let (code, name) = try launch(scenario: "parked")
+
+        try step("Join the trip as a new car, open the map") { try joinAndOpenMap(code: code, name: name) }
+
+        // Car 6 (Mei) joined fifth, so this phone is car 6 in the list and Mei is row 5.
+        try step("1. Parked ahead: Mei, this car, then cars 1, 2, 3; Mei's row says how far and that she is parked") {
+            try waitFor("convoy order 5, 6, 1, 2, 3", timeout: 180) { convoyOrder() == [5, 6, 1, 2, 3] }
+            XCTAssertTrue(element("convoy.row.6").label.hasPrefix("Me"), "row 6 should be this phone's car: \(element("convoy.row.6").label)")
+            // 4 km on: "4.0 km ahead · parked near <town>" once the town is found, "· parked" before.
+            try waitFor("Mei's row: about 4 km ahead, parked", timeout: 60) {
+                element("convoy.row.5").label.contains(" km ahead · parked")
+            }
+            XCTAssertTrue(element("convoy.row.1").label.contains("km behind"), "Aisha's row: \(element("convoy.row.1").label)")
+            XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in Convoy"), "header: \(element("convoy.header").label)")
+            XCTAssertFalse(exists("catchup.pill"), "too early for the heads-up")
+            XCTAssertFalse(exists("convoy.separation"), "a far car is in the convoy, not fallen behind: \(element("convoy.separation").label)")
+            shot("p01-parked-ahead")
+        }
+
+        try step("2. A far stop request says how far it is; this car says OK from the pill") {
+            // Car 3 asks at T=300: about 150 s after go at 2x. The question stays 20 s.
+            let pill = element("stop.pill.text")
+            try waitFor("the stop pill", timeout: 360 / speed + 60, poll: 0.3) { pill.exists }
+            // About 13 km: car 3 is near 11 km along, this car at 24 km.
+            XCTAssertNotNil(pill.label.range(of: #"Hafiz needs fuel · 1[234] km behind"#, options: .regularExpression), "pill: \(pill.label)")
+            shot("p02-far-stop-request")
+            app.buttons["stop.pill.button"].tap()
+            try waitFor("the pill goes after OK", timeout: 30) { !element("stop.pill.button").exists }
+            XCTAssertFalse(exists("convoy.separation"), "no separation warning: \(element("convoy.separation").label)")
+        }
+
+        try step("3. About 2 minutes before the lead reaches this car: Aisha’s car is behind you") {
+            // Due about T=561: some 130 s after the stop at 2x.
+            let pill = element("catchup.pill")
+            try waitFor("the heads-up pill", timeout: 300 / speed + 90) { pill.exists }
+            XCTAssertTrue(pill.label.hasPrefix("Aisha’s car is behind you"), "pill: \(pill.label)")
+            XCTAssertTrue(pill.label.contains("away"), "pill: \(pill.label)")
+            XCTAssertFalse(exists("convoy.separation"), "the lead coming up to the parked cars is no separation: \(element("convoy.separation").label)")
+            shot("p03-heads-up")
+        }
+
+        try step("4. The lead passes: the heads-up goes") {
+            try waitFor("the heads-up pill goes", timeout: 200 / speed + 90) { !exists("catchup.pill") }
+            try waitFor("this car behind the lead", timeout: 120 / speed + 60) {
+                let order = convoyOrder()
+                guard let lead = order.firstIndex(of: 1), let me = order.firstIndex(of: 6) else { return false }
+                return lead < me
+            }
+            shot("p04-lead-passes")
         }
     }
 

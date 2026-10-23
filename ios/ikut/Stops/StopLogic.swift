@@ -64,6 +64,9 @@ struct StopRequestState: Equatable, Sendable {
     /// "Wyna needs fuel".
     var title: String { "\(requesterName) \(Self.need(for: type))" }
 
+    /// "Wyna needs fuel · 40 km behind" when the asking car is over 2 km from mine (`far`), else `title`.
+    func title(far: String?) -> String { far.map { "\(title) · \($0)" } ?? title }
+
     /// "Car 2 · asked 1 min ago".
     func subtitle(now: Date) -> String {
         var parts: [String] = []

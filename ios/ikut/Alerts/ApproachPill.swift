@@ -51,6 +51,33 @@ struct ApproachPill: View {
     }
 }
 
+/// "Aisha’s car is behind you" (D26), on the phones of a car parked ahead on the route, from about 2
+/// minutes before the nearest car behind reaches it until it has: that car's live distance, and the
+/// time while it is moving. Spoken once as "Aisha’s car is 3.3 km behind you."
+struct CatchUpPill: View {
+    let alert: TripAlert
+    let model: TripMapModel
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let distance = max(0, model.catchUpDistance(alert, now: context.date) ?? alert.distance ?? 0)
+            let title = alert.title
+            let subtitle = model.catchUpSeconds(alert, distance: distance).map { "About \(ConvoyFormat.duration($0)) away" }
+            DarkBanner(title: title, subtitle: subtitle, symbol: "car.2.fill", circle: .green) {
+                Text(ConvoyFormat.distance(distance))
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.green)
+                    .padding(.trailing, Spacing.tight)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel([title, subtitle, ConvoyFormat.distance(distance)].compactMap { $0 }.joined(separator: ", "))
+            .accessibilityIdentifier("catchup.pill")
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+}
+
 /// "Passed the debris", for a few seconds once the hazard being followed is behind.
 struct PassedBanner: View {
     let text: String

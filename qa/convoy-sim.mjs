@@ -16,6 +16,10 @@
 //      makes a real phone go stale: the SDK keeps one write queued and flushes it on reconnect.
 //   6. Sim cars listen to events like phones do and report when ApproachMonitor would announce the hazard.
 //   7. Reads everything back as a member and prints PASS / FAIL per check.
+//   8. With --scenario parked (D26), car 6 and the phone are parked on the route far ahead of the convoy and drive on
+//      once it comes by. They are in the convoy all along. Car 6 plays that car's phone (lib/farahead.mjs): who the
+//      arrival time comes from, which gaps would warn, the heads-up when the lead is about 2 minutes away, and how an
+//      early stop request from car 3, 17 km behind, is spoken.
 //
 // Source of each piece of logic is cited in lib/route.mjs and lib/tracking.mjs.
 //
@@ -40,7 +44,8 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
-import { CARS, DURATION, FIX_HZ, TIMELINE, TRIP } from './lib/scenario.mjs';
+import { DURATION, FIX_HZ, SCENARIOS, TRIP, appKey, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referenceId, relativeDistance, spokenStopRequest, togetherPairs } from './lib/farahead.mjs';
 import { loadRoutes } from './generate-gpx.mjs';
 import { endsWithResult } from './lib/shell.mjs';
 
@@ -51,7 +56,7 @@ const REGION = 'asia-southeast1';
 // ---------------------------------------------------------------- CLI
 
 function parseArgs(argv) {
-  const o = { speed: null, host: '127.0.0.1', waitApp: false, startIn: 5, goDelay: 5, waitTimeout: 900, deadline: null, endTrip: false, setupOnly: false, state: path.join(os.tmpdir(), 'ikut-qa', 'state.json'), results: path.join(os.tmpdir(), 'ikut-qa', 'results.json'), help: false };
+  const o = { speed: null, host: '127.0.0.1', waitApp: false, startIn: 5, goDelay: 5, waitTimeout: 900, deadline: null, endTrip: false, setupOnly: false, scenario: 'drive', state: path.join(os.tmpdir(), 'ikut-qa', 'state.json'), results: path.join(os.tmpdir(), 'ikut-qa', 'results.json'), help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -65,6 +70,7 @@ function parseArgs(argv) {
     else if (a === '--end-trip') o.endTrip = true;
     else if (a === '--expect-app-ok') o.expectAppOk = true;
     else if (a === '--setup-only') o.setupOnly = true;
+    else if (a === '--scenario') o.scenario = next();
     else if (a === '--state-file') o.state = next();
     else if (a === '--results-file') o.results = next();
     else if (a === '-h' || a === '--help') o.help = true;
@@ -72,6 +78,7 @@ function parseArgs(argv) {
   }
   o.speed ??= o.waitApp ? 2 : 10;
   if (!(o.speed > 0)) throw new Error('--speed must be > 0');
+  if (!SCENARIOS.includes(o.scenario)) throw new Error(`unknown scenario ${o.scenario} (${SCENARIOS.join(' or ')})`);
   return o;
 }
 
@@ -87,12 +94,18 @@ if (opts.help) {
   --deadline S      stop with RESULT: ABORT after S seconds (default: the wait, the scenario at --speed, and 300)
   --expect-app-ok   check that the phone's car said OK to the stop request (the UI test taps OK)
   --end-trip        end the trip when the scenario finishes (default: leave it active)
+  --scenario S      drive (default) or parked: car 6 and the phone parked on the route far ahead (D26)
   --setup-only      create the trip and cars, print the code, write positions as a heartbeat and wait (Ctrl-C to stop)
   --host H          emulator host (default 127.0.0.1)
   --state-file F    JSON with code, tripId and phase, for scripts (default $TMPDIR/ikut-qa/state.json)
   --results-file F  JSON with the check results`);
   process.exit(0);
 }
+const CARS = scenarioCars(opts.scenario);
+const APP_KEY = appKey(opts.scenario);
+/** Cars parked on the route ahead of the convoy (the parked scenario). */
+const PARKED = CARS.filter((c) => c.waitOffset !== undefined);
+
 // The scenario clock. Without a phone, car 2's signal drop (and the checks just after it) plays at no more than 2x:
 // staleness is judged on the server clock after 60 real seconds, which a 3-minute gap only reaches at <= 2.5x.
 const dropGap = CARS.find((c) => c.key === 'car2').gap;
@@ -270,6 +283,64 @@ class Phone {
     });
   }
 
+  // ---- A parked car's phone (D26): ConvoyModel / TripMapModel on every convoy update, from everyone's positions.
+  watchConvoy(names) {
+    this.positions = new Map();
+    this.cars = new Map();
+    this.names = names; // carId -> displayName
+    this.together = new Set();
+    this.headsUp = new CatchUpHeadsUp();
+    this.headsUps = [];
+    this.references = new Map(); // reference key -> ticks
+    this.parkedWarnings = [];
+    this.otherWarnings = new Set();
+    this.stopWords = new Map(); // eventId -> {T, spoken, distance}
+    this.unsubPositions = onSnapshot(collection(this.db, `trips/${this.tripId}/positions`), (snap) => {
+      this.positions = new Map(snap.docs.map((d) => [d.id, d.data({ serverTimestamps: 'estimate' })]));
+    });
+    this.unsubCars = onSnapshot(collection(this.db, `trips/${this.tripId}/cars`), (snap) => {
+      this.cars = new Map(snap.docs.map((d) => [d.id, d.data()]));
+    });
+  }
+
+  /** After every tick, like the map's model. parkedIds: cars still parked ahead (for the warning check). */
+  judgeConvoy(parkedIds, keyOf) {
+    if (!this.positions?.size || !this.cars.size) return;
+    const now = Date.now();
+    const convoy = entries([...this.positions.entries()]
+      .filter(([id, p]) => typeof p.convoyOffset === 'number' && this.cars.has(id))
+      .map(([id, p]) => ({
+        id, name: this.cars.get(id).name, isLead: Boolean(this.cars.get(id).isLead), offset: p.convoyOffset, speed: p.speed,
+        age: p.updatedAt ? Math.max(0, (now - p.updatedAt.toMillis()) / 1000) : 0,
+      })));
+    this.together = new Set([...this.together, ...togetherPairs(convoy)]);
+    const ref = referenceId(convoy);
+    const refKey = ref ? keyOf(ref) : 'none';
+    this.references.set(refKey, (this.references.get(refKey) ?? 0) + 1);
+    const ids = convoy.map((e) => e.id);
+    for (const id of driftedGaps(convoy, this.together)) {
+      const i = ids.indexOf(id);
+      const pair = `${keyOf(ids[i - 1])} | ${keyOf(id)}`;
+      if (parkedIds.has(id) || parkedIds.has(ids[i - 1])) this.parkedWarnings.push({ T: clock.T, pair });
+      else if (!this.otherWarnings.has(pair)) { this.otherWarnings.add(pair); log(`${this.key}'s phone would warn about the gap ${pair}`); }
+    }
+    const due = this.headsUp.check(convoy, this.carId);
+    if (due) {
+      this.headsUps.push({ T: clock.T, ...due, spoken: catchUpSpoken(due), key: keyOf(due.carId) });
+      log(`${this.key} heads-up: "${catchUpSpoken(due)}" (${due.distance.toFixed(0)} m, ${due.seconds.toFixed(0)} s away)`);
+    }
+    const mine = this.positions.get(this.carId)?.convoyOffset;
+    for (const ev of this.events) {
+      if (ev.category !== 'stopRequest' || this.stopWords.has(ev.id) || ev.carId === this.carId) continue;
+      const theirs = this.positions.get(ev.carId)?.convoyOffset;
+      if (typeof mine !== 'number' || typeof theirs !== 'number') continue;
+      const distance = theirs - mine;
+      const spoken = spokenStopRequest(ev.type, this.names.get(ev.carId), relativeDistance(distance));
+      this.stopWords.set(ev.id, { T: clock.T, spoken, distance });
+      log(`${this.key} hears the stop request: "${spoken}"`);
+    }
+  }
+
   /** One GPS fix: TrackingService.handle -> PositionBuilder -> PositionPublisher, then CarRouteService.handle. */
   onFix(fix, battery) {
     this.lastFix = fix;
@@ -353,6 +424,8 @@ class Phone {
 
   async close() {
     this.unsubscribe?.();
+    this.unsubPositions?.();
+    this.unsubCars?.();
     this.publisher?.stop();
     await terminate(this.db).catch(() => {});
     await deleteApp(this.app).catch(() => {});
@@ -417,6 +490,7 @@ async function main() {
     const plan = await p.ensureRoute(first);
     log(`${p.key} (${p.spec.name}) ${p.carId}: ${plan.kind}, state ${plan.state}, mergeOffset ${plan.mergeOffset.toFixed(0)} m${plan.route ? `, own route ${plan.route.length} chars` : ''}`);
     p.startListening();
+    if (p.spec.waitOffset !== undefined) p.watchConvoy(new Map([...phones.values()].map((q) => [q.carId, q.spec.displayName])));
   }
 
   // Rules probes: things a client must not be able to do.
@@ -467,7 +541,7 @@ async function main() {
   clock.T = 0;
   clock.label = 'drive';
   const goWall = Date.now();
-  const timeline = TIMELINE.map((e) => ({ ...e, done: false }));
+  const timeline = scenarioTimeline(opts.scenario).map((e) => ({ ...e, done: false }));
   const scheduled = scheduleChecks({ phones, tracks, truth, tripId, organizer, getAppCarId: () => appCarId });
   const ctx = { phones, tripId, organizer, tracks, truth, stopEvent: null, hazard: null, hazardAt: null };
   const gapCar = phones.get('car2');
@@ -487,6 +561,11 @@ async function main() {
       const fix = tracks[p.key].bySecond.get(sec);
       if (fix) p.onFix(fix, Math.max(0.2, 0.8 - T / 6000));
       p.publisher.tick();
+    }
+    if (PARKED.length) {
+      const keyOf = keyOfCar(phones, appCarId);
+      const parkedIds = new Set(PARKED.filter((c) => T < departAt(c, truth)).map((c) => (c.kind === 'app' ? appCarId : phones.get(c.key).carId)));
+      for (const p of phones.values()) if (p.spec.waitOffset !== undefined) p.judgeConvoy(parkedIds, keyOf);
     }
     for (const ev of timeline) {
       if (!ev.done && T >= ev.at) { ev.done = true; await runTimeline(ev, ctx).catch((e) => check(`timeline ${ev.do} by ${ev.car}`, false, e.message)); }
@@ -533,6 +612,8 @@ async function runTimeline(ev, ctx) {
     // EventCategory.stopRequest: severity medium, closes itself 30 minutes after it was asked.
     const r = await p.reportEvent(ev.type, 'stopRequest', 'medium', STOP_LIFETIME_SECONDS, ev.message);
     ctx.stopEvent = r;
+    ctx.stopAt = clock.T;
+    ctx.stopCar = ev.car;
     log(`${p.key} asks for a stop (${ev.type}) with the message "${ev.message}", event ${r.id}`);
   } else if (ev.do === 'ok') {
     await p.ok(ctx.stopEvent.id);
@@ -578,6 +659,47 @@ function expectedConvoyOrder(T, { truth, phones, appPresent }) {
   return rows.sort((a, b) => b.offset - a.offset);
 }
 
+/**
+ * The convoy list matches the GPX truth: the same cars, and every pair the truth has more than 300 m apart in the
+ * same order (closer than that, the 5 s write throttle can swap them; the drive's own cars are 800 m or more apart,
+ * a parked car pulling out behind the lead is not).
+ */
+function sameOrder(actual, expected) {
+  const keys = (rows) => rows.map((r) => r.key).sort().join(',');
+  if (keys(actual) !== keys(expected)) return false;
+  const at = new Map(actual.map((r, i) => [r.key, i]));
+  for (let i = 0; i < expected.length; i++) {
+    for (let j = i + 1; j < expected.length; j++) {
+      if (expected[i].offset - expected[j].offset > 300 && at.get(expected[i].key) > at.get(expected[j].key)) return false;
+    }
+  }
+  return true;
+}
+
+/** Car id -> scenario key, the phone's car included. */
+function keyOfCar(phones, appCarId) {
+  const names = new Map([...phones.values()].map((p) => [p.carId, p.key]));
+  if (appCarId) names.set(appCarId, APP_KEY);
+  return (id) => names.get(id) ?? id;
+}
+
+/** When a parked car pulls out, from the GPX truth (the first second it has moved). */
+function departAt(spec, truth) {
+  const series = truth[spec.key];
+  const start = series[0].offset;
+  return series.find((p) => p.offset > start + 1)?.t ?? Infinity;
+}
+
+/** When the heads-up is due for a parked car, from the GPX truth: car 1 (the lead, nearest behind) LEAD_TIME away. */
+function headsUpAt(spec, truth) {
+  for (let t = 1; t <= DURATION; t++) {
+    const lead = interpolate(truth.car1, t);
+    const speed = lead - interpolate(truth.car1, t - 1);
+    if ((spec.waitOffset - lead) / speed <= LEAD_TIME) return t;
+  }
+  return Infinity;
+}
+
 async function readPositions(organizer, tripId) {
   const snap = await getDocs(collection(organizer.db, `trips/${tripId}/positions`));
   return new Map(snap.docs.map((d) => [d.id, d.data({ serverTimestamps: 'estimate' })]));
@@ -595,7 +717,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
       const positions = await readPositions(organizer, tripId);
       const appCarId = readAppCarId();
       const names = keyByCar();
-      if (appCarId) names.set(appCarId, 'car5-app');
+      if (appCarId) names.set(appCarId, APP_KEY);
       const actual = [...positions.entries()]
         .filter(([, p]) => p.convoyOffset !== undefined && p.convoyOffset !== null)
         .map(([id, p]) => ({ key: names.get(id) ?? id, offset: p.convoyOffset }))
@@ -603,7 +725,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
       const joining = [...positions.entries()].filter(([, p]) => p.convoyOffset === undefined || p.convoyOffset === null).map(([id]) => names.get(id) ?? id);
       const expected = expectedConvoyOrder(clock.T, { truth: ctx.truth, phones, appPresent: Boolean(appCarId) });
       const fmt = (rows) => rows.map((r) => `${r.key}@${(r.offset / 1000).toFixed(1)}k`).join(' > ');
-      const ok = fmt(actual.map((r) => ({ ...r }))).replace(/@[\d.]+k/g, '') === fmt(expected).replace(/@[\d.]+k/g, '');
+      const ok = sameOrder(actual, expected);
       check(label, ok, `convoy ${fmt(actual)}; joining [${joining.join(', ')}]; expected ${fmt(expected).replace(/@[\d.]+k/g, '')}`);
     },
   });
@@ -621,7 +743,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
         if (!appCarId) return;
         const d = (await readPositions(organizer, tripId)).get(appCarId);
         if (!d) return log('phone has no position yet');
-        const expected = interpolate(ctx.truth['car5-app'], clock.T);
+        const expected = interpolate(ctx.truth[APP_KEY], clock.T);
         const off = d.convoyOffset ?? d.routeOffset;
         log(`phone at ${off.toFixed(0)} m, GPX says ${expected.toFixed(0)} m (${((expected - off) / 27.4).toFixed(0)} s behind), ${(d.speed * 3.6).toFixed(0)} km/h`);
       },
@@ -760,11 +882,33 @@ async function finalChecks(ctx, appCarId) {
       check(`approach alert: ${key} warned once, ~500 m before the hazard`, ok, got.length ? `at T=${got[0].T}, ${got[0].distance.toFixed(0)} m, predicted T=${predicted}; "${got[0].title}"` : `no alert, predicted T=${predicted}`);
     }
     check('approach alert: the reporter (car1) is not warned about its own hazard', phones.get('car1').alerts.length === 0, '');
-    if (appCarId) {
-      const off = (t) => interpolate(truth['car5-app'], t);
+    if (appCarId && opts.scenario === 'drive') {
+      const off = (t) => interpolate(truth[APP_KEY], t);
       let predicted = null;
       for (let t = ctx.hazardAt; t <= T; t++) { const d = H - off(t); if (d > 0 && d <= 500) { predicted = t; break; } }
       log(`the phone (car5) should announce "Debris ahead in 500 meters" about T=${predicted} (assuming it follows car5-app.gpx without lag)`);
+    }
+  }
+
+  // Cars parked far ahead (D26), as their phones see the convoy.
+  for (const spec of PARKED) {
+    const ready = headsUpAt(spec, truth);
+    if (spec.kind === 'app') {
+      if (appCarId) log(`the phone (${APP_KEY}) should show "Aisha’s car is behind you" about T=${ready}, and drives on about T=${departAt(spec, truth)}`);
+      continue;
+    }
+    const p = phones.get(spec.key);
+    const refs = [...p.references.entries()].map(([k, n]) => `${k}: ${n}`).join(', ');
+    check(`${spec.key}'s phone: the arrival time comes from the lead (car1) all drive, never the car furthest ahead`, p.references.size === 1 && p.references.has('car1'), `reference by ticks: ${refs}`);
+    const w = p.parkedWarnings;
+    check(`${spec.key}'s phone: no separation warning about a car parked ahead while it is parked`, w.length === 0, w.length ? `${w.length} ticks, first at T=${w[0].T}: ${w[0].pair}` : `other gaps it would warn about: [${[...p.otherWarnings].join('; ')}]`);
+    const h = p.headsUps;
+    check(`${spec.key} hears once that the lead is about 2 minutes behind it`, h.length === 1 && h[0].key === 'car1' && Math.abs(h[0].T - ready) <= 20 && /^Aisha’s car is [\d.]+ km behind you\.$/.test(h[0].spoken), h.length ? `at T=${h[0].T}, predicted T=${ready}: "${h[0].spoken}"` : `never, predicted T=${ready}`);
+    if (ctx.stopEvent) {
+      const heard = p.stopWords.get(ctx.stopEvent.id);
+      const truthKm = ctx.stopAt !== undefined ? (spec.waitOffset - interpolate(truth[ctx.stopCar], ctx.stopAt)) / 1000 : null;
+      const km = heard?.spoken.match(/, (\d+) km behind\./)?.[1];
+      check(`${spec.key} hears the far stop request with how far it is`, Boolean(km) && /^Hafiz needs fuel, \d+ km behind\. Tap OK\.$/.test(heard.spoken) && Math.abs(Number(km) - truthKm) <= 1.5, heard ? `"${heard.spoken}", the GPX has car 3 ${truthKm?.toFixed(1)} km behind` : 'never heard');
     }
   }
 

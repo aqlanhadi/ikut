@@ -14,6 +14,16 @@ struct TripAlert: Sendable, Equatable, Identifiable {
     let title: String
     let body: String
     let spoken: String
+    /// What the alert is about: a trip event, or a car coming up behind mine.
+    var kind: Kind = .event
+
+    enum Kind: Sendable, Equatable {
+        case event
+        /// "Aisha’s car is 3.3 km behind you" (D26), on the phones of a car parked ahead, about 2 minutes
+        /// before the nearest car behind reaches it. `eventId` is then that car's id. Shown as its own
+        /// pill (`CatchUpPill`), never as a banner.
+        case catchUp
+    }
 }
 
 /// All the alert copy in one place. Pure, so it is easy to test.
@@ -21,29 +31,44 @@ enum AlertWording {
     /// Name used when the reporter's name is unknown.
     static let unknownCar = "another car"
 
+    /// `far` is how far the asking car is from mine when over 2 km ("40 km behind"), for a stop request.
     static func alert(
         for event: TripEvent, tripId: String, distance: Double? = nil, authorName: String?,
-        now: Date
+        far: String? = nil, now: Date
     ) -> TripAlert {
         let car = carPhrase(authorName)
         let ago = relativeTime(since: event.createdAt, now: now)
         let id = alertId(eventId: event.id ?? "", approach: distance != nil)
         let lead = line(for: event, car: car)
+        let farPart = event.category == .stopRequest ? far : nil
         return TripAlert(
             id: id, eventId: event.id ?? "", tripId: tripId, type: event.type, category: event.category,
             severity: event.severity, distance: distance,
             title: title(for: event, distance: distance),
-            body: "\(lead) · \(ago)",
-            spoken: spoken(for: event, car: car, distance: distance, authorName: authorName))
+            body: ([lead, farPart, ago].compactMap { $0 }).joined(separator: " · "),
+            spoken: spoken(for: event, car: car, distance: distance, authorName: authorName, far: farPart))
     }
 
-    /// "Wyna needs fuel. Tap OK." Only the reason is spoken, never the message a passenger typed, and
-    /// no place (there is none). Voice answers are not built yet, so it never says "say OK".
-    static func spokenStopRequest(for type: EventType, authorName: String?) -> String {
+    /// "Wyna needs fuel. Tap OK.", or "Wyna needs fuel, 40 km behind. Tap OK." when the car is over 2 km
+    /// away. Only the reason is spoken, never the message a passenger typed, and no place (there is
+    /// none). Voice answers are not built yet, so it never says "say OK".
+    static func spokenStopRequest(for type: EventType, authorName: String?, far: String? = nil) -> String {
         let trimmed = authorName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let who = trimmed.isEmpty ? "Another car" : trimmed
         let need = StopRequestState.need(for: type)
-        return "\(who) \(need). Tap OK."
+        return "\(who) \(need)\(far.map { ", \($0)" } ?? ""). Tap OK."
+    }
+
+    /// Spoken "Aisha’s car is 3.3 km behind you."; the pill and the notification read "Aisha’s car is
+    /// behind you" over "3.3 km · about 2 min away". Once per car per trip.
+    static func catchUp(tripId: String, myCarId: String, due: CatchUpHeadsUp.Due) -> TripAlert {
+        let distance = distanceText(due.distance)
+        return TripAlert(
+            id: due.stop == 1 ? "\(myCarId)@catchup" : "\(myCarId)@catchup\(due.stop)", eventId: due.carId, tripId: tripId, type: .other("catchUp"),
+            category: .status, severity: .medium, distance: due.distance,
+            title: "\(due.carPhrase) is behind you",
+            body: "\(distance) · about \(ConvoyFormat.duration(due.seconds)) away",
+            spoken: "\(due.carPhrase) is \(distance) behind you.", kind: .catchUp)
     }
 
     static func alertId(eventId: String, approach: Bool) -> String {
@@ -122,7 +147,7 @@ enum AlertWording {
     }
 
     private static func spoken(
-        for event: TripEvent, car: String, distance: Double?, authorName: String?
+        for event: TripEvent, car: String, distance: Double?, authorName: String?, far: String?
     ) -> String {
         switch event.category {
         case .hazard, .condition:
@@ -130,7 +155,7 @@ enum AlertWording {
             if let distance { return "\(what) ahead in \(distanceText(distance)), reported by \(car)." }
             return "\(what) reported by \(car)."
         case .stopRequest:
-            return spokenStopRequest(for: event.type, authorName: authorName)
+            return spokenStopRequest(for: event.type, authorName: authorName, far: far)
         case .status:
             return "\(capitalized(car)) \(statement(for: event.type))."
         case .message:

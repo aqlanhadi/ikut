@@ -29,6 +29,13 @@ enum ConvoyFormat {
     /// "1 min behind".
     static func behind(_ seconds: TimeInterval) -> String { "\(duration(seconds)) behind" }
 
+    /// "38 km ahead" or "40 km behind" for a car `meters` along the route from mine (positive: ahead),
+    /// nil when it is `beyond` meters (2 km) or closer: then the words stay as they were.
+    static func relativeDistance(_ meters: Double, beyond: Double = 2000) -> String? {
+        guard meters.isFinite, abs(meters) > beyond else { return nil }
+        return "\(distance(abs(meters))) \(meters > 0 ? "ahead" : "behind")"
+    }
+
     /// Km/h, whole number ("96 km/h").
     static func speed(metersPerSecond: Double) -> String {
         "\(Int((max(0, metersPerSecond.isFinite ? metersPerSecond : 0) * 3.6).rounded())) km/h"

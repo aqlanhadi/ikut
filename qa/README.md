@@ -134,6 +134,13 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 | 730, 735 | Cars 2 and 4 say OK (a vote with `userId` and `at`). The UI test makes the phone say OK from its card. |
 | 800 | Car 1 (lead) says We've stopped (`status closed`, `closedReason stopped`, `expiresAt` now). Drive ends at 900. |
 
+**A car parked ahead** (`--scenario parked`, D26): the same convoy plus Mei (car 6, a simulated car with its own
+phone model), parked 28 km along, near Gopeng, until the convoy reaches her (drives on at T=835). In `run-ui.mjs
+--scenario parked` the app is the parked car instead (`car5-parked.gpx`, parked 24 km along, drives on at T=691).
+The timeline moves so it lands while she waits: car 3 asks for fuel at 300, car 2 says OK at 400 (after its drop:
+an offline write would hold the clock), car 4 at 450, debris at 520, We've stopped at 800. The heads-up is due
+about 2 minutes before the lead reaches her (car 6 about T=704, the phone about T=561).
+
 ## What is checked
 
 `convoy-sim.mjs` (PASS/FAIL lines, exit code 1 on any FAIL):
@@ -146,6 +153,10 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 - hazard: stored with the app's field set and 45 minute expiry; reaches each car's listener within 5 s; ApproachCore (ported) fires exactly once per car behind, at about 500 m, at the time predicted from the GPX; not for the author
 - stop: event open with its message, no place, `expiresAt` 30 minutes after `createdAt`; OKs from cars 2 and 4 with nothing but `userId` and `at`; closed as stopped by the lead
 - phone: has a position with `convoyOffset`, its car doc is `convoy` with a tracker, and it said OK (with `--expect-app-ok`, which `run-ui.mjs` passes)
+- parked (`--scenario parked`, car 6's convoy as `lib/farahead.mjs` ports it from the app): the arrival time comes
+  from the lead the whole drive, never the car furthest ahead; no separation warning about the parked car; one
+  heads-up "Aisha’s car is 3.2 km behind you." within 20 s of the time the GPX predicts; the far stop request is
+  spoken with its distance ("Hafiz needs fuel, 17 km behind. Tap OK."), within 1.5 km of the GPX
 
 `ConvoyScenarioUITests` (the panel as a person sees it, ids `convoy.row.N`, `joining.row.N`, `convoy.header`,
 `convoy.joining.header`, `hazard.marker`):
@@ -158,6 +169,11 @@ Route: the North-South Expressway from just south of Bidor to Ipoh. Cars 1-3 sta
 6. approach banner "Debris ahead in ... meters"
 7. hazard marker clears
 8. the Pit stop button shows the stop and the card has the message; tapping OK for our car is recorded; the card goes when the lead taps We've stopped
+
+`testParkedAheadOfTheConvoy` (`run-ui.mjs --scenario parked`, the phone parked ahead): Mei's row says "km ahead ·
+parked", the lead's row "km behind", "5 in Convoy"; the stop pill reads "Hafiz needs fuel · 13 km behind" and its
+OK is recorded; the `catchup.pill` "Aisha’s car is behind you" shows once; no `convoy.separation` warning through all
+three; then the lead passes and the pill goes.
 
 ## Things to know
 

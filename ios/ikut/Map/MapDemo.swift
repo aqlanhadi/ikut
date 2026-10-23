@@ -48,7 +48,15 @@ enum MapDemo {
         return out
     }
 
-    static func model(now: Date = Date(), fiveCars: Bool = false) -> TripMapModel {
+    /// No-op announcer, so the demo's alerts show without sound.
+    private final class SilentAnnouncer: AlertAnnouncing {
+        func announce(event: TripEvent, distance: Double?) async -> Bool { false }
+        func announce(alert: TripAlert) -> Bool { true }
+    }
+
+    /// `parked` (D26, `IKUT_MAP_DEMO_PARKED`): "far" adds Mei, parked 30 km ahead of the lead near Gopeng;
+    /// "catchup" makes the viewer Mei, parked 3.1 km ahead of the convoy, with "Aqlan’s car is behind you".
+    static func model(now: Date = Date(), fiveCars: Bool = false, parked: String? = nil) -> TripMapModel {
         let main = RouteLine(densify(mainWaypoints))
         let own = RouteLine(densify(joiningWaypoints))
         let tapah = main.project(.init(latitude: 4.2000, longitude: 101.2600))?.offset ?? 0
@@ -74,6 +82,7 @@ enum MapDemo {
             car("c4", "Daniel’s City", "#7C3AED", number: 4),
         ]
         if fiveCars { cars.append(car("c5", "Faiz’s car", "#BE185D", number: 5)) }
+        if parked != nil { cars.append(car("c6", "Mei’s Saga", "#DB2777", number: 6)) }
         // 12 km short of the merge point, at 84 km/h.
         let hafizOffset = max(0, (own.length) - 12_000)
         let hafizPoint = own.coordinate(atOffset: hafizOffset) ?? own.coordinates[0]
@@ -88,16 +97,29 @@ enum MapDemo {
                 convoyOffset: nil, battery: 0.6, updatedAt: now.addingTimeInterval(-3)),
         ]
         if fiveCars { positions["c5"] = onMain(tapah - 8_000, speed: 90 / 3.6, age: 5) }
+        // Mei parked ahead: 30 km on, or (for the heads-up) 15 km on until the lead is 3.1 km from her.
+        if let parked { positions["c6"] = onMain(tapah + (parked == "far" ? 30_000 : 15_000), speed: 0, age: 3) }
         let trip = Trip(
             id: "demo", name: "Balik kampung raya", code: "K7M2QX", organizerId: "u-c1",
             route: Polyline.encode(main.coordinates),
             destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 4.6, longitude: 101.09)),
             status: .active, createdAt: now, lastActivityAt: now, endedAt: nil)
 
-        let convoy = ConvoyModel(provider: FixedETA(seconds: 3_000), clock: { now })
+        let convoy = ConvoyModel(provider: FixedETA(seconds: 3_000), clock: { now }, placeNamer: { _ in "Gopeng" })
         let model = TripMapModel(session: nil, convoy: convoy)
-        model.apply(trip: trip, myCar: cars[0], myCarId: "c1", positions: positions, isTracker: true)
+        let viewer = parked == "catchup" ? cars.count - 1 : 0
+        if parked == "catchup" { model.startHazardAlerts(announcer: SilentAnnouncer(), userId: "u-c6", tripId: "demo") }
+        model.apply(trip: trip, myCar: cars[viewer], myCarId: cars[viewer].id, positions: positions, isTracker: true)
         model.setCars(cars)
+        if parked == "catchup" {
+            // The convoy drives on until the lead is 3.1 km behind Mei: just under 2 minutes at 96 km/h.
+            for id in ["c1", "c2", "c4"] {
+                if let p = positions[id], let offset = p.convoyOffset {
+                    positions[id] = onMain(offset + 15_000 - 3_100, speed: p.speed, age: 1)
+                }
+            }
+            model.apply(trip: trip, myCar: cars[viewer], myCarId: cars[viewer].id, positions: positions, isTracker: true)
+        }
         // Debris 3 km ahead of the lead car, reported 4 minutes ago by Wyna.
         if let spot = main.coordinate(atOffset: tapah + 3_000) {
             var debris = TripEvent(
@@ -116,7 +138,7 @@ enum MapDemo {
         let env = ProcessInfo.processInfo.environment
         let five = env["IKUT_MAP_DEMO_CARS"] == "5"
         let gallery = env["IKUT_MAP_DEMO_BANNERS"] != nil
-        let model = model(fiveCars: five)
+        let model = model(fiveCars: five, parked: env["IKUT_MAP_DEMO_PARKED"])
         // IKUT_MAP_DEMO_STOP picks what the stop screens show (see `stopBoard`); IKUT_MAP_DEMO_NO_STOP
         // shows none. IKUT_MAP_DEMO_CARD opens the stop card (or one of its screens), and
         // IKUT_MAP_DEMO_EXPANDED=1 unfolds the panel, IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.

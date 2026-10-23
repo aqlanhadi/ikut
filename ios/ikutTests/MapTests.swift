@@ -26,8 +26,9 @@ private func position(
         routeOffset: ownOffset, convoyOffset: offset, battery: nil, updatedAt: t0.addingTimeInterval(-age))
 }
 
-private func snapshot(cars: [Car], positions: [String: Position], main: RouteLine? = nil) -> ConvoySnapshot {
-    ConvoyOrdering.order(cars: cars, positions: positions, now: t0, mainRoute: main)
+private func snapshot(cars: [Car], positions: [String: Position], main: RouteLine? = nil,
+                      together: Set<CarPair> = []) -> ConvoySnapshot {
+    ConvoyOrdering.order(cars: cars, positions: positions, now: t0, mainRoute: main, together: together)
 }
 
 /// A straight route due north along longitude 100, about 11 km long.
@@ -133,14 +134,20 @@ struct MapMarkerTests {
 
     @Test func separationWarningText() {
         let cars = [car("a", number: 1), car("b", name: "Daniel’s City", number: 2), car("c", name: "Sam’s Vios", number: 3)]
+        // They all left together.
+        let together = snapshot(
+            cars: cars, positions: ["a": position(offset: 300), "b": position(offset: 200), "c": position(offset: 100)]
+        ).together
         var snap = snapshot(
-            cars: Array(cars.prefix(2)), positions: ["a": position(offset: 10_000), "b": position(offset: 3_900)])
-        #expect(SeparationWarning.text(snap.separatedGaps) == "Daniel is 6.1 km behind the car ahead.")
+            cars: Array(cars.prefix(2)), positions: ["a": position(offset: 10_000), "b": position(offset: 3_900)],
+            together: together)
+        #expect(SeparationWarning.text(snap.driftedGaps) == "Daniel is 6.1 km behind the car ahead.")
         snap = snapshot(
-            cars: cars, positions: ["a": position(offset: 20_000), "b": position(offset: 12_000), "c": position(offset: 1_000)])
-        #expect(SeparationWarning.text(snap.separatedGaps) == "2 cars have fallen behind.")
+            cars: cars, positions: ["a": position(offset: 20_000), "b": position(offset: 12_000), "c": position(offset: 1_000)],
+            together: together)
+        #expect(SeparationWarning.text(snap.driftedGaps) == "2 cars have fallen behind.")
         snap = snapshot(cars: Array(cars.prefix(2)), positions: ["a": position(offset: 2_000), "b": position(offset: 1_000)])
-        #expect(SeparationWarning.text(snap.separatedGaps) == nil)
+        #expect(SeparationWarning.text(snap.driftedGaps) == nil)
     }
 }
 
@@ -588,6 +595,15 @@ struct MapStopContextTests {
         #expect(context.isOrganizer)
         #expect(context.mainRoute != nil)
         #expect(context.snapshot() != nil)
+    }
+
+    /// The D26 screenshot states: Mei's far row, and her heads-up as the lead comes within 2 minutes.
+    @Test func parkedDemoStates() throws {
+        let far = MapDemo.model(parked: "far")
+        #expect(far.convoy.convoy.first?.id == "c6")
+        #expect((far.convoy.distance(fromMyCarTo: "c6") ?? 0) > 29_000)
+        let alert = try #require(MapDemo.model(parked: "catchup").catchUp)
+        #expect(alert.eventId == "c1")
     }
 
     @Test func noContextUntilMyCarIsKnown() {

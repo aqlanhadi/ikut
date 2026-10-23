@@ -53,6 +53,9 @@ final class AlertCenter {
     @ObservationIgnored private let readAloud: @MainActor () -> Bool
     @ObservationIgnored private let now: @MainActor () -> Date
     @ObservationIgnored let bannerDuration: Duration
+    /// Meters along the route from my car to a car (positive: ahead), for "· 40 km behind" on a far
+    /// stop request. Set by the map; nil when unknown.
+    @ObservationIgnored var carDistance: @MainActor (String) -> Double? = { _ in nil }
 
     @ObservationIgnored private var tripId: String?
     @ObservationIgnored private var policy: AlertPolicy?
@@ -131,8 +134,22 @@ final class AlertCenter {
         let name = await names.displayName(tripId: tripId, userId: event.authorId)
         // The trip may have changed or stopped while the name loaded.
         guard self.tripId == tripId else { return false }
+        let far = event.category == .stopRequest
+            ? carDistance(event.carId).flatMap { ConvoyFormat.relativeDistance($0) }
+            : nil
         deliver(AlertWording.alert(
-            for: event, tripId: tripId, distance: distance, authorName: name, now: now()))
+            for: event, tripId: tripId, distance: distance, authorName: name, far: far, now: now()))
+        return true
+    }
+
+    /// Announces an alert that isn't about a trip event ("Aisha’s car is 3.3 km behind you"): read
+    /// aloud, and a notification in the background. Never the banner slot: its own pill shows it on
+    /// the map, so a hazard or status banner already up stays. Once per alert id while listening to
+    /// its trip.
+    @discardableResult
+    func announce(alert: TripAlert) -> Bool {
+        guard tripId == alert.tripId, announced.insert(alert.id).inserted else { return false }
+        deliver(alert, banner: false)
         return true
     }
 
@@ -143,9 +160,9 @@ final class AlertCenter {
         for event in fresh { await announce(event: event) }
     }
 
-    private func deliver(_ alert: TripAlert) {
+    private func deliver(_ alert: TripAlert, banner: Bool = true) {
         if isForeground() {
-            show(alert)
+            if banner { show(alert) }
         } else {
             let notifier = notifier
             Task { await notifier.post(alert) }

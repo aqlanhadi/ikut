@@ -322,7 +322,9 @@ struct TripMapView: View {
     private var viewButtonsTop: CGFloat {
         guard topHeight > 0 else { return Spacing.xs + 56 + Spacing.s }
         var bannerSlotEmpty = true
-        if let alert = alerts.current { bannerSlotEmpty = bannerHiding.contains(alert.category) || alert.id == approach?.id }
+        if let alert = alerts.current {
+            bannerSlotEmpty = alert.kind != .event || bannerHiding.contains(alert.category) || alert.id == approach?.id
+        }
         var toastHidden = false
         if case .hidden = toast.state { toastHidden = true }
         let nothingBelowSlot = bannerSlotEmpty && passedText == nil && toastHidden && stopError == nil
@@ -330,8 +332,8 @@ struct TripMapView: View {
     }
 
     private var bannerShowing: Bool {
-        if approach != nil || passedText != nil { return true }
-        guard let alert = alerts.current else { return false }
+        if approach != nil || passedText != nil || model.catchUp != nil { return true }
+        guard let alert = alerts.current, alert.kind == .event else { return false }
         return !bannerHiding.contains(alert.category)
     }
 
@@ -408,6 +410,7 @@ struct TripMapView: View {
             if let stopPill, !stopCardOpen {
                 StopPillView(pill: stopPill, onButton: pillTapped)
             }
+            if let catchUp = model.catchUp { CatchUpPill(alert: catchUp, model: model) }
             if let approach {
                 ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) }
             }
@@ -602,7 +605,9 @@ struct TripMapView: View {
     }
 
     private var stopPill: StopPill? {
-        StopPillPlanner.current(requests: stopBoard.requests, memory: pillMemory, now: pillNow)
+        StopPillPlanner.current(
+            requests: stopBoard.requests, memory: pillMemory, now: pillNow,
+            distance: { model.convoy.distance(fromMyCarTo: $0) })
     }
 
     private struct PillTimerKey: Equatable {
@@ -706,6 +711,8 @@ struct TripMapView: View {
         }
         model.start()
         model.startHazardAlerts(announcer: alerts, userId: session.userId)
+        // Weak: the model holds `alerts` as its announcer, so a strong capture would keep every map opened.
+        alerts.carDistance = { [weak model] in model?.convoy.distance(fromMyCarTo: $0) }
         alerts.start(tripId: session.tripId, myUserId: session.userId, myCarId: session.member?.carId)
         onScreen = true
         updateAwake()

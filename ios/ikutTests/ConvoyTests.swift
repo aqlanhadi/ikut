@@ -38,10 +38,10 @@ struct ConvoyTests {
     }
 
     private func order(_ cars: [Car], _ positions: [String: Position], speeds: [String: Double] = [:],
-                       main: RouteLine? = nil, merges: [String: Double] = [:],
+                       main: RouteLine? = nil, merges: [String: Double] = [:], together: Set<CarPair> = [],
                        config: ConvoyOrdering.Config = .default) -> ConvoySnapshot {
         ConvoyOrdering.order(cars: cars, positions: positions, now: Self.now, speeds: speeds,
-                             mainRoute: main, ownMergeOffsets: merges, config: config)
+                             mainRoute: main, ownMergeOffsets: merges, together: together, config: config)
     }
 
     // MARK: Ordering
@@ -108,15 +108,15 @@ struct ConvoyTests {
         s = order([car("1"), car("2")], ["1": pos(offset: 10_000), "2": pos(offset: 5000, speed: 5000.0 / 300)],
                   config: .init(minSpeed: 1))
         #expect(s.convoy[1].gap?.isSeparated == false)
-        #expect(s.separatedGaps.isEmpty)
-        // Custom thresholds.
+        #expect(s.driftedGaps.isEmpty)
+        // Custom thresholds; the two were together earlier, so the gap counts as drifted.
         s = order([car("1"), car("2")], ["1": pos(offset: 10_000), "2": pos(offset: 9000)],
-                  config: .init(separationDistance: 500))
-        #expect(s.separatedGaps.map(\.id) == ["2"])
+                  together: [CarPair("1", "2")], config: .init(separationDistance: 500))
+        #expect(s.driftedGaps.map(\.id) == ["2"])
     }
 
     @Test func timeBehindReferenceAccumulates() {
-        let s = order([car("1"), car("2"), car("3")],
+        let s = order([car("1", lead: true), car("2"), car("3")],
                       ["1": pos(offset: 10_000), "2": pos(offset: 8000, speed: 20), "3": pos(offset: 7000, speed: 10)])
         #expect(s.convoy.map(\.timeBehindReference) == [0, 100, 200])
     }
@@ -140,11 +140,18 @@ struct ConvoyTests {
     }
 
     @Test func staleFrontDoesNotAnchorETA() {
-        let s = order([car("1"), car("2"), car("3")],
+        // The lead's position is old: the reference is the fresh car with the most cars around it,
+        // the one further back on a tie (D26).
+        let s = order([car("1", lead: true), car("2"), car("3")],
                       ["1": pos(offset: 9000, age: 300), "2": pos(offset: 8000, speed: 20), "3": pos(offset: 7000, speed: 10)])
         #expect(s.front?.id == "1")
-        #expect(s.etaReference?.id == "2")
-        #expect(s.convoy.map(\.timeBehindReference) == [nil, 0, 100])
+        #expect(s.etaReference?.id == "3")
+        #expect(s.convoy.map(\.timeBehindReference) == [nil, nil, 0])
+        // With the lead fresh, it is the reference wherever it is.
+        let fresh = order([car("1"), car("2", lead: true), car("3")],
+                          ["1": pos(offset: 9000, age: 300), "2": pos(offset: 8000, speed: 20), "3": pos(offset: 7000, speed: 10)])
+        #expect(fresh.etaReference?.id == "2")
+        #expect(fresh.convoy.map(\.timeBehindReference) == [nil, 0, 100])
     }
 
     @Test func lastSeenText() {

@@ -53,8 +53,8 @@ struct FrontETA: Equatable, Sendable {
 /// `setCars`, `setPositions`, `setMainRoute` (or `update`), plus `run()` to keep staleness and
 /// ETAs moving between fixes. No Firestore here.
 ///
-/// ETAs: one MKDirections request per refresh, for the ETA reference car (front-most car with a fresh
-/// position) to the end of the main route, paced by `ETARefreshSchedule`. Every other convoy car's
+/// ETAs: one MKDirections request per refresh, for the ETA reference car (the lead when fresh, else
+/// the car with the most cars around it: `ConvoyOrdering`) to the end of the main route, paced by `ETARefreshSchedule`. Every other convoy car's
 /// ETA is the reference ETA plus its time behind the reference (the sum of the gap times). Joining
 /// cars get `now + timeToMerge`, from their speed and own-route distance: no MKDirections request,
 /// because per-car requests would hit Apple's throttle. The last good ETA is kept while a refresh is
@@ -70,6 +70,12 @@ final class ConvoyModel {
     var joining: [JoiningEntry] { snapshot.joining }
     /// Set by the owner for "ETA Ipoh 14:52"; optional.
     var destinationName: String?
+    /// Town names of cars parked far from the viewer ("Rawang"), by car id, as the reverse geocoder answers.
+    private(set) var placeNames: [String: String] = [:]
+    /// The viewer's car, for the distance in the rows ("38 km ahead"); nil when not in a car.
+    var myCarId: String? {
+        didSet { if myCarId != oldValue { lookUpPlaceNames() } }
+    }
 
     // MARK: Configuration
 
@@ -79,6 +85,7 @@ final class ConvoyModel {
     @ObservationIgnored private let clock: @MainActor () -> Date
     @ObservationIgnored private let locale: Locale
     @ObservationIgnored private let timeZone: TimeZone
+    @ObservationIgnored private let placeNamer: @MainActor (CLLocationCoordinate2D) async -> String?
 
     // MARK: Inputs and bookkeeping
 
@@ -90,6 +97,13 @@ final class ConvoyModel {
     @ObservationIgnored private var lastRequest: (at: Date, from: CLLocationCoordinate2D, carId: String)?
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var etaTask: Task<Void, Never>?
+    /// Cars that have been together this session (`ConvoySnapshot.together`), in memory only: after a
+    /// relaunch a gap that is already wide stays quiet until it closes and opens again.
+    @ObservationIgnored private var together: Set<CarPair> = []
+    /// Where each far car's place name was looked up, the lookups in flight, and when to try again.
+    @ObservationIgnored private var placeLookedUpAt: [String: CLLocationCoordinate2D] = [:]
+    @ObservationIgnored private var placeTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var placeRetryAt: [String: Date] = [:]
 
     init(
         provider: any ETAProviding = MapKitETAProvider(),
@@ -97,8 +111,12 @@ final class ConvoyModel {
         config: ConvoyOrdering.Config = .default,
         locale: Locale = .current,
         timeZone: TimeZone = .current,
-        clock: @escaping @MainActor () -> Date = { Date() }
+        clock: @escaping @MainActor () -> Date = { Date() },
+        placeNamer: @escaping @MainActor (CLLocationCoordinate2D) async -> String? = {
+            await RouteBuilder.placeName(at: $0)
+        }
     ) {
+        self.placeNamer = placeNamer
         self.provider = provider
         self.schedule = schedule
         self.config = config
@@ -141,8 +159,15 @@ final class ConvoyModel {
         let now = now ?? clock()
         snapshot = ConvoyOrdering.order(
             cars: cars, positions: positions, now: now, speeds: smoother.all,
-            mainRoute: mainRoute, ownMergeOffsets: mergeOffsets, config: config)
+            mainRoute: mainRoute, ownMergeOffsets: mergeOffsets, together: together, config: config)
+        together = snapshot.together
+        lookUpPlaceNames()
         requestETAIfNeeded(now: now)
+    }
+
+    /// Waits for in-flight place-name lookups. For tests.
+    func waitForPlaceNames() async {
+        for task in placeTasks.values { await task.value }
     }
 
     /// Ticks `refresh` every `interval` until cancelled. Use as `.task { await model.run() }`.
@@ -221,9 +246,10 @@ final class ConvoyModel {
         return parts.joined(separator: " · ")
     }
 
-    var convoyRows: [ConvoyRowText] { convoyRows(myCarId: nil) }
+    var convoyRows: [ConvoyRowText] { convoyRows(myCarId: myCarId) }
 
-    /// The rows, with the viewer's own car named "Me".
+    /// The rows, with the viewer's own car named "Me". A car more than 2 km from the viewer's along the
+    /// route says how far instead of its speed: "38 km ahead · parked near Rawang", "12 km behind".
     func convoyRows(myCarId: String?) -> [ConvoyRowText] {
         convoy.map { e in
             let mine = e.id == myCarId
@@ -232,7 +258,7 @@ final class ConvoyModel {
                 ? ConvoyFormat.paused
                 : e.isStale
                     ? ConvoyFormat.lastSeen(age: e.age ?? 0)
-                    : leadPrefix + ConvoyFormat.speed(metersPerSecond: e.speed)
+                    : leadPrefix + (farText(e, myCarId: myCarId) ?? ConvoyFormat.speed(metersPerSecond: e.speed))
             let primary: String
             let secondary: String
             if e.hasArrived {
@@ -243,15 +269,17 @@ final class ConvoyModel {
                 secondary = ConvoyFormat.behind(gap.time)
             } else {
                 primary = e.isLead ? "Lead" : "Front"
+                // A front car ahead of the reference (parked far on, or stale) has no arrival time of its own.
+                let aheadOfReference = snapshot.etaReference != nil && e.timeBehindReference == nil
                 secondary = arrival(forCar: e.id).map {
                     ConvoyFormat.eta($0, locale: locale, timeZone: timeZone)
-                } ?? "Calculating ETA"
+                } ?? (aheadOfReference ? "" : "Calculating ETA")
             }
             return ConvoyRowText(
                 id: e.id, number: e.car.number, name: mine ? ConvoyFormat.me : e.car.name, color: e.car.color,
                 subtitle: subtitle, subtitleIsWarning: e.isStale,
                 trailingPrimary: primary, trailingSecondary: secondary,
-                isStale: e.isStale, isSeparated: !e.hasArrived && (e.gap?.isSeparated ?? false),
+                isStale: e.isStale, isSeparated: !e.hasArrived && (e.gap?.hasDrifted ?? false),
                 isMine: mine, hasArrived: e.hasArrived)
         }
     }
@@ -270,6 +298,46 @@ final class ConvoyModel {
                 subtitleIsWarning: e.isStale,
                 trailingPrimary: e.timeToMerge.map(ConvoyFormat.duration) ?? "--",
                 trailingSecondary: "to merge", isStale: e.isStale)
+        }
+    }
+
+    // MARK: Far cars
+
+    /// Meters along the route from my car to `carId`, positive when it is ahead; nil unless both are in
+    /// the convoy.
+    func distance(fromMyCarTo carId: String) -> Double? { snapshot.distance(from: myCarId, to: carId) }
+
+    /// "38 km ahead · parked near Rawang", "38 km ahead" while it moves, or nil within 2 km of my car
+    /// (and for my own car, or a car that has arrived).
+    private func farText(_ e: ConvoyEntry, myCarId: String?) -> String? {
+        guard e.id != myCarId, !e.hasArrived, let meters = snapshot.distance(from: myCarId, to: e.id),
+              let far = ConvoyFormat.relativeDistance(meters, beyond: config.groupRadius) else { return nil }
+        guard e.isParked else { return far }
+        guard let place = placeNames[e.id] else { return "\(far) · parked" }
+        return "\(far) · parked near \(ConvoyFormat.placeShortName(place))"
+    }
+
+    /// Looks up the town of each car parked more than 2 km from mine, once, and again only if it moves
+    /// 2 km. A lookup that finds nothing is tried again after a minute.
+    private func lookUpPlaceNames() {
+        let now = clock()
+        for (id, at) in placeRetryAt where at <= now {
+            placeRetryAt[id] = nil
+            placeLookedUpAt[id] = nil
+        }
+        for e in convoy where e.isParked && e.id != myCarId && !e.hasArrived && placeTasks[e.id] == nil {
+            guard let meters = snapshot.distance(from: myCarId, to: e.id), abs(meters) > config.groupRadius else { continue }
+            let here = CLLocationCoordinate2D(latitude: e.position.location.latitude, longitude: e.position.location.longitude)
+            if let last = placeLookedUpAt[e.id], RouteLine.haversine(last, here) < 2000 { continue }
+            placeLookedUpAt[e.id] = here
+            let id = e.id
+            let namer = placeNamer
+            placeTasks[id] = Task { [weak self] in
+                let name = await namer(here)
+                guard let self else { return }
+                self.placeTasks[id] = nil
+                if let name { self.placeNames[id] = name } else { self.placeRetryAt[id] = self.clock().addingTimeInterval(60) }
+            }
         }
     }
 

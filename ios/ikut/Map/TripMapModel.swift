@@ -53,6 +53,11 @@ final class TripMapModel {
     @ObservationIgnored private var events: [TripEvent] = []
     @ObservationIgnored private var alertAnnouncer: (any AlertAnnouncing)?
     @ObservationIgnored private var alertUserId: String?
+    @ObservationIgnored private var alertTripId: String?
+    @ObservationIgnored private var catchUpWatch = CatchUpHeadsUp()
+    @ObservationIgnored private var catchUpAt: Date?
+    /// "Aisha’s car is 3.3 km behind you" while its pill is up (D26).
+    private(set) var catchUp: TripAlert?
     @ObservationIgnored private var approach: ApproachMonitor?
     @ObservationIgnored private var approachCarId: String?
     /// My joining route (nil once merged), decoded once per change.
@@ -125,6 +130,7 @@ final class TripMapModel {
     ) {
         self.myCar = myCar
         self.myCarId = myCarId
+        convoy.myCarId = myCarId
         self.isTracker = isTracker
         self.isEnded = isEnded
         self.positions = positions
@@ -148,6 +154,7 @@ final class TripMapModel {
         convoy.update(cars: cars, positions: positions)
         hazards.setPositions(positions)
         feedHazardServices(routeChanged: routeChanged)
+        checkCatchUp()
     }
 
     /// New car list from the listener. Overlays are rebuilt only when a route or state changed.
@@ -156,6 +163,47 @@ final class TripMapModel {
         recomputeOverlays()
         convoy.update(cars: cars, positions: positions)
         hazards.setCars(cars)
+        checkCatchUp()
+    }
+
+    // MARK: A car parked ahead (D26)
+
+    /// After every convoy update: when my car is parked ahead on the route, tells its phone once,
+    /// about 2 minutes before the nearest car behind reaches it, and keeps the pill up until it has.
+    private func checkCatchUp() {
+        if let alert = catchUp, !catchUpShowing(alert) { catchUp = nil }
+        guard !isEnded, let announcer = alertAnnouncer, let tripId = alertTripId, let myCarId,
+              let due = catchUpWatch.check(convoy.snapshot, tripId: tripId, myCarId: myCarId)
+        else { return }
+        let alert = AlertWording.catchUp(tripId: tripId, myCarId: myCarId, due: due)
+        catchUp = alert
+        catchUpAt = Date()
+        announcer.announce(alert: alert)
+    }
+
+    /// The pill stays until the car behind is within 150 m of mine or past it, for at most 5 minutes.
+    private func catchUpShowing(_ alert: TripAlert) -> Bool {
+        guard let at = catchUpAt, Date().timeIntervalSince(at) < 5 * 60,
+              let gap = catchUpDistance(alert) else { return false }
+        return gap > 150
+    }
+
+    /// Meters from the car coming up behind (`alert.eventId`) to mine, carried forward at its speed
+    /// between fixes; nil once either car is off the route.
+    func catchUpDistance(_ alert: TripAlert, now: Date = Date()) -> Double? {
+        guard let ahead = convoy.distance(fromMyCarTo: alert.eventId) else { return nil }
+        var gap = -ahead
+        if let them = convoy.convoy.first(where: { $0.id == alert.eventId }), let at = them.position.updatedAt,
+           !them.isPaused {
+            gap -= them.movingSpeed * min(max(now.timeIntervalSince(at), 0), 30)
+        }
+        return gap
+    }
+
+    /// Seconds until the car coming up behind reaches mine at its speed; nil while it is barely moving.
+    func catchUpSeconds(_ alert: TripAlert, distance: Double) -> Double? {
+        guard let them = convoy.convoy.first(where: { $0.id == alert.eventId }), them.movingSpeed > 1 else { return nil }
+        return distance / them.movingSpeed
     }
 
     private func recomputeOverlays() {
@@ -207,15 +255,17 @@ final class TripMapModel {
     /// The latest position written for a car, if any.
     func carPosition(_ carId: String) -> Position? { positions[carId] }
 
-    var separationWarning: String? { SeparationWarning.text(convoy.snapshot.separatedGaps) }
+    var separationWarning: String? { SeparationWarning.text(convoy.snapshot.driftedGaps) }
 
     // MARK: Hazards
 
     /// Starts approach alerts (announced through `announcer`) and, for the tracker, region monitoring.
     /// Call when the map appears; `stop()` ends them.
-    func startHazardAlerts(announcer: any AlertAnnouncing, userId: String) {
+    /// The same announcer tells a car parked ahead that the convoy is coming (`tripId` defaults to the session's).
+    func startHazardAlerts(announcer: any AlertAnnouncing, userId: String, tripId: String? = nil) {
         alertAnnouncer = announcer
         alertUserId = userId
+        alertTripId = tripId ?? session?.tripId
         hazardsRunning = true
         feedHazardServices(routeChanged: true)
     }
@@ -245,6 +295,7 @@ final class TripMapModel {
         hazardsRunning = false
         approach = nil
         approachCarId = nil
+        alertAnnouncer = nil
         stopRegions()
     }
 

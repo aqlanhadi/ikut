@@ -41,3 +41,41 @@ export const TIMELINE = [
   { at: 735, car: 'car4', do: 'ok' },
   { at: 800, car: 'car1', do: 'markStopped' },
 ];
+
+/**
+ * The parked-ahead scenario (D26, `--scenario parked` on convoy-sim.mjs and run-ui.mjs): the same drive, plus cars
+ * parked on the main route far ahead of the convoy, at an R&R say, that drive on once it comes by. They are in the
+ * convoy all along. `waitOffset`: parked there until car 1 (the lead) has passed it by `departAfter`, then pulls out
+ * behind it at 1.5 m/s² up to `speed`. Car 1 starts at 5.0 km and covers about 27.9 m/s, so (lib/farahead.mjs):
+ *   the phone (car5-parked), parked at 24 km: heads-up "Aisha’s car is 3.3 km behind you" about T=561, drives on about T=692
+ *   car 6 (Mei), parked at 28 km:             heads-up about T=704,                                 drives on about T=835
+ * Car 3 asks for a fuel stop early, at T=300, while 13 km behind the phone and 17 km behind car 6, so it is worded
+ * with the distance. The phone replaces car5-app; run-ui runs ConvoyScenarioUITests/testParkedAheadOfTheConvoy.
+ */
+export const PARKED_CARS = [
+  { key: 'car6', kind: 'main', name: 'Mei’s Saga', displayName: 'Mei', color: '#DB2777', waitOffset: 28_000, departAfter: 300, speed: 27.4 },
+  { key: 'car5-parked', kind: 'app', name: 'the app', waitOffset: 24_000, departAfter: 300, speed: 27.4 },
+];
+
+export const PARKED_TIMELINE = [
+  { at: 300, car: 'car3', do: 'stopRequest', type: 'stopFuel', message: 'Low on fuel, next R&R please' },
+  { at: 400, car: 'car2', do: 'ok' }, // after its signal drop (200-380): an offline write would hold the clock
+  { at: 450, car: 'car4', do: 'ok' },
+  { at: 520, car: 'car1', do: 'hazard', type: 'debris' },
+  { at: 800, car: 'car1', do: 'markStopped' },
+];
+
+export const SCENARIOS = ['drive', 'parked'];
+
+/** The cars of a scenario: 'drive' (the default) or 'parked'. */
+export function scenarioCars(name = 'drive') {
+  if (name === 'drive') return CARS;
+  if (name === 'parked') return [...CARS.filter((c) => c.kind !== 'app'), ...PARKED_CARS];
+  throw new Error(`unknown scenario ${name} (${SCENARIOS.join(' or ')})`);
+}
+
+/** The scripted happenings of a scenario. */
+export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : TIMELINE);
+
+/** The phone's track in a scenario. */
+export const appKey = (name = 'drive') => scenarioCars(name).find((c) => c.kind === 'app').key;

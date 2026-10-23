@@ -298,6 +298,7 @@ struct ConvoyPanel: View {
             .padding(.vertical, Spacing.s)
             .background(MapPalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
             .padding(.bottom, Spacing.tight)
+            .accessibilityIdentifier("convoy.separation")
     }
 
     private var buttons: some View {

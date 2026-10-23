@@ -306,6 +306,50 @@ struct AlertCenterTests {
         #expect(rig.notifier.categories == ["t"])
     }
 
+    /// D26: a stop request from a car more than 2 km away says how far, spoken and in the notification.
+    @Test func farStopRequestSaysHowFar() async {
+        let rig = Rig()
+        rig.state.foreground = false
+        rig.center.carDistance = { $0 == "c" ? -40_000 : nil }
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        rig.source.emit([alertEvent(.stopFuel, id: "s1")])
+        await waitUntil { !rig.notifier.posted.isEmpty }
+        #expect(rig.speaker.spoken.map(\.text) == ["Aqlan needs fuel, 40 km behind. Tap OK."])
+        #expect(rig.notifier.posted.first?.body == "Aqlan’s car wants to stop for fuel · 40 km behind · just now")
+    }
+
+    /// The heads-up for a car parked ahead is spoken once and never takes the banner slot: its own pill
+    /// shows it, so a hazard banner already up stays.
+    @Test func catchUpAlertIsDeliveredOnce() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        rig.source.emit([alertEvent(.debris, id: "1")])
+        await waitUntil { rig.center.current != nil }
+        let due = CatchUpHeadsUp.Due(carId: "1", carPhrase: "Aisha’s car", distance: 3_000, seconds: 120)
+        let alert = AlertWording.catchUp(tripId: "t", myCarId: "3", due: due)
+        #expect(rig.center.announce(alert: alert))
+        #expect(!rig.center.announce(alert: alert))
+        #expect(!rig.center.announce(alert: AlertWording.catchUp(tripId: "other", myCarId: "3", due: due)))
+        #expect(rig.speaker.spoken.map(\.text).last == "Aisha’s car is 3 km behind you.")
+        #expect(rig.center.current?.id == "1")
+        #expect(rig.notifier.posted.isEmpty)
+    }
+
+    /// In the background the heads-up is a notification, and still spoken.
+    @Test func catchUpAlertInBackgroundIsNotified() async {
+        let rig = Rig()
+        rig.state.foreground = false
+        rig.center.start(tripId: "t", myUserId: "me")
+        let due = CatchUpHeadsUp.Due(carId: "1", carPhrase: "Aisha’s car", distance: 3_000, seconds: 120)
+        #expect(rig.center.announce(alert: AlertWording.catchUp(tripId: "t", myCarId: "3", due: due)))
+        await waitUntil { !rig.notifier.posted.isEmpty }
+        #expect(rig.notifier.posted.first?.kind == .catchUp)
+        #expect(rig.center.current == nil)
+        #expect(rig.speaker.spoken.count == 1)
+    }
+
     @Test func backgroundPostsNotificationAndKeepsBannerEmpty() async {
         let rig = Rig()
         rig.state.foreground = false
