@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		05D8D98DF55B338C949EC769 /* ReportOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */; };
 		079075CB6B156BCB6CBF0CEA /* HazardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3444E323182FDDB4B67D7428 /* HazardTests.swift */; };
+		093FA6B49C799544A49C2A82 /* FarAheadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */; };
 		0A6FE771CAA54DCA9D39B177 /* PolylineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C004029CF785E6F7B0DC74 /* PolylineTests.swift */; };
 		0BAFE3B186247E8A27720E2D /* PastTripsMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276A665B881911A49A9C38D7 /* PastTripsMap.swift */; };
 		0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */; };
@@ -126,6 +127,7 @@
 		C9EBB30503561CC0D3A77FD9 /* PickedTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322ED2F251FFDF594FC7D83E /* PickedTrip.swift */; };
 		D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D7B5FA67D691851818F691 /* ConvoyTests.swift */; };
 		D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991414E381145C07351D7F20 /* LocationDeniedView.swift */; };
+		D53034881D28E618144A5117 /* CatchUpHeadsUp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */; };
 		D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D417D8CDD8A80CCF181936 /* TrackingTests.swift */; };
 		D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */; };
 		D80A984085D33024BE6B519E /* PausedBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236F0C8AD5686F34C2F35CD8 /* PausedBanner.swift */; };
@@ -231,11 +233,13 @@
 		644401FB5F0CAB8C10EF3B3B /* StopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopTests.swift; sourceTree = "<group>"; };
 		650E26FDD008B015443CC328 /* AlertWording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertWording.swift; sourceTree = "<group>"; };
 		66FF5396649ED8B58EC123A7 /* TripAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAskTests.swift; sourceTree = "<group>"; };
+		67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarAheadTests.swift; sourceTree = "<group>"; };
 		698FEDDD6491F2113B929776 /* RecapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapService.swift; sourceTree = "<group>"; };
 		6CAD86226D34FC774F9DB35D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyScenarioUITests.swift; sourceTree = "<group>"; };
 		71B82F24EB5831D1B00E8EF6 /* ReportContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportContext.swift; sourceTree = "<group>"; };
 		7817F4C6CB269ADF3664EA9E /* RecapMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapMapView.swift; sourceTree = "<group>"; };
+		78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatchUpHeadsUp.swift; sourceTree = "<group>"; };
 		7BC7EB105E449EB09482E179 /* TripRouteInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripRouteInfo.swift; sourceTree = "<group>"; };
 		7C2769228FEE1D9534950492 /* TripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripService.swift; sourceTree = "<group>"; };
 		7CAC79F1BB254D2FFA7FF24B /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
@@ -526,6 +530,7 @@
 				B6117F5F8B2493D250C4083B /* AlertSettings.swift */,
 				650E26FDD008B015443CC328 /* AlertWording.swift */,
 				97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */,
+				78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */,
 				826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */,
 				573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */,
 				C963869E69413A0E655BFED4 /* SpeechQueue.swift */,
@@ -603,6 +608,7 @@
 				E0D7B5FA67D691851818F691 /* ConvoyTests.swift */,
 				FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */,
 				28F201EC357C45D84BC4395C /* EventTests.swift */,
+				67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */,
 				3444E323182FDDB4B67D7428 /* HazardTests.swift */,
 				55CC3926DEEA6AE07A394182 /* JoinTests.swift */,
 				E8576506422AFD08E8778B82 /* LobbyTests.swift */,
@@ -836,6 +842,7 @@
 				D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */,
 				584A3D742D1E46142E1B6A44 /* CarRouteLogic.swift in Sources */,
 				80D285211412E053AE968E46 /* CarRouteService.swift in Sources */,
+				D53034881D28E618144A5117 /* CatchUpHeadsUp.swift in Sources */,
 				543F159C6474EEE812A787EF /* ContentView.swift in Sources */,
 				95EC198723C3BA9E48C96F02 /* ConvoyFormat.swift in Sources */,
 				66B1B1B98B60E2439AD59234 /* ConvoyModel.swift in Sources */,
@@ -951,6 +958,7 @@
 				7B2B2622524DCA230BA33FC3 /* DeepLinkTests.swift in Sources */,
 				72913577CD65DD10CE46D83D /* EventTests.swift in Sources */,
 				E4EF98D0A5B5842B9FC8EA69 /* Fakes.swift in Sources */,
+				093FA6B49C799544A49C2A82 /* FarAheadTests.swift in Sources */,
 				934D513F0C9E2DFAE1B60D1C /* Fixtures.swift in Sources */,
 				079075CB6B156BCB6CBF0CEA /* HazardTests.swift in Sources */,
 				9785EEBC824C5B168FFD8B25 /* JoinTests.swift in Sources */,

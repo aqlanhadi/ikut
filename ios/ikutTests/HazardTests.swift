@@ -276,6 +276,11 @@ private final class FakeAnnouncer: AlertAnnouncing {
         calls.append((event.id, distance))
         return true
     }
+    var alerts: [TripAlert] = []
+    func announce(alert: TripAlert) -> Bool {
+        alerts.append(alert)
+        return true
+    }
 }
 
 @MainActor

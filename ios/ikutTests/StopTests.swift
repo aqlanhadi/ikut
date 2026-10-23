@@ -354,6 +354,26 @@ struct StopLogicTests {
 
     // MARK: The pill
 
+    /// D26: a request from a car more than 2 km from mine says how far, along the route.
+    @Test func pillSaysHowFarAFarRequestIs() throws {
+        let first = try tally(request("one", at: 0), me: "c3", user: "u3")
+        var memory = StopPillMemory()
+        memory.observe([first], now: t0)
+        func title(_ meters: Double?) -> String? {
+            guard case .question(_, _, let title, _)? = StopPillPlanner.current(
+                requests: [first], memory: memory, now: t0.addingTimeInterval(1), distance: { _ in meters }) else { return nil }
+            return title
+        }
+        #expect(title(-40_000) == "Wyna needs fuel · 40 km behind")
+        #expect(title(12_000) == "Wyna needs fuel · 12 km ahead")
+        #expect(title(-1_500) == "Wyna needs fuel")
+        #expect(title(2_000) == "Wyna needs fuel")
+        #expect(title(nil) == "Wyna needs fuel")
+        // Every car is counted once, however far: "N of M OK" (D24).
+        #expect(Set(first.rows.map(\.carId)).count == first.rows.count)
+        #expect(first.rows.count == 4)          // the four tracked cars
+    }
+
     @Test func pillOffersTheOldestUnansweredRequestFirst() throws {
         let first = try tally(request("one", at: 0), me: "c3", user: "u3")
         let second = try #require(StopLogic.tally(

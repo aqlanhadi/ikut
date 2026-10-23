@@ -14,7 +14,9 @@ struct AlertBannerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var shown: TripAlert? {
-        guard let alert = center.current, !hiding.contains(alert.category), alert.id != hidingAlertId else { return nil }
+        // "Aisha’s car is 3.3 km behind you" is always its own pill at the top (`CatchUpPill`), never a banner.
+        guard let alert = center.current, alert.kind == .event, !hiding.contains(alert.category),
+              alert.id != hidingAlertId else { return nil }
         return alert
     }
 

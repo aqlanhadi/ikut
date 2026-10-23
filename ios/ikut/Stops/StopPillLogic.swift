@@ -67,8 +67,12 @@ enum StopPillPlanner {
 
     /// The pill to show at `now`, or nil. Order: a confirmation of the tap, then the oldest request
     /// this car has not said OK to (one at a time, until its 20 seconds are up), then the asker's own
-    /// confirmation. `requests` are oldest first.
-    static func current(requests: [StopRequestState], memory: StopPillMemory, now: Date) -> StopPill? {
+    /// confirmation. `requests` are oldest first. `distance` gives meters along the route from my car to
+    /// a car (positive: ahead), so a request from over 2 km away says how far: "Wyna needs fuel · 40 km behind".
+    static func current(
+        requests: [StopRequestState], memory: StopPillMemory, now: Date,
+        distance: (String) -> Double? = { _ in nil }
+    ) -> StopPill? {
         if let c = memory.confirmation, now.timeIntervalSince(c.at) < confirmWindow {
             let symbol = requests.first.map { StopLogic.reasonSymbol($0.type) } ?? "checkmark"
             return .confirm(symbol: symbol, title: c.title, detail: c.detail)
@@ -76,7 +80,8 @@ enum StopPillPlanner {
         for request in requests where StopLogic.needsAnswer(request) {
             guard let seen = memory.questionSeen[request.eventId], now.timeIntervalSince(seen) < questionWindow else { continue }
             return .question(
-                eventId: request.eventId, symbol: StopLogic.reasonSymbol(request.type), title: request.title,
+                eventId: request.eventId, symbol: StopLogic.reasonSymbol(request.type),
+                title: request.title(far: distance(request.requesterCarId).flatMap { ConvoyFormat.relativeDistance($0) }),
                 detail: request.pillDetail(now: now))
         }
         for request in requests where StopLogic.viewerIsRequester(request) {
