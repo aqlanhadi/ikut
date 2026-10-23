@@ -284,6 +284,33 @@ final class ConvoyModel {
         }
     }
 
+    /// Time to merge while the car moves, distance under the speed floor; nil without an estimate.
+    func joinAmount(_ e: JoiningEntry) -> ConvoyFormat.JoinAmount? {
+        ConvoyFormat.joinAmount(
+            timeToMerge: e.timeToMerge, distanceToMerge: e.distanceToMerge, speed: e.speed, parkedSpeed: config.parkedSpeed)
+    }
+
+    /// The collapsed summary: my own joining car first ("You join in 14 km"), else the first with a merge time.
+    func summaryParts(myCarId: String?) -> (driving: String, joining: String?, spread: String?) {
+        let joiner = joining.first(where: { $0.id == myCarId })
+            ?? joining.first(where: { $0.timeToMerge != nil }) ?? joining.first
+        return ConvoyFormat.convoySummary(
+            driving: convoy.count, joinerName: joiner?.car.name, joinIn: joiner?.timeToMerge,
+            spread: convoy.count > 1 ? snapshot.spread : nil,
+            joinerIsMe: joiner != nil && joiner?.id == myCarId,
+            joinAmount: joiner.flatMap { joinAmount($0) })
+    }
+
+    /// The panel header's words for my own trip; the joining line only while my car is in the joining list.
+    func headerText(
+        car: Car?, join: OwnWayJoin?, ownStartTown: String?, mainStartTown: String?, joinPlace: String?, destination: String
+    ) -> ConvoyHeader.Text {
+        let mine = joining.first(where: { $0.id == myCarId })
+        return ConvoyHeader.text(
+            car: car, joinEntry: mine, join: join, ownStartTown: ownStartTown, mainStartTown: mainStartTown,
+            joinPlace: joinPlace, destination: destination, amount: mine.flatMap { joinAmount($0) })
+    }
+
     var joiningRows: [JoiningRowText] { joiningRows(myCarId: nil) }
 
     func joiningRows(myCarId: String?) -> [JoiningRowText] {
@@ -296,7 +323,7 @@ final class ConvoyModel {
                     ? ConvoyFormat.lastSeen(age: e.age ?? 0)
                     : (e.position == nil ? "Waiting for location" : ConvoyFormat.speed(metersPerSecond: e.speed)),
                 subtitleIsWarning: e.isStale,
-                trailingPrimary: e.timeToMerge.map(ConvoyFormat.duration) ?? "--",
+                trailingPrimary: joinAmount(e)?.text ?? "--",
                 trailingSecondary: "to merge", isStale: e.isStale)
         }
     }

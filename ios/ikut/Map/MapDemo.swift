@@ -56,7 +56,11 @@ enum MapDemo {
 
     /// `parked` (D26, `IKUT_MAP_DEMO_PARKED`): "far" adds Mei, parked 30 km ahead of the lead near Gopeng;
     /// "catchup" makes the viewer Mei, parked 3.1 km ahead of the convoy, with "Aqlan’s car is behind you".
-    static func model(now: Date = Date(), fiveCars: Bool = false, parked: String? = nil) -> TripMapModel {
+    /// The viewer is Hafiz, whose car is still joining (D26 panel header): driving to the merge point, parked at
+    /// home, or on a route that never meets the main one.
+    enum Joiner { case moving, parked, never }
+
+    static func model(now: Date = Date(), fiveCars: Bool = false, parked: String? = nil, joiner: Joiner? = nil) -> TripMapModel {
         let main = RouteLine(densify(mainWaypoints))
         let own = RouteLine(densify(joiningWaypoints))
         let tapah = main.project(.init(latitude: 4.2000, longitude: 101.2600))?.offset ?? 0
@@ -87,6 +91,7 @@ enum MapDemo {
         let hafizOffset = max(0, (own.length) - 12_000)
         let hafizPoint = own.coordinate(atOffset: hafizOffset) ?? own.coordinates[0]
         let hafizAhead = own.coordinate(atOffset: hafizOffset + 50) ?? hafizPoint
+        cars[0].mergeOffset = 0
         var positions: [String: Position] = [
             "c1": onMain(tapah, speed: 96 / 3.6, age: 4),
             "c2": onMain(tapah - 1_800, speed: 92 / 3.6, age: 6),
@@ -99,6 +104,22 @@ enum MapDemo {
         if fiveCars { positions["c5"] = onMain(tapah - 8_000, speed: 90 / 3.6, age: 5) }
         // Mei parked ahead: 30 km on, or (for the heads-up) 15 km on until the lead is 3.1 km from her.
         if let parked { positions["c6"] = onMain(tapah + (parked == "far" ? 30_000 : 15_000), speed: 0, age: 3) }
+        switch joiner {
+        case .parked:
+            positions["c3"]?.speed = 0
+        case .never:
+            // Penang to Ipoh: the whole route is Hafiz's own and ends off the main route, 60 km on.
+            let penang = CLLocationCoordinate2D(latitude: 5.4141, longitude: 100.3288)
+            let end = CLLocationCoordinate2D(latitude: 4.6005, longitude: 101.09)
+            let far = RouteLine(densify([penang, end]))
+            cars[2].route = Polyline.encode(far.coordinates)
+            cars[2].mergeOffset = main.length
+            let at = far.coordinate(atOffset: max(0, far.length - 60_000)) ?? penang
+            positions["c3"]?.location = GeoPoint(latitude: at.latitude, longitude: at.longitude)
+            positions["c3"]?.routeOffset = max(0, far.length - 60_000)
+        case .moving, nil:
+            break
+        }
         let trip = Trip(
             id: "demo", name: "Balik kampung raya", code: "K7M2QX", organizerId: "u-c1",
             route: Polyline.encode(main.coordinates),
@@ -107,7 +128,7 @@ enum MapDemo {
 
         let convoy = ConvoyModel(provider: FixedETA(seconds: 3_000), clock: { now }, placeNamer: { _ in "Gopeng" })
         let model = TripMapModel(session: nil, convoy: convoy)
-        let viewer = parked == "catchup" ? cars.count - 1 : 0
+        let viewer = parked == "catchup" ? cars.count - 1 : joiner != nil ? 2 : 0
         if parked == "catchup" { model.startHazardAlerts(announcer: SilentAnnouncer(), userId: "u-c6", tripId: "demo") }
         model.apply(trip: trip, myCar: cars[viewer], myCarId: cars[viewer].id, positions: positions, isTracker: true)
         model.setCars(cars)

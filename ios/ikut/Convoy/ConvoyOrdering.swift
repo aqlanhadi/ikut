@@ -161,7 +161,8 @@ enum ConvoyArrival {
 /// **Joining distance:** the car's remaining distance along its own route to the point where it
 /// joins the main route. That point is `ownMergeOffsets[carId]` (from
 /// `RouteLine.mergeOffset(of:).otherOffset`, see `mergeOffsets`), minus `routeOffset`, clamped at 0.
-/// If there is no such offset (no route, never joins), the straight-line distance from the car to the
+/// If the car has its own route but no such offset (it never joins), the rest of that route: its length minus
+/// `routeOffset`, by road. If there is no route, the straight-line distance from the car to the
 /// main-route coordinate at `car.mergeOffset` is used instead, or nil when that is unknown too.
 enum ConvoyOrdering {
     struct Config: Equatable, Sendable {
@@ -337,6 +338,11 @@ enum ConvoyOrdering {
         car: Car, position: Position, mainRoute: RouteLine?, ownMergeOffset: Double?
     ) -> Double? {
         if let ownMergeOffset { return max(0, ownMergeOffset - position.routeOffset) }
+        // An own route that never meets the main one (no merge offset for it): the rest of that route, by road.
+        // Only once the main route is known; before that, a missing offset says nothing about merging.
+        if mainRoute != nil, let encoded = car.route, let own = ownRoute(encoded) {
+            return max(0, own.length - position.routeOffset)
+        }
         guard let mainRoute, let offset = car.mergeOffset, let point = mainRoute.coordinate(atOffset: offset)
         else { return nil }
         let here = CLLocationCoordinate2D(latitude: position.location.latitude, longitude: position.location.longitude)
