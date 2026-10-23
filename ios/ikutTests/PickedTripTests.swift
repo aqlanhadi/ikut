@@ -175,6 +175,69 @@ struct PickedTripTests {
         #expect(p.model.recap == nil)
     }
 
+    // MARK: Pin and camera
+
+    @Test func pinSaysWhatItIsAndWhen() throws {
+        let p = pickedTrip()
+        let recap = try #require(p.model.recap)
+        let stop = try #require(recap.timeline.first { $0.kind == .stop })
+        let report = try #require(recap.timeline.first { $0.kind == .hazard })
+        #expect(PickedTripLogic.pinLabel(stop) == "Fuel stop · \(RecapLogic.clock(stop.time))")
+        #expect(PickedTripLogic.pinLabel(report) == "Road report · \(RecapLogic.clock(report.time))")
+        #expect(!PickedTripLogic.pinLabel(stop).contains("asked"))
+    }
+
+    @Test func cameraRefitsWhenTheRecapFirstArrivesAndIsStillOurs() {
+        #expect(PickedTripLogic.shouldRefit(hadSnapshot: false, hasSnapshot: true, itemSelected: false, cameraMovedByUser: false))
+        #expect(!PickedTripLogic.shouldRefit(hadSnapshot: true, hasSnapshot: true, itemSelected: false, cameraMovedByUser: false))
+        #expect(!PickedTripLogic.shouldRefit(hadSnapshot: false, hasSnapshot: false, itemSelected: false, cameraMovedByUser: false))
+        #expect(!PickedTripLogic.shouldRefit(hadSnapshot: false, hasSnapshot: true, itemSelected: true, cameraMovedByUser: false))
+        #expect(!PickedTripLogic.shouldRefit(hadSnapshot: false, hasSnapshot: true, itemSelected: false, cameraMovedByUser: true))
+    }
+
+    // MARK: Try again
+
+    private struct Offline: Error {}
+
+    @Test func retryGoesFromLoadingToFailedToLoaded() async throws {
+        var online = false
+        var calls = 0
+        let snap = RecapSnapshot.demo()
+        let model = RecapModel(tripId: snap.tripId, originName: "Tanjung Malim", fetch: { _ in
+            calls += 1
+            if online { return snap }
+            throw Offline()
+        }, persist: false)
+        #expect(model.isLoading)
+        await model.load(myUserId: nil)
+        #expect(!model.isLoading)
+        #expect(model.errorMessage == RecapModel.couldntLoad)
+        #expect(model.recap == nil)
+        online = true
+        await model.retry(myUserId: nil)
+        #expect(model.errorMessage == nil)
+        #expect(model.snapshot != nil)
+        #expect(model.recap?.title == snap.name)
+        #expect(calls == 2)
+    }
+
+    @Test func retryDoesNothingOnceTheRecapIsThere() async {
+        var calls = 0
+        let model = RecapModel(tripId: "x", originName: "Somewhere", fetch: { _ in calls += 1; return RecapSnapshot.demo() }, persist: false)
+        await model.load(myUserId: nil)
+        #expect(calls == 1)
+        await model.retry(myUserId: nil)
+        #expect(calls == 1)
+    }
+
+    @Test func aFailedTryAgainStaysFailed() async {
+        let model = RecapModel(tripId: "x", originName: "Somewhere", fetch: { _ in throw Offline() }, persist: false)
+        await model.load(myUserId: nil)
+        await model.retry(myUserId: nil)
+        #expect(model.errorMessage == RecapModel.couldntLoad)
+        #expect(model.snapshot == nil)
+    }
+
     // MARK: Shared content
 
     @Test func theSheetAndTheScreenShareOneRecapContent() throws {

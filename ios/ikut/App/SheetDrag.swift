@@ -18,16 +18,15 @@ enum SheetDrag {
     /// The sheet's visible height for a drag of `travel` (positive is down), with rubber bands past both detents.
     static func height(expanded: Bool, compact: CGFloat, tall: CGFloat, travel: CGFloat) -> CGFloat {
         let raw = (expanded ? tall : compact) - travel
-        if raw > tall { return tall + (raw - tall) * rubberFactor }
-        if raw < compact { return compact - (compact - raw) * rubberFactor }
+        // However far the finger goes, the sheet stays inside what is laid out.
+        if raw > tall { return min(tall + (raw - tall) * rubberFactor, tall + rubberRoom) }
+        if raw < compact { return max(compact - (compact - raw) * rubberFactor, compact - rubberRoom) }
         return raw
     }
 
-    /// The height the sheet is laid out at.
+    /// The height the sheet's content is laid out at, whatever the visible height: it is clipped to the
+    /// visible shape instead of being laid out again for every drag frame.
     static func layoutHeight(tall: CGFloat) -> CGFloat { tall + rubberRoom }
-
-    /// How far down the laid-out sheet is moved to show `height`.
-    static func offset(tall: CGFloat, height: CGFloat) -> CGFloat { layoutHeight(tall: tall) - height }
 
     /// Which detent a finished drag settles on. The fling is projected (`predicted` is the gesture's
     /// predicted end translation) so a quick flick moves a detent over a short distance.

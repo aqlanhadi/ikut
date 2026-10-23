@@ -63,6 +63,18 @@ enum PickedTripLogic {
                                   span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span))
     }
 
+    /// The label on a marked item's pin and its VoiceOver name: what it is and when, "Fuel stop · 13:16".
+    static func pinLabel(_ item: RecapTimelineItem) -> String {
+        let what = item.pinTitle.isEmpty ? item.title : item.pinTitle
+        return "\(what) · \(RecapLogic.clock(item.time))"
+    }
+
+    /// Whether the camera should go back to the whole route: the recap has just arrived (the full route
+    /// and the dots with it, or a Try again that worked), nothing is selected and the camera is still ours.
+    static func shouldRefit(hadSnapshot: Bool, hasSnapshot: Bool, itemSelected: Bool, cameraMovedByUser: Bool) -> Bool {
+        !hadSnapshot && hasSnapshot && !itemSelected && !cameraMovedByUser
+    }
+
     /// What the map marks on the picked route: stops (red) and road reports (yellow) with a place.
     static func markers(_ recap: Recap?) -> [RecapTimelineItem] {
         (recap?.timeline ?? []).filter { ($0.kind == .stop || $0.kind == .hazard) && $0.coordinate != nil }

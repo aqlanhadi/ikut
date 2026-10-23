@@ -98,6 +98,13 @@ struct TripsHomeView: View {
         }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
+        .onChange(of: picked?.model.snapshot != nil) { was, has in
+            // The recap arrived, perhaps from Try again: its route is the full one and the dots come with it.
+            guard let picked, !isDemo,
+                  PickedTripLogic.shouldRefit(hadSnapshot: was, hasSnapshot: has, itemSelected: picked.selectedItem != nil,
+                                              cameraMovedByUser: camera.positionedByUser) else { return }
+            refocus(animated: true)
+        }
         .overlay(alignment: .topTrailing) { profileButton }
         .alert("Your name", isPresented: $renaming) {
             TextField("Your name", text: $newName)
@@ -231,9 +238,17 @@ struct TripsHomeView: View {
         }
         ForEach(PickedTripLogic.markers(picked.model.recap)) { item in
             let selected = picked.selectedItemId == item.id
-            Annotation(item.title, coordinate: item.coordinate!, anchor: .center) {
-                RecapEventDot(kind: item.kind, symbol: item.symbol, size: selected ? 30 : 22, selected: selected)
-                    .overlay(Circle().stroke(.white, lineWidth: 2))
+            Annotation(PickedTripLogic.pinLabel(item), coordinate: item.coordinate!, anchor: .center) {
+                // A tap selects it like its timeline row (and doesn't fall through to the map's tap-away).
+                Button { selectItem(item) } label: {
+                    RecapEventDot(kind: item.kind, symbol: item.symbol, size: selected ? 30 : 22, selected: selected)
+                        .overlay(Circle().stroke(.white, lineWidth: 2))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(PickedTripLogic.pinLabel(item))
+                .accessibilityHint("Shows it on the map")
             }
             .annotationTitles(selected ? .visible : .hidden)
         }
@@ -396,17 +411,24 @@ struct TripsHomeView: View {
                 ScrollView {
                     if let picked {
                         PickedTripBody(picked: picked, onSelect: selectItem)
-                            .padding(.bottom, bottomInset + Spacing.l)
+                            .padding(.bottom, bottomInset + Spacing.l + SheetDrag.rubberRoom)
                     } else {
                         pastTrips
-                            .padding(.bottom, bottomInset + Spacing.l)
+                            .padding(.bottom, bottomInset + Spacing.l + SheetDrag.rubberRoom)
                     }
                 }
                 .id(picked?.entry.id)
                 // The short picked sheet is only its header; the recap shows as it is pulled up.
                 .opacity(picked != nil && !expanded && dragOffset == 0 ? 0 : 1)
+                // Nor is the hidden recap read out while the short sheet shows only the header.
+                .accessibilityHidden(picked != nil && !expanded)
                 .scrollDisabled(!expanded)
                 .scrollBounceBehavior(.basedOnSize)
+            }
+            // A drag that was cancelled never reaches onEnded; the gesture state resets either way, and
+            // the baseline goes with it (a turn later, so an ended drag has read it first).
+            .onChange(of: drag.start == nil) { _, none in
+                if none { DispatchQueue.main.async { dragStart = nil } }
             }
             .onChange(of: compact, initial: true) { _, new in
                 if picked != nil, pickedCompact != new {
@@ -416,12 +438,15 @@ struct TripsHomeView: View {
             }
             .padding(.horizontal, Spacing.l)
             .frame(maxWidth: .infinity, alignment: .top)
+            // The content is laid out at one fixed height, so a drag frame doesn't lay it out again...
             .frame(height: SheetDrag.layoutHeight(tall: tall), alignment: .top)
+            // ...and the glass is only the visible height, clipping what runs past it: its bottom edge and
+            // rounded corners stay where they were at every detent.
+            .frame(height: height, alignment: .top)
             .glassSurface(.sheet)
             .padding(.horizontal, Spacing.s)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            // Laid out at the tall height and moved down to the detent (and by the finger): no layout per drag frame.
-            .offset(y: bottomInset - 8 + SheetDrag.offset(tall: tall, height: height))
+            .offset(y: bottomInset - 8)
         }
     }
 

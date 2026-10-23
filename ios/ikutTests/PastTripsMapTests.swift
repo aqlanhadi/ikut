@@ -124,12 +124,18 @@ struct SheetDragTests {
         #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: 100) == 280)
     }
 
-    @Test func offsetKeepsTheLaidOutSheetAtTheVisibleHeight() {
+    @Test func contentIsLaidOutAtOneHeightAboveEveryVisibleHeight() {
         let layout = SheetDrag.layoutHeight(tall: 700)
-        #expect(layout > 700)
-        #expect(layout - SheetDrag.offset(tall: 700, height: 300) == 300)
-        // The rubber band's extra stays inside what is laid out.
-        #expect(SheetDrag.offset(tall: 700, height: 700 + 100 * SheetDrag.rubberFactor) >= 0)
+        for height in [300, 500, 700, 700 + SheetDrag.rubberRoom] as [CGFloat] { #expect(layout >= height) }
+    }
+
+    @Test func aHugeOverPullStaysInsideWhatIsLaidOut() {
+        // 300 pt (and 3000) past either detent: the band caps, so the glass never outruns the content.
+        let up = SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: -3000)
+        #expect(up == 700 + SheetDrag.rubberRoom)
+        #expect(up <= SheetDrag.layoutHeight(tall: 700))
+        #expect(SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: -300) == 700 + SheetDrag.rubberRoom)
+        #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: 3000) == 300 - SheetDrag.rubberRoom)
     }
 
     @Test func aFlickSettlesOnTheNearerDetentInItsDirection() {
@@ -137,5 +143,25 @@ struct SheetDragTests {
         #expect(!SheetDrag.settlesExpanded(expanded: false, compact: 300, tall: 700, predicted: -60, start: -8))
         #expect(!SheetDrag.settlesExpanded(expanded: true, compact: 300, tall: 700, predicted: 300, start: 8))
         #expect(SheetDrag.settlesExpanded(expanded: true, compact: 300, tall: 700, predicted: 60, start: 8))
+    }
+}
+
+struct PastTripsCacheTests {
+    private func entry(_ id: String) -> PastTrips.Entry {
+        PastTrips.Entry(id: id, name: id, destination: "D", endedAt: Date(), seenAt: Date(), others: nil)
+    }
+    private func route(_ id: String) -> PastTripRoute {
+        PastTripRoute(id: id, name: id, destinationName: "D", destinationLatitude: 4, destinationLongitude: 101, points: [])
+    }
+
+    @Test func loadingOneOlderTripLeavesTheCacheAlone() {
+        let cache = ["a": route("a"), "b": route("b"), "old": route("old")]
+        #expect(PastTripsMapService.routesToKeep([entry("old")], cache: cache, keeping: false) == nil)
+    }
+
+    @Test func loadingTheDrawnTripsKeepsOnlyWhatHomeStillLists() {
+        let cache = ["a": route("a"), "b": route("b"), "gone": route("gone")]
+        let kept = PastTripsMapService.routesToKeep([entry("a"), entry("b")], cache: cache, keeping: true)
+        #expect(kept?.map(\.id) == ["a", "b"])
     }
 }

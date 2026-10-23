@@ -23,9 +23,9 @@ struct PickedTripHeader: View {
                 .accessibilityLabel("Back to trips")
                 VStack(alignment: .leading, spacing: 1) {
                     Text(picked.title)
-                        .font(.title2.bold()).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                        .font(.title2.bold()).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    Text(picked.subtitle).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(picked.subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let recap = model.recap {
@@ -81,9 +81,9 @@ struct PickedTripHeader: View {
         HStack(spacing: Spacing.m) {
             RecapEventDot(kind: item.kind, symbol: item.symbol, size: 28)
             VStack(alignment: .leading, spacing: 0) {
-                Text(item.title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 Text([RecapLogic.clock(item.time), item.detail].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.footnote).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)

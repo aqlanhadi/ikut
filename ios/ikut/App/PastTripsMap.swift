@@ -92,6 +92,12 @@ enum PastTripsMapService {
         try? data.write(to: url, options: .atomic)
     }
 
+    /// What to write to the file cache after a load: the routes Home still lists, or nothing when the load
+    /// was for one trip outside them (`keeping: false`), which must not shrink the 12-trip cache.
+    static func routesToKeep(_ entries: [PastTrips.Entry], cache: [String: PastTripRoute], keeping: Bool) -> [PastTripRoute]? {
+        keeping ? entries.compactMap { cache[$0.id] } : nil
+    }
+
     /// Routes for `entries` in the same order; trips that can't be read are skipped.
     /// `keeping: false` is for a single trip outside the newest 12 (picked from the list): the file cache,
     /// which holds only what Home draws, is left as it is.
@@ -116,7 +122,7 @@ enum PastTripsMapService {
             }
         }
         // Keep only what Home still lists.
-        if keeping { save(entries.compactMap { cache[$0.id] }) }
+        if let toSave = routesToKeep(entries, cache: cache, keeping: keeping) { save(toSave) }
         return result
     }
 }

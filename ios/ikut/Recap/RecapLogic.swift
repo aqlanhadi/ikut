@@ -103,6 +103,8 @@ struct RecapTimelineItem: Equatable, Sendable, Identifiable {
     /// Where it happened, when known (for the map).
     var latitude: Double?
     var longitude: Double?
+    /// What the map pin says for this item, before the time: "Fuel stop", "Road report"; the title otherwise.
+    var pinTitle: String = ""
 
     var coordinate: CLLocationCoordinate2D? {
         guard let latitude, let longitude else { return nil }
@@ -267,13 +269,14 @@ enum RecapLogic {
                     id: e.id, kind: .hazard, time: time, title: "\(label) reported",
                     detail: [who, e.message].compactMap { $0 }.joined(separator: " · "),
                     symbol: e.category == .hazard ? "exclamationmark.triangle.fill" : "cloud.rain.fill",
-                    latitude: e.latitude, longitude: e.longitude))
+                    latitude: e.latitude, longitude: e.longitude, pinTitle: "Road report"))
             case .stopRequest:
                 items.append(.init(
                     id: e.id, kind: .stop, time: time, title: "\(who) asked for a \(stopNoun(e.eventType))",
                     detail: [carName(e.carId, in: s), e.message].compactMap { $0 }.joined(separator: " · "),
                     symbol: StopLogic.reasonSymbol(e.eventType),
-                    latitude: e.latitude, longitude: e.longitude))
+                    latitude: e.latitude, longitude: e.longitude,
+                    pinTitle: stopNoun(e.eventType).prefix(1).uppercased() + stopNoun(e.eventType).dropFirst()))
             case .status:
                 items.append(.init(
                     id: e.id, kind: .car, time: time, title: "\(carName(e.carId, in: s)): \(label.lowercased())",
