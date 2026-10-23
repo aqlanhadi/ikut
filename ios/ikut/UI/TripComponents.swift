@@ -45,12 +45,15 @@ struct StatGrid: View {
         /// Nil shows a dash.
         var value: String?
         var color: Color?
+        /// A small line under the value ("18 km · 12 min").
+        var detail: String?
         var id: String { caption }
 
-        init(_ caption: String, _ value: String?, color: Color? = nil) {
+        init(_ caption: String, _ value: String?, color: Color? = nil, detail: String? = nil) {
             self.caption = caption
             self.value = value
             self.color = color
+            self.detail = detail
         }
     }
 
@@ -78,6 +81,14 @@ struct StatGrid: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .foregroundStyle(item.color ?? (item.value == nil ? Color.secondary : Color.primary))
+                    if let detail = item.detail {
+                        Text(detail)
+                            .font(.caption)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .foregroundStyle(Color.surfaceSecondary)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .accessibilityElement(children: .combine)
