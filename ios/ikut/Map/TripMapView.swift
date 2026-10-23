@@ -572,7 +572,7 @@ struct TripMapView: View {
             if arrivalOpen, !stopCardOpen, let id = arrivalStopId {
                 StopArrivalCard(
                     model: model, stopId: id, frozenNow: nil, isOrganizer: session.isOrganizer,
-                    leave: liveServices ? { stopId in await leaveStop(stopId) } : nil
+                    leave: liveServices ? { @MainActor stopId in await leaveStop(stopId) } : nil
                 ) {
                     withAnimation(.snappy) { arrivalStopId = nil }
                 }
@@ -598,13 +598,13 @@ struct TripMapView: View {
             onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } })
     }
 
-    /// Leave on the who-is-here card (D25 4a). True once the write is sent (offline it stays queued and the stop
-    /// shows as left right away); false when the server refused it.
-    private func leaveStop(_ stopId: String) async -> Bool {
+    /// Leave on the who-is-here card (D25 4a): sent when the server took it, queued when it did not answer in time
+    /// (no signal; Firestore keeps the write and sends it when the phone is back online), refused when the rules said no.
+    private func leaveStop(_ stopId: String) async -> StopLeave.Result {
         do {
-            try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
-            return true
-        } catch { return false }
+            let sent = try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            return sent ? .sent : .queued
+        } catch { return .refused }
     }
 
     private func stopCard(_ context: StopContext) -> some View {

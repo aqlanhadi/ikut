@@ -11,7 +11,7 @@ import { HERE_RADIUS } from './stoparrival.mjs';
 
 const millis = (t) => (t === undefined || t === null ? null : typeof t === 'number' ? t : t.toMillis());
 
-export const isOpen = (stop) => stop.skipped !== true && !stop.leftAt;
+export const isOpen = (stop) => stop.skipped !== true && !stop.leftAt && !stop.leftBy;
 
 /** The first open stop by place on the route that `offset` has not left more than the here-radius behind. */
 export function nextStop(stops, offset) {

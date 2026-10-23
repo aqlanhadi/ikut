@@ -30,7 +30,7 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
     .map(({ isLead: _isLead, ...car }) => car);
   const stops: PreviewStop[] = stopsSnap.docs
     .map((d) => d.data() as PlannedStop)
-    .filter((s) => s.skipped !== true)
+    .filter((s) => s.skipped !== true && !s.leftAt && !s.leftBy)
     .sort((a, b) => a.order - b.order)
     // Copy field by field: the stop document also holds its place on the map, notes and who skipped it.
     .map((s) => ({ name: s.name, kind: s.kind, ...(typeof s.minutes === "number" ? { minutes: s.minutes } : {}) }));

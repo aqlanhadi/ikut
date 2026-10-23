@@ -9,6 +9,8 @@ test('a left or skipped stop is not open', () => {
   assert.equal(isOpen(stop('a', 1)), true);
   assert.equal(isOpen(stop('a', 1, { leftAt: 5 })), false);
   assert.equal(isOpen(stop('a', 1, { skipped: true })), false);
+  // leftAt can still be a pending server time (absent) while leftBy is there.
+  assert.equal(isOpen(stop('a', 1, { leftBy: 'u1' })), false);
 });
 
 test('next stop moves on once a stop is left, even beside it', () => {

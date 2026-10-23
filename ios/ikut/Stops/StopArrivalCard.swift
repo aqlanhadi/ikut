@@ -13,7 +13,7 @@ struct StopArrivalCard: View {
     /// The viewer is the trip's organizer (the lead car's tracker is read from the cars).
     var isOrganizer = false
     /// Taps Leave for the stop; true once the write is sent. Nil in demos.
-    var leave: (@MainActor (String) async -> Bool)?
+    var leave: (@MainActor (String) async -> StopLeave.Result)?
     var onClose: () -> Void
 
     /// For the demo: opens on the confirm sentence.
@@ -22,6 +22,8 @@ struct StopArrivalCard: View {
     @State private var confirming = false
     @State private var leaving = false
     @State private var couldNotLeave = false
+    /// Leave is saved on this phone and goes through when it is back online.
+    @State private var queued = false
 
     var body: some View {
         if let frozenNow {
@@ -74,10 +76,18 @@ struct StopArrivalCard: View {
     /// Leave for the lead car's tracker and the organizer; the others read who taps it.
     @ViewBuilder private func leaveActions(_ stop: PlannedStop, tally: StopArrival.Tally) -> some View {
         let isLeadTracker = model.myCar?.isLead == true && model.isTracker
-        if StopLeave.canLeave(stop: stop, isLeadTracker: isLeadTracker, isOrganizer: isOrganizer, tripStarted: model.tripStarted) {
+        let leadHere = tally.rows.contains { $0.car.isLead && $0.isHere }
+        if StopLeave.canLeave(
+            stop: stop, isLeadTracker: isLeadTracker, isOrganizer: isOrganizer, tripStarted: model.tripStarted,
+            leadHere: leadHere
+        ) {
             let waiting = StopLeave.waitingLine(tally.rows, leaving: model.myCarId)
             VStack(spacing: Spacing.xs) {
-                if couldNotLeave {
+                if queued {
+                    Text("No signal. Leave goes through when you’re back online.")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
+                        .accessibilityIdentifier("stop.leave.queued")
+                } else if couldNotLeave {
                     Text("That didn’t go through. Try Leave again.")
                         .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.leave.retry")
                 }
@@ -110,10 +120,14 @@ struct StopArrivalCard: View {
         guard let leave, let id = stop.id, !leaving else { return }
         leaving = true
         Task {
-            let sent = await leave(id)
+            let result = await leave(id)
             leaving = false
             // Sent: the stop is left, so the card closes by itself when the stop reaches this phone.
-            if !sent { couldNotLeave = true; confirming = false }
+            switch result {
+            case .sent: break
+            case .queued: queued = true; confirming = false
+            case .refused: couldNotLeave = true; confirming = false
+            }
         }
     }
 

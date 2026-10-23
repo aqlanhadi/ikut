@@ -17,9 +17,17 @@ enum StopLeave {
         leavingAt(stop).map { "Leaving at \(ConvoyFormat.clock($0, locale: locale, timeZone: timeZone))" }
     }
 
+    /// What came of a tap on Leave: the server took it, it is queued (no signal), or it was refused.
+    enum Result: Equatable, Sendable { case sent, queued, refused }
+
     /// The lead car's tracker or the organizer, on a started trip, on a stop still to do (the rules check the same).
-    static func canLeave(stop: PlannedStop, isLeadTracker: Bool, isOrganizer: Bool, tripStarted: Bool) -> Bool {
-        tripStarted && stop.isOpen && (isLeadTracker || isOrganizer)
+    /// Not on a stop nobody has reached (that would be a skip for everyone): the lead car is counted here
+    /// (`leadHere`) or has marked its arrival. A meeting point can be left at any time.
+    static func canLeave(
+        stop: PlannedStop, isLeadTracker: Bool, isOrganizer: Bool, tripStarted: Bool, leadHere: Bool
+    ) -> Bool {
+        guard tripStarted, stop.isOpen, isLeadTracker || isOrganizer else { return false }
+        return stop.isMeeting || leadHere || stop.arrivedAt != nil
     }
 
     /// The lead car's phone writes `arrivedAt` once: a stop with a planned length, not yet marked, while the lead
@@ -62,6 +70,8 @@ enum StopLeave {
         switch first.status {
         case .away(_, let seconds?): return "\(name) is \(ConvoyFormat.duration(seconds)) away"
         case .away(let distance?, nil): return "\(name) is \(ConvoyFormat.distance(distance)) away"
+        case .lastSeenHere: return "\(name) was last seen here"
+        case .unknown: return "No location from \(name) yet"
         default: return "\(name) is still on the way"
         }
     }

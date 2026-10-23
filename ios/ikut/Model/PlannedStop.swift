@@ -43,7 +43,9 @@ struct PlannedStop: Codable, Sendable, Equatable, Identifiable {
 
     /// Not skipped.
     var isActive: Bool { skipped != true }
-    var isLeft: Bool { leftAt != nil }
+    /// The rules write `leftAt` and `leftBy` together. A Leave still waiting to reach the server has `leftBy` but a
+    /// pending `leftAt` that reads as nil, so either one means left.
+    var isLeft: Bool { leftAt != nil || leftBy != nil }
     /// Still to be done: not skipped and not left. Next stop, the card and the approach alert look at this.
     var isOpen: Bool { isActive && !isLeft }
     var isMeeting: Bool { kind == .meet }

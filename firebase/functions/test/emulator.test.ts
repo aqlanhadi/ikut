@@ -320,6 +320,7 @@ describe("previewTrip (emulator)", () => {
     await tripRef.collection("stops").doc("z").set(stop(0, "Petronas SB", { meetAt: Timestamp.now(), kind: "meet" }));
     await tripRef.collection("stops").doc("x").set(stop(2, "Skipped one", { skipped: true, skippedBy: "someone", skippedAt: Timestamp.now() }));
     await tripRef.collection("stops").doc("w").set(stop(3, "Kuala Kangsar", { minutes: 10, kind: "toilet" }));
+    await tripRef.collection("stops").doc("v").set(stop(4, "Left one", { leftAt: Timestamp.now(), leftBy: "someone" }));
     const r = await previewTripData(db, tripRef.id);
     assert.deepEqual(r.stops, [
       { name: "Petronas SB", kind: "meet" },
@@ -327,7 +328,7 @@ describe("previewTrip (emulator)", () => {
       { name: "Kuala Kangsar", kind: "toilet", minutes: 10 },
     ]);
     const json = JSON.stringify(r);
-    for (const secret of ["coordinate", "routeOffset", "note", "skipped", "meetAt", "order", "ask for Sam"]) {
+    for (const secret of ["Left one", "coordinate", "routeOffset", "note", "skipped", "meetAt", "order", "ask for Sam"]) {
       assert.ok(!json.includes(secret), secret);
     }
   });

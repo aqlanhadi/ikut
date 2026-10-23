@@ -52,13 +52,37 @@ struct StopLeaveTests {
     // MARK: Who may
 
     @Test func onlyTheLeadCarsTrackerOrTheOrganizerCanLeaveAStopStillToDo() {
+        func can(_ s: PlannedStop, lead: Bool = false, org: Bool = false, started: Bool = true, here: Bool = true) -> Bool {
+            StopLeave.canLeave(stop: s, isLeadTracker: lead, isOrganizer: org, tripStarted: started, leadHere: here)
+        }
         let s = stop()
-        #expect(StopLeave.canLeave(stop: s, isLeadTracker: true, isOrganizer: false, tripStarted: true))
-        #expect(StopLeave.canLeave(stop: s, isLeadTracker: false, isOrganizer: true, tripStarted: true))
-        #expect(!StopLeave.canLeave(stop: s, isLeadTracker: false, isOrganizer: false, tripStarted: true))
-        #expect(!StopLeave.canLeave(stop: s, isLeadTracker: true, isOrganizer: true, tripStarted: false))
-        #expect(!StopLeave.canLeave(stop: stop(skipped: true), isLeadTracker: true, isOrganizer: true, tripStarted: true))
-        #expect(!StopLeave.canLeave(stop: stop(leftAt: t0), isLeadTracker: true, isOrganizer: true, tripStarted: true))
+        #expect(can(s, lead: true))
+        #expect(can(s, org: true))
+        #expect(!can(s))
+        #expect(!can(s, lead: true, org: true, started: false))
+        #expect(!can(stop(skipped: true), lead: true, org: true))
+        #expect(!can(stop(leftAt: t0), lead: true, org: true))
+    }
+
+    @Test func leaveIsNotOfferedOnAStopNobodyHasReached() {
+        func can(_ s: PlannedStop, here: Bool) -> Bool {
+            StopLeave.canLeave(stop: s, isLeadTracker: true, isOrganizer: true, tripStarted: true, leadHere: here)
+        }
+        // 40 km out: Leave would really be a skip for everyone.
+        #expect(!can(stop(), here: false))
+        #expect(can(stop(), here: true))
+        // The lead car marked its arrival earlier, even if the fix is stale now.
+        #expect(can(stop(arrivedAt: t0), here: false))
+        // A meeting point can be left at any time.
+        #expect(can(stop(kind: .meet), here: false))
+    }
+
+    @Test func aLeaveStillWaitingForTheServerCountsAsLeft() {
+        // leftAt is a pending server time and reads as nil; leftBy is there.
+        var s = stop()
+        s.leftBy = "u1"
+        #expect(s.leftAt == nil)
+        #expect(s.isLeft && !s.isOpen)
     }
 
     @Test func aLeftStopIsDoneForEveryone() {
@@ -162,7 +186,9 @@ struct StopLeaveTests {
         #expect(StopLeave.waitingLine([here, hafiz], leaving: "c1") == "Hafiz is 3 min away")
         #expect(StopLeave.waitingLine([here, row("c2", "Hafiz’s Axia", .away(distance: 9_000, seconds: nil))], leaving: "c1")
             == "Hafiz is 9.0 km away")
-        #expect(StopLeave.waitingLine([here, row("c2", "Hafiz’s Axia", .unknown)], leaving: "c1") == "Hafiz is still on the way")
+        #expect(StopLeave.waitingLine([here, row("c2", "Hafiz’s Axia", .unknown)], leaving: "c1") == "No location from Hafiz yet")
+        #expect(StopLeave.waitingLine([here, row("c2", "Hafiz’s Axia", .lastSeenHere)], leaving: "c1") == "Hafiz was last seen here")
+        #expect(StopLeave.waitingLine([here, row("c2", "Hafiz’s Axia", .away(distance: nil, seconds: nil))], leaving: "c1") == "Hafiz is still on the way")
         #expect(StopLeave.waitingLine([here, hafiz, row("c3", "Wyna’s Bezza", .unknown, number: 3)], leaving: "c1")
             == "Hafiz and 1 more are still on the way")
         #expect(StopLeave.waitingLine([here, row("c2", "Hafiz’s Axia", .here)], leaving: "c1") == nil)
