@@ -118,6 +118,9 @@ enum DemoScreens {
         case "lobby-own-main": return nav(OwnWayDemo.lobby(.onMain))
         case "lobby-own-never": return nav(OwnWayDemo.lobby(.neverMerges))
         case "lobby-own-noroute": return nav(OwnWayDemo.lobby(.noRoute))
+        case "road-arrival": return AnyView(StopArrivalDemo(.someHere))
+        case "road-arrival-all": return AnyView(StopArrivalDemo(.allHere))
+        case "road-arrival-meet": return AnyView(StopArrivalDemo(.meeting))
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":

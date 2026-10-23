@@ -207,6 +207,16 @@ final class TripMapModel {
         return stop.routeOffset - mine
     }
 
+    /// Seconds per meter along the main route for my car (`NextStop.pace`): my ETA over what is left of the route,
+    /// else my speed; nil while I'm not in the convoy or with neither.
+    func stopPace() -> Double? {
+        guard let length = mainRoute?.length, length > 0, let mine = convoy.convoy.first(where: { $0.id == myCarId })
+        else { return nil }
+        return NextStop.pace(
+            travelTimeToGo: convoy.arrival(forCar: mine.id)?.timeIntervalSinceNow,
+            remaining: max(0, length - mine.convoyOffset), speed: mine.speed)
+    }
+
     // MARK: A car parked ahead (D26)
 
     /// After every convoy update: when my car is parked ahead on the route, tells its phone once,

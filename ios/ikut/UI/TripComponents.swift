@@ -47,9 +47,12 @@ struct StatGrid: View {
         var color: Color?
         /// A small line under the value ("18 km · 12 min").
         var detail: String?
+        /// Makes the cell a button.
+        var action: (() -> Void)?
         var id: String { caption }
 
-        init(_ caption: String, _ value: String?, color: Color? = nil, detail: String? = nil) {
+        init(_ caption: String, _ value: String?, color: Color? = nil, detail: String? = nil, action: (() -> Void)? = nil) {
+            self.action = action
             self.caption = caption
             self.value = value
             self.color = color
@@ -73,29 +76,44 @@ struct StatGrid: View {
                 if index > 0 {
                     Divider().frame(height: 28)
                 }
-                VStack(spacing: 0) {
-                    StatCaption(item.caption)
-                    Text(item.value ?? "–")
-                        .font(.system(size: valueSize, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .foregroundStyle(item.color ?? (item.value == nil ? Color.secondary : Color.primary))
-                    if let detail = item.detail {
-                        Text(detail)
-                            .font(.caption)
-                            .monospacedDigit()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .foregroundStyle(Color.surfaceSecondary)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
+                cell(item)
             }
         }
         .padding(.vertical, Spacing.s)
         .background(background, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+    }
+
+    @ViewBuilder private func cell(_ item: Item) -> some View {
+        if let action = item.action {
+            Button(action: action) { content(item) }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("stat.\(item.caption)")
+                .accessibilityAddTraits(.isButton)
+        } else {
+            content(item)
+        }
+    }
+
+    private func content(_ item: Item) -> some View {
+        VStack(spacing: 0) {
+            StatCaption(item.caption)
+            Text(item.value ?? "–")
+                .font(.system(size: valueSize, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(item.color ?? (item.value == nil ? Color.secondary : Color.primary))
+            if let detail = item.detail {
+                Text(detail)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(Color.surfaceSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 }
 

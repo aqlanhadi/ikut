@@ -17,6 +17,8 @@ struct ConvoyPanel: View {
         label: "Pit stop", symbol: "mappin.and.ellipse", badge: 0, accessibilityLabel: "Pit stop")
     var onReport: () -> Void
     var onStop: () -> Void
+    /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
+    var onNextStop: (String) -> Void = { _ in }
 
     @State private var listHeight: CGFloat = 0
     @State private var originName: String?
@@ -185,12 +187,10 @@ struct ConvoyPanel: View {
     }
 
     private var nextStopCell: NextStop.Cell? {
-        guard let length = routeLength, let mine = myEntry else { return nil }
-        let remaining = max(0, length - mine.convoyOffset)
-        let pace = NextStop.pace(
-            travelTimeToGo: convoy.arrival(forCar: mine.id)?.timeIntervalSinceNow, remaining: remaining,
-            speed: mine.speed)
-        return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: pace)
+        if let mine = myEntry { return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: model.stopPace()) }
+        // Still joining: the meeting point, how far my own way in has to go.
+        guard let mine = convoy.joining.first(where: { $0.id == model.myCarId }) else { return nil }
+        return NextStop.joiningCell(stops: model.stops, distance: mine.distanceToMerge, seconds: mine.timeToMerge)
     }
 
     private var myEntry: ConvoyEntry? { convoy.convoy.first(where: { $0.id == model.myCarId }) }
@@ -257,8 +257,10 @@ struct ConvoyPanel: View {
                   color: model.separationWarning == nil ? nil : MapPalette.warning),
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
         ]
-        // Planned stops (D25): no stop ahead, no cell. 3b opens the stop's card from this cell.
-        if let cell = nextStopCell { items.append(.init("Next stop", cell.name, detail: cell.detail)) }
+        // Planned stops (D25): no stop ahead, no cell. Tapping the cell opens that stop's card.
+        if let cell = nextStopCell {
+            items.append(.init("Next stop", cell.name, detail: cell.detail, action: cell.stopId.map { id in { onNextStop(id) } }))
+        }
         return StatGrid(items, background: Color(.tertiarySystemFill), valueSize: 20)
         .padding(.top, Spacing.cozy)
     }

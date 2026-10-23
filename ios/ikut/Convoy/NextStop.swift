@@ -53,4 +53,14 @@ enum NextStop {
             name: stop.name, distance: here ? 0 : distance, seconds: here ? nil : pace.map { $0 * distance },
             isHere: here, stopId: stop.id)
     }
+
+    /// The cell for a car still on its own way in: the meeting point, if the trip has one that is not skipped,
+    /// with how far its own route has to go. Nil without a meeting point or a known distance, and for any other
+    /// stop: a car that has not joined has no place on the route to measure them from.
+    static func joiningCell(stops: [PlannedStop], distance: Double?, seconds: TimeInterval?) -> Cell? {
+        guard let distance, let meet = stops.first(where: { $0.isMeeting && $0.isActive }) else { return nil }
+        let here = distance <= hereRadius
+        return Cell(
+            name: meet.name, distance: here ? 0 : distance, seconds: here ? nil : seconds, isHere: here, stopId: meet.id)
+    }
 }
