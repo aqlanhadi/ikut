@@ -11,6 +11,10 @@ struct ConvoyEntry: Equatable, Identifiable, Sendable {
     var convoyOffset: Double
     /// Smoothed speed estimate in m/s, floored at `Config.minSpeed`. Used for gap and merge times.
     var speed: Double
+    /// The same smoothed speed without the floor: how fast the car is really going (0 when parked).
+    var movingSpeed: Double = 0
+    /// Slower than `Config.parkedSpeed` (about 20 km/h): stopped, parked or crawling.
+    var isParked = false
     /// The car furthest ahead (first in the list).
     var isFront: Bool
     /// The designated lead (`Car.isLead`); not necessarily the front.
@@ -23,8 +27,8 @@ struct ConvoyEntry: Equatable, Identifiable, Sendable {
     var age: TimeInterval?
     /// Gap to the car ahead; nil for the front car.
     var gap: Gap?
-    /// Time behind the ETA reference car (the front-most fresh car), summed over the gaps between.
-    /// Zero for the reference itself; nil for cars ahead of it (stale fronts).
+    /// Time behind the ETA reference car (`ConvoySnapshot.etaReference`), summed over the gaps between.
+    /// Zero for the reference itself; nil for cars ahead of it (a stale front, a car parked far ahead).
     var timeBehindReference: TimeInterval?
     /// Within `ConvoyArrival.radius` of the end of the main route.
     var hasArrived = false
@@ -34,6 +38,10 @@ struct ConvoyEntry: Equatable, Identifiable, Sendable {
         var time: TimeInterval
         /// Over the separation threshold (distance or time).
         var isSeparated: Bool
+        /// Over the threshold, and a car ahead of the gap and a car behind it were within the threshold of
+        /// each other earlier in the trip (`ConvoySnapshot.together`): they were together and have drifted
+        /// apart. Only this warns; a car that has been far ahead or behind since it joined doesn't.
+        var hasDrifted = false
     }
 }
 
@@ -53,11 +61,27 @@ struct JoiningEntry: Equatable, Identifiable, Sendable {
     var age: TimeInterval?
 }
 
+/// Two cars, in either order.
+struct CarPair: Hashable, Sendable {
+    let first: String
+    let second: String
+
+    init(_ a: String, _ b: String) {
+        first = min(a, b)
+        second = max(a, b)
+    }
+}
+
 struct ConvoySnapshot: Equatable, Sendable {
     /// Front car first.
     var convoy: [ConvoyEntry]
     /// Nearest to merging first; unknown distances last.
     var joining: [JoiningEntry]
+    /// The car the ETA is requested for (see `ConvoyOrdering.referenceIndex`); nil with no fresh car.
+    var referenceId: String?
+    /// Pairs of cars that have been within the separation threshold of each other at some refresh so
+    /// far, this one included. The caller keeps it and passes it back in (`ConvoyOrdering.order`).
+    var together: Set<CarPair> = []
 
     static let empty = ConvoySnapshot(convoy: [], joining: [])
 
@@ -65,15 +89,24 @@ struct ConvoySnapshot: Equatable, Sendable {
     var front: ConvoyEntry? { convoy.first }
     /// The designated lead car, if it is in the convoy.
     var lead: ConvoyEntry? { convoy.first(where: \.isLead) }
-    /// The car whose ETA is requested: the front-most car with a fresh, unpaused position. A stale car's
-    /// position says little about where it is now, so it must not anchor everyone's ETA.
-    var etaReference: ConvoyEntry? { convoy.first(where: { !$0.isStale && !$0.isPaused }) }
+    /// The car whose ETA is requested, and every other car's arrival is worked out from: the designated
+    /// lead when it is fresh, else the car with the most fresh cars around it (`ConvoyOrdering`).
+    var etaReference: ConvoyEntry? { referenceId.flatMap { id in convoy.first(where: { $0.id == id }) } }
     /// Front to back, meters. Nil with fewer than two cars.
     var spread: Double? {
         guard let first = convoy.first, let last = convoy.last, convoy.count > 1 else { return nil }
         return first.convoyOffset - last.convoyOffset
     }
-    var separatedGaps: [ConvoyEntry] { convoy.filter { $0.gap?.isSeparated == true } }
+    /// Cars behind a gap that has opened up between cars that were together (`Gap.hasDrifted`): what the
+    /// separation warning is about.
+    var driftedGaps: [ConvoyEntry] { convoy.filter { $0.gap?.hasDrifted == true } }
+    /// Meters along the main route from car `from` to car `to`: positive when `to` is ahead. Nil unless
+    /// both are in the convoy.
+    func distance(from: String?, to: String) -> Double? {
+        guard let from, let a = convoy.first(where: { $0.id == from }),
+              let b = convoy.first(where: { $0.id == to }) else { return nil }
+        return b.convoyOffset - a.convoyOffset
+    }
     /// Every car (convoy and joining) has reached the destination; false with no cars.
     var everyoneArrived: Bool { !convoy.isEmpty && joining.isEmpty && convoy.allSatisfy(\.hasArrived) }
     func hasArrived(_ carId: String?) -> Bool {
@@ -105,8 +138,19 @@ enum ConvoyArrival {
 /// **Front vs lead:** the list is in road order, so the first row is the *actual front*
 /// (`isFront`), and `isLead` marks the *designated lead* wherever it is. The UI shows "Lead" on the
 /// designated lead, and "Front" on the front car when it isn't the lead. Gaps are always to the car
-/// physically ahead, and ETAs hang off the front, not the lead, because that's the car whose route
-/// remaining is shortest. If the lead falls behind, nothing reorders around it.
+/// physically ahead. If the lead falls behind, nothing reorders around it.
+///
+/// **ETA reference** (D26): the car every arrival time is worked out from. A car on the route is in
+/// the convoy however far ahead it is (a friend parked at an R&R 38 km on), so the front car says
+/// little about when the convoy arrives. The reference is the designated lead when its position is
+/// fresh; else the fresh car with the most other fresh cars within `Config.groupRadius` (2 km) of it,
+/// the one further back on a tie; nil with no fresh car. Arrived and paused cars never count.
+///
+/// **Separation** (D26): a gap over the threshold warns only once the cars on either side of it were
+/// within the threshold of each other at some point (`together`, kept by the caller across refreshes).
+/// A pair counts as together when both are fresh and the one behind is within `separationDistance`
+/// and `separationTime` of the one ahead. Pairs, not neighbours, so a car passing between two others
+/// doesn't make them forget they were together.
 ///
 /// **Gap time:** gap distance / follower's speed. The speed comes from `speeds` (smoothed, see
 /// `SpeedSmoother`), falling back to the raw `Position.speed`, then is floored at `Config.minSpeed`
@@ -127,6 +171,11 @@ enum ConvoyOrdering {
         var separationDistance: Double = 5000
         /// ... slower than this (seconds).
         var separationTime: TimeInterval = 300
+        /// Cars this close (meters along the route) count as one group, for the ETA reference and the
+        /// distance in the words ("38 km ahead").
+        var groupRadius: Double = 2000
+        /// Slower than this (m/s, about 20 km/h) a car reads as parked.
+        var parkedSpeed: Double = 20 / 3.6
 
         static let `default` = Config()
     }
@@ -138,6 +187,7 @@ enum ConvoyOrdering {
         speeds: [String: Double] = [:],
         mainRoute: RouteLine? = nil,
         ownMergeOffsets: [String: Double] = [:],
+        together: Set<CarPair> = [],
         config: Config = .default
     ) -> ConvoySnapshot {
         var convoy: [ConvoyEntry] = []
@@ -146,7 +196,8 @@ enum ConvoyOrdering {
         for car in cars {
             let id = carID(car)
             let position = positions[id]
-            let speed = effectiveSpeed(speeds[id] ?? position?.speed, config: config)
+            let moving = movingSpeed(speeds[id] ?? position?.speed)
+            let speed = effectiveSpeed(moving, config: config)
             let age = position?.updatedAt.map { max(0, now.timeIntervalSince($0)) }
             let paused = TripSessionLogic.isPaused(car, now: now)
             let stale = !paused && (age ?? 0) > config.staleAfter
@@ -154,8 +205,8 @@ enum ConvoyOrdering {
             if let position, let offset = position.convoyOffset {
                 convoy.append(ConvoyEntry(
                     id: id, car: car, position: position, convoyOffset: offset, speed: speed,
-                    isFront: false, isLead: car.isLead, isStale: stale, isPaused: paused, age: age,
-                    gap: nil, timeBehindReference: nil,
+                    movingSpeed: moving, isParked: moving < config.parkedSpeed, isFront: false, isLead: car.isLead,
+                    isStale: stale, isPaused: paused, age: age, gap: nil, timeBehindReference: nil,
                     hasArrived: ConvoyArrival.hasArrived(offset: offset, routeLength: mainRoute?.length)))
             } else if position != nil || car.state == .joining {
                 let distance = position.flatMap {
@@ -180,7 +231,15 @@ enum ConvoyOrdering {
                 distance: distance, time: time,
                 isSeparated: distance > config.separationDistance || time > config.separationTime)
         }
-        if let ref = convoy.firstIndex(where: { !$0.isStale && !$0.isPaused }) {
+        let pairs = together.union(togetherPairs(convoy, config: config))
+        let ids = convoy.map(\.id)
+        for i in convoy.indices where i > 0 && convoy[i].gap?.isSeparated == true {
+            convoy[i].gap?.hasDrifted = ids[..<i].contains { a in
+                ids[i...].contains { b in pairs.contains(CarPair(a, b)) }
+            }
+        }
+        let refIndex = referenceIndex(convoy, config: config)
+        if let ref = refIndex {
             var total: TimeInterval = 0
             convoy[ref].timeBehindReference = 0
             for i in (ref + 1)..<max(ref + 1, convoy.count) {
@@ -197,7 +256,42 @@ enum ConvoyOrdering {
             default: return numberOrder(a.car, b.car)
             }
         }
-        return ConvoySnapshot(convoy: convoy, joining: joining)
+        return ConvoySnapshot(
+            convoy: convoy, joining: joining, referenceId: refIndex.map { convoy[$0].id }, together: pairs)
+    }
+
+    /// A fresh car: its position is recent and its tracker isn't paused.
+    private static func isFresh(_ e: ConvoyEntry) -> Bool { !e.isStale && !e.isPaused }
+
+    /// Pairs of fresh cars within the separation threshold of each other right now. `convoy` is front first.
+    static func togetherPairs(_ convoy: [ConvoyEntry], config: Config) -> Set<CarPair> {
+        var pairs: Set<CarPair> = []
+        let fresh = convoy.filter(isFresh)
+        for (i, ahead) in fresh.enumerated() {
+            for behind in fresh[(i + 1)...] {
+                let distance = ahead.convoyOffset - behind.convoyOffset
+                guard distance <= config.separationDistance else { break }
+                if distance / behind.speed <= config.separationTime { pairs.insert(CarPair(ahead.id, behind.id)) }
+            }
+        }
+        return pairs
+    }
+
+    /// Index of the ETA reference in `convoy` (front first): the designated lead when fresh, else the
+    /// fresh car with the most fresh cars within `groupRadius`, the one further back on a tie. Cars
+    /// that have arrived don't count. Nil when no car qualifies.
+    static func referenceIndex(_ convoy: [ConvoyEntry], config: Config) -> Int? {
+        let candidates = convoy.indices.filter { isFresh(convoy[$0]) && !convoy[$0].hasArrived }
+        if let lead = candidates.first(where: { convoy[$0].isLead }) { return lead }
+        var best: (index: Int, count: Int)?
+        for i in candidates {
+            let count = candidates.filter {
+                $0 != i && abs(convoy[$0].convoyOffset - convoy[i].convoyOffset) <= config.groupRadius
+            }.count
+            // Front first, so `>=` keeps the one further back on a tie.
+            if count >= (best?.count ?? -1) { best = (i, count) }
+        }
+        return best?.index
     }
 
     /// Own-route merge offsets for every car that has a route that joins `main`. Not free (it walks
@@ -221,8 +315,12 @@ enum ConvoyOrdering {
     static func carID(_ car: Car) -> String { car.id ?? car.name }
 
     static func effectiveSpeed(_ speed: Double?, config: Config) -> Double {
-        let s = speed.flatMap { $0.isFinite ? $0 : nil } ?? 0
-        return max(config.minSpeed, s)
+        max(config.minSpeed, movingSpeed(speed))
+    }
+
+    /// A speed as it is, without the floor: 0 when unknown, negative or not a number.
+    static func movingSpeed(_ speed: Double?) -> Double {
+        max(0, speed.flatMap { $0.isFinite ? $0 : nil } ?? 0)
     }
 
     private static func distanceToMerge(
