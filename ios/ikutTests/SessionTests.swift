@@ -62,11 +62,11 @@ struct SessionLogicTests {
 private let mainPolyline = "_p~iF~ps|U_ulLnnqC"
 private let ownPolyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
 
-private func testTrip(route: String = mainPolyline, status: TripStatus = .active) -> Trip {
+private func testTrip(route: String = mainPolyline, status: TripStatus = .active, startedAt: Date? = nil) -> Trip {
     Trip(
         id: "t1", name: "T", code: "ABC123", organizerId: "u1", route: route,
         destination: Destination(name: "KB", coordinate: GeoPoint(latitude: 6.1, longitude: 102.2)),
-        status: status)
+        status: status, startedAt: startedAt)
 }
 
 private func testCar(route: String? = nil, tracker: String? = "u1") -> Car {
@@ -229,23 +229,23 @@ struct MeetingPointLogicTests {
         #expect(TripSessionLogic.meetingPoint(in: [meetStop(skipped: true)]) == nil)
     }
 
-    @Test func aCarDocFromTheOldRouteIsNotTrustedWhenTheRouteChangesUnderAMeetingPoint() {
+    @Test func aCarDocIsNotTrustedWhileATripWithAMeetingPointHasNotStarted() {
         var organizerCar = testCar(route: ownPolyline)
         organizerCar.state = .convoy
         organizerCar.mergeOffset = 12
-        let fresh = TripSessionLogic.carForNewSession(organizerCar, routeChanged: true, hasMeetingPoint: true)
+        let fresh = TripSessionLogic.carForNewSession(organizerCar, hasMeetingPoint: true, tripStarted: false)
         #expect(fresh.state == .joining)
         #expect(fresh.route == nil)
         #expect(fresh.mergeOffset == nil)
-        // No meeting point, or not a change: the car doc is used as it always was.
-        #expect(TripSessionLogic.carForNewSession(organizerCar, routeChanged: true, hasMeetingPoint: false) == organizerCar)
-        #expect(TripSessionLogic.carForNewSession(organizerCar, routeChanged: false, hasMeetingPoint: true) == organizerCar)
+        // No meeting point, or the trip has started: the car doc is used as it always was.
+        #expect(TripSessionLogic.carForNewSession(organizerCar, hasMeetingPoint: false, tripStarted: false) == organizerCar)
+        #expect(TripSessionLogic.carForNewSession(organizerCar, hasMeetingPoint: true, tripStarted: true) == organizerCar)
     }
 }
 
 @MainActor
 struct SessionMeetingPointTests {
-    private final class Seen { var meetingPoints: [CLLocationCoordinate2D?] = []; var states: [CarState] = [] }
+    private final class Seen { var meetingPoints: [CLLocationCoordinate2D?] = []; var states: [CarState] = []; var routes: [String?] = [] }
 
     @Test func theMeetingPointReachesTheCarRouteAndAChangeRestartsTheSession() async throws {
         let tracker = FakeTrackingController()
@@ -272,6 +272,29 @@ struct SessionMeetingPointTests {
         #expect(seen.meetingPoints.count == 2)
         #expect(seen.meetingPoints[1]?.latitude == 38.55)
         #expect(seen.states == [.convoy, .joining])
+    }
+
+    @Test func aNewSessionStartsJoiningWhateverTheCarDocSaysWhileTheTripHasAMeetingPointAndHasNotStarted() async throws {
+        var convoyCar = testCar(route: ownPolyline)
+        convoyCar.state = .convoy
+        convoyCar.mergeOffset = 5
+        for (startedAt, expected) in [(nil as Date?, CarState.joining), (Date(), CarState.convoy)] {
+            let seen = Seen()
+            let tracker = FakeTrackingController()
+            let session = TripSession(
+                tripId: "t1", userId: "u1", tracker: tracker,
+                carRouteFactory: { _, _, _, car, _ in
+                    seen.states.append(car.state)
+                    seen.routes.append(car.route)
+                    return FakeCarRoute()
+                })
+            // The first session of a phone that just launched, or resumed after a pause: no earlier key to compare.
+            session.applyForTesting(
+                trip: testTrip(startedAt: startedAt), member: testMember, car: convoyCar, stops: [meetStop()])
+            await waitUntil(.seconds(2)) { !seen.states.isEmpty }
+            #expect(seen.states == [expected])
+            #expect((seen.routes.first ?? nil) == (expected == .joining ? nil : ownPolyline))
+        }
     }
 }
 

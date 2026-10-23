@@ -92,11 +92,13 @@ enum TripSessionLogic {
         return CLLocationCoordinate2D(latitude: first.coordinate.latitude, longitude: first.coordinate.longitude)
     }
 
-    /// What a tracking session starts from. When the route changed under a trip with a meeting point, the car doc's
-    /// state and route belong to the old route (the organizer's car says `convoy` from the day the trip was made), so
-    /// the car works out afresh whether it is on the new route and where it has to go.
-    static func carForNewSession(_ car: Car, routeChanged: Bool, hasMeetingPoint: Bool) -> Car {
-        guard routeChanged, hasMeetingPoint else { return car }
+    /// What a tracking session starts from. While a trip with a meeting point has not started, the car doc's state and
+    /// route can't be trusted: they may belong to an old route (the organizer's car says `convoy` from the day the trip
+    /// was made), or be left from before a pause, a relaunch, or an add made while the phone had no fix. So every
+    /// session starts from `joining` with no route, and the car works out afresh whether it is at the meeting point
+    /// (then it comes out `convoy`) and where it has to go. Once the trip has started the doc is used as it is.
+    static func carForNewSession(_ car: Car, hasMeetingPoint: Bool, tripStarted: Bool) -> Car {
+        guard hasMeetingPoint, !tripStarted else { return car }
         var fresh = car
         fresh.state = .joining
         fresh.route = nil

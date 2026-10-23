@@ -72,11 +72,12 @@ service cloud.firestore {
     function validTripShape(d) {
       return d.keys().hasOnly(['name', 'code', 'organizerId', 'route', 'destination',
                                'status', 'createdAt', 'lastActivityAt', 'endedAt', 'startedAt',
-                               'routeSeconds'])
+                               'routeSeconds', 'stopCount'])
         && d.keys().hasAll(['name', 'code', 'organizerId', 'route', 'destination', 'status', 'createdAt'])
         && d.name is string
         && d.route is string
         && (optionalOf(d, 'routeSeconds') == null || (d.routeSeconds is number && d.routeSeconds >= 0))
+        && (optionalOf(d, 'stopCount') == null || (d.stopCount is int && d.stopCount >= 0 && d.stopCount <= 20))
         && validDestination(d.destination);
     }
 
@@ -237,7 +238,15 @@ service cloud.firestore {
         && resource.data.organizerId == request.auth.uid
         && resource.data.status == 'active'
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['name', 'destination', 'route', 'routeSeconds', 'status', 'lastActivityAt', 'endedAt'])
+             .hasOnly(['name', 'destination', 'route', 'routeSeconds', 'stopCount', 'status',
+                       'lastActivityAt', 'endedAt'])
+        // Once the trip has started, a trip with planned stops keeps its route and destination: the stops sit at
+        // offsets on that route and are locked too. Rules cannot list the stops, so the trip counts them
+        // (stopCount, written in the same batch as the stops).
+        && (resource.data.get('startedAt', null) == null
+            || resource.data.get('stopCount', 0) == 0
+            || !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['route', 'destination', 'routeSeconds', 'stopCount']))
         && validTripShape(request.resource.data)
         && (request.resource.data.status == 'active'
             || (request.resource.data.status == 'ended'

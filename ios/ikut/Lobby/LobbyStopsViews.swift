@@ -82,7 +82,7 @@ struct StopRow: View {
     var first: Bool
     /// Extra meters the road turns back on itself near this stop, when it does.
     var turnBack: Double?
-    var failure: StopPlanner.Failure.Place?
+    var failure: StopPlanner.Failure?
     var failed: Bool
     var onRetry: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -127,15 +127,14 @@ struct StopRow: View {
             .frame(minHeight: 56)
 
             if let turnBack {
-                StopNote(
-                    tone: .warning, title: "This R&R is on the other side of the highway",
-                    detail: "The route turns back at the next exit, about \(max(1, Int((turnBack / 1000).rounded()))) km extra. Pick another stop, or leave it.")
+                let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
+                StopNote(tone: .warning, title: text.title, detail: text.detail)
                     .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.gap)
             }
-            if failure != nil {
+            if let failure {
                 StopNote(
-                    tone: .failure, title: "Couldn’t find a road to \(stop.name)",
-                    detail: "Maps didn’t answer. Try again, or pick another place.", retry: onRetry)
+                    tone: .failure, title: StopNoteText.failureTitle(failure, stopName: stop.name, destinationName: ""),
+                    detail: StopNoteText.failureDetail(failure), retry: onRetry)
                     .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.gap)
             }
         }

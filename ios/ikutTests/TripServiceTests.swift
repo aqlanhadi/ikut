@@ -116,6 +116,7 @@ struct TripServiceEmulatorTests {
 
         let saved = try await db.document(FirestorePaths.trip(trip.tripId)).getDocument(as: Trip.self)
         #expect(saved.routeSeconds == 9_600)
+        #expect(saved.stopCount == 2)
         let docs = try await db.collection(FirestorePaths.stops(tripId: trip.tripId)).order(by: "order").getDocuments()
         let stops = docs.documents.compactMap { try? $0.data(as: PlannedStop.self) }
         #expect(stops.map(\.name) == ["R&R Tapah", "Kopitiam"])

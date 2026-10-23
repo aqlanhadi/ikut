@@ -670,3 +670,42 @@ describe('planned stops', () => {
     it('a member can still read the stops', () => assertSucceeds(getDoc(doc(db('mem'), stopPath()))));
   });
 });
+
+describe('a trip with stops keeps its route once it has started', () => {
+  const seedTrip = async (over) => {
+    await seed();
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc(over)));
+  };
+  const newDestination = { name: 'Ipoh', coordinate: new GeoPoint(4.6, 101.1) };
+  describe('started, with stops', () => {
+    beforeEach(() => seedTrip({ startedAt: ts(60000), stopCount: 2 }));
+    it('the organizer cannot change the route', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC', routeSeconds: 100 })));
+    it('the organizer cannot change the destination', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination })));
+    it('the organizer cannot change the stop count', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { stopCount: 0 })));
+    it('the organizer can still rename and end the trip', async () => {
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'New name' }));
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() }));
+    });
+  });
+  describe('started, without stops', () => {
+    it('the destination can still change (stopCount 0 or absent)', async () => {
+      await seedTrip({ startedAt: ts(60000), stopCount: 0 });
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination, route: '_p~iF~ps|U_ulLnnqC' }));
+      await seedTrip({ startedAt: ts(60000) });
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination }));
+    });
+  });
+  describe('not started, with stops', () => {
+    beforeEach(() => seedTrip({ stopCount: 2 }));
+    it('the route, destination and stop count can change', async () => {
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination, route: '_p~iF~ps|U_ulLnnqC', stopCount: 3 }));
+    });
+    it('the stop count must be a whole number', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { stopCount: 'two' })));
+    it('a member who is not the organizer cannot set it', () =>
+      assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { stopCount: 0 })));
+  });
+});

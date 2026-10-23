@@ -359,11 +359,10 @@ final class TripSession {
         let key = SessionKey(
             carId: carId, tripRoute: trip.route, meetingPoint: meetingPoint.map { [$0.latitude, $0.longitude] })
         if key != sessionKey {
-            let routeChanged = sessionKey?.carId == carId
             stopTrackingNow()
             beginSession(
                 key, trip: trip,
-                car: TripSessionLogic.carForNewSession(car, routeChanged: routeChanged, hasMeetingPoint: meetingPoint != nil),
+                car: TripSessionLogic.carForNewSession(car, hasMeetingPoint: meetingPoint != nil, tripStarted: trip.startedAt != nil),
                 meetingPoint: meetingPoint)
         } else if tracker.isTracking {
             let docRoute = TripSessionLogic.routeLine(from: car.route)

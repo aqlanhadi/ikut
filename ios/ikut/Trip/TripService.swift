@@ -145,7 +145,9 @@ extension TripService {
     private static func write(tripId: String, destination: DestinationResult?, plan: StopPlanSave) async throws {
         let db = Firestore.firestore()
         let tripRef = db.collection(FirestorePaths.trips).document(tripId)
-        var fields: [String: Any] = ["route": plan.route.polyline, "routeSeconds": plan.route.travelTime]
+        var fields: [String: Any] = [
+            "route": plan.route.polyline, "routeSeconds": plan.route.travelTime, "stopCount": plan.stops.count,
+        ]
         if let destination {
             fields["destination"] = [
                 "name": destination.name,

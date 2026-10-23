@@ -70,9 +70,14 @@ enum CarRouteLogic {
     /// approach). `PositionBuilder` then never sets `convoyOffset` for this car, so the car is
     /// absent from convoy ordering, and `CarRouteService.handle` marks it `.convoy` when it is within
     /// `nearMainThreshold` of the main route or reaches the end of its own route.
-    static func makePlan(computed: [CLLocationCoordinate2D], main: RouteLine) -> CarRoutePlan? {
+    static func makePlan(computed: [CLLocationCoordinate2D], main: RouteLine, toMeetingPoint: Bool = false) -> CarRoutePlan? {
         guard computed.count >= 2, !main.isEmpty else { return nil }
         let full = RouteLine(computed)
+        // On the way to a meeting point the car joins only on arrival, at the main route's start; the whole route is kept.
+        if toMeetingPoint, let meet = main.meetingMerge(of: full, tolerance: mergeTolerance) {
+            let simplified = RouteSimplifier.simplify(computed, maxEncodedLength: maxEncodedLength)
+            return CarRoutePlan(route: Polyline.encode(simplified), mergeOffset: meet.mainOffset, state: .joining, kind: .merges)
+        }
         guard let merge = main.mergeOffset(of: full, tolerance: mergeTolerance) else {
             let simplified = RouteSimplifier.simplify(computed, maxEncodedLength: maxEncodedLength)
             let end = computed[computed.count - 1]

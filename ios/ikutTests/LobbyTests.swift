@@ -50,6 +50,13 @@ struct LobbyTests {
         #expect(image.size.width == image.size.height)
     }
 
+    @Test func changeDestinationIsHiddenOnAStartedTripThatHasStops() {
+        #expect(LobbyLogic.canChangeDestination(canEdit: true, started: false, hasStops: true))
+        #expect(LobbyLogic.canChangeDestination(canEdit: true, started: true, hasStops: false))
+        #expect(!LobbyLogic.canChangeDestination(canEdit: true, started: true, hasStops: true))
+        #expect(!LobbyLogic.canChangeDestination(canEdit: false, started: false, hasStops: false))
+    }
+
     private func trip(status: TripStatus = .active, startedAt: Date? = nil) -> Trip {
         .fixture(name: "Trip", code: "ABC123", organizerId: "u1", status: status, startedAt: startedAt)
     }

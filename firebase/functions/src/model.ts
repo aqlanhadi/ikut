@@ -38,6 +38,8 @@ export interface Trip {
   destination: Destination;
   /** Driving time in seconds along `route`, the legs added up when it goes through stops; absent on older trips. */
   routeSeconds?: number;
+  /** How many planned stops the trip has (the stops subcollection can't be counted in rules). Absent means none. */
+  stopCount?: number;
   status: TripStatus;
   createdAt: Timestamp;
   lastActivityAt?: Timestamp;

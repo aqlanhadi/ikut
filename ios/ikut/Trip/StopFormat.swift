@@ -76,3 +76,41 @@ enum StopFormat {
             after: now, matching: DateComponents(hour: hour, minute: minute), matchingPolicy: .nextTime)
     }
 }
+
+/// The words of the notes under a stop and under the list (LobbyStops.dc.html and what it doesn't draw).
+enum StopNoteText {
+    /// Stops on a highway's rest area: fuel, rest and toilet. A meal or a sight is somewhere else, so it is "this stop".
+    static func isRestArea(_ kind: PlannedStopKind) -> Bool { [.fuel, .rest, .toilet].contains(kind) }
+
+    static func turnBack(kind: PlannedStopKind, extraMeters: Double) -> (title: String, detail: String) {
+        let km = max(1, Int((extraMeters / 1000).rounded()))
+        if isRestArea(kind) {
+            return ("This R&R is on the other side of the highway",
+                    "The route turns back at the next exit, about \(km) km extra. Pick another stop, or leave it.")
+        }
+        return ("This stop is across the road", "The route turns back at the next exit, about \(km) km extra.")
+    }
+
+    static func failureTitle(_ failure: StopPlanner.Failure, stopName: String?, destinationName: String) -> String {
+        switch failure.place {
+        case .stop: "Couldn’t find a road to \(stopName ?? "this stop")"
+        case .destination: "Couldn’t find a road to \(destinationName)"
+        case .start: "Can’t find where you are"
+        case .saving: "Couldn’t save the stops"
+        }
+    }
+
+    static func failureDetail(_ failure: StopPlanner.Failure) -> String {
+        switch (failure.place, failure.reason) {
+        case (.start, _): return "Check that location is on, then try again."
+        case (.saving, _): return "The change wasn’t accepted. Try again in a moment."
+        case (.stop, .noRoute): return "There’s no road to this stop from the one before. Pick another place."
+        case (.destination, .noRoute): return "There’s no road to the destination from the stop before. Pick another place."
+        default: return "Maps didn’t answer. Try again, or pick another place."
+        }
+    }
+
+    /// An edit that is queued because there is no connection: it saves by itself later.
+    static let queuedTitle = "Not saved yet"
+    static let queuedDetail = "It saves when you’re back online."
+}

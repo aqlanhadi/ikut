@@ -330,6 +330,68 @@ struct CarRouteServiceTests {
         #expect(s.state == .convoy)
     }
 
+    /// A road to the meeting point that comes in along the other carriageway, 35 m south of the main route, for the last
+    /// 15 km. `mergeOffset(of:)` alone would call the car joined as soon as it turns onto that stretch.
+    private func roadInOnTheOtherCarriageway() -> [CLLocationCoordinate2D] {
+        let far = move(origin, north: 5_000, east: 20_000)
+        var pts = [far]
+        pts += (1...10).map { i in
+            let t = Double(i) / 10
+            return move(origin, north: 5_000 * (1 - t) - 35 * t, east: 20_000 - 5_000 * t)
+        }
+        pts += stride(from: 14_500.0, through: 0, by: -500).map { move(origin, north: -35, east: $0) }
+        return pts
+    }
+
+    @Test func aCarComingInOnTheOtherCarriagewayJoinsOnlyAtTheMeetingPoint() async throws {
+        let box = CarRouteFakeDirections.Box([roadInOnTheOtherCarriageway()])
+        let writer = CarRouteFakeWriter()
+        let s = try service(box, writer, meetingPoint: mainCoords.first!)
+        let plan = try await s.ensureRoute(at: move(origin, north: 5_000, east: 20_000))
+        #expect(plan.state == .joining)
+        #expect(close(try #require(plan.mergeOffset), 0, 1))
+        let own = try #require(s.routeLine)
+        // The merge is the end of the road, not where it first comes within 50 m of the main route.
+        #expect(close(try #require(s.ownMergeOffset), own.length, 1))
+        var clock = 0.0
+        for off in stride(from: 0.0, to: own.length - 100, by: 250) {
+            let e = await s.handle(fix: fix(try #require(own.coordinate(atOffset: off)), at: clock))
+            #expect(e == .none, "joined early at \(off) m of \(own.length)")
+            clock += 1
+        }
+        #expect(s.state == .joining)
+        // The position builder agrees: no convoy offset until the car is at the meeting point.
+        var builder = PositionBuilder(mainRoute: RouteLine(mainCoords), carRoute: own)
+        for off in stride(from: 0.0, to: own.length - 100, by: 500) {
+            let c = try #require(own.coordinate(atOffset: off))
+            let pos = builder.build(from: LocationFix(latitude: c.latitude, longitude: c.longitude, speed: 20, course: 270, timestamp: Date()), battery: nil)
+            #expect(pos.convoyOffset == nil, "convoyOffset at \(off) m")
+        }
+        let arrived = await s.handle(fix: fix(origin, at: clock))
+        #expect(arrived == .merged)
+    }
+
+    @Test func aCarAlreadyOnTheRouteAheadOfTheMeetingPointNeedsNoRoadToIt() async throws {
+        let box = CarRouteFakeDirections.Box([roadToMeetingPoint()])
+        let s = try service(box, CarRouteFakeWriter(), meetingPoint: mainCoords.first!)
+        let plan = try await s.ensureRoute(at: move(origin, north: 20, east: 30_000))
+        #expect(plan.kind == .onMainRoute)
+        #expect(plan.state == .convoy)
+        #expect(close(try #require(plan.mergeOffset), 30_000, 2))
+        #expect(box.calls.isEmpty)
+    }
+
+    @Test func withoutAMeetingPointTheOtherCarriagewayStillCountsAsJoinedAsBefore() async throws {
+        let box = CarRouteFakeDirections.Box([roadInOnTheOtherCarriageway()])
+        let s = try service(box, CarRouteFakeWriter(), meetingPoint: nil)
+        try await s.ensureRoute(at: move(origin, north: 5_000, east: 20_000))
+        let own = try #require(s.routeLine)
+        // As on main: the merge is where the road first runs alongside the main route, and the stored road is cut
+        // 500 m past it, so it is far shorter than the 19 km computed.
+        #expect(own.length < 10_000)
+        #expect(try #require(s.ownMergeOffset) < own.length - 400)
+    }
+
     @Test func aMergedCarThatLeavesTheRouteIsSentOnToTheDestination() async throws {
         let box = CarRouteFakeDirections.Box([roadToMeetingPoint(), joiningRoute()])
         let writer = CarRouteFakeWriter()

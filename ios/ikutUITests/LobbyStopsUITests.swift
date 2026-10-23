@@ -7,6 +7,10 @@ final class LobbyStopsUITests: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = false
+    }
+
+    /// Opens the organizer's lobby on sample data; each test starts its own app, as the other UI tests do.
+    private func launchLobby() {
         app = XCUIApplication()
         app.launchEnvironment["IKUT_SCREEN"] = "lobby-organizer"
         app.launch()
@@ -17,6 +21,7 @@ final class LobbyStopsUITests: XCTestCase {
     }
 
     func testSwipeRemovesAStop() {
+        launchLobby()
         let bidor = row("R&R Bidor")
         XCTAssertTrue(bidor.waitForExistence(timeout: 10))
         bidor.swipeLeft()
@@ -30,6 +35,7 @@ final class LobbyStopsUITests: XCTestCase {
     }
 
     func testDragReordersStops() {
+        launchLobby()
         // The list is in driving order: Bidor, Tapah, Gopeng.
         let bidor = row("R&R Bidor")
         XCTAssertTrue(bidor.waitForExistence(timeout: 10))

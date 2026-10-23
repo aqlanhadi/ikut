@@ -28,7 +28,8 @@ struct PositionBuilder {
         main = mainRoute
         if let carRoute, !carRoute.isEmpty {
             own = carRoute
-            ownMergeOffset = mainRoute.mergeOffset(of: carRoute)?.otherOffset
+            // A route that ends at the main route's start is a car's way to the meeting point: it joins on arrival.
+            ownMergeOffset = (mainRoute.meetingMerge(of: carRoute) ?? mainRoute.mergeOffset(of: carRoute))?.otherOffset
             hasMerged = false
         } else {
             own = nil

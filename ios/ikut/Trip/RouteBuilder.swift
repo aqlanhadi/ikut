@@ -46,10 +46,34 @@ enum RouteError: LocalizedError, Equatable {
     }
 }
 
-/// `RouteBuilder.leg` as the real leg router.
+/// One MapKit request for a leg, no retry.
+struct MapKitDirectionsRouter: LegRouting {
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        try await RouteBuilder.requestLeg(from: from, to: to)
+    }
+}
+
+/// Asks `base` again, once, after `wait`, when it answers that MapKit is throttling (about 50 requests a minute).
+/// A second throttle is passed on. The wait is injectable so tests don't sit through it.
+struct ThrottleRetryRouter: LegRouting {
+    var base: LegRouting
+    var wait: Duration = RouteBuilder.throttleWait
+    var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        do {
+            return try await base.leg(from: from, to: to)
+        } catch let error as MKError where error.code == .loadingThrottled {
+            try await sleep(wait)
+            return try await base.leg(from: from, to: to)
+        }
+    }
+}
+
+/// The real leg router: a MapKit request, retried once when throttled.
 struct MapKitLegRouter: LegRouting {
     func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
-        try await RouteBuilder.leg(from: from, to: to)
+        try await ThrottleRetryRouter(base: MapKitDirectionsRouter()).leg(from: from, to: to)
     }
 }
 
@@ -96,22 +120,17 @@ enum RouteBuilder {
         return BuiltRoute(distance: leg.distance, travelTime: leg.travelTime, name: leg.name, polyline: Polyline.encode(leg.coordinates))
     }
 
-    /// One driving leg from `source` to `destination`, with the timeout every request here gets. A throttled
-    /// request (Apple allows about 50 a minute) waits a few seconds and tries once more.
+    /// One driving leg from `source` to `destination`: the MapKit request, with the timeout every request here gets,
+    /// and one more try after a wait when MapKit says it is throttling (`ThrottleRetryRouter`).
     @MainActor
     static func leg(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> RouteLeg {
-        do {
-            return try await requestLeg(from: source, to: destination)
-        } catch let error as MKError where error.code == .loadingThrottled {
-            try await Task.sleep(for: throttleWait)
-            return try await requestLeg(from: source, to: destination)
-        }
+        try await MapKitLegRouter().leg(from: source, to: destination)
     }
 
     static let throttleWait: Duration = .seconds(4)
 
     @MainActor
-    private static func requestLeg(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> RouteLeg {
+    static func requestLeg(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> RouteLeg {
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))

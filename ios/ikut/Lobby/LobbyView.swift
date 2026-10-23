@@ -89,6 +89,10 @@ struct LobbyView: View {
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
     private var canEdit: Bool { isOrganizer && canLeave }
+    /// Change destination: not on a started trip that has stops.
+    private var canChangeDestination: Bool {
+        LobbyLogic.canChangeDestination(canEdit: canEdit, started: isStarted, hasStops: !model.stops.isEmpty)
+    }
     /// Add, move and remove stops: the organizer, before the trip has started.
     private var canEditStops: Bool { canEdit && !isStarted }
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
@@ -333,10 +337,12 @@ struct LobbyView: View {
             .overlay(alignment: .topLeading) {
                 if canEdit {
                     HStack(spacing: Spacing.tight) {
-                        Button { showChangeDestination = true } label: {
-                            pill("Change destination", systemImage: "magnifyingglass")
+                        if canChangeDestination {
+                            Button { showChangeDestination = true } label: {
+                                pill("Change destination", systemImage: "magnifyingglass")
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                         if canEditStops {
                             Button { showAddStop = true } label: {
                                 pill("Add a stop", systemImage: "plus")
@@ -406,12 +412,20 @@ struct LobbyView: View {
             .onMove(perform: canEditStops ? { planner.move(from: $0, to: $1) } : nil)
             if let failure, failure.place.stopId == nil {
                 StopNote(
-                    tone: .failure, title: failureTitle(failure, trip: trip), detail: failureDetail(failure),
-                    retry: { planner.retry() })
+                    tone: .failure,
+                    title: StopNoteText.failureTitle(failure, stopName: nil, destinationName: trip.destination.name),
+                    detail: StopNoteText.failureDetail(failure), retry: { planner.retry() })
                     .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
                     .cardSlice()
                     .lobbyRow()
             }
+        }
+
+        if planner.queued && canEditStops {
+            StopNote(tone: .warning, title: StopNoteText.queuedTitle, detail: StopNoteText.queuedDetail)
+                .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                .cardSlice()
+                .lobbyRow()
         }
 
         routeTotal(trip, stops: stops)
@@ -436,7 +450,7 @@ struct LobbyView: View {
         StopRow(
             stop: stop, editable: canEditStops, first: index == 0,
             turnBack: canEditStops && !planner.isBuilding ? planner.turnBacks[stop.id] : nil,
-            failure: failedHere ? failure?.place : nil, failed: failedHere, onRetry: { planner.retry() })
+            failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() })
             .cardSlice()
             .lobbyRow()
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -457,23 +471,6 @@ struct LobbyView: View {
                     Button("Remove") { planner.remove(id: stop.id) }
                 }
             }
-    }
-
-    private func failureTitle(_ failure: StopPlanner.Failure, trip: Trip) -> String {
-        switch failure.place {
-        case .destination: "Couldn’t find a road to \(trip.destination.name)"
-        case .start: "Can’t find where you are"
-        case .saving: "Couldn’t save the stops"
-        case .stop: ""
-        }
-    }
-
-    private func failureDetail(_ failure: StopPlanner.Failure) -> String {
-        switch failure.place {
-        case .start: "Check that location is on, then try again."
-        case .saving: "Check your connection, then try again."
-        default: "Maps didn’t answer. Try again, or pick another place."
-        }
     }
 
     /// "205 km · 2 h 40 + 35 min of stops" (or "Route not ready" while a stop has no road).

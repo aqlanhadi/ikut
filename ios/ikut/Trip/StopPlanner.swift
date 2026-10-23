@@ -117,6 +117,8 @@ final class StopPlanner {
     private(set) var status: Status = .saved
     /// Extra meters a stop's road turns back on itself, by stop id; only stops with a turn-back are in it.
     private(set) var turnBacks: [String: Double] = [:]
+    /// The last edit is waiting for a connection: Firestore holds it and sends it when the phone is back online.
+    private(set) var queued = false
 
     /// What the trip doc says now.
     private var route = ""
@@ -130,12 +132,16 @@ final class StopPlanner {
     private let cache = LegCache()
     private let save: @MainActor (StopPlanSave) async throws -> Void
     private let delay: Duration
+    /// Resolves once Firestore has sent every queued write.
+    private let waitForPending: @MainActor () async -> Void
 
     init(
         router: LegRouting = MapKitLegRouter(), delay: Duration = .milliseconds(350),
         origin: @escaping @MainActor () async -> CLLocationCoordinate2D? = { try? await RouteBuilder.currentLocation() },
+        waitForPending: @escaping @MainActor () async -> Void = { try? await Firestore.firestore().waitForPendingWrites() },
         save: @escaping @MainActor (StopPlanSave) async throws -> Void
     ) {
+        self.waitForPending = waitForPending
         self.router = router
         self.origin = origin
         self.delay = delay
@@ -201,7 +207,11 @@ final class StopPlanner {
     }
 
     private func run(_ edited: [StopDraft]) async {
-        guard let destination else { return }
+        guard let destination else {
+            // The trip hasn't loaded yet: say so rather than show "Updating the route" for good.
+            status = .failed(Failure(place: .saving, reason: .failed("The trip hasn't loaded")))
+            return
+        }
         do {
             let built = try await Self.build(
                 items: edited, destination: destination, origin: origin,
@@ -214,6 +224,14 @@ final class StopPlanner {
                     removedIds: removed))
             } catch is CancellationError {
                 return
+            } catch is ServerWrite.Offline {
+                // No connection: Firestore keeps the batch and sends it later, so the plan stands and says so.
+                guard !Task.isCancelled else { return }
+                queued = true
+                Task { [weak self] in
+                    await self?.waitForPending()
+                    self?.queued = false
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 items = built.items

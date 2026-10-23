@@ -1,5 +1,6 @@
 import CoreLocation
 import FirebaseFirestore
+import MapKit
 import Foundation
 import Testing
 @testable import ikut
@@ -42,6 +43,68 @@ private final class StraightRoads: LegRouting, @unchecked Sendable {
         lock.withLock { _requests.append((from, to)) }
         if lock.withLock({ noRoadTo.contains(to.latitude) }) { throw RouteError.noRoute }
         return ikutTests.leg(line(from, to))
+    }
+}
+
+/// Answers "throttled" the first `throttles` times, then like StraightRoads.
+private final class ThrottledRoads: LegRouting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var left: Int
+    private(set) var requests = 0
+    init(throttles: Int) { left = throttles }
+
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        let throttled: Bool = lock.withLock {
+            requests += 1
+            if left > 0 { left -= 1; return true }
+            return false
+        }
+        if throttled { throw MKError(.loadingThrottled) }
+        return ikutTests.leg(line(from, to))
+    }
+}
+
+private final class Waits: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _items: [Duration] = []
+    var items: [Duration] { lock.withLock { _items } }
+    func add(_ d: Duration) { lock.withLock { _items.append(d) } }
+}
+
+struct ThrottleRetryTests {
+    private let a = move(start, north: 60_000)
+    private let end = move(start, north: 200_000)
+
+    @Test func oneThrottleWaitsAndTriesOnceMoreAndSucceeds() async throws {
+        let base = ThrottledRoads(throttles: 1)
+        let waits = Waits()
+        let router = ThrottleRetryRouter(base: base, wait: .seconds(4), sleep: { waits.add($0) })
+        let leg = try await router.leg(from: start, to: a)
+        #expect(leg.coordinates.count > 2)
+        #expect(base.requests == 2)
+        #expect(waits.items == [.seconds(4)])
+    }
+
+    @Test func noThrottleIsOneRequestAndNoWait() async throws {
+        let base = ThrottledRoads(throttles: 0)
+        let waits = Waits()
+        _ = try await ThrottleRetryRouter(base: base, sleep: { waits.add($0) }).leg(from: start, to: a)
+        #expect(base.requests == 1)
+        #expect(waits.items.isEmpty)
+    }
+
+    @Test @MainActor func twoThrottlesInARowAreALegFailureForThatLeg() async {
+        let base = ThrottledRoads(throttles: 2)
+        let router = ThrottleRetryRouter(base: base, sleep: { _ in })
+        do {
+            _ = try await StopRouting.build(from: start, via: [a], to: end, router: router)
+            Issue.record("expected a failure")
+        } catch let failure as LegFailure {
+            #expect(failure.index == 0)
+            #expect(base.requests == 2)
+        } catch {
+            Issue.record("expected a LegFailure, got \(error)")
+        }
     }
 }
 
@@ -228,6 +291,40 @@ struct StopListLogicTests {
     }
 }
 
+struct StopNoteTextTests {
+    private func failure(_ place: StopPlanner.Failure.Place, _ reason: RouteError) -> StopPlanner.Failure { .init(place: place, reason: reason) }
+
+    @Test func noRoadAndNoAnswerReadDifferently() {
+        #expect(StopNoteText.failureDetail(failure(.stop("a"), .noRoute))
+            == "There’s no road to this stop from the one before. Pick another place.")
+        #expect(StopNoteText.failureDetail(failure(.stop("a"), .timedOut))
+            == "Maps didn’t answer. Try again, or pick another place.")
+        #expect(StopNoteText.failureDetail(failure(.stop("a"), .failed("x")))
+            == "Maps didn’t answer. Try again, or pick another place.")
+        #expect(StopNoteText.failureDetail(failure(.destination, .noRoute)).hasPrefix("There’s no road to the destination"))
+        #expect(StopNoteText.failureTitle(failure(.stop("a"), .noRoute), stopName: "Lunch", destinationName: "Ipoh") == "Couldn’t find a road to Lunch")
+        #expect(StopNoteText.failureTitle(failure(.destination, .noRoute), stopName: nil, destinationName: "Ipoh") == "Couldn’t find a road to Ipoh")
+    }
+
+    @Test func aRefusedSaveAndAQueuedOneAreTold() {
+        #expect(StopNoteText.failureTitle(failure(.saving, .failed("x")), stopName: nil, destinationName: "") == "Couldn’t save the stops")
+        #expect(StopNoteText.failureDetail(failure(.saving, .failed("x"))) == "The change wasn’t accepted. Try again in a moment.")
+        #expect(StopNoteText.queuedTitle == "Not saved yet")
+        #expect(StopNoteText.queuedDetail == "It saves when you’re back online.")
+    }
+
+    @Test func onlyFuelRestAndToiletAreRestAreas() {
+        for kind in [PlannedStopKind.fuel, .rest, .toilet] {
+            #expect(StopNoteText.turnBack(kind: kind, extraMeters: 6_000).title == "This R&R is on the other side of the highway")
+        }
+        for kind in [PlannedStopKind.food, .sight] {
+            let text = StopNoteText.turnBack(kind: kind, extraMeters: 6_000)
+            #expect(text.title == "This stop is across the road")
+            #expect(text.detail == "The route turns back at the next exit, about 6 km extra.")
+        }
+    }
+}
+
 struct StopFormatTests {
     @Test func theLineUnderAStop() {
         let nine = Calendar.current.date(from: DateComponents(year: 2027, month: 1, day: 15, hour: 9, minute: 0))!
@@ -256,6 +353,13 @@ struct StopFormatTests {
         let elevenToday = try #require(StopFormat.nextTime(hour: 11, minute: 0, after: now))
         #expect(elevenToday.timeIntervalSince(now) == 3600)
     }
+}
+
+@MainActor
+private final class PendingGate {
+    private var isOpen = false
+    func open() { isOpen = true }
+    func wait() async { while !isOpen { try? await Task.sleep(for: .milliseconds(5)) } }
 }
 
 @MainActor
@@ -382,6 +486,33 @@ struct StopPlannerTests {
         planner.add(fuel("A", a))
         await waitUntil { if case .failed = planner.status { true } else { false } }
         #expect(planner.status == .failed(.init(place: .destination, reason: .noRoute)))
+    }
+
+    @Test func aSaveQueuedOfflineKeepsThePlanAndSaysItIsNotSavedYetUntilTheServerHasIt() async {
+        let roads = StraightRoads()
+        let pending = PendingGate()
+        let planner = StopPlanner(
+            router: roads, delay: .zero, origin: { start }, waitForPending: { await pending.wait() },
+            save: { _ in throw ServerWrite.Offline() })
+        planner.sync(trip: trip(route: Polyline.encode(line(start, end))), stops: [])
+        planner.add(fuel("A", a))
+        await waitUntil { planner.queued }
+        #expect(planner.queued)
+        #expect(planner.status == .saved)
+        #expect(planner.items.map(\.name) == ["A"])
+        pending.open()
+        await waitUntil { !planner.queued }
+        #expect(!planner.queued)
+    }
+
+    @Test func anEditBeforeTheTripHasLoadedSaysSoInsteadOfWaitingForever() async {
+        let planner = StopPlanner(router: StraightRoads(), delay: .zero, origin: { start }, save: { _ in })
+        planner.add(fuel("A", a))
+        await waitUntil { if case .failed = planner.status { true } else { false } }
+        guard case .failed = planner.status else {
+            Issue.record("still \(planner.status)")
+            return
+        }
     }
 
     @Test func aSaveThatFailsKeepsTheListAndSaysSo() async {

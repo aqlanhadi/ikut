@@ -220,6 +220,18 @@ struct RouteLine: Sendable {
 
     // MARK: Merging
 
+    /// Where a car's route to a meeting point joins this route: the very end of `other`, when `other` ends at this
+    /// route's start (the main route starts at the meeting point). Unlike `mergeOffset(of:)` it ignores a stretch
+    /// before the end that runs within `tolerance` of this route, such as the other carriageway on the way in, so
+    /// a car is not counted as joined until it reaches the meeting point. Nil when `other` doesn't end there.
+    func meetingMerge(
+        of other: RouteLine, tolerance: CLLocationDistance = 50
+    ) -> (otherOffset: CLLocationDistance, mainOffset: CLLocationDistance)? {
+        guard let start = coordinates.first, let end = other.coordinates.last,
+              RouteLine.haversine(start, end) <= tolerance else { return nil }
+        return (other.length, 0)
+    }
+
     /// Where `other` joins this route for good: the first point along `other` from which it stays
     /// within `tolerance` of this route until its end. `other` is sampled every ~25 m, walking back
     /// from its end, then the boundary is bisected to about a meter. Returns nil if `other` ends

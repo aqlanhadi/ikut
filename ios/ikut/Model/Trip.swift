@@ -24,6 +24,8 @@ struct Trip: Codable, Sendable, Equatable, Identifiable {
     /// Driving time in seconds along `route` (the legs added up when it goes through stops); nil on trips
     /// made before it was stored, which then ask MapKit for the time.
     var routeSeconds: Double?
+    /// How many planned stops the trip has; the rules use it to lock the route once a trip with stops has started.
+    var stopCount: Int?
     var status: TripStatus
     @ServerTimestamp var createdAt: Date?
     /// Bumped on activity; trips idle for 12 hours are ended.
