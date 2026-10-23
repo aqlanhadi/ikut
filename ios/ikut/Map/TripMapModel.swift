@@ -295,6 +295,7 @@ final class TripMapModel {
         hazardsRunning = false
         approach = nil
         approachCarId = nil
+        alertAnnouncer = nil
         stopRegions()
     }
 

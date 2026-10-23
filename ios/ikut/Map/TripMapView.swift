@@ -711,7 +711,8 @@ struct TripMapView: View {
         }
         model.start()
         model.startHazardAlerts(announcer: alerts, userId: session.userId)
-        alerts.carDistance = { [model] in model.convoy.distance(fromMyCarTo: $0) }
+        // Weak: the model holds `alerts` as its announcer, so a strong capture would keep every map opened.
+        alerts.carDistance = { [weak model] in model?.convoy.distance(fromMyCarTo: $0) }
         alerts.start(tripId: session.tripId, myUserId: session.userId, myCarId: session.member?.carId)
         onScreen = true
         updateAwake()
