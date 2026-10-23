@@ -192,3 +192,37 @@ struct PickedTripTests {
         #expect(!recap.timeline.filter(RecapFilter.reports.matches).isEmpty)
     }
 }
+
+#if DEBUG
+import SwiftUI
+import UIKit
+
+/// Hosts Home in a demo state and waits, so the simulator can be screenshotted from outside:
+/// `TEST_RUNNER_IKUT_HOME_DEMO=short|tall|item|loading|failed|list` and `TEST_RUNNER_IKUT_HOME_DEMO_HOLD=40`
+/// (plus `IKUT_HOME_DEMO_DARK=1`, `IKUT_HOME_DEMO_TEXT=1` for the largest text), then
+/// `xcrun simctl io <device> screenshot home.png`. Skipped unless the hold is set.
+@MainActor
+struct HomePickedScreenshot {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["IKUT_HOME_DEMO_HOLD"] != nil))
+    func holdDemoOnScreen() async throws {
+        let env = ProcessInfo.processInfo.environment
+        let seconds = Double(env["IKUT_HOME_DEMO_HOLD"] ?? "") ?? 30
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        let size: DynamicTypeSize = env["IKUT_HOME_DEMO_TEXT"] == nil ? .large : .accessibility5
+        let which = env["IKUT_HOME_DEMO"] ?? "list"
+        // "recap" is the end-of-trip screen, to show it reads and looks as before.
+        let content: AnyView = which == "recap"
+            ? AnyView(RecapView(model: RecapModel(snapshot: .demo(), originName: "Tanjung Malim")))
+            : AnyView(HomePickedDemo.view(which))
+        let root = content
+            .environment(AuthModel())
+            .environment(\.dynamicTypeSize, size)
+        window.rootViewController = UIHostingController(rootView: root)
+        window.overrideUserInterfaceStyle = env["IKUT_HOME_DEMO_DARK"] == nil ? .light : .dark
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        try await Task.sleep(for: .seconds(seconds))
+    }
+}
+#endif

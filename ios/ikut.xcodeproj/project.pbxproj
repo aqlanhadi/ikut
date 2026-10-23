@@ -58,6 +58,7 @@
 		5626212E868D041FB840F37F /* HazardRegionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FFC0A7C9CC4F4FA9D59983 /* HazardRegionMonitor.swift */; };
 		56AD3DB484BF8EFED6033D2E /* ETARefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F504AF6A067112D2A409082 /* ETARefresh.swift */; };
 		56F65EF34C546F42247FD052 /* TripComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091C79B7B0A90381F07CB73D /* TripComponents.swift */; };
+		57A2D5C5D587F6AECCC286A4 /* SheetDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08F8F075604584E9A319923 /* SheetDrag.swift */; };
 		57F8B464EC89FCDCF61E28B2 /* TripsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */; };
 		582410C7C30935CFC992CE36 /* QRCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178127AA3169E8E115308E18 /* QRCode.swift */; };
 		584A3D742D1E46142E1B6A44 /* CarRouteLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4365C32AF91E6D4FEA8C34F4 /* CarRouteLogic.swift */; };
@@ -284,6 +285,7 @@
 		CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripView.swift; sourceTree = "<group>"; };
 		CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachMonitor.swift; sourceTree = "<group>"; };
 		CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameEntryView.swift; sourceTree = "<group>"; };
+		D08F8F075604584E9A319923 /* SheetDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetDrag.swift; sourceTree = "<group>"; };
 		D0D7948AC8E4880C3065A836 /* MapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTests.swift; sourceTree = "<group>"; };
 		D34759F3D28A64C5908B2C7D /* AuthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTests.swift; sourceTree = "<group>"; };
 		D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyUITestCase.swift; sourceTree = "<group>"; };
@@ -333,6 +335,7 @@
 				322ED2F251FFDF594FC7D83E /* PickedTrip.swift */,
 				8D336F2B85FEC1BD5D004993 /* PickedTripSheet.swift */,
 				56BDE68F366CE545C453468B /* ServerWrite.swift */,
+				D08F8F075604584E9A319923 /* SheetDrag.swift */,
 				AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */,
 				2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */,
 			);
@@ -892,6 +895,7 @@
 				2209A42F9B1AEA04759BE495 /* RouteBuilder.swift in Sources */,
 				941BE30C2A87EF38E26515B6 /* RouteGeometry.swift in Sources */,
 				182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */,
+				57A2D5C5D587F6AECCC286A4 /* SheetDrag.swift in Sources */,
 				7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */,
 				3C240B4486DA232F9E1504AA /* StopAskModel.swift in Sources */,
 				2BA5F8BF9D332EAB9287D796 /* StopCard.swift in Sources */,

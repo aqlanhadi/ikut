@@ -100,3 +100,38 @@ final class PickedTrip {
     /// Back to the whole trip.
     func clearSelection() { selectedItemId = nil }
 }
+
+#if DEBUG
+/// States of Home for the screenshot test (`IKUT_HOME_DEMO`): the list, and a trip picked while its recap
+/// is loaded, loading or couldn't load.
+@MainActor
+enum HomePickedDemo {
+    static func view(_ name: String) -> TripsHomeView {
+        let snapshot = RecapSnapshot.demo()
+        let day: TimeInterval = 86_400
+        let now = Date()
+        let entry = PastTrips.Entry(id: snapshot.tripId, name: snapshot.name, destination: snapshot.destinationName,
+                                    endedAt: now.addingTimeInterval(-day), seenAt: now, others: ["Wyna", "Hafiz", "Daniel"])
+        let older = [
+            PastTrips.Entry(id: "sample-2", name: "Makan trip", destination: "Melaka", endedAt: now.addingTimeInterval(-9 * day),
+                            seenAt: now.addingTimeInterval(-9 * day), others: nil),
+            PastTrips.Entry(id: "sample-3", name: "Cameron weekend", destination: "Tanah Rata",
+                            endedAt: now.addingTimeInterval(-40 * day), seenAt: now.addingTimeInterval(-40 * day), others: ["Wyna"]),
+        ]
+        let thin = PastTripsMapLogic.route(id: entry.id, name: entry.name, destinationName: snapshot.destinationName,
+                                           destination: snapshot.destination, encodedRoute: snapshot.route)
+        let past = [entry] + older
+        let model = RecapModel(snapshot: snapshot, originName: "Tanjung Malim")
+        switch name {
+        case "short": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model))
+        case "tall": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model), expanded: true)
+        case "item":
+            let stop = model.recap?.timeline.first { $0.kind == .stop }?.id
+            return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model), selecting: stop)
+        case "loading": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(tripId: "demo-never-loaded")))
+        case "failed": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(failedTripId: entry.id)))
+        default: return TripsHomeView(demo: past, routes: [thin])
+        }
+    }
+}
+#endif

@@ -106,3 +106,36 @@ struct PastTripsMapTests {
         #expect(r.destinationName == "Ipoh")
     }
 }
+
+struct SheetDragTests {
+    @Test func travelStartsFromTheFirstTranslation() {
+        // The drag reports 8 pt as soon as it begins; the sheet must not jump by that.
+        #expect(SheetDrag.travel(translation: 8, start: 8) == 0)
+        #expect(SheetDrag.travel(translation: -8, start: -8) == 0)
+        #expect(SheetDrag.travel(translation: -58, start: -8) == -50)
+        #expect(SheetDrag.travel(translation: 5, start: nil) == 0)
+    }
+
+    @Test func heightFollowsTheFingerBetweenDetentsAndBandsBeyond() {
+        #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: -100) == 400)
+        #expect(SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: 100) == 600)
+        // Past tall: only a fifth of the extra shows. Below compact likewise.
+        #expect(SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: -100) == 720)
+        #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: 100) == 280)
+    }
+
+    @Test func offsetKeepsTheLaidOutSheetAtTheVisibleHeight() {
+        let layout = SheetDrag.layoutHeight(tall: 700)
+        #expect(layout > 700)
+        #expect(layout - SheetDrag.offset(tall: 700, height: 300) == 300)
+        // The rubber band's extra stays inside what is laid out.
+        #expect(SheetDrag.offset(tall: 700, height: 700 + 100 * SheetDrag.rubberFactor) >= 0)
+    }
+
+    @Test func aFlickSettlesOnTheNearerDetentInItsDirection() {
+        #expect(SheetDrag.settlesExpanded(expanded: false, compact: 300, tall: 700, predicted: -300, start: -8))
+        #expect(!SheetDrag.settlesExpanded(expanded: false, compact: 300, tall: 700, predicted: -60, start: -8))
+        #expect(!SheetDrag.settlesExpanded(expanded: true, compact: 300, tall: 700, predicted: 300, start: 8))
+        #expect(SheetDrag.settlesExpanded(expanded: true, compact: 300, tall: 700, predicted: 60, start: 8))
+    }
+}
