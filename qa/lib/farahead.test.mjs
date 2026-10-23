@@ -29,6 +29,15 @@ test('cars that left together and drift 6 km apart: warned', () => {
   assert.deepEqual(driftedGaps(later, together), ['Wyna']);
 });
 
+test('the lead coming up to two parked cars: no warning about the gap between them', () => {
+  const start = entries([car('Aisha', 10_000, 27, { isLead: true }), car('Wyna', 9200, 27), car('Daniel', 28_000, 0), car('Sam', 24_000, 0)]);
+  let together = togetherPairs(start);
+  const later = entries([car('Aisha', 23_000, 27, { isLead: true }), car('Wyna', 22_200, 27), car('Daniel', 28_000, 0), car('Sam', 24_000, 0)]);
+  together = new Set([...together, ...togetherPairs(later)]);
+  assert.ok(together.has('Aisha|Daniel'));
+  assert.deepEqual(driftedGaps(later, together), []);
+});
+
 test('everyone far apart: no warnings until cars that were together part', () => {
   const far = entries([car('Aisha', 30_000, 27, { isLead: true }), car('Wyna', 18_000, 27), car('Hafiz', 6000, 27)]);
   assert.equal(referenceId(far), 'Aisha');

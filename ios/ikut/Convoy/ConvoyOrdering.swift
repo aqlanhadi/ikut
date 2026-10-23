@@ -39,8 +39,9 @@ struct ConvoyEntry: Equatable, Identifiable, Sendable {
         /// Over the separation threshold (distance or time).
         var isSeparated: Bool
         /// Over the threshold, and a car ahead of the gap and a car behind it were within the threshold of
-        /// each other earlier in the trip (`ConvoySnapshot.together`): they were together and have drifted
-        /// apart. Only this warns; a car that has been far ahead or behind since it joined doesn't.
+        /// each other earlier in the trip (`ConvoySnapshot.together`) and are over it now: they were
+        /// together and have drifted apart. Only this warns; a car that has been far ahead or behind since
+        /// it joined doesn't, nor a gap between two parked cars that a moving car is coming up to.
         var hasDrifted = false
     }
 }
@@ -147,7 +148,8 @@ enum ConvoyArrival {
 /// the one further back on a tie; nil with no fresh car. Arrived and paused cars never count.
 ///
 /// **Separation** (D26): a gap over the threshold warns only once the cars on either side of it were
-/// within the threshold of each other at some point (`together`, kept by the caller across refreshes).
+/// within the threshold of each other at some point (`together`, kept by the caller across refreshes)
+/// and those two are over it now.
 /// A pair counts as together when both are fresh and the one behind is within `separationDistance`
 /// and `separationTime` of the one ahead. Pairs, not neighbours, so a car passing between two others
 /// doesn't make them forget they were together.
@@ -232,10 +234,12 @@ enum ConvoyOrdering {
                 isSeparated: distance > config.separationDistance || time > config.separationTime)
         }
         let pairs = together.union(togetherPairs(convoy, config: config))
-        let ids = convoy.map(\.id)
+        let ordered = convoy
         for i in convoy.indices where i > 0 && convoy[i].gap?.isSeparated == true {
-            convoy[i].gap?.hasDrifted = ids[..<i].contains { a in
-                ids[i...].contains { b in pairs.contains(CarPair(a, b)) }
+            convoy[i].gap?.hasDrifted = ordered[..<i].contains { a in
+                ordered[i...].contains { b in
+                    pairs.contains(CarPair(a.id, b.id)) && isApart(a, b, config: config)
+                }
             }
         }
         let refIndex = referenceIndex(convoy, config: config)
@@ -258,6 +262,12 @@ enum ConvoyOrdering {
         }
         return ConvoySnapshot(
             convoy: convoy, joining: joining, referenceId: refIndex.map { convoy[$0].id }, together: pairs)
+    }
+
+    /// `behind` is over the separation threshold from `ahead` (distance, or time at its floored speed).
+    private static func isApart(_ ahead: ConvoyEntry, _ behind: ConvoyEntry, config: Config) -> Bool {
+        let distance = ahead.convoyOffset - behind.convoyOffset
+        return distance > config.separationDistance || distance / behind.speed > config.separationTime
     }
 
     /// A fresh car: its position is recent and its tracker isn't paused.

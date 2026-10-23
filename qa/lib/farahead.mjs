@@ -62,9 +62,15 @@ export function togetherPairs(convoy, config = CONFIG) {
   return pairs;
 }
 
+/** ConvoyOrdering.isApart: `behind` over the threshold from `ahead`. */
+const isApart = (ahead, behind, config) => {
+  const distance = ahead.offset - behind.offset;
+  return distance > config.separationDistance || distance / behind.speed > config.separationTime;
+};
+
 /**
  * ConvoyOrdering.order, the separation part: the ids of cars behind a gap over the threshold where a car ahead of
- * the gap and a car behind it are in `together` (kept across refreshes, this one included).
+ * the gap and a car behind it are in `together` (kept across refreshes, this one included) and apart now.
  */
 export function driftedGaps(convoy, together, config = CONFIG) {
   const out = [];
@@ -72,7 +78,8 @@ export function driftedGaps(convoy, together, config = CONFIG) {
     const distance = convoy[i - 1].offset - convoy[i].offset;
     const separated = distance > config.separationDistance || distance / convoy[i].speed > config.separationTime;
     if (!separated) continue;
-    const drifted = convoy.slice(0, i).some((a) => convoy.slice(i).some((b) => together.has(pairKey(a.id, b.id))));
+    const drifted = convoy.slice(0, i).some((a) =>
+      convoy.slice(i).some((b) => together.has(pairKey(a.id, b.id)) && isApart(a, b, config)));
     if (drifted) out.push(convoy[i].id);
   }
   return out;

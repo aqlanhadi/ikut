@@ -76,6 +76,19 @@ struct FarAheadTests {
         #expect(steps[1].together == [CarPair("1", "2")])
     }
 
+    /// Found by run-ui: two cars parked 4 km apart, and the lead coming up within 5 km of the first.
+    /// Aisha and Daniel are "together" now, but nobody has drifted: no warning about the gap between
+    /// the two parked cars.
+    @Test func approachingTheParkedCarsWarnsAboutNoGapBetweenThem() {
+        let steps = run([aisha, wyna, daniel, sam], [
+            ["1": pos(10_000), "2": pos(9_200), "3": pos(28_000, speed: 0), "5": pos(24_000, speed: 0)],
+            ["1": pos(23_000), "2": pos(22_200), "3": pos(28_000, speed: 0), "5": pos(24_000, speed: 0)],
+        ])
+        #expect(steps[1].together.contains(CarPair("3", "1")))
+        #expect(steps[1].convoy[1].gap?.isSeparated == true) // 4 km at the parked car's floored speed
+        #expect(steps.allSatisfy { $0.driftedGaps.isEmpty })
+    }
+
     @Test func leadNotTrackingTheReferenceIsTheCarWithMostAround() {
         // Aisha's phone is off (stale), Wyna and Sam left together, Daniel parked ahead.
         let s = order([aisha, wyna, daniel, sam], [
