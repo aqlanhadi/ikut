@@ -20,7 +20,8 @@ export class PositionBuilder {
     this.mainHint = null;
     if (own && !own.isEmpty) {
       this.own = own;
-      const m = main.mergeOffset(own);
+      // PositionBuilder.init: a road that ends at the main route's start is a car's way to the meeting point; it joins on arrival.
+      const m = main.meetingMerge(own) ?? main.mergeOffset(own);
       this.ownMergeOffset = m ? m.otherOffset : null;
       this.hasMerged = false;
     } else {

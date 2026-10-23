@@ -1,7 +1,7 @@
 // Route geometry, ported line for line from the app so the simulator computes the same offsets.
 //
 //   Polyline        <- ios/ikut/Model/Polyline.swift          (Google encoded polyline, precision 5)
-//   RouteLine       <- ios/ikut/Route/RouteGeometry.swift     (haversine, project, coordinate(atOffset:), mergeOffset)
+//   RouteLine       <- ios/ikut/Route/RouteGeometry.swift     (haversine, project, coordinate(atOffset:), mergeOffset, meetingMerge)
 //   RouteSimplifier <- ios/ikut/CarRoute/CarRouteLogic.swift  (Douglas-Peucker, maxEncodedLength variant)
 //   makeCarRoutePlan, truncate, planIfOnMain <- ios/ikut/CarRoute/CarRouteLogic.swift (CarRouteLogic)
 //
@@ -213,6 +213,19 @@ export class RouteLine {
     };
   }
 
+  /**
+   * RouteLine.meetingMerge(of:tolerance:): where a car's road to a meeting point joins this route: the very end of
+   * `other`, when it ends at this route's start. Ignores an earlier stretch within tolerance (the other carriageway on
+   * the way in). {otherOffset, mainOffset} or null.
+   */
+  meetingMerge(other, tolerance = 50) {
+    if (this.isEmpty || other.coordinates.length === 0) return null;
+    const start = this.coordinates[0];
+    const end = other.coordinates[other.coordinates.length - 1];
+    if (haversine(start, end) > tolerance) return null;
+    return { otherOffset: other.length, mainOffset: 0 };
+  }
+
   /** RouteLine.mergeOffset(of:tolerance:): {otherOffset, mainOffset} or null. */
   mergeOffset(other, tolerance = 50) {
     if (this.isEmpty || other.coordinates.length === 0) return null;
@@ -271,10 +284,20 @@ export const CarRouteLogic = {
     return { route: null, mergeOffset: p.offset, state: 'convoy', kind: 'onMainRoute' };
   },
 
-  /** CarRouteLogic.makePlan: cut a computed route at the merge, store it, and recompute the merge on the stored polyline. */
-  makePlan(computed, main) {
+  /**
+   * CarRouteLogic.makePlan: cut a computed route at the merge, store it, and recompute the merge on the stored polyline.
+   * `toMeetingPoint`: the road ends at the main route's start, so it joins only on arrival and is kept whole.
+   */
+  makePlan(computed, main, toMeetingPoint = false) {
     if (computed.length < 2 || main.isEmpty) return null;
     const full = new RouteLine(computed);
+    if (toMeetingPoint) {
+      const meet = main.meetingMerge(full, this.mergeTolerance);
+      if (meet) {
+        const simplified = simplifyToFit(computed, this.maxEncodedLength);
+        return { route: Polyline.encode(simplified), mergeOffset: meet.mainOffset, state: 'joining', kind: 'merges' };
+      }
+    }
     const merge = main.mergeOffset(full, this.mergeTolerance);
     if (!merge) {
       const simplified = simplifyToFit(computed, this.maxEncodedLength);
