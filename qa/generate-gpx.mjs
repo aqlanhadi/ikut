@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RouteLine, haversine } from './lib/route.mjs';
 import { writeGpx } from './lib/gpx.mjs';
-import { CARS, CAR4_START, DURATION, FIX_HZ, GPX_EPOCH, SPEED_WOBBLE, TRIP, PARKED_CARS, WOBBLE_PERIOD } from './lib/scenario.mjs';
+import { CARS, CAR4_START, DURATION, FIX_HZ, GPX_EPOCH, SPEED_WOBBLE, TRIP, PARKED_CARS, STOP_CARS, WOBBLE_PERIOD } from './lib/scenario.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(here, 'data');
@@ -176,7 +176,7 @@ async function main() {
   const truth = {}; // key -> [{t, coord}] true (noise-free) positions, for the gap report
   const summary = [];
 
-  for (const car of [...CARS, ...PARKED_CARS]) {
+  for (const car of [...CARS, ...PARKED_CARS, ...STOP_CARS]) {
     const rand = noiseSource(car.key.length * 7919 + car.key.charCodeAt(car.key.length - 1));
     const points = [];
     const trueAt = [];
@@ -190,29 +190,31 @@ async function main() {
         const s = motion.distanceAt(t);
         coord = s <= merge.otherOffset
           ? own.coordinateAtOffset(s)
-          : main.coordinateAtOffset(merge.mainOffset + (s - merge.otherOffset));
+          : main.coordinateAtOffset(Math.min(merge.mainOffset + (s - merge.otherOffset), car.stopAt ?? Infinity));
       } else if (waiting) {
         coord = main.coordinateAtOffset(waiting.offsetAt(t));
       } else {
-        coord = main.coordinateAtOffset(mainOffsetAt(car, t));
+        coord = main.coordinateAtOffset(Math.min(mainOffsetAt(car, t), car.stopAt ?? Infinity));
       }
       trueAt.push({ t, coord });
       if (car.gap && t > car.gap.from && t < car.gap.to) continue;
       // The app car is a simulated GPS fed by simctl: no noise, so its offsets are exactly reproducible.
       // A parked car is noise-free too: parked, GPS jitter alone would read as creeping along.
-      const noisy = car.kind === 'app' || waiting ? coord : jitter(coord, rand());
+      const atStop = car.stopAt !== undefined && t > 0 && trueAt.length > 1 && haversine(coord, trueAt[trueAt.length - 2].coord) < 0.01;
+      const noisy = car.kind === 'app' || waiting || atStop ? coord : jitter(coord, rand());
       points.push({ ...noisy, ele: 60, time: isoAt(t) });
     }
-    truth[car.key] = trueAt;
+    truth[car.gpx ?? car.key] = trueAt;
     const desc = [
       `ikut QA scenario, ${car.key}.`,
       waiting ? `Parked on the main route at ${car.waitOffset} m, drives on at t=${waiting.departAt.toFixed(0)} s at about ${(car.speed * 3.6).toFixed(0)} km/h.` : '',
       !waiting && (car.kind === 'main' || car.kind === 'app') ? `Main route from ${car.startOffset} m at about ${(car.speed * 3.6).toFixed(0)} km/h.` : '',
       car.kind === 'merge' ? `Starts in Tapah town, departs at t=${motion.departAt.toFixed(0)} s, reaches the Tapah ramp merge at t=${motion.mergeTime.toFixed(0)} s.` : '',
+      car.stopAt !== undefined ? `Pulls in at the planned stop ${car.stopAt} m along the main route and parks.` : '',
       car.gap ? `Signal drop: no fixes between t=${car.gap.from} s and t=${car.gap.to} s (${car.gap.to - car.gap.from} s).` : '',
       `1 Hz, ${DURATION} s, start ${GPX_EPOCH}.`,
     ].filter(Boolean).join(' ');
-    writeGpx(path.join(gpxDir, `${car.key}.gpx`), { name: `${car.key} ${car.name}`, desc, points });
+    writeGpx(path.join(gpxDir, `${car.gpx ?? car.key}.gpx`), { name: `${car.gpx ?? car.key} ${car.name}`, desc, points });
     summary.push(`${car.key}: ${points.length} points${car.gap ? `, gap ${car.gap.from}-${car.gap.to} s` : ''}${motion ? `, departs ${motion.departAt.toFixed(0)} s, merges ${motion.mergeTime.toFixed(0)} s` : ''}${waiting ? `, waits at ${waiting.offsetAt(0)} m, drives on at ${waiting.departAt.toFixed(0)} s` : ''}`);
   }
 

@@ -110,7 +110,8 @@ its suite finishes; the script takes the suite's result and kills it after 60 s.
 | `gpx/car1..car4.gpx`, `car5-app.gpx` | The tracks, 1 Hz, 900 s. `route-*.gpx` are reference polylines. |
 | `convoy-sim.mjs` | The scenario driver. |
 | `lib/route.mjs`, `lib/tracking.mjs` | JS ports of the Swift logic, each function annotated with its source file. |
-| `lib/scenario.mjs` | The script: cars, speeds, gap, timeline. |
+| `lib/scenario.mjs` | The script: cars, speeds, gap, timeline, and the parked and stop scenarios. |
+| `lib/stoparrival.mjs` | Who is at a planned stop (port of `StopArrival`), with `lib/stoparrival.test.mjs`. |
 | `lib/shell.mjs`, `lib/firebase-config.mjs` | `run`/`simctl`/`sleep`/`makeSay`, `endsWithResult` (the `RESULT` line and `--deadline`) and `holdSimulators` (the simulator lock) for the scripts that drive simulators; the production client config read from the app's plist. |
 | `simlock.sh` | Holds one or more simulators while a command runs, see Waiting on a run. |
 | `run-ui.mjs` | One-command orchestrator with the app in the loop. |
@@ -141,6 +142,11 @@ The timeline moves so it lands while she waits: car 3 asks for fuel at 300, car 
 an offline write would hold the clock), car 4 at 450, debris at 520, We've stopped at 800. The heads-up is due
 about 2 minutes before the lead reaches her (car 6 about T=704, the phone about T=561).
 
+**A planned stop** (`--scenario stop`, D25 piece 3b): cars 1-4 drive as in the default scenario (car 2's drop, car 4's
+merge at 408) but each pulls in at R&R Tapah, 20 km along, and parks there (car 1 about T=532, car 2 565, car 4 598,
+car 3 616; tracks `car<N>-stop.gpx`). The organizer writes the stop before the start. No phone car, no timeline: it
+does not take `--wait-app` and `run-ui.mjs` does not run it.
+
 ## What is checked
 
 `convoy-sim.mjs` (PASS/FAIL lines, exit code 1 on any FAIL):
@@ -157,6 +163,9 @@ about 2 minutes before the lead reaches her (car 6 about T=704, the phone about 
   from the lead the whole drive, never the car furthest ahead; no separation warning about the parked car; one
   heads-up "Aisha’s car is 3.2 km behind you." within 20 s of the time the GPX predicts; the far stop request is
   spoken with its distance ("Hafiz needs fuel, 17 km behind. Tap OK."), within 1.5 km of the GPX
+- stop (`--scenario stop`, car 1's phone as `lib/stoparrival.mjs` ports `StopArrival` from the app): the stop is stored
+  with its place on the route, kind and minutes; each car is counted here within 10 s of the GPX coming within 150 m of
+  it, never before; "4 of 4 here" when the last car pulls in, and still at the end
 
 `ConvoyScenarioUITests` (the panel as a person sees it, ids `convoy.row.N`, `joining.row.N`, `convoy.header`,
 `convoy.joining.header`, `hazard.marker`):
