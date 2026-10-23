@@ -171,9 +171,9 @@ about 2 minutes before the lead reaches her (car 6 about T=704, the phone about 
 8. the Pit stop button shows the stop and the card has the message; tapping OK for our car is recorded; the card goes when the lead taps We've stopped
 
 `testParkedAheadOfTheConvoy` (`run-ui.mjs --scenario parked`, the phone parked ahead): Mei's row says "km ahead ·
-parked", the lead's row "km behind", "5 in Convoy", no separation warning; the stop pill reads "Hafiz needs fuel ·
-13 km behind" and its OK is recorded; the `catchup.pill` "Aisha’s car is behind you" shows once; then it goes and the
-lead passes.
+parked", the lead's row "km behind", "5 in Convoy"; the stop pill reads "Hafiz needs fuel · 13 km behind" and its
+OK is recorded; the `catchup.pill` "Aisha’s car is behind you" shows once; no `convoy.separation` warning through all
+three; then the lead passes and the pill goes.
 
 ## Things to know
 

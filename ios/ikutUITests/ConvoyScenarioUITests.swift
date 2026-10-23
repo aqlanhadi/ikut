@@ -161,6 +161,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             XCTAssertTrue(element("convoy.row.1").label.contains("km behind"), "Aisha's row: \(element("convoy.row.1").label)")
             XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in Convoy"), "header: \(element("convoy.header").label)")
             XCTAssertFalse(exists("catchup.pill"), "too early for the heads-up")
+            XCTAssertFalse(exists("convoy.separation"), "a far car is in the convoy, not fallen behind: \(element("convoy.separation").label)")
             shot("p01-parked-ahead")
         }
 
@@ -173,6 +174,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             shot("p02-far-stop-request")
             app.buttons["stop.pill.button"].tap()
             try waitFor("the pill goes after OK", timeout: 30) { !element("stop.pill.button").exists }
+            XCTAssertFalse(exists("convoy.separation"), "no separation warning: \(element("convoy.separation").label)")
         }
 
         try step("3. About 2 minutes before the lead reaches this car: Aisha’s car is behind you") {
@@ -181,17 +183,18 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             try waitFor("the heads-up pill", timeout: 300 / speed + 90) { pill.exists }
             XCTAssertTrue(pill.label.hasPrefix("Aisha’s car is behind you"), "pill: \(pill.label)")
             XCTAssertTrue(pill.label.contains("away"), "pill: \(pill.label)")
+            XCTAssertFalse(exists("convoy.separation"), "the lead coming up to the parked cars is no separation: \(element("convoy.separation").label)")
             shot("p03-heads-up")
         }
 
-        try step("4. This car drives on behind the lead: the heads-up goes") {
+        try step("4. The lead passes: the heads-up goes") {
             try waitFor("the heads-up pill goes", timeout: 200 / speed + 90) { !exists("catchup.pill") }
             try waitFor("this car behind the lead", timeout: 120 / speed + 60) {
                 let order = convoyOrder()
                 guard let lead = order.firstIndex(of: 1), let me = order.firstIndex(of: 6) else { return false }
                 return lead < me
             }
-            shot("p04-drove-on")
+            shot("p04-lead-passes")
         }
     }
 
