@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 /// The floating glass panel at the bottom of the map (Map.dc.html): FROM and TO with the arrival
@@ -24,6 +25,9 @@ struct ConvoyPanel: View {
     @State private var originName: String?
     @State private var ownStartName: String?
     @State private var joinPlaceName: String?
+    @State private var ownStart: CLLocationCoordinate2D?
+    @State private var ownJoin: OwnWayJoin?
+    @State private var joinCoordinate: CLLocationCoordinate2D?
 
     private var convoy: ConvoyModel { model.convoy }
     private let maxListHeight: CGFloat = 220
@@ -53,14 +57,26 @@ struct ConvoyPanel: View {
             guard let start = model.mainRoute?.coordinates.first else { return }
             originName = await RouteBuilder.placeName(at: start)
         }
-        .task(id: ownKey) {
+        .task(id: ownInputs) {
+            // Once per change of my car's route, merge offset, state or the main route, not per refresh.
+            let main = model.mainRoute
+            ownStart = OwnWayLogic.start(car: model.myCar, phone: nil)
+            if model.myCar?.state == .joining, let main {
+                ownJoin = OwnWayLogic.join(car: model.myCar, main: main)?.join
+                joinCoordinate = OwnWayLogic.joinCoordinate(ownJoin, main: main)
+            } else {
+                ownJoin = nil
+                joinCoordinate = nil
+            }
+        }
+        .task(id: coordinateKey(ownStart)) {
             ownStartName = nil
-            guard let start = OwnWayLogic.start(car: model.myCar, phone: nil) else { return }
+            guard let start = ownStart else { return }
             ownStartName = await RouteBuilder.placeName(at: start)
         }
-        .task(id: joinKey) {
+        .task(id: coordinateKey(joinCoordinate)) {
             joinPlaceName = nil
-            guard let at = OwnWayLogic.joinCoordinate(ownJoin?.join, main: model.mainRoute ?? RouteLine([])) else { return }
+            guard let at = joinCoordinate else { return }
             joinPlaceName = await RouteBuilder.placeName(at: at)
         }
     }
@@ -72,31 +88,23 @@ struct ConvoyPanel: View {
         return "\(c.latitude),\(c.longitude)"
     }
 
-    /// How my car meets the main route; nil before its route is known.
-    private var ownJoin: (join: OwnWayJoin, ownToJoin: Double, own: RouteLine?, viaMeeting: Bool)? {
-        guard let main = model.mainRoute else { return nil }
-        return OwnWayLogic.join(car: model.myCar, main: main)
+    private var ownInputs: String {
+        let car = model.myCar
+        return "\(car?.route ?? "-")|\(car?.mergeOffset.map { String($0) } ?? "-")|\(car?.state.rawValue ?? "-")|\(model.mainRoute?.length ?? 0)"
     }
 
-    private var ownKey: String {
-        guard let c = OwnWayLogic.start(car: model.myCar, phone: nil) else { return "" }
-        return "\(c.latitude),\(c.longitude)"
-    }
-
-    private var joinKey: String {
-        guard let main = model.mainRoute, let c = OwnWayLogic.joinCoordinate(ownJoin?.join, main: main) else { return "" }
-        return "\(c.latitude),\(c.longitude)"
+    private func coordinateKey(_ c: CLLocationCoordinate2D?) -> String {
+        c.map { "\($0.latitude),\($0.longitude)" } ?? ""
     }
 
     private var myJoining: JoiningEntry? { convoy.joining.first(where: { $0.id == model.myCarId }) }
 
     /// My own trip's words: start town, and the joining line while my car is joining.
     private var headerText: ConvoyHeader.Text {
-        ConvoyHeader.text(
-            car: model.myCar, joinEntry: myJoining, join: ownJoin?.join,
+        convoy.headerText(
+            car: model.myCar, join: ownJoin,
             ownStartTown: ownStartName.map(ConvoyFormat.placeShortName), mainStartTown: originShort,
-            joinPlace: joinPlaceName.map(ConvoyFormat.placeShortName), destination: destinationShort,
-            amount: myJoining.flatMap { convoy.joinAmount($0) })
+            joinPlace: joinPlaceName.map(ConvoyFormat.placeShortName), destination: destinationShort)
     }
 
     private var routeLength: Double? {
@@ -235,14 +243,7 @@ struct ConvoyPanel: View {
     /// Collapsed only (MapCollapsed.dc.html): overlapping car dots (dashed for joining cars), then
     /// "3 cars driving · Hafiz joins in 18 min · 6.4 km spread" and a chevron. Tapping expands.
     private var summary: some View {
-        // My own joining car first ("You join in 18 min"), else the first with a merge time.
-        let joiner = convoy.joining.first(where: { $0.id == model.myCarId })
-            ?? convoy.joining.first(where: { $0.timeToMerge != nil }) ?? convoy.joining.first
-        let parts = ConvoyFormat.convoySummary(
-            driving: convoy.convoy.count, joinerName: joiner?.car.name, joinIn: joiner?.timeToMerge,
-            spread: convoy.convoy.count > 1 ? convoy.snapshot.spread : nil,
-            joinerIsMe: joiner != nil && joiner?.id == model.myCarId,
-            joinAmount: joiner.flatMap { convoy.joinAmount($0) })
+        let parts = convoy.summaryParts(myCarId: model.myCarId)
         let warn = model.separationWarning != nil
         var text = Text(parts.driving).fontWeight(.semibold)
         if let joining = parts.joining { text = text + Text(" · \(joining)") }

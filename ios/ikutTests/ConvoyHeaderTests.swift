@@ -159,5 +159,48 @@ struct ConvoyHeaderTests {
             == "3 in Convoy, from Shah Alam to Ipoh, arrive 3:40 PM")
         #expect(ConvoyHeader.label(title: "3 in Convoy", text: inConvoy, destination: "Ipoh", arrive: nil)
             == "3 in Convoy, from Shah Alam to Ipoh")
+        let never = ConvoyHeader.Text(from: "George Town", joinLine: "x", spokenJoin: "meets the convoy in Ipoh, 160 km away")
+        #expect(ConvoyHeader.label(title: "3 in Convoy", text: never, destination: "Ipoh", arrive: "3:40 PM")
+            == "3 in Convoy, from George Town, meets the convoy in Ipoh, 160 km away, arrive 3:40 PM")
+    }
+
+    // MARK: Never merges, by road
+
+    @Test func neverMergingCarDistanceIsTheRestOfItsOwnRoute() throws {
+        let m = ConvoyModel(provider: StubETA(), locale: Locale(identifier: "en_GB"),
+                            timeZone: TimeZone(identifier: "UTC")!, clock: { Self.now })
+        m.setMainRoute(Self.main)
+        // A dog-leg west of the main route: about 110 km by road, about 95 km straight to the main route's end.
+        let own = RouteLine(MapDemo.densify([
+            .init(latitude: 3.5, longitude: 100.5), .init(latitude: 3.5, longitude: 100.0), .init(latitude: 3.0, longitude: 100.0)]))
+        let c = own.coordinates[0]
+        let p = Position(location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: 0, heading: 180,
+                         routeOffset: 10_000, convoyOffset: nil, battery: nil, updatedAt: Self.now.addingTimeInterval(-1))
+        let hafiz = car(route: Polyline.encode(own.coordinates), merge: Self.main.length)
+        m.update(cars: [hafiz], positions: ["4": p])
+        let entry = try #require(m.joining.first)
+        #expect(abs(try #require(entry.distanceToMerge) - (own.length - 10_000)) < 200)
+        #expect(m.joiningRows.first?.trailingPrimary == ConvoyFormat.distance(own.length - 10_000))
+    }
+
+    // MARK: Panel wiring
+
+    @Test func summaryAndHeaderUseTheJoinAmountOfMyJoiningCar() {
+        let m = model(speed: 0)
+        m.myCarId = "4"
+        let summary = m.summaryParts(myCarId: "4")
+        #expect(summary.joining?.hasPrefix("You join in ") == true)
+        #expect(summary.joining?.hasSuffix("km") == true)
+        let header = m.headerText(
+            car: car(route: "abc", merge: 20_000), join: .merges(offset: 20_000), ownStartTown: "Shah Alam",
+            mainStartTown: "Cyberjaya", joinPlace: "Rawang", destination: "Ipoh")
+        #expect(header.joinLine?.hasPrefix("Joining near Rawang · ") == true)
+        #expect(header.joinLine?.hasSuffix("km") == true)
+        // Not my car: no joining line.
+        m.myCarId = "1"
+        let other = m.headerText(
+            car: car(route: "abc", merge: 20_000, state: .convoy), join: .merges(offset: 20_000), ownStartTown: "Shah Alam",
+            mainStartTown: "Cyberjaya", joinPlace: "Rawang", destination: "Ipoh")
+        #expect(other.joinLine == nil)
     }
 }
