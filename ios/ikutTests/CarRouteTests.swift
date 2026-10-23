@@ -248,10 +248,13 @@ struct CarRouteServiceTests {
         LocationFix(latitude: c.latitude, longitude: c.longitude, speed: 20, course: 90, timestamp: t0.addingTimeInterval(s))
     }
 
-    private func service(_ box: CarRouteFakeDirections.Box, _ writer: CarRouteFakeWriter, route: String? = nil, state: CarState = .joining) throws -> CarRouteService {
+    private func service(
+        _ box: CarRouteFakeDirections.Box, _ writer: CarRouteFakeWriter, route: String? = nil, state: CarState = .joining,
+        meetingPoint: CLLocationCoordinate2D? = nil
+    ) throws -> CarRouteService {
         try CarRouteService(
             tripId: "t", carId: "c", mainRoute: mainString, destination: mainCoords.last!,
-            route: route, state: state, directions: CarRouteFakeDirections(routes: box), writer: writer)
+            meetingPoint: meetingPoint, route: route, state: state, directions: CarRouteFakeDirections(routes: box), writer: writer)
     }
 
     @Test func onMainRouteWritesConvoyWithoutDirections() async throws {
@@ -278,6 +281,73 @@ struct CarRouteServiceTests {
         #expect(plan.route != nil)
         #expect(s.state == .joining)
         #expect(s.ownMergeOffset != nil)
+    }
+
+    // MARK: Meeting point
+
+    /// A road from 8 km south and 3 km west of the main route's start, ending at its start (the meeting point).
+    private func roadToMeetingPoint() -> [CLLocationCoordinate2D] {
+        (0...16).map { i in
+            let t = Double(i) / 16
+            return move(origin, north: -8_000 * (1 - t), east: -3_000 * (1 - t))
+        }
+    }
+
+    @Test func aJoiningCarRoutesToTheMeetingPointNotTheDestination() async throws {
+        let box = CarRouteFakeDirections.Box([roadToMeetingPoint()])
+        let writer = CarRouteFakeWriter()
+        let meet = mainCoords.first!
+        let s = try service(box, writer, meetingPoint: meet)
+        let plan = try await s.ensureRoute(at: move(origin, north: -8_000, east: -3_000))
+        #expect(box.calls.count == 1)
+        #expect(box.calls[0].1.latitude == meet.latitude && box.calls[0].1.longitude == meet.longitude)
+        #expect(plan.state == .joining)
+        // The main route starts at the meeting point, so the car joins it at its very start.
+        #expect(close(try #require(plan.mergeOffset), 0, 60))
+    }
+
+    @Test func aCarAtTheMeetingPointIsInTheConvoyWithoutOwnRoute() async throws {
+        let box = CarRouteFakeDirections.Box([roadToMeetingPoint()])
+        let writer = CarRouteFakeWriter()
+        let s = try service(box, writer, meetingPoint: mainCoords.first!)
+        let plan = try await s.ensureRoute(at: move(origin, north: 40, east: 20))
+        #expect(plan.kind == .onMainRoute)
+        #expect(box.calls.isEmpty)
+        #expect(s.state == .convoy)
+    }
+
+    @Test func aCarJoiningTheMeetingPointMergesOnArrival() async throws {
+        let box = CarRouteFakeDirections.Box([roadToMeetingPoint()])
+        let writer = CarRouteFakeWriter()
+        let s = try service(box, writer, meetingPoint: mainCoords.first!)
+        try await s.ensureRoute(at: move(origin, north: -8_000, east: -3_000))
+        let own = try #require(s.routeLine)
+        let far = await s.handle(fix: fix(try #require(own.coordinate(atOffset: own.length / 2)), at: 0))
+        #expect(far == .none)
+        #expect(s.state == .joining)
+        let arrived = await s.handle(fix: fix(origin, at: 1))
+        #expect(arrived == .merged)
+        #expect(s.state == .convoy)
+    }
+
+    @Test func aMergedCarThatLeavesTheRouteIsSentOnToTheDestination() async throws {
+        let box = CarRouteFakeDirections.Box([roadToMeetingPoint(), joiningRoute()])
+        let writer = CarRouteFakeWriter()
+        let s = try service(box, writer, meetingPoint: mainCoords.first!)
+        try await s.ensureRoute(at: move(origin, north: -8_000, east: -3_000))
+        _ = await s.handle(fix: fix(origin, at: 0))
+        #expect(s.state == .convoy)
+        let lost = move(origin, north: -10_000, east: 20_000)
+        for i in 1...5 { _ = await s.handle(fix: fix(lost, at: Double(i))) }
+        #expect(box.calls.count == 2)
+        #expect(box.calls[1].1.longitude == mainCoords.last!.longitude)
+    }
+
+    @Test func withoutAMeetingPointACarRoutesToTheDestinationAsBefore() async throws {
+        let box = CarRouteFakeDirections.Box([joiningRoute()])
+        let s = try service(box, CarRouteFakeWriter(), meetingPoint: nil)
+        try await s.ensureRoute(at: move(origin, north: -10_000, east: 20_000))
+        #expect(box.calls[0].1.longitude == mainCoords.last!.longitude)
     }
 
     @Test func mergeIsMarkedWhenOffsetPassesMergePoint() async throws {

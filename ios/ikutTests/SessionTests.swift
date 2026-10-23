@@ -92,7 +92,7 @@ private struct Rig {
         carRoute.events = events
         session = TripSession(
             tripId: "t1", userId: "u1", tracker: tracker,
-            carRouteFactory: { _, _, _, _ in carRoute }, ensureTimeout: ensureTimeout)
+            carRouteFactory: { _, _, _, _, _ in carRoute }, ensureTimeout: ensureTimeout)
     }
 
     func becomeTracker(car: Car = testCar()) {
@@ -205,6 +205,73 @@ struct SessionCarRouteTests {
         try await Task.sleep(for: .milliseconds(100))
         #expect(rig.tracker.startCount == 0)
         #expect(!rig.session.isTracking)
+    }
+}
+
+private func meetStop(order: Int = 0, skipped: Bool? = nil) -> PlannedStop {
+    PlannedStop(
+        id: "m", name: "Petronas Sungai Buloh", coordinate: GeoPoint(latitude: 38.55, longitude: -120.1), routeOffset: 0,
+        kind: .meet, order: order, skipped: skipped)
+}
+
+private func fuelStop(order: Int) -> PlannedStop {
+    PlannedStop(
+        id: "f\(order)", name: "R&R", coordinate: GeoPoint(latitude: 38.6, longitude: -120.3), routeOffset: 1_000,
+        kind: .fuel, minutes: 20, order: order)
+}
+
+struct MeetingPointLogicTests {
+    @Test func theMeetingPointIsTheFirstStopWhenItIsOfKindMeet() {
+        let point = TripSessionLogic.meetingPoint(in: [fuelStop(order: 1), meetStop()])
+        #expect(point?.latitude == 38.55)
+        #expect(TripSessionLogic.meetingPoint(in: [fuelStop(order: 0)]) == nil)
+        #expect(TripSessionLogic.meetingPoint(in: []) == nil)
+        #expect(TripSessionLogic.meetingPoint(in: [meetStop(skipped: true)]) == nil)
+    }
+
+    @Test func aCarDocFromTheOldRouteIsNotTrustedWhenTheRouteChangesUnderAMeetingPoint() {
+        var organizerCar = testCar(route: ownPolyline)
+        organizerCar.state = .convoy
+        organizerCar.mergeOffset = 12
+        let fresh = TripSessionLogic.carForNewSession(organizerCar, routeChanged: true, hasMeetingPoint: true)
+        #expect(fresh.state == .joining)
+        #expect(fresh.route == nil)
+        #expect(fresh.mergeOffset == nil)
+        // No meeting point, or not a change: the car doc is used as it always was.
+        #expect(TripSessionLogic.carForNewSession(organizerCar, routeChanged: true, hasMeetingPoint: false) == organizerCar)
+        #expect(TripSessionLogic.carForNewSession(organizerCar, routeChanged: false, hasMeetingPoint: true) == organizerCar)
+    }
+}
+
+@MainActor
+struct SessionMeetingPointTests {
+    private final class Seen { var meetingPoints: [CLLocationCoordinate2D?] = []; var states: [CarState] = [] }
+
+    @Test func theMeetingPointReachesTheCarRouteAndAChangeRestartsTheSession() async throws {
+        let tracker = FakeTrackingController()
+        let carRoute = FakeCarRoute()
+        let seen = Seen()
+        let session = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker,
+            carRouteFactory: { _, _, _, car, meet in
+                seen.meetingPoints.append(meet)
+                seen.states.append(car.state)
+                return carRoute
+            })
+        var convoyCar = testCar()
+        convoyCar.state = .convoy
+        session.applyForTesting(trip: testTrip(), member: testMember, car: convoyCar)
+        await waitUntil(.seconds(2)) { tracker.isTracking }
+        #expect(seen.meetingPoints.count == 1 && seen.meetingPoints[0] == nil)
+        #expect(seen.states == [.convoy])
+
+        // The organizer adds a meeting point: the route changes with it and the car starts again from scratch.
+        session.applyForTesting(
+            trip: testTrip(route: ownPolyline), member: testMember, car: convoyCar, stops: [meetStop()])
+        await waitUntil(.seconds(2)) { seen.meetingPoints.count == 2 }
+        #expect(seen.meetingPoints.count == 2)
+        #expect(seen.meetingPoints[1]?.latitude == 38.55)
+        #expect(seen.states == [.convoy, .joining])
     }
 }
 
@@ -357,7 +424,7 @@ final class PausedRig {
         let carRoute = self.carRoute
         session = TripSession(
             tripId: "t1", userId: "u1", tracker: tracker,
-            carRouteFactory: { _, _, _, _ in carRoute }, ensureTimeout: .seconds(5),
+            carRouteFactory: { _, _, _, _, _ in carRoute }, ensureTimeout: .seconds(5),
             clock: { [clock] in clock.now },
             pauseWriter: { [unowned self] _, date in
                 self.onWrite?()
@@ -423,7 +490,7 @@ struct SessionEmulatorTests {
         ])
         let session = TripSession(
             tripId: s.tripId, userId: s.uid, tracker: tracker,
-            carRouteFactory: { tripId, carId, trip, car in
+            carRouteFactory: { tripId, carId, trip, car, _ in
                 try CarRouteService(
                     tripId: tripId, carId: carId, mainRoute: trip.route,
                     destination: .init(latitude: 40.7, longitude: -120.95),

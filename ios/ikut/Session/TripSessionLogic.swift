@@ -39,7 +39,10 @@ extension CarRouteService: CarRouteControlling {}
 typealias PauseWriter = @MainActor (_ carId: String, _ pausedAt: Date?) async throws -> Void
 
 /// Builds the car-route service for one tracking session from the trip and car docs.
-typealias CarRouteFactory = @MainActor (_ tripId: String, _ carId: String, _ trip: Trip, _ car: Car) throws -> CarRouteControlling
+/// `meetingPoint` is the trip's meeting point when it has one: cars still joining route to it.
+typealias CarRouteFactory = @MainActor (
+    _ tripId: String, _ carId: String, _ trip: Trip, _ car: Car, _ meetingPoint: CLLocationCoordinate2D?
+) throws -> CarRouteControlling
 
 enum TripSessionLogic {
     /// Only the car's tracker, while the trip is active and they are still a member, broadcasts.
@@ -73,12 +76,32 @@ enum TripSessionLogic {
     /// The Always sheet is on screen only while wanted and no map ask is up, so the two never stack.
     static func explainerVisible(wanted: Bool, askShowing: Bool) -> Bool { wanted && !askShowing }
 
-    @MainActor static func makeCarRouteService(tripId: String, carId: String, trip: Trip, car: Car) throws -> CarRouteControlling {
+    @MainActor static func makeCarRouteService(
+        tripId: String, carId: String, trip: Trip, car: Car, meetingPoint: CLLocationCoordinate2D? = nil
+    ) throws -> CarRouteControlling {
         try CarRouteService(
             tripId: tripId, carId: carId, mainRoute: trip.route,
             destination: CLLocationCoordinate2D(
                 latitude: trip.destination.coordinate.latitude, longitude: trip.destination.coordinate.longitude),
-            route: car.route, state: car.state)
+            meetingPoint: meetingPoint, route: car.route, state: car.state)
+    }
+
+    /// The meeting point: the first stop when it is of kind `meet` and not skipped. Nil for a trip without one.
+    static func meetingPoint(in stops: [PlannedStop]) -> CLLocationCoordinate2D? {
+        guard let first = stops.min(by: { $0.order < $1.order }), first.kind == .meet, first.isActive else { return nil }
+        return CLLocationCoordinate2D(latitude: first.coordinate.latitude, longitude: first.coordinate.longitude)
+    }
+
+    /// What a tracking session starts from. When the route changed under a trip with a meeting point, the car doc's
+    /// state and route belong to the old route (the organizer's car says `convoy` from the day the trip was made), so
+    /// the car works out afresh whether it is on the new route and where it has to go.
+    static func carForNewSession(_ car: Car, routeChanged: Bool, hasMeetingPoint: Bool) -> Car {
+        guard routeChanged, hasMeetingPoint else { return car }
+        var fresh = car
+        fresh.state = .joining
+        fresh.route = nil
+        fresh.mergeOffset = nil
+        return fresh
     }
 
     /// Flat lat/lon list used to compare routes (`RouteLine` is not Equatable); nil for no route.
