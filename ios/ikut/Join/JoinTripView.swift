@@ -211,6 +211,12 @@ struct JoinTripView: View {
             .padding(.top, Spacing.cozy)
             .padding(.bottom, Spacing.m)
 
+            if !preview.stops.isEmpty {
+                TicketStops(stops: preview.stops)
+                    .padding(.horizontal, Spacing.l)
+                    .padding(.bottom, Spacing.m)
+            }
+
             TicketTear()
 
             HStack(alignment: .top) {

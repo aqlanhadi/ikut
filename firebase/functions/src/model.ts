@@ -156,9 +156,18 @@ export interface PreviewCar {
   number?: number;
 }
 
+/** One planned stop on the ticket: only what a stranger with the code needs. Never ids, coordinates, offsets, notes or skipped fields. */
+export interface PreviewStop {
+  name: string;
+  kind: PlannedStopKind;
+  minutes?: number;
+}
+
 export interface PreviewTripResult {
   tripId: string;
   name: string;
   destinationName: string;
   cars: PreviewCar[];
+  /** Planned stops in order, skipped ones left out; absent when there are none. */
+  stops?: PreviewStop[];
 }
