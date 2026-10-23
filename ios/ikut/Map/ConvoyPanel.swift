@@ -184,6 +184,15 @@ struct ConvoyPanel: View {
             remaining: remaining, travelTime: arrival?.timeIntervalSinceNow, arrived: subject?.hasArrived ?? false)
     }
 
+    private var nextStopCell: NextStop.Cell? {
+        guard let length = routeLength, let mine = myEntry else { return nil }
+        let remaining = max(0, length - mine.convoyOffset)
+        let pace = NextStop.pace(
+            travelTimeToGo: convoy.arrival(forCar: mine.id)?.timeIntervalSinceNow, remaining: remaining,
+            speed: mine.speed)
+        return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: pace)
+    }
+
     private var myEntry: ConvoyEntry? { convoy.convoy.first(where: { $0.id == model.myCarId }) }
 
     /// Collapsed only (MapCollapsed.dc.html): overlapping car dots (dashed for joining cars), then
@@ -243,11 +252,14 @@ struct ConvoyPanel: View {
 
     private var stats: some View {
         let lead = convoy.snapshot.lead ?? convoy.snapshot.front
-        return StatGrid([
+        var items: [StatGrid.Item] = [
             .init("Spread", convoy.snapshot.spread.map(ConvoyFormat.distance),
                   color: model.separationWarning == nil ? nil : MapPalette.warning),
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
-        ], background: Color(.tertiarySystemFill), valueSize: 20)
+        ]
+        // Planned stops (D25): no stop ahead, no cell. 3b opens the stop's card from this cell.
+        if let cell = nextStopCell { items.append(.init("Next stop", cell.name, detail: cell.detail)) }
+        return StatGrid(items, background: Color(.tertiarySystemFill), valueSize: 20)
         .padding(.top, Spacing.cozy)
     }
 
