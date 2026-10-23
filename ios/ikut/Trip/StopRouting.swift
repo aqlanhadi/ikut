@@ -64,6 +64,15 @@ enum StopRouting {
         from start: CLLocationCoordinate2D, via: [CLLocationCoordinate2D], to destination: CLLocationCoordinate2D,
         router: LegRouting, cache: LegCache? = nil
     ) async throws -> StopRoute {
+        join(try await legs(from: start, via: via, to: destination, router: router, cache: cache))
+    }
+
+    /// The legs `build` joins, each asked for in order.
+    @MainActor
+    static func legs(
+        from start: CLLocationCoordinate2D, via: [CLLocationCoordinate2D], to destination: CLLocationCoordinate2D,
+        router: LegRouting, cache: LegCache? = nil
+    ) async throws -> [RouteLeg] {
         let points = [start] + via + [destination]
         var legs: [RouteLeg] = []
         for i in 0..<(points.count - 1) {
@@ -85,7 +94,7 @@ enum StopRouting {
                 throw LegFailure(index: i, reason: .failed(error.localizedDescription))
             }
         }
-        return join(legs)
+        return legs
     }
 
     // MARK: Which side of the highway
