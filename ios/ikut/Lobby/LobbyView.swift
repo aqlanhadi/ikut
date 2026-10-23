@@ -100,7 +100,6 @@ struct LobbyView: View {
         }
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            let catchUp = LobbyLogic.catchUpLine(model.groupedCars)
             let started = isStarted
             Button {
                 if !started {
@@ -109,16 +108,9 @@ struct LobbyView: View {
                 }
                 showMap = true
             } label: {
-                VStack(spacing: 0) {
-                    Text(started ? "Back to Map" : "Start Trip")
-                    if let catchUp, !started {
-                        Text(catchUp).font(.caption).opacity(0.85)
-                    }
-                }
+                Text(started ? "Back to Map" : "Start Trip")
             }
             .buttonStyle(PillButtonStyle())
-            .accessibilityLabel(started ? "Back to Map" : "Start Trip")
-            .accessibilityHint(started ? "" : (catchUp ?? ""))
             .ikutBottomBar()
         }
         // The map shares this lobby's session; the lobby stays on the stack underneath it.
@@ -480,20 +472,6 @@ extension LobbyLogic {
     static func displayCode(_ code: String) -> String {
         guard code.count == 6 else { return code }
         return "\(code.prefix(3)) \(code.suffix(3))"
-    }
-
-    /// Under Start Trip while some cars have no tracker: "Daniel can catch up on the road",
-    /// "Daniel and Siti can…", "3 cars can…". Nil when every car is tracked.
-    static func catchUpLine(_ cars: [LobbyCar]) -> String? {
-        let waiting = cars.filter { !$0.hasTracker }
-        guard !waiting.isEmpty else { return nil }
-        let names = waiting.map { $0.members.first?.displayName ?? $0.car.name }
-        let who = switch names.count {
-        case 1: names[0]
-        case 2: "\(names[0]) and \(names[1])"
-        default: "\(names.count) cars"
-        }
-        return "\(who) can catch up on the road"
     }
 
     /// "You (organizer, tracker) · Siti", "Wyna (tracker) · 3 others", "Daniel · no tracker yet".
