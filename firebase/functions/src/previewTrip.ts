@@ -34,7 +34,16 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
     .sort((a, b) => a.order - b.order)
     // Copy field by field: the stop document also holds its place on the map, notes and who skipped it.
     .map((s) => ({ name: s.name, kind: s.kind, ...(typeof s.minutes === "number" ? { minutes: s.minutes } : {}) }));
-  return { tripId, name: trip.name, destinationName: trip.destination.name, cars, ...(stops.length > 0 ? { stops } : {}) };
+  const { latitude, longitude } = trip.destination.coordinate;
+  const destinationCoordinate = typeof latitude === "number" && typeof longitude === "number" ? { latitude, longitude } : undefined;
+  return {
+    tripId,
+    name: trip.name,
+    destinationName: trip.destination.name,
+    ...(destinationCoordinate ? { destinationCoordinate } : {}),
+    cars,
+    ...(stops.length > 0 ? { stops } : {}),
+  };
 }
 
 export const previewTrip = onCall(async (request): Promise<PreviewTripResult> => {

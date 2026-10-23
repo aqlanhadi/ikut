@@ -167,6 +167,8 @@ export interface PreviewTripResult {
   tripId: string;
   name: string;
   destinationName: string;
+  /** Where the trip ends, so a stranger's phone can work out its own drive time; the only coordinate a stranger gets (never the route or the start). */
+  destinationCoordinate?: { latitude: number; longitude: number };
   cars: PreviewCar[];
   /** Planned stops in order, skipped ones left out; absent when there are none. */
   stops?: PreviewStop[];

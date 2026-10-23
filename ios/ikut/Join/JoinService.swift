@@ -1,3 +1,4 @@
+import CoreLocation
 import FirebaseFunctions
 import Foundation
 
@@ -26,11 +27,20 @@ struct PreviewStop: Sendable, Equatable {
     }
 }
 
+/// Where the trip ends: the only coordinate `previewTrip` gives someone who has only the code.
+struct PreviewCoordinate: Sendable, Equatable {
+    var latitude: Double
+    var longitude: Double
+    var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
+}
+
 /// What `previewTrip` returns: no member ids or other personal data.
 struct TripPreview: Sendable, Equatable {
     var tripId: String
     var name: String
     var destinationName: String
+    /// Only used to ask MapKit for the drive from here; nil from an older server.
+    var destinationCoordinate: PreviewCoordinate? = nil
     var cars: [PreviewCar]
     /// In the organizer's order, skipped ones already left out; empty on trips without stops (and older servers).
     var stops: [PreviewStop] = []
@@ -149,7 +159,14 @@ enum JoinService {
             else { return nil }
             return PreviewStop(name: name, kind: kind, minutes: (raw["minutes"] as? NSNumber)?.intValue)
         }
-        return TripPreview(tripId: tripId, name: name, destinationName: destination, cars: cars, stops: stops)
+        let coordinate = (root["destinationCoordinate"] as? [String: Any]).flatMap { raw -> PreviewCoordinate? in
+            guard let lat = (raw["latitude"] as? NSNumber)?.doubleValue, let lng = (raw["longitude"] as? NSNumber)?.doubleValue,
+                abs(lat) <= 90, abs(lng) <= 180
+            else { return nil }
+            return PreviewCoordinate(latitude: lat, longitude: lng)
+        }
+        return TripPreview(
+            tripId: tripId, name: name, destinationName: destination, destinationCoordinate: coordinate, cars: cars, stops: stops)
     }
 
     static func parseJoinResult(_ data: Any) throws -> JoinResult {

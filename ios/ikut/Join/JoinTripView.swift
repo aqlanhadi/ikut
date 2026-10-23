@@ -206,6 +206,12 @@ struct JoinTripView: View {
                         .background(Color.ikutPositive.opacity(0.14), in: Capsule())
                 }
                 RouteEnds(from: nil, to: preview.destinationName)
+                if let line = model.ticketDrive?.line {
+                    Text(line)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                }
             }
             .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.cozy)
@@ -248,6 +254,7 @@ struct JoinTripView: View {
             .padding(.top, Spacing.gap)
             .padding(.bottom, Spacing.cozy)
         }
+        .animation(.easeOut, value: model.ticketDrive)
         .ikutCard()
         // The code field stays in the view tree (hidden) so "Change" can clear it and type again.
         .background { codeField.opacity(0).allowsHitTesting(false) }
