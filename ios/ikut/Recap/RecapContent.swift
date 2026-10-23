@@ -35,6 +35,10 @@ struct RecapContent: View {
     /// A timeline item was tapped (only items with a place on the map are tappable); nil leaves rows plain.
     var onSelect: ((RecapTimelineItem) -> Void)?
     var onDone: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// At the largest text sizes the sheet's tiles and awards go one to a row (the screen keeps two).
+    private var columns: Int { layout == .sheet && typeSize.isAccessibilitySize ? 1 : 2 }
 
     var body: some View {
         if layout == .screen {
@@ -74,7 +78,7 @@ struct RecapContent: View {
 
         if !recap.awards.isEmpty {
             sectionTitle("Road Trip Awards")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible())], spacing: Spacing.gap) {
+            LazyVGrid(columns: columns == 1 ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible())], spacing: Spacing.gap) {
                 ForEach(recap.awards, id: \.kind) { award(of: $0, snapshot) }
             }
         }
@@ -112,11 +116,11 @@ struct RecapContent: View {
 
     private func statGrid(_ stats: [RecapStat]) -> some View {
         Grid(horizontalSpacing: 0, verticalSpacing: 0) {
-            ForEach(Array(stride(from: 0, to: stats.count, by: 2)), id: \.self) { row in
+            ForEach(Array(stride(from: 0, to: stats.count, by: columns)), id: \.self) { row in
                 if row > 0 { Divider() }
                 GridRow {
                     statTile(stats[row])
-                    if row + 1 < stats.count {
+                    if columns == 2, row + 1 < stats.count {
                         statTile(stats[row + 1]).overlay(alignment: .leading) { Rectangle().fill(Color(.separator)).frame(width: 0.5) }
                     }
                 }
