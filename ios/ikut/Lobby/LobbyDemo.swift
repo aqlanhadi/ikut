@@ -103,7 +103,53 @@ enum DemoScreens {
                                         meetClock: meet ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) : nil)
                 .environment(LocationPermission()))
         }
+        let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
+        func search(_ model: CreateTripModel) -> AnyView { nav(CreateTripView(model: model) { _ in }) }
+        func petrol(_ name: String, _ area: String, _ lat: Double, _ lon: Double) -> DestinationResult {
+            DestinationResult(name: name, subtitle: area, coordinate: .init(latitude: lat, longitude: lon), category: MKPointOfInterestCategory.gasStation.rawValue)
+        }
         switch name {
+        case "search-typing":
+            let model = CreateTripModel()
+            model.showSuggestionsForDemo(
+                query: "petr",
+                suggestions: [
+                    SearchSuggestion(title: "Petronas Sungai Buloh", subtitle: "Jalan Sungai Buloh, Selangor", highlights: [NSRange(location: 0, length: 4)]),
+                    SearchSuggestion(title: "Petaling Jaya", subtitle: "Selangor, Malaysia", highlights: [NSRange(location: 0, length: 3)]),
+                    SearchSuggestion(title: "petrol station", subtitle: "Search Nearby", highlights: [NSRange(location: 0, length: 4)]),
+                    SearchSuggestion(title: "Petrosains", subtitle: "Suria KLCC, Kuala Lumpur", highlights: [NSRange(location: 0, length: 4)]),
+                ], origin: kl, originName: "Kuala Lumpur")
+            return search(model)
+        case "search-results":
+            let model = CreateTripModel()
+            model.showForDemo(
+                query: "petrol station",
+                results: [
+                    petrol("Petronas Jalan Ampang", "Jalan Ampang, Kuala Lumpur", 3.16, 101.72),
+                    petrol("Shell Sungai Besi", "Sungai Besi, Kuala Lumpur", 3.07, 101.71),
+                    petrol("Petron Cheras", "Cheras, Selangor", 3.09, 101.75),
+                    petrol("BHP Kajang", "Kajang, Selangor", 2.99, 101.79),
+                    petrol("Caltex Shah Alam", "Shah Alam, Selangor", 3.07, 101.52),
+                    petrol("Petronas Genting Sempah R&R", "Karak Highway, Pahang", 3.37, 101.77),
+                ], origin: kl, originName: "Kuala Lumpur")
+            return search(model)
+        case "search-empty":
+            let model = CreateTripModel()
+            model.showForDemo(query: "zxqv", results: [], origin: kl, originName: "Kuala Lumpur")
+            return search(model)
+        case "search-stop-results":
+            let model = CreateTripModel()
+            model.along = AlongRoute(coordinates: LobbyStopsDemo.route, seconds: 2 * 3600 + 40 * 60)
+            model.showForDemo(
+                query: "petrol station",
+                results: [
+                    petrol("Petronas Sungai Buloh", "Selangor", 3.2, 101.58),
+                    petrol("Petronas Tapah Road", "Perak", 4.17, 101.3),
+                    petrol("Shell Taiping", "Perak", 4.85, 100.74),
+                    petrol("Petronas Genting Highlands", "Pahang", 3.42, 101.79),
+                ], origin: kl, originName: "Kuala Lumpur")
+            return AnyView(AddStopSheet(demoModel: model, picked: nil, kind: .fuel, minutes: nil, canMeet: false)
+                .environment(LocationPermission()))
         case "lobby-organizer": return nav(LobbyStopsDemo.lobby(.organizer))
         case "lobby-empty": return nav(LobbyStopsDemo.lobby(.organizerEmpty))
         case "lobby-member": return nav(LobbyStopsDemo.lobby(.member))

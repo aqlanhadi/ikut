@@ -143,6 +143,7 @@ struct AddStopSheet: View {
                         .accessibilityLabel("Stop")
                         .accessibilityIdentifier("addStop.search")
                         .onChange(of: model.query) { model.queryChanged() }
+                        .onSubmit { model.submit() }
                 }
                 if !model.query.isEmpty {
                     Button {
@@ -165,46 +166,10 @@ struct AddStopSheet: View {
                 InlineNote(message, tone: .alert).padding(.top, Spacing.m)
             }
             if !model.trimmedQuery.isEmpty {
-                CardHeader("Results")
-                VStack(spacing: 0) {
-                    if model.isSearching && model.results.isEmpty {
-                        ProgressView().frame(maxWidth: .infinity, minHeight: 58).accessibilityLabel("Searching")
-                    } else if model.results.isEmpty {
-                        Text("No places match “\(model.trimmedQuery)”. Try another name.")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.section)
-                    }
-                    ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
-                        if index > 0 { RowDivider() }
-                        row(result)
-                    }
-                }
-                .ikutCard()
-                if along != nil, !model.results.isEmpty {
-                    InlineNote("Distances are along your route.").padding(.top, Spacing.s)
-                }
+                PlaceSearchResults(model: model, distance: .alongRoute, showsKind: true, onPick: pick)
             }
         }
         .task { searchFocused = picked == nil }
-    }
-
-    private func row(_ result: DestinationResult) -> some View {
-        var shown = result
-        shown.subtitle = [PlaceKind.word(for: result), result.subtitle].filter { !$0.isEmpty }.joined(separator: " · ")
-        let along = model.alongText(result)
-        return PlaceResultRow(result: shown, action: { pick(result) }) {
-            if let along {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(along.distance)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                    if let time = along.time { Text(time).font(.caption).foregroundStyle(.secondary) }
-                }
-            } else if let distance = model.distanceText(result) {
-                Text(distance).font(.system(.subheadline, design: .rounded).weight(.semibold)).monospacedDigit()
-            }
-        }
     }
 
     private func pick(_ result: DestinationResult) {

@@ -8,8 +8,16 @@ import SwiftUI
 @Observable @MainActor
 final class CreateTripModel {
     var query = ""
+    /// Suggestions for what is typed, until a query is searched.
+    private(set) var suggestions: [SearchSuggestion] = []
+    /// A query's matches, once searched (`showingResults`).
     private(set) var results: [DestinationResult] = []
+    private(set) var showingResults = false
     private(set) var isSearching = false
+    /// True once a search has taken over 0.3 s, so a quick answer never flashes a spinner.
+    private(set) var spinnerVisible = false
+    /// The suggestion being turned into a place; its row shows a spinner.
+    private(set) var resolving: SearchSuggestion.ID?
     /// The result being turned into a trip; its row shows a spinner.
     private(set) var working: DestinationResult.ID?
     var errorMessage: String?
@@ -20,10 +28,31 @@ final class CreateTripModel {
     /// The route a stop would be added to: results then read how far along it they are ("62 km", "40 min along").
     var along: AlongRoute?
 
+    static let searchMessage = "Couldn't search. Check your signal and try again."
+    static let spinnerDelay: Duration = .milliseconds(300)
+
     @ObservationIgnored private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var spinnerTask: Task<Void, Never>?
+    @ObservationIgnored private var source: SuggestionSource?
+    @ObservationIgnored private let makeSource: @MainActor () -> SuggestionSource
+    @ObservationIgnored private let places: PlaceSearching
+    /// The text a query search ran for, so setting the field to it does not go back to suggestions.
+    @ObservationIgnored private var searchedText = ""
+
+    init(
+        suggestions: (@MainActor () -> SuggestionSource)? = nil, places: PlaceSearching = MapKitPlaceSearch()
+    ) {
+        makeSource = suggestions ?? { MapKitSuggestionSource() }
+        self.places = places
+    }
 
     var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     var isWorking: Bool { working != nil }
+
+    /// Near the phone, else around the trip's route, else Malaysia.
+    var searchRegion: MKCoordinateRegion {
+        SearchRegion.choose(location: origin, route: along?.line.coordinates ?? [])
+    }
 
     func locate() async {
         guard origin == nil, let here = CLLocationManager().location?.coordinate else { return }
@@ -31,30 +60,107 @@ final class CreateTripModel {
         originName = await RouteBuilder.placeName(at: here)
     }
 
+    /// The field changed: suggestions for the new text, or back to nothing when it is short.
     func queryChanged() {
-        searchTask?.cancel()
-        errorMessage = nil
         let text = trimmedQuery
+        if showingResults, text == searchedText { return }
+        cancelSearch()
+        errorMessage = nil
+        showingResults = false
+        results = []
+        let source = source ?? makeSource()
+        self.source = source
+        source.onUpdate = { [weak self] query, outcome in self?.receive(query: query, outcome) }
         guard text.count >= 2 else {
-            results = []
+            suggestions = []
             isSearching = false
+            source.stop()
             return
         }
-        isSearching = true
+        beginSearching()
+        source.update(query: text, region: searchRegion)
+    }
+
+    /// MapKit's answer for `query`; one for an older query than the field now holds is dropped.
+    func receive(query answered: String, _ outcome: Result<[SearchSuggestion], Error>) {
+        guard !showingResults, answered.trimmingCharacters(in: .whitespacesAndNewlines) == trimmedQuery,
+              trimmedQuery.count >= 2 else { return }
+        switch outcome {
+        case .success(let found):
+            suggestions = SearchSuggestion.rows(found, for: trimmedQuery)
+        case .failure:
+            suggestions = SearchSuggestion.rows([], for: trimmedQuery)
+            errorMessage = Self.searchMessage
+        }
+        endSearching()
+    }
+
+    /// The keyboard's Search key: every match for the text.
+    func submit() {
+        guard trimmedQuery.count >= 2 else { return }
+        runSearch(trimmedQuery)
+    }
+
+    /// Lists every match for `text` near the search region (a "Search petrol station" row, or the Search key).
+    func runSearch(_ text: String) {
+        cancelSearch()
+        source?.stop()
+        errorMessage = nil
+        searchedText = text
+        if query != text { query = text }
+        showingResults = true
+        suggestions = []
+        results = []
+        beginSearching()
+        let region = searchRegion
         searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(350))
-            guard !Task.isCancelled else { return }
             do {
-                let found = try await RouteBuilder.searchDestinations(query: text)
+                let found = try await places.search(query: text, region: region)
                 guard !Task.isCancelled else { return }
-                results = Array(found.prefix(8))
+                results = along?.sorted(found) ?? found
             } catch {
                 guard !Task.isCancelled else { return }
                 results = []
-                errorMessage = "Search failed. Check your connection."
+                errorMessage = Self.searchMessage
             }
-            isSearching = false
+            endSearching()
         }
+    }
+
+    /// A tapped place suggestion as a place; nil (with a message) when it cannot be found.
+    func resolve(_ suggestion: SearchSuggestion) async -> DestinationResult? {
+        guard resolving == nil else { return nil }
+        resolving = suggestion.id
+        errorMessage = nil
+        defer { resolving = nil }
+        do {
+            if let place = try await places.resolve(suggestion) { return place }
+            errorMessage = "Couldn't find that place. Try another."
+        } catch {
+            errorMessage = Self.searchMessage
+        }
+        return nil
+    }
+
+    private func cancelSearch() {
+        searchTask?.cancel()
+        spinnerTask?.cancel()
+        spinnerVisible = false
+    }
+
+    private func beginSearching() {
+        isSearching = true
+        spinnerTask = Task {
+            try? await Task.sleep(for: Self.spinnerDelay)
+            guard !Task.isCancelled else { return }
+            spinnerVisible = true
+        }
+    }
+
+    private func endSearching() {
+        isSearching = false
+        spinnerTask?.cancel()
+        spinnerVisible = false
     }
 
     /// "≈205 km" as the crow flies from here; nil without a fix.
@@ -69,6 +175,11 @@ final class CreateTripModel {
     /// "≈65 km" when the road only passes near it, and "40 min along" of the drive.
     func alongText(_ result: DestinationResult) -> (distance: String, time: String?)? {
         along?.text(for: result.coordinate)
+    }
+
+    /// `alongText`, with "Off the route" for a place far from the line.
+    func alongRowText(_ result: DestinationResult) -> (distance: String, time: String?)? {
+        along?.rowText(for: result.coordinate)
     }
 
     /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.
@@ -140,6 +251,15 @@ final class CreateTripModel {
     func showForDemo(query: String, results: [DestinationResult], origin: CLLocationCoordinate2D, originName: String) {
         self.query = query
         self.results = results
+        showingResults = true
+        self.origin = origin
+        self.originName = originName
+    }
+
+    /// Shows `suggestions` for `query`, as while typing.
+    func showSuggestionsForDemo(query: String, suggestions: [SearchSuggestion], origin: CLLocationCoordinate2D, originName: String) {
+        self.query = query
+        self.suggestions = SearchSuggestion.rows(suggestions, for: query)
         self.origin = origin
         self.originName = originName
     }
@@ -224,8 +344,9 @@ struct CreateTripView: View {
                 }
 
                 if !model.trimmedQuery.isEmpty {
-                    CardHeader("Results")
-                    resultsCard
+                    PlaceSearchResults(
+                        model: model, distance: .fromYou,
+                        workingLabel: changingTripId == nil ? "Creating trip" : "Updating trip", onPick: pick)
                 }
             }
             .padding(.horizontal, Spacing.l)
@@ -279,6 +400,7 @@ struct CreateTripView: View {
                         .disabled(model.isWorking)
                         .accessibilityLabel("Destination")
                         .onChange(of: model.query) { model.queryChanged() }
+                        .onSubmit { model.submit() }
                 }
                 if !model.query.isEmpty {
                     Button {
@@ -299,41 +421,6 @@ struct CreateTripView: View {
             .frame(minHeight: 54)
         }
         .ikutCard()
-    }
-
-    private var resultsCard: some View {
-        VStack(spacing: 0) {
-            if model.isSearching && model.results.isEmpty {
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 58)
-                    .accessibilityLabel("Searching")
-            } else if model.results.isEmpty {
-                Text("No places match “\(model.trimmedQuery)”. Try a town name.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Spacing.l)
-                    .padding(.vertical, Spacing.section)
-            }
-            ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
-                if index > 0 { RowDivider() }
-                resultRow(result)
-            }
-        }
-        .ikutCard()
-    }
-
-    private func resultRow(_ result: DestinationResult) -> some View {
-        PlaceResultRow(result: result, disabled: model.isWorking, action: { pick(result) }) {
-            if model.working == result.id {
-                ProgressView().accessibilityLabel(changingTripId == nil ? "Creating trip" : "Updating trip")
-            } else if let distance = model.distanceText(result) {
-                Text(distance)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.primary)
-            }
-        }
     }
 
     private func pick(_ result: DestinationResult) {
@@ -373,28 +460,53 @@ struct CreateTripView: View {
     }
 }
 
-/// One search result: its kind's icon, name and subtitle, then whatever `trailing` says (a distance, a spinner).
-/// Shared by Where to? and the add-a-stop sheet.
+/// One search line: its kind's icon, name (the typed part in bold for a suggestion) and subtitle, then whatever
+/// `trailing` says (a distance, a spinner). Shared by Where to?, Change destination and Add a stop.
 struct PlaceResultRow<Trailing: View>: View {
-    var result: DestinationResult
+    var title: AttributedString
+    var subtitle: String
+    var symbol: String
+    var color: Color
+    var label: String
     var disabled = false
     var action: () -> Void
     @ViewBuilder var trailing: Trailing
 
-    var body: some View {
+    init(result: DestinationResult, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
         let kind = PlaceKind(result)
+        title = AttributedString(result.name)
+        subtitle = result.subtitle
+        (symbol, color) = (kind.symbol, kind.color)
+        label = [result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+        self.disabled = disabled
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    /// A suggestion has no category: a pin for a place, a magnifying glass for "Search petrol station".
+    init(suggestion: SearchSuggestion, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
+        title = HighlightedText.attributed(suggestion.shownTitle, suggestion.shownHighlights)
+        subtitle = suggestion.shownSubtitle
+        (symbol, color) = suggestion.isQuery ? ("magnifyingglass", .gray) : ("mappin", .orange)
+        label = [suggestion.shownTitle, suggestion.shownSubtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+        self.disabled = disabled
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.m) {
-                Image(systemName: kind.symbol)
+                Image(systemName: symbol)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
-                    .background(kind.color, in: Circle())
+                    .background(color, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(result.name).foregroundStyle(.primary).lineLimit(1)
-                    if !result.subtitle.isEmpty {
-                        Text(result.subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                    Text(title).foregroundStyle(.primary).lineLimit(1)
+                    if !subtitle.isEmpty {
+                        Text(subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -406,7 +518,7 @@ struct PlaceResultRow<Trailing: View>: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .accessibilityLabel([result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityLabel(label)
     }
 }
 
