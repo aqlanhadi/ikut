@@ -10,17 +10,15 @@ struct TripsHomeView: View {
     var onJoin: () -> Void
     /// A trip that hasn't ended opens its lobby; an ended one is picked on this map instead.
     var onOpenTrip: (PastTrips.Entry) -> Void = { _ in }
+    /// A pushed screen or a sheet of the parent is up: Home's sheet steps aside (a sheet is presented
+    /// over Home, so it would sit over them) and comes back when this is false again.
+    var covered = false
 
     @State private var renaming = false
     @State private var newName = ""
     @State private var renameError: String?
+    /// The sheet is at its tall detent (the detent selection reads and writes it).
     @State private var expanded = false
-    /// Springs back with the detent change when the drag ends, rather than snapping to the old
-    /// detent for a frame first.
-    @GestureState(resetTransaction: Transaction(animation: .snappy)) private var drag = SheetDragState()
-    /// Where the current drag's translation began (see `SheetDrag.travel`), for its fling.
-    @State private var dragStart: CGFloat?
-    private var dragOffset: CGFloat { drag.travel }
     @State private var past: [PastTrips.Entry] = []
     /// Routes of the newest ended trips, drawn on the map (newest first).
     @State private var routes: [PastTripRoute] = []
@@ -33,14 +31,17 @@ struct TripsHomeView: View {
     /// Where the camera was before picking, for Back.
     @State private var cameraBeforePick: MapCameraPosition?
     /// Height of the short sheet while a trip is picked: it holds the stats line, so it follows the text size.
-    @State private var pickedCompact: CGFloat = TripsHomeView.pickedCompactMinimum
-    /// Height of the pinned part of the sheet (grabber and header), measured.
+    @State private var pickedCompact: CGFloat = HomeSheet.pickedCompactMinimum
+    /// Height of the pinned part of the sheet (its header), measured.
     @State private var pinnedHeight: CGFloat = 0
+    /// The home indicator's height, which the short picked sheet reaches under.
+    @State private var bottomInset: CGFloat = 0
     /// Screenshot demo (`init(demo:)`): shows what it was given, and reads nothing from the phone or the server.
     @State private var isDemo = false
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
-         onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }) {
+         onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }, covered: Bool = false) {
+        self.covered = covered
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
         self.onOpenTrip = onOpenTrip
@@ -72,7 +73,7 @@ struct TripsHomeView: View {
             if let itemId, let item = picked.model.recap?.timeline.first(where: { $0.id == itemId }) { picked.select(item) }
             let route = PickedTripLogic.route(for: picked.entry, snapshot: picked.model.snapshot, drawn: routes, fetched: nil)
             _fetchedRoute = State(initialValue: route)
-            let sheet = Self.pickedCompactMinimum + (picked.selectedItem == nil ? 0 : 60)
+            let sheet = HomeSheet.pickedCompactMinimum + (picked.selectedItem == nil ? 0 : 60)
             let insets = Self.obscured(mapHeight: 0, sheet: sheet)
             if let c = picked.selectedItem?.coordinate {
                 _camera = State(initialValue: .region(PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)))
@@ -94,8 +95,8 @@ struct TripsHomeView: View {
     var body: some View {
         ZStack {
             map
-            sheet
         }
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { bottomInset = $0 }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
         .onChange(of: picked?.model.snapshot != nil) { was, has in
@@ -105,20 +106,7 @@ struct TripsHomeView: View {
                                               cameraMovedByUser: camera.positionedByUser) else { return }
             refocus(animated: true)
         }
-        .overlay(alignment: .topTrailing) { profileButton }
-        .alert("Your name", isPresented: $renaming) {
-            TextField("Your name", text: $newName)
-                .textInputAutocapitalization(.words)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") { saveName() }
-        } message: {
-            Text("What the convoy sees in new trips.")
-        }
-        .alert("Couldn't change your name", isPresented: .constant(renameError != nil)) {
-            Button("OK") { renameError = nil }
-        } message: {
-            Text(renameError ?? "")
-        }
+        .sheet(isPresented: Binding(get: { !covered }, set: { _ in })) { sheetContent }
     }
 
     // MARK: Map
@@ -362,7 +350,7 @@ struct TripsHomeView: View {
     /// the top, and the compact sheet at the bottom (the map runs under both). Before the map has a
     /// height the typical phone height stands in, rather than dividing by zero (which pushed the
     /// fit far south).
-    nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = TripsHomeView.compactHeight) -> (top: Double, bottom: Double) {
+    nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = HomeSheet.compactHeight) -> (top: Double, bottom: Double) {
         let height = mapHeight > sheet + Self.topObscured ? mapHeight : 874
         return (Double(Self.topObscured / height), Double(sheet / height))
     }
@@ -376,119 +364,85 @@ struct TripsHomeView: View {
     nonisolated static let compactHeight: CGFloat = 300
     /// The short sheet of a picked trip (design/project/HomePicked.dc.html): back, name, date, stats line.
     nonisolated static let pickedCompactMinimum: CGFloat = 172
-    /// Room left above the expanded sheet for the profile button.
-    private static let topClearance: CGFloat = 64
+    /// The short detent's height now (a picked trip's follows its header).
+    private var compact: CGFloat {
+        HomeSheet.compact(picked: picked != nil, pinnedHeight: pinnedHeight, bottomInset: bottomInset, margin: Spacing.l)
+    }
 
-    /// A Flighty-style glass sheet floating over the map. Drag or tap the top to move between a
-    /// compact and a tall detent. A custom overlay rather than a `.sheet`, like `ConvoyPanel`:
-    /// a sheet that is always up would sit over pushed screens and block the name sheet.
-    private var sheet: some View {
-        GeometryReader { geo in
-            let bottomInset = geo.safeAreaInsets.bottom
-            // From the top of the safe area to the bottom of the screen.
-            let full = geo.size.height + bottomInset
-            // A picked trip's short sheet is as tall as its header (the text size can wrap it).
-            let compact = picked == nil ? Self.compactHeight
-                : max(Self.pickedCompactMinimum, pinnedHeight + bottomInset + Spacing.l)
-            let tall = max(compact, full - Self.topClearance)
-            let height = SheetDrag.height(expanded: expanded, compact: compact, tall: tall, travel: dragOffset)
-
-            VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 0) {
-                    grabber
-                    if let picked {
-                        PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
-                    } else {
-                        header
-                    }
-                }
-                .contentShape(Rectangle())
-                // High priority: the grabber's tap and the pills inside would otherwise win first and the
-                // drag would start only after they failed, a beat late. A tap never reaches 8 pt, so it still lands.
-                .highPriorityGesture(sheetDrag(compact: compact, tall: tall))
-                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { pinnedHeight = $0 }
-
-                ScrollView {
-                    if let picked {
-                        PickedTripBody(picked: picked, onSelect: selectItem)
-                            .padding(.bottom, bottomInset + Spacing.l + SheetDrag.rubberRoom)
-                    } else {
-                        pastTrips
-                            .padding(.bottom, bottomInset + Spacing.l + SheetDrag.rubberRoom)
-                    }
-                }
-                .id(picked?.entry.id)
-                // The short picked sheet is only its header; the recap shows as it is pulled up.
-                .opacity(picked != nil && !expanded && dragOffset == 0 ? 0 : 1)
-                // Nor is the hidden recap read out while the short sheet shows only the header.
-                .accessibilityHidden(picked != nil && !expanded)
-                .scrollDisabled(!expanded)
-                .scrollBounceBehavior(.basedOnSize)
-            }
-            // A drag that was cancelled never reaches onEnded; the gesture state resets either way, and
-            // the baseline goes with it (a turn later, so an ended drag has read it first).
-            .onChange(of: drag.start == nil) { _, none in
-                if none { DispatchQueue.main.async { dragStart = nil } }
-            }
-            .onChange(of: compact, initial: true) { _, new in
-                if picked != nil, pickedCompact != new {
-                    pickedCompact = new
-                    refocus(animated: false)
+    /// Apple's own sheet over the map: drag it between a short and a tall detent, as in Apple Maps. It is
+    /// always up (no dismiss), and the map behind it takes touches while it is short. The name alerts are
+    /// presented from here, since a presented sheet blocks a presentation from Home.
+    private var sheetContent: some View {
+        let compact = compact
+        return VStack(alignment: .leading, spacing: 0) {
+            Group {
+                if let picked {
+                    PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
+                } else {
+                    header
                 }
             }
-            .padding(.horizontal, Spacing.l)
-            .frame(maxWidth: .infinity, alignment: .top)
-            // The content is laid out at one fixed height, so a drag frame doesn't lay it out again...
-            .frame(height: SheetDrag.layoutHeight(tall: tall), alignment: .top)
-            // ...and the glass is only the visible height, clipping what runs past it: its bottom edge and
-            // rounded corners stay where they were at every detent.
-            .frame(height: height, alignment: .top)
-            .glassSurface(.sheet)
-            .padding(.horizontal, Spacing.s)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .offset(y: bottomInset - 8)
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { pinnedHeight = $0 }
+
+            ScrollView {
+                if let picked {
+                    PickedTripBody(picked: picked, onSelect: selectItem)
+                        .padding(.bottom, Spacing.l)
+                } else {
+                    pastTrips
+                        .padding(.bottom, Spacing.l)
+                }
+            }
+            .id(picked?.entry.id)
+            // The short picked sheet is only its header; the recap shows once it is pulled up, and isn't
+            // read out before.
+            .opacity(picked != nil && !expanded ? 0 : 1)
+            .animation(.snappy, value: expanded)
+            .accessibilityHidden(picked != nil && !expanded)
+            .scrollBounceBehavior(.basedOnSize)
         }
-    }
-
-    private func sheetDrag(compact: CGFloat, tall: CGFloat) -> some Gesture {
-        // Global: the header moves with the sheet, so a local translation would chase the finger and jitter.
-        DragGesture(minimumDistance: 8, coordinateSpace: .global)
-            .updating($drag) { value, state, _ in
-                if state.start == nil { state.start = value.translation.height }
-                state.travel = SheetDrag.travel(translation: value.translation.height, start: state.start)
+        .padding(.horizontal, Spacing.l)
+        .padding(.top, HomeSheet.indicatorRoom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: compact, initial: true) { _, new in
+            if picked != nil, pickedCompact != new {
+                pickedCompact = new
+                refocus(animated: false)
             }
-            .onChanged { value in
-                if dragStart == nil { dragStart = value.translation.height }
-            }
-            .onEnded { value in
-                let start = dragStart
-                dragStart = nil
-                let up = SheetDrag.settlesExpanded(expanded: expanded, compact: compact, tall: tall,
-                                                   predicted: value.predictedEndTranslation.height, start: start)
-                withAnimation(.snappy) { expanded = up }
-            }
-    }
-
-    private var grabber: some View {
-        Capsule()
-            .fill(Color(.systemGray3))
-            .frame(width: 36, height: 5)
-            .frame(maxWidth: .infinity, minHeight: 20)
-            .contentShape(Rectangle())
-            .onTapGesture { withAnimation(.snappy) { expanded.toggle() } }
-            .accessibilityElement()
-            .accessibilityLabel(picked != nil ? (expanded ? "Collapse recap" : "Expand recap") : (expanded ? "Collapse trips" : "Expand trips"))
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { withAnimation(.snappy) { expanded.toggle() } }
+        }
+        .presentationDetents(HomeSheet.detents(compact: compact), selection: Binding(
+            get: { HomeSheet.detent(expanded: expanded, compact: compact) },
+            set: { expanded = HomeSheet.isExpanded($0) }))
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(compact)))
+        .interactiveDismissDisabled()
+        .alert("Your name", isPresented: $renaming) {
+            TextField("Your name", text: $newName)
+                .textInputAutocapitalization(.words)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { saveName() }
+        } message: {
+            Text("What the convoy sees in new trips.")
+        }
+        .alert("Couldn't change your name", isPresented: .constant(renameError != nil)) {
+            Button("OK") { renameError = nil }
+        } message: {
+            Text(renameError ?? "")
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Trips")
-                .font(.largeTitle.bold())
-                .padding(.horizontal, Spacing.xs)
-                .padding(.top, Spacing.tight)
-                .accessibilityAddTraits(.isHeader)
+            // The title row, with the profile button at its top right as in Apple Maps.
+            HStack(alignment: .center, spacing: Spacing.s) {
+                Text("Trips")
+                    .font(.largeTitle.bold())
+                    .padding(.horizontal, Spacing.xs)
+                    .accessibilityAddTraits(.isHeader)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                profileButton
+            }
+            .frame(minHeight: 44)
 
             HStack(spacing: Spacing.gap) {
                 Button(action: onNewTrip) {
@@ -553,7 +507,7 @@ struct TripsHomeView: View {
 
     @ViewBuilder
     private var profileButton: some View {
-        if let name = auth.displayName, auth.state == .signedIn {
+        if let name = profileName {
             Menu {
                 Section(name) {
                     Button("Change Name", systemImage: "pencil") {
@@ -569,14 +523,20 @@ struct TripsHomeView: View {
                     .font(.system(.body, design: .rounded).weight(.semibold))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-                    .shadow(color: .black.opacity(0.08), radius: 7, y: 4)
+                    .background(Color(.tertiarySystemFill), in: Circle())
+                    .contentShape(Circle())
             }
             .tint(.primary)
             .accessibilityLabel("Profile, \(name)")
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.s)
         }
+    }
+
+    /// Who the profile button shows: the signed-in name (a demo state shows a sample name).
+    private var profileName: String? {
+        #if DEBUG
+        if isDemo { return "Aqlan" }
+        #endif
+        return auth.state == .signedIn ? auth.displayName : nil
     }
 
     private func saveName() {
@@ -589,12 +549,6 @@ struct TripsHomeView: View {
             do { try await auth.updateDisplayName(trimmed) } catch { renameError = error.localizedDescription }
         }
     }
-}
-
-/// What a drag of Home's sheet has done so far: where its translation began, and the travel since.
-private struct SheetDragState {
-    var start: CGFloat?
-    var travel: CGFloat = 0
 }
 
 /// `SecondaryPillButtonStyle` for a glass background: the opaque card fill would read as a slab.

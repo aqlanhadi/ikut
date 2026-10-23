@@ -142,6 +142,7 @@ enum HomePickedDemo {
             return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model), selecting: stop)
         case "loading": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(tripId: "demo-never-loaded")))
         case "failed": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(failedTripId: entry.id)))
+        case "list-tall": return TripsHomeView(demo: past, routes: [thin], expanded: true)
         default: return TripsHomeView(demo: past, routes: [thin])
         }
     }

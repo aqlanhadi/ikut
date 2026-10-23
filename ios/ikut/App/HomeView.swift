@@ -23,6 +23,14 @@ struct HomeView: View {
     @State private var showName = false
     /// Where to go once the name step finishes.
     @State private var afterName: Route?
+    /// A route is being opened (a permission prompt may be up), so Home's sheet stays away.
+    @State private var opening = false
+
+    /// Home's sheet is presented over Home, so it steps aside for everything that is pushed or presented
+    /// from here, and comes back when they are gone.
+    private var homeSheetCovered: Bool {
+        !path.isEmpty || showName || showDenied || afterName != nil || opening
+    }
 
     init(pendingJoinCode: Binding<String?> = .constant(nil)) {
         _pendingJoinCode = pendingJoinCode
@@ -36,7 +44,8 @@ struct HomeView: View {
                         onNewTrip: { begin(.create) },
                         onJoin: { begin(.join(code: nil)) },
                         // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
-                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) }
+                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) },
+                        covered: homeSheetCovered
                     )
                 } else {
                     WelcomeView(
@@ -76,8 +85,10 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showName) {
                 NameEntryView {
+                    // Opening from here on, so Home's sheet stays away until the route is pushed.
+                    opening = true
                     showName = false
-                    guard let route = afterName else { return }
+                    guard let route = afterName else { opening = false; return }
                     afterName = nil
                     Task {
                         // Let the sheet finish dismissing before a permission prompt appears.
@@ -86,6 +97,10 @@ struct HomeView: View {
                     }
                 }
                 .presentationDetents([.medium])
+            }
+            .onChange(of: showName) { _, shown in
+                // Dismissed by a swipe instead of Continue: the trip it was for isn't going anywhere.
+                if !shown, !opening { afterName = nil }
             }
             .sheet(isPresented: $showDenied) {
                 LocationDeniedView { location.openSettings() }
@@ -108,18 +123,29 @@ struct HomeView: View {
             Task { await open(route) }
         } else {
             afterName = route
-            showName = true
+            Task {
+                // Home's sheet leaves first: a sheet can't be presented while another is still on its way down.
+                if hasSeenWelcome { try? await Task.sleep(for: .milliseconds(400)) }
+                showName = true
+            }
         }
     }
 
     private func open(_ route: Route, replacing: Bool = false) async {
+        opening = true
+        defer { opening = false }
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
                 if await location.requestWhenInUse() == .notDetermined { return }
             case .requestFullAccuracy:
-                if await location.requestFullAccuracy() == .reduced { showDenied = true; return }
+                if await location.requestFullAccuracy() == .reduced {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    showDenied = true
+                    return
+                }
             case .showSettingsPrompt:
+                try? await Task.sleep(for: .milliseconds(400))
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:
