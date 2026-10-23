@@ -109,6 +109,8 @@ enum DemoScreens {
         case "lobby-member": return nav(LobbyStopsDemo.lobby(.member))
         case "lobby-turnback": return nav(LobbyStopsDemo.lobby(.turnBack))
         case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
+        case "join-stops": return nav(JoinDemo.ticket(withStops: true))
+        case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":

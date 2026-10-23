@@ -73,6 +73,7 @@ struct JoinServiceTests {
         #expect(preview.cars == [PreviewCar(id: "c1", name: "Myvi", color: "#2563EB", hasTracker: true)])
         #expect(preview.destinationName == "Ipoh")
         #expect(throws: JoinError.self) { try JoinService.parsePreview(["tripId": "t1"]) }
+        #expect(preview.stops.isEmpty)
         let result = try JoinService.parseJoinResult(["tripId": "t1", "carId": "c1", "trackerTaken": true])
         #expect(result == JoinResult(tripId: "t1", carId: "c1", trackerTaken: true))
     }
@@ -84,6 +85,42 @@ private struct FakeJoinAPI: JoinAPI {
     func preview(code: String) async throws -> TripPreview { preview }
     func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
         joinResult
+    }
+}
+
+struct JoinStopsTests {
+    private let base: [String: Any] = [
+        "tripId": "t1", "name": "Raya", "destinationName": "Ipoh",
+        "cars": [["id": "c1", "name": "Myvi", "color": "#2563EB", "hasTracker": true]],
+    ]
+
+    @Test func decodesStopsInOrder() throws {
+        var data = base
+        data["stops"] = [
+            ["name": "R&R Tapah", "kind": "fuel", "minutes": 20],
+            ["name": "Kuala Kangsar", "kind": "food"],
+            ["name": "Odd", "kind": "teleport"],
+        ] as [[String: Any]]
+        let preview = try JoinService.parsePreview(data)
+        #expect(preview.stops == [
+            PreviewStop(name: "R&R Tapah", kind: .fuel, minutes: 20),
+            PreviewStop(name: "Kuala Kangsar", kind: .food),
+        ])
+    }
+
+    @Test func previewWithoutStopsFieldStillDecodes() throws {
+        #expect(try JoinService.parsePreview(base).stops.isEmpty)
+        var empty = base
+        empty["stops"] = [] as [[String: Any]]
+        #expect(try JoinService.parsePreview(empty).stops.isEmpty)
+    }
+
+    @Test func ticketLineText() {
+        #expect(PreviewStop(name: "R&R Tapah", kind: .fuel, minutes: 20).line == "R&R Tapah · fuel · 20 min")
+        #expect(PreviewStop(name: "R&R Tapah", kind: .fuel).line == "R&R Tapah · fuel")
+        #expect(PreviewStop(name: "A", kind: .food, minutes: 60).line == "A · food · 1 h")
+        let words = PlannedStopKind.allCases.map { PreviewStop(name: "A", kind: $0).line }
+        #expect(words == ["A · meeting point", "A · fuel", "A · food", "A · rest", "A · toilet", "A · sight"])
     }
 }
 

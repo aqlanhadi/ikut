@@ -11,12 +11,29 @@ struct PreviewCar: Sendable, Equatable, Identifiable {
     var number: Int? = nil
 }
 
+/// A planned stop as a non-member sees it: name, kind and planned length, nothing else.
+struct PreviewStop: Sendable, Equatable {
+    var name: String
+    var kind: PlannedStopKind
+    var minutes: Int? = nil
+
+    /// "R&R Tapah · fuel · 20 min", or "R&R Tapah · fuel" without a length. A meeting point reads
+    /// "· meeting point": "meet" alone reads like a verb to someone with only the code (owner, #204).
+    var line: String {
+        var parts = [name, kind == .meet ? "meeting point" : StopFormat.kind(kind).lowercased()]
+        if let minutes { parts.append(StopFormat.length(minutes: minutes)) }
+        return parts.joined(separator: " · ")
+    }
+}
+
 /// What `previewTrip` returns: no member ids or other personal data.
 struct TripPreview: Sendable, Equatable {
     var tripId: String
     var name: String
     var destinationName: String
     var cars: [PreviewCar]
+    /// In the organizer's order, skipped ones already left out; empty on trips without stops (and older servers).
+    var stops: [PreviewStop] = []
 }
 
 enum JoinCarChoice: Sendable, Equatable {
@@ -125,7 +142,14 @@ enum JoinService {
                 id: id, name: name, color: color, hasTracker: raw["hasTracker"] as? Bool ?? false,
                 number: (raw["number"] as? NSNumber)?.intValue)
         }
-        return TripPreview(tripId: tripId, name: name, destinationName: destination, cars: cars)
+        // A stop the app can't read is left out rather than hiding the whole ticket.
+        let stops = (root["stops"] as? [[String: Any]] ?? []).compactMap { raw -> PreviewStop? in
+            guard let name = raw["name"] as? String, let kindRaw = raw["kind"] as? String,
+                let kind = PlannedStopKind(rawValue: kindRaw)
+            else { return nil }
+            return PreviewStop(name: name, kind: kind, minutes: (raw["minutes"] as? NSNumber)?.intValue)
+        }
+        return TripPreview(tripId: tripId, name: name, destinationName: destination, cars: cars, stops: stops)
     }
 
     static func parseJoinResult(_ data: Any) throws -> JoinResult {

@@ -7,6 +7,7 @@ import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/fi
 import { endIdleTrips } from "../lib/endIdleTrips.js";
 import { purgeTripData } from "../lib/retention.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
+import { previewTripData } from "../lib/previewTrip.js";
 
 const PROJECT = "ikut-b1083";
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
@@ -296,6 +297,34 @@ describe("previewTrip (emulator)", () => {
       ],
     });
     assert.ok(!JSON.stringify(r.body).includes(organizerId));
+  });
+
+  it("lists the planned stops in order as name, kind and minutes only, without skipped ones", async () => {
+    const { tripRef } = await seedTrip();
+    // Doc ids sort opposite to `order` (Firestore returns by id), so this fails without the sort.
+    const stop = (order: number, name: string, extra: object = {}) => ({
+      name, kind: "fuel", coordinate: new GeoPoint(4.2, 101.2), routeOffset: 1000 * (order + 1), order, ...extra,
+    });
+    await tripRef.collection("stops").doc("y").set(stop(1, "R&R Tapah", { minutes: 20, note: "ask for Sam", kind: "food" }));
+    await tripRef.collection("stops").doc("z").set(stop(0, "Petronas SB", { meetAt: Timestamp.now(), kind: "meet" }));
+    await tripRef.collection("stops").doc("x").set(stop(2, "Skipped one", { skipped: true, skippedBy: "someone", skippedAt: Timestamp.now() }));
+    await tripRef.collection("stops").doc("w").set(stop(3, "Kuala Kangsar", { minutes: 10, kind: "toilet" }));
+    const r = await previewTripData(db, tripRef.id);
+    assert.deepEqual(r.stops, [
+      { name: "Petronas SB", kind: "meet" },
+      { name: "R&R Tapah", kind: "food", minutes: 20 },
+      { name: "Kuala Kangsar", kind: "toilet", minutes: 10 },
+    ]);
+    const json = JSON.stringify(r);
+    for (const secret of ["coordinate", "routeOffset", "note", "skipped", "meetAt", "order", "ask for Sam"]) {
+      assert.ok(!json.includes(secret), secret);
+    }
+  });
+
+  it("has no stops field when the trip has none", async () => {
+    const { tripRef } = await seedTrip();
+    const r = await previewTripData(db, tripRef.id);
+    assert.ok(!("stops" in r));
   });
 
   it("previews, then joins the previewed car", async () => {
