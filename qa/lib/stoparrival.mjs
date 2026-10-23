@@ -16,13 +16,14 @@ export const STALE_AFTER = 60; // s
 
 export const isFresh = (age) => age === null || age === undefined || age <= STALE_AFTER;
 
-/** {kind: 'here'} | {kind: 'away', distance, seconds} (each null when unknown) | {kind: 'unknown'}. */
+/** {kind: 'here'} | {kind: 'lastSeenHere'} (within 150 m on a fix older than 60 s) | {kind: 'away', distance, seconds}
+ *  (each null when unknown) | {kind: 'unknown'}. */
 export function status(car, target, { pace = null } = {}) {
   if (!car.location) return { kind: 'unknown' };
   const straight = haversine(car.location, target);
   const alongRoute = typeof car.offset === 'number' ? Math.abs(target.routeOffset - car.offset) : null;
   const near = straight <= HERE_RADIUS || (alongRoute ?? Infinity) <= HERE_RADIUS;
-  if (near && isFresh(car.age)) return { kind: 'here' };
+  if (near) return { kind: isFresh(car.age) ? 'here' : 'lastSeenHere' };
   const perMeter = pace ?? (car.speed > 0 ? 1 / car.speed : null);
   if (alongRoute !== null) return { kind: 'away', distance: alongRoute, seconds: perMeter === null ? null : perMeter * alongRoute };
   if (target.isMeeting && typeof car.timeToMerge === 'number') return { kind: 'away', distance: straight, seconds: car.timeToMerge };

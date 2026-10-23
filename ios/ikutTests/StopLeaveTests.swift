@@ -1,3 +1,4 @@
+import FirebaseAuth
 import FirebaseFirestore
 import Foundation
 import Testing
@@ -177,5 +178,66 @@ struct StopLeaveTests {
             == "Start the convoy from R&R Tapah now? Everyone is here.")
         #expect(StopLeave.waitingForLead(leadCar: car("c1", "Aqlan’s Myvi", number: 1)) == "Aqlan taps Leave when everyone’s ready")
         #expect(StopLeave.waitingForLead(leadCar: nil) == "The lead car taps Leave when everyone’s ready")
+    }
+}
+
+/// Runs against the local emulators with this branch's rules (`tools/with-rules.mjs`). Start them first, then:
+/// `TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test ...`
+@Suite(.emulator, .serialized)
+@MainActor
+struct StopLeaveEmulatorTests {
+    init() throws {
+        Backend.configure()
+        try Auth.auth().signOut()
+    }
+
+    /// The organizer (and lead car) marks its arrival once, then taps Leave once; a car that is neither cannot, and
+    /// the left stop takes no more skip answers.
+    @Test func theOrganizerLeavesAStopOnce() async throws {
+        let trip = try await EmulatorTrip.make(name: "Leave", route: Fixtures.longRoute)
+        let code = try await trip.code()
+        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
+        let tapah = PlannedStop(
+            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
+            kind: .fuel, minutes: 20, order: 0)
+        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
+        let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
+
+        // Before the start there is nothing to mark or leave.
+        await #expect(throws: (any Error).self) { try await StopLeaveService.markArrived(tripId: trip.tripId, stopId: "tapah") }
+        await #expect(throws: (any Error).self) {
+            try await StopLeaveService.leave(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        }
+        await TripService.markStarted(tripId: trip.tripId)
+
+        try await StopLeaveService.markArrived(tripId: trip.tripId, stopId: "tapah")
+        let arrived = try await ref.getDocument(as: PlannedStop.self)
+        let arrivedAt = try #require(arrived.arrivedAt)
+        #expect(abs(arrivedAt.timeIntervalSinceNow) < 60)
+        #expect(StopLeave.leavingAt(arrived) == arrivedAt.addingTimeInterval(20 * 60))
+        // Written once: the second try is refused and the time stays.
+        await #expect(throws: (any Error).self) { try await StopLeaveService.markArrived(tripId: trip.tripId, stopId: "tapah") }
+        #expect(try await ref.getDocument(as: PlannedStop.self).arrivedAt == arrivedAt)
+
+        try await StopLeaveService.leave(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        let left = try await ref.getDocument(as: PlannedStop.self)
+        #expect(left.isLeft && left.leftBy == trip.uid && !left.isOpen)
+        #expect(left.arrivedAt == arrivedAt)
+        await #expect(throws: (any Error).self) {
+            try await StopLeaveService.leave(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        }
+
+        // A car that is neither the lead car nor the organizer cannot leave; a left stop takes no skip answer.
+        try Auth.auth().signOut()
+        try await Auth.auth().signInAnonymously()
+        let joiner = try #require(Auth.auth().currentUser?.uid)
+        let joined = try await LiveJoinAPI().join(
+            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        await #expect(throws: (any Error).self) {
+            try await StopLeaveService.leave(tripId: trip.tripId, stopId: "tapah", userId: joiner)
+        }
+        await #expect(throws: (any Error).self) {
+            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        }
     }
 }
