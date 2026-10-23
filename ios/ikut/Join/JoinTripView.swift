@@ -206,6 +206,12 @@ struct JoinTripView: View {
                         .background(Color.ikutPositive.opacity(0.14), in: Capsule())
                 }
                 RouteEnds(from: nil, to: preview.destinationName)
+                if let line = model.ticketDrive?.line {
+                    Text(line)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                }
             }
             .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.cozy)

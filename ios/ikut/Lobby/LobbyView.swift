@@ -13,6 +13,8 @@ struct LobbyView: View {
     @State private var model: LobbyModel
     @State private var session: TripSession
     @State private var routeInfo = TripRouteInfo()
+    /// A participant's own trip: their start, where they join, their distance and drive time (D26).
+    @State private var ownWay = OwnWayInfo()
     @State private var planner: StopPlanner
     @State private var showAddStop = false
     @State private var renaming = false
@@ -29,6 +31,8 @@ struct LobbyView: View {
     private var isSample = false
     /// In a sample lobby: whether to show the organizer's card.
     private var sampleOrganizer = true
+    /// The car colour a sample participant's own route is drawn in.
+    private let sampleCarColor = "#D9480F"
 
     init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
@@ -51,10 +55,11 @@ struct LobbyView: View {
 
     /// A lobby on sample data with the planner in a given state, for previews and screenshots: `organizer` shows the
     /// organizer's card (editable) rather than a member's.
-    init(sample model: LobbyModel, planner: StopPlanner, organizer: Bool) {
+    init(sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil) {
         self.init(sample: model)
         _planner = State(initialValue: planner)
         sampleOrganizer = organizer
+        if let ownWay { _ownWay = State(initialValue: ownWay) }
     }
     #endif
 
@@ -179,7 +184,18 @@ struct LobbyView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.trip?.route) {
             guard let trip = model.trip else { return }
-            await routeInfo.load(route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty)
+            await routeInfo.load(
+                route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty, ownTrip: !isOrganizer)
+        }
+        // A participant's own way in, once their car doc has loaded (its route arrives from the car's tracker).
+        .task(id: OwnWayTaskKey(route: model.trip?.route, carRoute: session.car?.route, mergeOffset: session.car?.mergeOffset, loaded: session.car != nil)) {
+            guard !isSample, !isOrganizer, let trip = model.trip, let car = session.car else { return }
+            let granted = location.status == .whenInUse || location.status == .always
+            await ownWay.load(
+                main: RouteLine(Polyline.decode(trip.route)),
+                destination: CLLocationCoordinate2D(latitude: trip.destination.coordinate.latitude, longitude: trip.destination.coordinate.longitude),
+                destinationName: trip.destination.name, car: car,
+                phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
         .alert("Trip name", isPresented: $renaming) {
             TextField("Trip name", text: $renameText)
@@ -373,8 +389,13 @@ struct LobbyView: View {
             Text(trip.name)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            RouteEnds(from: routeInfo.originName, to: trip.destination.name)
+            RouteEnds(from: isOrganizer ? routeInfo.originName : ownWay.fromName, to: trip.destination.name)
                 .padding(.top, -6)
+            if !isOrganizer, let line = ownWay.joinLine {
+                Text(line)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, Spacing.l)
         .padding(.top, Spacing.m)
@@ -478,10 +499,13 @@ struct LobbyView: View {
     private func routeTotal(_ trip: Trip, stops: [StopDraft]) -> some View {
         if failure != nil {
             RouteTotalLine(content: .notReady)
-        } else if let distance = routeInfo.distance, let seconds = routeInfo.travelTime {
+        } else if let distance = isOrganizer ? routeInfo.distance : ownWay.distance,
+            let seconds = isOrganizer ? routeInfo.travelTime : ownWay.drive?.travelTime
+        {
+            let road = isOrganizer ? routeInfo.roadName : ownWay.drive?.roadName
             let caption = StopListLogic.plannedMinutes(stops) > 0
                 ? "Drive time and planned stops"
-                : (stops.isEmpty ? (routeInfo.roadName.flatMap { $0.isEmpty ? nil : "via \($0)" } ?? "Drive time") : "Drive time")
+                : (stops.isEmpty ? (road.flatMap { $0.isEmpty ? nil : "via \($0)" } ?? "Drive time") : "Drive time")
             RouteTotalLine(
                 content: .total(
                     StopFormat.total(distance: distance, driveSeconds: seconds, stopMinutes: StopListLogic.plannedMinutes(stops)),
@@ -514,13 +538,27 @@ struct LobbyView: View {
                             .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
                     }
                 }
+                if !isOrganizer, ownWay.ownRoute.count > 1 {
+                    let own = Color.car(hex: ownCarColor)
+                    MapPolyline(coordinates: ownWay.ownRoute)
+                        .stroke(own, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                }
+                if !isOrganizer, let join = ownWay.joinCoordinate {
+                    Annotation("", coordinate: join, anchor: .center) {
+                        Circle().fill(Color.car(hex: ownCarColor)).frame(width: 12, height: 12)
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                    }
+                }
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         // The camera fits the route only when the map is built, so rebuild once the route loads.
-        .id(coords.count)
+        .id(coords.count + ownWay.ownRoute.count)
         .accessibilityHidden(true)
     }
+
+    /// The viewer's car colour for their own route on the map preview.
+    private var ownCarColor: String { session.car?.color ?? sampleCarColor }
 
     private func inviteCard(_ code: String) -> some View {
         HStack(spacing: 0) {
@@ -698,3 +736,11 @@ extension LobbyLogic {
     .environment(LocationPermission())
 }
 #endif
+
+/// What the participant's own-way-in task reloads on.
+private struct OwnWayTaskKey: Equatable {
+    var route: String?
+    var carRoute: String?
+    var mergeOffset: Double?
+    var loaded: Bool
+}

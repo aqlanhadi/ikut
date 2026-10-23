@@ -112,6 +112,12 @@ enum DemoScreens {
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))
         case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "road-next-stop": return AnyView(NextStopDemo())
+        case "join-with-location": return nav(JoinDemo.ticket(withStops: true, drive: TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60)))
+        case "join-without-location": return nav(JoinDemo.ticket(withStops: true))
+        case "lobby-own-merges": return nav(OwnWayDemo.lobby(.merges))
+        case "lobby-own-main": return nav(OwnWayDemo.lobby(.onMain))
+        case "lobby-own-never": return nav(OwnWayDemo.lobby(.neverMerges))
+        case "lobby-own-noroute": return nav(OwnWayDemo.lobby(.noRoute))
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":

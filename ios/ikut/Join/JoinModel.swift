@@ -1,3 +1,4 @@
+import CoreLocation
 import Observation
 import SwiftUI
 
@@ -20,16 +21,24 @@ final class JoinModel {
     private(set) var selection: CarSelection?
     var tracker = true
     var errorMessage: String?
+    /// How far and how long from here to the destination, once the phone's location and MapKit have answered.
+    private(set) var ticketDrive: TicketDrive?
 
     @ObservationIgnored private let api: any JoinAPI
+    @ObservationIgnored private let driveFromHere: @MainActor (CLLocationCoordinate2D) async -> TicketDrive?
     @ObservationIgnored private var previewTask: Task<Void, Never>?
+    @ObservationIgnored private var driveTask: Task<Void, Never>?
     @ObservationIgnored private var newCarNameEdited = false
 
     /// `initialCode` (e.g. from a link or QR) is normalised and shown straight away;
     /// call `start()` once the screen appears to load its preview.
-    init(displayName: String, initialCode: String? = nil, api: any JoinAPI = LiveJoinAPI()) {
+    init(
+        displayName: String, initialCode: String? = nil, api: any JoinAPI = LiveJoinAPI(),
+        driveFromHere: @escaping @MainActor (CLLocationCoordinate2D) async -> TicketDrive? = { await TicketDrive.fromHere(to: $0) }
+    ) {
         self.displayName = displayName
         self.api = api
+        self.driveFromHere = driveFromHere
         if let initialCode { code = JoinService.normalizeCode(initialCode) }
     }
 
@@ -110,6 +119,8 @@ final class JoinModel {
         selection = nil
         errorMessage = nil
         trackerTakenResult = nil
+        ticketDrive = nil
+        driveTask?.cancel()
     }
 
     private func loadPreview() {
@@ -122,11 +133,25 @@ final class JoinModel {
                 let result = try await api.preview(code: requested)
                 guard !Task.isCancelled, requested == code else { return }
                 preview = result
+                loadDrive(for: result)
             } catch {
                 guard !Task.isCancelled, requested == code else { return }
                 errorMessage = JoinService.map(error).message
             }
             isLoadingPreview = false
+        }
+    }
+
+    /// The quiet "About 2 h 10 from you · 185 km" line: one drive request from the phone's location to the destination.
+    /// Nothing is shown when there's no destination coordinate, no location or no road.
+    private func loadDrive(for preview: TripPreview) {
+        driveTask?.cancel()
+        guard let destination = preview.destinationCoordinate?.coordinate else { return }
+        let requested = code
+        driveTask = Task {
+            let drive = await driveFromHere(destination)
+            guard !Task.isCancelled, requested == code else { return }
+            ticketDrive = drive
         }
     }
 
