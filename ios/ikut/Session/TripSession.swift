@@ -18,6 +18,8 @@ final class TripSession {
     private(set) var car: Car?
     /// The planned stops, in driving order.
     private(set) var stops: [PlannedStop] = []
+    /// True while this car's answer on the meeting point is "we'll meet you along the way" (D25 4d-2).
+    private(set) var skipsMeetingPoint = false
     /// Latest position per car id.
     private(set) var positions: [String: Position] = [:]
     private(set) var errorMessage: String?
@@ -48,6 +50,9 @@ final class TripSession {
     @ObservationIgnored private var carListener: ListenerRegistration?
     @ObservationIgnored private var positionsListener: ListenerRegistration?
     @ObservationIgnored private var stopsListener: ListenerRegistration?
+    @ObservationIgnored private var answerListener: ListenerRegistration?
+    /// The stop and car `answerListener` is on, so it moves only when either does.
+    @ObservationIgnored private var listeningAnswer: [String]?
     @ObservationIgnored private var listeningCarId: String?
     /// The tracking session in progress (same car and main route); nil when not the tracker.
     @ObservationIgnored private var sessionKey: SessionKey?
@@ -288,8 +293,11 @@ final class TripSession {
     }
 
     /// Test seam: feeds the state the listeners would, without Firestore.
-    func applyForTesting(trip: Trip?, member: Member?, car: Car?, stops: [PlannedStop] = []) {
+    func applyForTesting(
+        trip: Trip?, member: Member?, car: Car?, stops: [PlannedStop] = [], skipsMeetingPoint: Bool = false
+    ) {
         self.trip = trip
+        self.skipsMeetingPoint = skipsMeetingPoint
         self.stops = stops
         self.member = member
         membershipLost = member == nil
@@ -358,13 +366,15 @@ final class TripSession {
         // Losing tracker duty while paused drops the local pause; the doc's pause is the next tracker's to resume.
         if !duty { localPausedAt = nil }
         syncExpiryTimer()
+        listenToOwnAnswer()
         let wants = duty && !isPaused
         guard wants, let trip, let car, let carId = car.id else {
             if tracker.isTracking || sessionKey != nil { stopTrackingNow() }
             isTracking = tracker.isTracking
             return
         }
-        let meetingPoint = TripSessionLogic.meetingPoint(in: stops)
+        let meetingPoint = TripSessionLogic.sessionMeetingPoint(
+            in: stops, skippingAlong: skipsMeetingPoint, carState: car.state, tripStarted: trip.startedAt != nil)
         let key = SessionKey(
             carId: carId, tripRoute: trip.route, meetingPoint: meetingPoint.map { [$0.latitude, $0.longitude] })
         if key != sessionKey {
@@ -495,12 +505,48 @@ final class TripSession {
         }
     }
 
+    /// Listens to this car's answer on the meeting point (the first stop, when it is a meeting point), so a
+    /// "we'll meet you along the way" restarts the car's route towards the destination and "we'll stop after all"
+    /// sends it back. Only once the listeners run (`start()`); a test feeds `skipsMeetingPoint` itself.
+    private func listenToOwnAnswer() {
+        guard tripListener != nil else { return }
+        let meet = stops.min(by: { $0.order < $1.order }).flatMap { $0.kind == .meet ? $0 : nil }
+        let carId = member?.carId ?? car?.id
+        guard let stopId = meet?.id, let carId else {
+            answerListener?.remove()
+            answerListener = nil
+            listeningAnswer = nil
+            skipsMeetingPoint = false
+            return
+        }
+        let target = [stopId, carId]
+        guard listeningAnswer != target else { return }
+        answerListener?.remove()
+        listeningAnswer = target
+        skipsMeetingPoint = false
+        answerListener = db.document(FirestorePaths.answer(tripId: tripId, stopId: stopId, carId: carId))
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let snapshot else { return }
+                let skipping = (try? snapshot.data(as: StopAnswer.self))?.answer == .skip
+                Task { @MainActor in
+                    guard let self, self.listeningAnswer == target else { return }
+                    if self.skipsMeetingPoint != skipping {
+                        self.skipsMeetingPoint = skipping
+                        self.reevaluate()
+                    }
+                }
+            }
+    }
+
     private func removeListeners() {
         tripListener?.remove()
         memberListener?.remove()
         carListener?.remove()
         positionsListener?.remove()
         stopsListener?.remove()
+        answerListener?.remove()
+        answerListener = nil
+        listeningAnswer = nil
         tripListener = nil
         memberListener = nil
         carListener = nil

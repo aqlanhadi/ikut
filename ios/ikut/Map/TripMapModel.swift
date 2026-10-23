@@ -64,6 +64,8 @@ final class TripMapModel {
     private(set) var catchUp: TripAlert?
     /// The trip's planned stops, in route order (by `routeOffset`), from the session. Observable, for the
     /// approach pill and the panel's Next stop.
+    /// My car's answer on the meeting point is "we'll meet you along the way" (from the session).
+    private(set) var skipsMeetingPoint = false
     private(set) var stops: [PlannedStop] = [] { didSet { convoy.setStops(stops) } }
     @ObservationIgnored private var stopWatch = StopApproach()
     @ObservationIgnored private var stopApproachAt: Date?
@@ -129,6 +131,7 @@ final class TripMapModel {
     func sync() {
         guard let session else { return }
         setStops(session.stops)
+        skipsMeetingPoint = session.skipsMeetingPoint
         apply(
             trip: session.trip, myCar: session.car, myCarId: session.member?.carId ?? session.car?.id,
             positions: session.positions, isTracker: session.isTracking, isEnded: session.isEnded)
@@ -243,6 +246,15 @@ final class TripMapModel {
         return NextStop.pace(
             travelTimeToGo: convoy.driveArrival(forCar: mine.id)?.timeIntervalSinceNow,
             remaining: max(0, length - mine.convoyOffset), speed: mine.speed)
+    }
+
+    /// Seconds per meter along the main route for the stop ahead of a car still joining: the convoy's pace from the
+    /// lead car's ETA over what is left of the route, since the joining car has no place on the route yet.
+    func joiningStopPace() -> Double? {
+        guard let length = mainRoute?.length, length > 0, let lead = convoy.convoy.first else { return nil }
+        return NextStop.pace(
+            travelTimeToGo: convoy.driveArrival(forCar: lead.id)?.timeIntervalSinceNow,
+            remaining: max(0, length - lead.convoyOffset), speed: lead.speed)
     }
 
     // MARK: A car parked ahead (D26)

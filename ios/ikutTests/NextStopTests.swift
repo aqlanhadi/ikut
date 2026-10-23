@@ -75,4 +75,42 @@ struct NextStopTests {
         #expect(NextStop.joiningCell(stops: [skipped], distance: 9_000, seconds: 420) == nil)
         #expect(NextStop.joiningCell(stops: stops, distance: nil, seconds: nil) == nil)
     }
+
+    @Test func afterTheLeaveAJoiningCarSeesTheNextStopAheadOfWhereItsRoadMeetsTheMainRoute() throws {
+        var meet = stop("Petronas Sungai Buloh", 0)
+        meet.kind = .meet
+        meet.leftAt = Date(timeIntervalSince1970: 1_000)
+        meet.leftBy = "u1"
+        let stops = [meet, stop("Behind", 2_000), stop("Tapah", 60_000)]
+        // 9 km of its own road to the merge, which is 10 km along the main route: Tapah is 50 km past it.
+        let cell = try #require(NextStop.joiningCell(
+            stops: stops, distance: 9_000, seconds: 420, mergeOffset: 10_000, pace: 0.05))
+        #expect(cell.name == "Tapah")
+        #expect(cell.stopId == "Tapah")
+        #expect(cell.detail == "59 km · 49 min")
+        // No pace: the distance alone. No known merge place: nothing to measure from.
+        #expect(NextStop.joiningCell(stops: stops, distance: 9_000, seconds: 420, mergeOffset: 10_000)?.detail == "59 km")
+        #expect(NextStop.joiningCell(stops: stops, distance: 9_000, seconds: 420) == nil)
+        // No stop left ahead: no cell.
+        #expect(NextStop.joiningCell(stops: [meet], distance: 9_000, seconds: 420, mergeOffset: 10_000) == nil)
+    }
+
+    @Test func aCarThatWillMeetAlongTheWayAlsoSeesTheNextStopBeforeLeave() throws {
+        var meet = stop("Petronas Sungai Buloh", 0)
+        meet.kind = .meet
+        let stops = [meet, stop("Tapah", 60_000)]
+        #expect(NextStop.joiningCell(stops: stops, distance: 9_000, seconds: 420, mergeOffset: 10_000, pace: 0.05, skipsMeet: false)?.name
+            == "Petronas Sungai Buloh")
+        #expect(NextStop.joiningCell(stops: stops, distance: 9_000, seconds: 420, mergeOffset: 10_000, pace: 0.05, skipsMeet: true)?.name
+            == "Tapah")
+    }
+
+    @Test func noMeetingAlongTheWayButtonOnceTheMeetingPointWasLeft() {
+        var meet = stop("m", 0)
+        meet.kind = .meet
+        #expect(SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
+        meet.leftAt = Date(timeIntervalSince1970: 1_000)
+        meet.leftBy = "u1"
+        #expect(!SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
+    }
 }

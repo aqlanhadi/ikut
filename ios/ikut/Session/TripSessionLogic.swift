@@ -92,6 +92,27 @@ enum TripSessionLogic {
         return CLLocationCoordinate2D(latitude: first.coordinate.latitude, longitude: first.coordinate.longitude)
     }
 
+    /// The meeting point a car's own route goes to (D25 4d-2). The same as `meetingPoint(in:)` until the lead car
+    /// has tapped Leave at it, or this car has said it will meet the convoy along the way (`skippingAlong`): after
+    /// either, the car's route goes to the destination and merges wherever its road meets the main route, as on a
+    /// trip with no meeting point.
+    static func joiningMeetingPoint(in stops: [PlannedStop], skippingAlong: Bool) -> CLLocationCoordinate2D? {
+        guard !skippingAlong,
+              let first = stops.min(by: { $0.order < $1.order }), first.kind == .meet, first.isOpen
+        else { return nil }
+        return meetingPoint(in: stops)
+    }
+
+    /// The meeting point that keys a tracking session. A car that has already merged after the start (state not
+    /// `joining`) keeps what it had, so a Leave does not restart the session of a car that is in the convoy; a car
+    /// still joining, or any car before the start, follows `joiningMeetingPoint`.
+    static func sessionMeetingPoint(
+        in stops: [PlannedStop], skippingAlong: Bool, carState: CarState, tripStarted: Bool
+    ) -> CLLocationCoordinate2D? {
+        if tripStarted, carState != .joining { return meetingPoint(in: stops) }
+        return joiningMeetingPoint(in: stops, skippingAlong: skippingAlong)
+    }
+
     /// What a tracking session starts from. While a trip with a meeting point has not started, the car doc's state and
     /// route can't be trusted: they may belong to an old route (the organizer's car says `convoy` from the day the trip
     /// was made), or be left from before a pause, a relaunch, or an add made while the phone had no fix. So every

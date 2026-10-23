@@ -104,6 +104,8 @@ enum MapDemo {
         if fiveCars { positions["c5"] = onMain(tapah - 8_000, speed: 90 / 3.6, age: 5) }
         // Mei parked ahead: 30 km on, or (for the heads-up) 15 km on until the lead is 3.1 km from her.
         if let parked { positions["c6"] = onMain(tapah + (parked == "far" ? 30_000 : 15_000), speed: 0, age: 3) }
+        // Where Hafiz's own road meets the main route, for a stop measured from there (D25 4d-2).
+        if joiner != nil { cars[2].mergeOffset = main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance)?.mainOffset }
         switch joiner {
         case .parked:
             positions["c3"]?.speed = 0
