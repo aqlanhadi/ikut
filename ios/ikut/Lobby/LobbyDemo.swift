@@ -147,6 +147,8 @@ enum DemoScreens {
             return sheet(query: "", picked: place, kind: .meet, minutes: nil, canMeet: true, meet: true)
         case "stop-approach": return AnyView(StopApproachDemo.view())
         case "stop-approach-food": return AnyView(StopApproachDemo.view(food: true))
+        case "road-route-rebuilt": return AnyView(StopApproachDemo.routeNotice(waiting: false))
+        case "road-route-waiting": return AnyView(StopApproachDemo.routeNotice(waiting: true))
         default: return nil
         }
     }

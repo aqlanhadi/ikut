@@ -126,6 +126,20 @@ struct PassedBanner: View {
     }
 }
 
+/// The organizer's line once the route is rebuilt mid-trip ("The route now goes through R&R Tapah and Ipoh"), or
+/// while it waits for signal (D25 4d).
+struct RouteNoticeBanner: View {
+    let notice: RouteRebuilder.Notice
+
+    var body: some View {
+        DarkBanner(
+            title: notice.text, symbol: notice.waiting ? "antenna.radiowaves.left.and.right.slash" : "arrow.triangle.turn.up.right.diamond.fill",
+            circle: notice.waiting ? .white.opacity(0.7) : .green)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .accessibilityIdentifier("route.notice")
+    }
+}
+
 #if DEBUG
 #Preview {
     // The demo's debris, 3 km ahead of my car.
