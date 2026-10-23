@@ -31,12 +31,15 @@ enum StopSkipAll {
 
     /// The one sentence before the skip is final.
     static func confirmSentence(stop: PlannedStop) -> String {
-        "Skip \(stop.name) for everyone? \(caption)"
+        "Skip \(stop.name) for everyone? You can’t undo this, and the route stays as it is."
     }
 
-    /// What everyone else reads where the button would be: "Aqlan can skip this stop for everyone."
-    static func passengerLine(organizer: Car?) -> String {
-        let who = organizer.map(StopLeave.ownerWord) ?? "The organizer"
+    /// What everyone else reads where the button would be: "Aqlan can skip this stop for everyone." The organizer's
+    /// name comes from their member document (`organizerName`); until that is loaded, the owner word of car number 1
+    /// (the organizer's car, kept on rejoin; the lead car can be another car); else "The organizer".
+    static func passengerLine(organizerName: String?, cars: [Car]) -> String {
+        let named = organizerName.flatMap { $0.isEmpty ? nil : $0 }
+        let who = named ?? cars.first { $0.number == 1 }.map(StopLeave.ownerWord) ?? "The organizer"
         return "\(who) can skip this stop for everyone."
     }
 }

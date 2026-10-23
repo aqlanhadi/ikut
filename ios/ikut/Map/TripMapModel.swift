@@ -38,6 +38,8 @@ final class TripMapModel {
     private(set) var isEnded = false
     /// The trip has started (`startedAt`): stops can then be left, and the lead car marks when it arrived.
     var tripStarted = false
+    /// The trip's organizer (user id), for naming who can skip a stop for everyone.
+    private(set) var organizerId: String?
 
     @ObservationIgnored private let session: TripSession?
     @ObservationIgnored private let db: Firestore?
@@ -147,6 +149,7 @@ final class TripMapModel {
         var routeChanged = false
         if let trip {
             tripStarted = trip.startedAt != nil
+            organizerId = trip.organizerId
             tripName = trip.name
             departedAt = trip.startedAt ?? trip.createdAt
             tripCode = Self.formatCode(trip.code)

@@ -22,6 +22,12 @@ enum StopLeaveService {
         return try await ServerWrite.commit { try await ref.updateData(payload) }
     }
 
+    /// The organizer's display name from their member document (members can read it); nil when it can't be read.
+    static func organizerName(tripId: String, organizerId: String) async -> String? {
+        let ref = Firestore.firestore().document(FirestorePaths.member(tripId: tripId, userId: organizerId))
+        return try? await ref.getDocument(as: Member.self).displayName
+    }
+
     /// The organizer skips a stop the convoy has not reached, for everyone (D25 4b). Once; the server's clock for
     /// `skippedAt` (the rules ask for `request.time`). Offline, the write stays queued and the call returns false.
     @discardableResult

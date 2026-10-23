@@ -63,11 +63,21 @@ struct StopSkipAllTests {
 
     @Test func theWordsAreTheCanvasOnes() {
         #expect(StopSkipAll.caption == "For everyone. The route stays as it is.")
-        #expect(StopSkipAll.confirmSentence(stop: stop()) == "Skip R&R Tapah for everyone? For everyone. The route stays as it is.")
-        let aqlan = Car(id: "c1", name: "Aqlan’s Myvi", color: "#2563EB", trackerUserId: nil, isLead: true, route: nil,
-                        mergeOffset: nil, state: .convoy, number: 1)
-        #expect(StopSkipAll.passengerLine(organizer: aqlan) == "Aqlan can skip this stop for everyone.")
-        #expect(StopSkipAll.passengerLine(organizer: nil) == "The organizer can skip this stop for everyone.")
+        #expect(StopSkipAll.confirmSentence(stop: stop()) == "Skip R&R Tapah for everyone? You can’t undo this, and the route stays as it is.")
+    }
+
+    @Test func theOrganizerIsNamedFromTheirMemberNotFromTheLeadCar() {
+        func car(_ id: String, _ name: String, number: Int, lead: Bool) -> Car {
+            Car(id: id, name: name, color: "#2563EB", trackerUserId: nil, isLead: lead, route: nil, mergeOffset: nil,
+                state: .convoy, number: number)
+        }
+        // The lead car moved to Wyna; Aqlan's car (number 1) is not the lead.
+        let cars = [car("c1", "Aqlan’s Myvi", number: 1, lead: false), car("c2", "Wyna’s X70", number: 2, lead: true)]
+        #expect(StopSkipAll.passengerLine(organizerName: "Aqlan", cars: cars) == "Aqlan can skip this stop for everyone.")
+        // Member not loaded yet: car number 1, never the lead car.
+        #expect(StopSkipAll.passengerLine(organizerName: nil, cars: cars) == "Aqlan can skip this stop for everyone.")
+        #expect(StopSkipAll.passengerLine(organizerName: "", cars: cars) == "Aqlan can skip this stop for everyone.")
+        #expect(StopSkipAll.passengerLine(organizerName: nil, cars: []) == "The organizer can skip this stop for everyone.")
     }
 
     // MARK: The highway jump (4b check 1)

@@ -40,6 +40,7 @@ struct StopArrivalCard: View {
     @State private var skipping = false
     @State private var skipQueued = false
     @State private var couldNotSkip = false
+    @State private var organizerName: String?
     @State private var confirmingSkipAll = false
     @State private var skippingAll = false
     @State private var skipAllQueued = false
@@ -83,6 +84,10 @@ struct StopArrivalCard: View {
                 if startConfirming { confirming = true }
                 if startConfirmingSkipAll { confirmingSkipAll = true }
                 if answers.isEmpty { answers = initialAnswers }
+            }
+            .task(id: model.organizerId) {
+                guard listensToAnswers, !isOrganizer, let id = model.organizerId else { return }
+                organizerName = await StopLeaveService.organizerName(tripId: tripId, organizerId: id)
             }
             .task(id: stopId) {
                 guard listensToAnswers else { return }
@@ -192,7 +197,7 @@ struct StopArrivalCard: View {
                 }
             }
         } else if !isOrganizer, StopSkipAll.isSkippable(stop: stop, tripStarted: model.tripStarted, carReached: reached) {
-            Text(StopSkipAll.passengerLine(organizer: model.cars.first { $0.isLead }))
+            Text(StopSkipAll.passengerLine(organizerName: organizerName, cars: model.cars))
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity).accessibilityIdentifier("stop.skipAll.others")
         }

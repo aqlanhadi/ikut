@@ -266,4 +266,42 @@ struct StopLeaveEmulatorTests {
             try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
         }
     }
+
+    /// The organizer skips a stop nobody has reached, once; before the start and for a joined car it is refused.
+    @Test func theOrganizerSkipsAStopForEveryoneOnce() async throws {
+        let trip = try await EmulatorTrip.make(name: "SkipAll", route: Fixtures.longRoute)
+        let code = try await trip.code()
+        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
+        let tapah = PlannedStop(
+            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
+            kind: .fuel, minutes: 20, order: 0)
+        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
+        let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
+
+        await #expect(throws: (any Error).self) {
+            try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        }
+        #expect(try await ref.getDocument(as: PlannedStop.self).isOpen)
+        await TripService.markStarted(tripId: trip.tripId)
+
+        try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        let skipped = try await ref.getDocument(as: PlannedStop.self)
+        #expect(skipped.skipped == true && skipped.skippedBy == trip.uid && !skipped.isOpen)
+        let skippedAt = try #require(skipped.skippedAt)
+        #expect(abs(skippedAt.timeIntervalSinceNow) < 60)
+        await #expect(throws: (any Error).self) {
+            try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        }
+
+        // A joined car that is not the organizer cannot skip for everyone.
+        try Auth.auth().signOut()
+        try await Auth.auth().signInAnonymously()
+        let joiner = try #require(Auth.auth().currentUser?.uid)
+        _ = try await LiveJoinAPI().join(
+            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        await #expect(throws: (any Error).self) {
+            try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "tapah", userId: joiner)
+        }
+        try Auth.auth().signOut()
+    }
 }
