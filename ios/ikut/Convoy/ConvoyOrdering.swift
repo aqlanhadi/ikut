@@ -339,7 +339,10 @@ enum ConvoyOrdering {
     ) -> Double? {
         if let ownMergeOffset { return max(0, ownMergeOffset - position.routeOffset) }
         // An own route that never meets the main one (no merge offset for it): the rest of that route, by road.
-        if let encoded = car.route, let own = ownRoute(encoded) { return max(0, own.length - position.routeOffset) }
+        // Only once the main route is known; before that, a missing offset says nothing about merging.
+        if mainRoute != nil, let encoded = car.route, let own = ownRoute(encoded) {
+            return max(0, own.length - position.routeOffset)
+        }
         guard let mainRoute, let offset = car.mergeOffset, let point = mainRoute.coordinate(atOffset: offset)
         else { return nil }
         let here = CLLocationCoordinate2D(latitude: position.location.latitude, longitude: position.location.longitude)
