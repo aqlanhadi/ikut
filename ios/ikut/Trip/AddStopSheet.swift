@@ -165,7 +165,7 @@ struct AddStopSheet: View {
             if let message = model.errorMessage {
                 InlineNote(message, tone: .alert).padding(.top, Spacing.m)
             }
-            if !model.trimmedQuery.isEmpty {
+            if model.showsList {
                 PlaceSearchResults(model: model, distance: .alongRoute, showsKind: true, onPick: pick)
             }
         }

@@ -43,13 +43,21 @@ struct SearchSuggestion: Identifiable, Equatable {
     /// What a tap resolves; nil for the "Search …" row made here and in tests.
     var completion: MKLocalSearchCompletion?
 
-    var id: String { "\(isQuery ? "q" : "p")|\(title)|\(subtitle)" }
+    /// Where the row sits in its list, so two completions with the same name and area (two "Petronas" nearby) are
+    /// still two rows, each with its own spinner. Set by `rows(_:for:)`.
+    var position = 0
+
+    var id: String { "\(position)|\(isQuery ? "q" : "p")|\(title)|\(subtitle)" }
 
     init(title: String, subtitle: String, highlights: [NSRange], completion: MKLocalSearchCompletion? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.highlights = highlights
         self.completion = completion
+        // A completion with no subtitle is a query as far as MapKit's own query rows go, so a place with no area
+        // becomes a "Search" row; and on a phone not set to English MapKit's query subtitle is localized, so a query
+        // reads as a place. Both still land somewhere sensible: a Search row lists every match, and a place row picks
+        // the first match for the name.
         isQuery = subtitle.isEmpty || subtitle == Self.queryMarker
     }
 
@@ -79,8 +87,13 @@ struct SearchSuggestion: Identifiable, Equatable {
     /// The suggestions for `text`, with a "Search text" row at the foot when MapKit gave no query row of its own, so
     /// a list of every match is always one tap away.
     static func rows(_ suggestions: [SearchSuggestion], for text: String) -> [SearchSuggestion] {
-        guard !text.isEmpty, !suggestions.contains(where: \.isQuery) else { return suggestions }
-        return suggestions + [.query(text)]
+        var all = suggestions
+        if !text.isEmpty, !all.contains(where: \.isQuery) { all.append(.query(text)) }
+        return all.enumerated().map { index, row in
+            var row = row
+            row.position = index
+            return row
+        }
     }
 }
 

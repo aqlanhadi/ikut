@@ -46,6 +46,10 @@ final class CreateTripModel {
         self.places = places
     }
 
+    /// Whether the list under the field has anything to show: a search under way, suggestions or a query's results.
+    /// One typed character shows none.
+    var showsList: Bool { showingResults || isSearching || !suggestions.isEmpty }
+
     var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     var isWorking: Bool { working != nil }
 
@@ -343,7 +347,7 @@ struct CreateTripView: View {
                         .accessibilityLabel("Error: \(message)")
                 }
 
-                if !model.trimmedQuery.isEmpty {
+                if model.showsList {
                     PlaceSearchResults(
                         model: model, distance: .fromYou,
                         workingLabel: changingTripId == nil ? "Creating trip" : "Updating trip", onPick: pick)

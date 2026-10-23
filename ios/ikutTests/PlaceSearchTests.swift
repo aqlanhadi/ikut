@@ -16,11 +16,30 @@ private final class FakeSuggestions: SuggestionSource {
 private final class FakePlaceSearch: PlaceSearching {
     var searches: [(String, MKCoordinateRegion)] = []
     var found: [DestinationResult] = []
+    /// Answers for a query, instead of `found`.
+    var foundFor: [String: [DestinationResult]] = [:]
+    /// Queries (or "resolve") that wait until `release` is called for them.
+    var held: Set<String> = []
+    var resolved: DestinationResult?
+    var resolveFails = false
+
+    func release(_ key: String) { held.remove(key) }
+
+    private func wait(_ key: String) async {
+        while held.contains(key) { try? await Task.sleep(for: .milliseconds(5)) }
+    }
+
     func search(query: String, region: MKCoordinateRegion) async throws -> [DestinationResult] {
         searches.append((query, region))
-        return found
+        await wait(query)
+        return foundFor[query] ?? found
     }
-    func resolve(_ suggestion: SearchSuggestion) async throws -> DestinationResult? { nil }
+
+    func resolve(_ suggestion: SearchSuggestion) async throws -> DestinationResult? {
+        await wait("resolve")
+        if resolveFails { throw URLError(.notConnectedToInternet) }
+        return resolved
+    }
 }
 
 private func place(_ name: String, _ lat: Double, _ lon: Double) -> DestinationResult {
@@ -127,5 +146,68 @@ struct PlaceSearchTests {
         #expect(model.results.map(\.name) == ["Early", "Mid", "Late", "Far east"])
         // The region for a search with no fix is the route's.
         #expect(abs(places.searches[0].1.center.latitude - 3.589) < 0.01)
+    }
+
+    @Test func twoCompletionsWithTheSameNameAreTwoRows() {
+        let petronas = SearchSuggestion(title: "Petronas", subtitle: "Jalan Ipoh", highlights: [])
+        let rows = SearchSuggestion.rows([petronas, petronas], for: "petr")
+        #expect(rows.count == 3)
+        #expect(Set(rows.map(\.id)).count == 3)
+    }
+
+    @Test func oneTypedCharacterShowsNoList() {
+        let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: FakePlaceSearch())
+        model.query = "p"
+        model.queryChanged()
+        #expect(!model.showsList)
+        model.query = "pe"
+        model.queryChanged()
+        #expect(model.showsList)
+    }
+
+    @Test func tappingAPlaceSuggestionPicksTheResolvedPlace() async throws {
+        let places = FakePlaceSearch()
+        let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: places)
+        let row = SearchSuggestion(title: "Petronas", subtitle: "Ipoh", highlights: [])
+        places.resolved = place("Petronas Ipoh", 4.6, 101.1)
+        places.held = ["resolve"]
+        let task = Task { await model.resolve(row) }
+        for _ in 0..<100 where model.resolving == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.resolving == row.id)
+        // A second tap while one is resolving does nothing.
+        #expect(await model.resolve(row) == nil)
+        places.release("resolve")
+        let picked = await task.value
+        #expect(picked?.name == "Petronas Ipoh")
+        #expect(model.resolving == nil && model.errorMessage == nil)
+    }
+
+    @Test func aSuggestionThatCannotBeFoundSaysSoAndClearsTheSpinner() async {
+        let places = FakePlaceSearch()
+        let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: places)
+        let row = SearchSuggestion(title: "Petronas", subtitle: "Ipoh", highlights: [])
+        #expect(await model.resolve(row) == nil)
+        #expect(model.errorMessage == "Couldn't find that place. Try another.")
+        #expect(model.resolving == nil)
+        places.resolveFails = true
+        #expect(await model.resolve(row) == nil)
+        #expect(model.errorMessage == CreateTripModel.searchMessage)
+        #expect(model.resolving == nil)
+    }
+
+    @Test func anOlderRegionSearchFinishingLastKeepsTheNewerResults() async throws {
+        let places = FakePlaceSearch()
+        places.foundFor = ["a": [place("From a", 3, 101)], "b": [place("From b", 4, 101)]]
+        places.held = ["a", "b"]
+        let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: places)
+        model.runSearch("a")
+        model.runSearch("b")
+        places.release("b")
+        for _ in 0..<100 where model.isSearching { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.results.map(\.name) == ["From b"])
+        places.release("a")
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(model.results.map(\.name) == ["From b"])
+        #expect(model.query == "b")
     }
 }
