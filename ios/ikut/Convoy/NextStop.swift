@@ -44,13 +44,19 @@ enum NextStop {
 
     /// The cell for a car at `offset` on the main route; nil with no stop ahead, or a car with no
     /// main-route offset yet (still joining).
-    static func cell(stops: [PlannedStop], offset: Double?, pace: Double?) -> Cell? {
+    /// With `now`, a meeting point whose `meetAt` is later than the drive there says when the convoy gets going
+    /// ("23 min"), not when the car could get there.
+    static func cell(stops: [PlannedStop], offset: Double?, pace: Double?, now: Date? = nil) -> Cell? {
         guard let offset, let stop = next(in: stops, from: offset) else { return nil }
         let ahead = stop.routeOffset - offset
         let here = abs(ahead) <= hereRadius
         let distance = max(0, ahead)
+        var seconds = pace.map { $0 * distance }
+        if let now, let meetAt = stop.meetAt, stop.isMeeting, let drive = seconds {
+            seconds = max(drive, meetAt.timeIntervalSince(now))
+        }
         return Cell(
-            name: stop.name, distance: here ? 0 : distance, seconds: here ? nil : pace.map { $0 * distance },
+            name: stop.name, distance: here ? 0 : distance, seconds: here ? nil : seconds,
             isHere: here, stopId: stop.id)
     }
 

@@ -62,7 +62,7 @@ final class TripMapModel {
     private(set) var catchUp: TripAlert?
     /// The trip's planned stops, in route order (by `routeOffset`), from the session. Observable, for the
     /// approach pill and the panel's Next stop.
-    private(set) var stops: [PlannedStop] = []
+    private(set) var stops: [PlannedStop] = [] { didSet { convoy.setStops(stops) } }
     @ObservationIgnored private var stopWatch = StopApproach()
     @ObservationIgnored private var stopApproachAt: Date?
     /// "R&R Tapah in 2 km" while its pill is up (D25 piece 3a).
@@ -238,7 +238,7 @@ final class TripMapModel {
         guard let length = mainRoute?.length, length > 0, let mine = convoy.convoy.first(where: { $0.id == myCarId })
         else { return nil }
         return NextStop.pace(
-            travelTimeToGo: convoy.arrival(forCar: mine.id)?.timeIntervalSinceNow,
+            travelTimeToGo: convoy.driveArrival(forCar: mine.id)?.timeIntervalSinceNow,
             remaining: max(0, length - mine.convoyOffset), speed: mine.speed)
     }
 

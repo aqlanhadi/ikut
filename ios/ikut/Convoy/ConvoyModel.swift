@@ -45,6 +45,8 @@ struct FrontETA: Equatable, Sendable {
     var carId: String
     var requestedAt: Date
     var travelTime: TimeInterval
+    /// The reference car's place on the main route when it was asked; the planned stops ahead of it add their time.
+    var referenceOffset: Double = 0
     /// When the reference car arrives: `requestedAt + travelTime`.
     var arrival: Date { requestedAt.addingTimeInterval(travelTime) }
 }
@@ -92,6 +94,8 @@ final class ConvoyModel {
     @ObservationIgnored private var cars: [Car] = []
     @ObservationIgnored private var positions: [String: Position] = [:]
     @ObservationIgnored private var mainRoute: RouteLine?
+    /// The trip's planned stops (D25): each one still ahead adds its planned length to the arrival times.
+    private(set) var stops: [PlannedStop] = []
     @ObservationIgnored private var smoother = SpeedSmoother()
     @ObservationIgnored private var mergeOffsets: [String: Double] = [:]
     @ObservationIgnored private var lastRequest: (at: Date, from: CLLocationCoordinate2D, carId: String)?
@@ -126,6 +130,8 @@ final class ConvoyModel {
     }
 
     // MARK: Inputs
+
+    func setStops(_ stops: [PlannedStop]) { self.stops = stops }
 
     func setCars(_ cars: [Car]) {
         self.cars = cars
@@ -205,30 +211,47 @@ final class ConvoyModel {
             let result: Result<TimeInterval, Error>
             do { result = .success(try await provider.travelTime(from: here, to: destination)) }
             catch { result = .failure(error) }
-            self?.finishETA(result, carId: ref.id, requestedAt: now)
+            self?.finishETA(result, carId: ref.id, requestedAt: now, offset: ref.convoyOffset)
         }
     }
 
-    private func finishETA(_ result: Result<TimeInterval, Error>, carId: String, requestedAt: Date) {
+    private func finishETA(_ result: Result<TimeInterval, Error>, carId: String, requestedAt: Date, offset: Double) {
         etaTask = nil
         switch result {
         case .success(let t) where t.isFinite && t >= 0:
             failures = 0
-            frontETA = FrontETA(carId: carId, requestedAt: requestedAt, travelTime: t)
+            frontETA = FrontETA(carId: carId, requestedAt: requestedAt, travelTime: t, referenceOffset: offset)
         default:
             failures += 1
         }
     }
 
     /// Arrival time at the destination for a convoy car: the reference ETA plus its time behind the
-    /// reference. Nil before the first ETA arrives, or for cars ahead of the reference (stale fronts).
+    /// reference, plus the planned length of every stop still ahead of the reference (`StopDelay`).
+    /// Nil before the first ETA arrives, or for cars ahead of the reference (stale fronts).
     func arrival(forCar id: String) -> Date? {
+        guard let drive = driveArrival(forCar: id), let eta = frontETA else { return nil }
+        return drive.addingTimeInterval(stopDelay(for: eta))
+    }
+
+    /// The same without the stops: when the car gets there by driving alone. The Next stop cell's pace comes from it.
+    func driveArrival(forCar id: String) -> Date? {
         guard let eta = frontETA, let entry = convoy.first(where: { $0.id == id }),
               let behind = entry.timeBehindReference else { return nil }
         // The ETA belongs to the reference it was requested for; if the reference changed since,
         // the gaps no longer line up until the next answer.
         guard snapshot.etaReference?.id == eta.carId else { return nil }
         return eta.arrival.addingTimeInterval(behind)
+    }
+
+    /// Counted from when the ETA was asked, so what is left of a stop does not shift the arrival as the clock runs.
+    private func stopDelay(for eta: FrontETA) -> TimeInterval {
+        guard !stops.isEmpty else { return 0 }
+        let length = mainRoute?.length ?? 0
+        let speed = convoy.first(where: { $0.id == eta.carId })?.speed
+        let pace = NextStop.pace(
+            travelTimeToGo: eta.travelTime, remaining: max(0, length - eta.referenceOffset), speed: speed)
+        return StopDelay.seconds(stops: stops, from: eta.referenceOffset, now: eta.requestedAt, pace: pace)
     }
 
     // MARK: Strings

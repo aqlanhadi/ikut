@@ -232,7 +232,7 @@ struct ConvoyPanel: View {
     }
 
     private var nextStopCell: NextStop.Cell? {
-        if let mine = myEntry { return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: model.stopPace()) }
+        if let mine = myEntry { return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: model.stopPace(), now: Date()) }
         // Still joining: the meeting point, how far my own way in has to go.
         guard let mine = convoy.joining.first(where: { $0.id == model.myCarId }) else { return nil }
         return NextStop.joiningCell(stops: model.stops, distance: mine.distanceToMerge, seconds: mine.timeToMerge)
