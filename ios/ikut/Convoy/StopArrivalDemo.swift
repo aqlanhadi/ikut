@@ -7,9 +7,10 @@ import SwiftUI
 /// "We'll stop after all"), `road-skip-others` (two cars skipping, the viewer's is not), `road-skip-lead` (the lead
 /// car: three cars skipping read as a count, no button). With Leave, D25 4a: `road-leave` (lead car or organizer, "Leaving at 12:40"), `road-leave-confirm` (after tapping
 /// Leave), `road-leave-other` (another car: no button), `road-leave-meet` (meeting point, "Leaving at 9:00");
+/// Skip for everyone, D25 4b: `road-skip-all` (the organizer, no car at the stop yet: "Skip this stop"), `road-skip-all-confirm` (after tapping it), `road-skip-all-others` (a passenger: "Aqlan can skip this stop for everyone."), `road-skip-all-meet` (a meeting point: no skip, only Leave);
 /// RoadStops.dc.html), over the demo convoy. The clock is fixed, so the cars never go stale while it is looked at.
 struct StopArrivalDemo: View {
-    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting, skip, skipMine, skipOthers, skipLead }
+    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting, skip, skipMine, skipOthers, skipLead, skipAll, skipAllConfirm, skipAllOthers, skipAllMeeting }
 
     var scene: Scene
     @State private var map: TripMapModel
@@ -36,7 +37,7 @@ struct StopArrivalDemo: View {
         let model = MapDemo.model(now: now)
         let main = RouteLine(MapDemo.densify(MapDemo.mainWaypoints))
         let bidor = main.project(MapDemo.joiningWaypoints.last ?? .init(latitude: 4.1, longitude: 101.29))?.offset ?? 0
-        let meets = scene == .meeting || scene == .leaveMeeting
+        let meets = scene == .meeting || scene == .leaveMeeting || scene == .skipAllMeeting
         let stopOffset = meets ? bidor : (main.project(.init(latitude: 4.2, longitude: 101.26))?.offset ?? 0)
         let at = main.coordinate(atOffset: stopOffset) ?? main.coordinates[0]
 
@@ -50,13 +51,16 @@ struct StopArrivalDemo: View {
         cars.sort { ($0.number ?? 99) < ($1.number ?? 99) }
         var positions: [String: Position] = [:]
         switch scene {
+        case .skipAll, .skipAllConfirm, .skipAllOthers:
+            positions = ["c1": fix(stopOffset - 9_000, joining: false), "c2": fix(stopOffset - 9_100, joining: false),
+                         "c4": fix(stopOffset - 10_000, joining: false), "c3": fix(stopOffset - 12_000, joining: true)]
         case .someHere, .leave, .leaveConfirm, .leaveOther, .skip, .skipMine, .skipOthers, .skipLead:
             positions = ["c1": fix(stopOffset, joining: false), "c2": fix(stopOffset - 80, joining: false),
                          "c4": fix(stopOffset - 4_000, joining: false), "c3": fix(stopOffset - 12_000, joining: true)]
         case .allHere:
             positions = ["c1": fix(stopOffset, joining: false), "c2": fix(stopOffset - 80, joining: false),
                          "c4": fix(stopOffset + 60, joining: false), "c3": fix(stopOffset - 30, joining: true)]
-        case .meeting, .leaveMeeting:
+        case .meeting, .leaveMeeting, .skipAllMeeting:
             // Everyone joins: the organizer is at the meeting point, the others are still on their way in.
             for i in cars.indices where cars[i].id != "c1" { cars[i].state = .joining }
             positions = ["c1": fix(stopOffset, joining: true), "c2": fix(stopOffset - 3_000, joining: true),
@@ -73,8 +77,8 @@ struct StopArrivalDemo: View {
         if leaveScene, !meets { stop.arrivedAt = Calendar.current.date(bySettingHour: 12, minute: 20, second: 0, of: now) }
         model.setStops([stop])
         model.setCars(cars)
-        model.tripStarted = leaveScene || [.skip, .skipMine, .skipOthers, .skipLead].contains(scene)
-        let viewer = scene == .leaveOther ? "c2" : [.skip, .skipMine, .skipOthers].contains(scene) ? "c4" : "c1"
+        model.tripStarted = leaveScene || [.skip, .skipMine, .skipOthers, .skipLead, .skipAll, .skipAllConfirm, .skipAllOthers, .skipAllMeeting].contains(scene)
+        let viewer = scene == .leaveOther || scene == .skipAllOthers ? "c2" : [.skip, .skipMine, .skipOthers].contains(scene) ? "c4" : "c1"
         model.apply(trip: nil, myCar: cars.first { $0.id == viewer }, myCarId: viewer, positions: positions, isTracker: true)
         return (model, "s1")
     }
@@ -83,8 +87,9 @@ struct StopArrivalDemo: View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
             StopArrivalCard(
-                model: map, stopId: stopId, frozenNow: now, isOrganizer: ![.leaveOther, .skip, .skipMine, .skipOthers].contains(scene), leave: nil,
-                skip: nil, initialAnswers: answers, onClose: {}, startConfirming: scene == .leaveConfirm)
+                model: map, stopId: stopId, frozenNow: now, isOrganizer: ![.leaveOther, .skip, .skipMine, .skipOthers, .skipAllOthers].contains(scene), leave: nil,
+                skip: nil, skipAll: nil, initialAnswers: answers, onClose: {}, startConfirming: scene == .leaveConfirm,
+                startConfirmingSkipAll: scene == .skipAllConfirm)
                 .padding(.horizontal, Spacing.s)
                 .padding(.bottom, Spacing.s)
         }

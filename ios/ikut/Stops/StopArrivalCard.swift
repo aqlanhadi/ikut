@@ -19,6 +19,8 @@ struct StopArrivalCard: View {
     var leave: (@MainActor @Sendable (String) async -> StopLeave.Result)?
     /// Says the viewer's car is skipping (true) or stopping after all (false); the result of the write. Nil in demos.
     var skip: (@MainActor @Sendable (String, Bool) async -> StopLeave.Result)?
+    /// The organizer skips the stop for everyone (D25 4b); the result of the write. Nil in demos.
+    var skipAll: (@MainActor @Sendable (String) async -> StopLeave.Result)?
     /// Listens to the stop's answers (live cards). The demo gives `initialAnswers` instead.
     var listensToAnswers = false
     var initialAnswers: [StopAnswer] = []
@@ -26,6 +28,8 @@ struct StopArrivalCard: View {
 
     /// For the demo: opens on the confirm sentence.
     var startConfirming = false
+    /// For the demo: opens on the organizer's confirm sentence for skipping the stop for everyone.
+    var startConfirmingSkipAll = false
 
     @State private var confirming = false
     @State private var leaving = false
@@ -36,6 +40,11 @@ struct StopArrivalCard: View {
     @State private var skipping = false
     @State private var skipQueued = false
     @State private var couldNotSkip = false
+    @State private var organizerName: String?
+    @State private var confirmingSkipAll = false
+    @State private var skippingAll = false
+    @State private var skipAllQueued = false
+    @State private var couldNotSkipAll = false
 
     var body: some View {
         if let frozenNow {
@@ -68,11 +77,17 @@ struct StopArrivalCard: View {
             } actions: {
                 leaveActions(stop, tally: tally)
                 skipActions(stop, skippers: skippers)
+                skipAllActions(stop, tally: tally)
             }
             .accessibilityIdentifier("stop.arrival")
             .onAppear {
                 if startConfirming { confirming = true }
+                if startConfirmingSkipAll { confirmingSkipAll = true }
                 if answers.isEmpty { answers = initialAnswers }
+            }
+            .task(id: model.organizerId) {
+                guard listensToAnswers, !isOrganizer, let id = model.organizerId else { return }
+                organizerName = await StopLeaveService.organizerName(tripId: tripId, organizerId: id)
             }
             .task(id: stopId) {
                 guard listensToAnswers else { return }
@@ -142,6 +157,65 @@ struct StopArrivalCard: View {
                     }
                     .disabled(skipping)
                 }
+            }
+        }
+    }
+
+    /// "Skip this stop" for the organizer, before any car has reached the stop; everyone else reads who can. One
+    /// sentence to confirm, since it has no undo. The route stays as it is.
+    @ViewBuilder private func skipAllActions(_ stop: PlannedStop, tally: StopArrival.Tally) -> some View {
+        let reached = StopSkipAll.carReached(tally.rows)
+        if StopSkipAll.canSkip(stop: stop, isOrganizer: isOrganizer, tripStarted: model.tripStarted, carReached: reached) {
+            VStack(spacing: Spacing.xs) {
+                if skipAllQueued {
+                    Text("Sends when you have signal")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skipAll.queued")
+                } else if couldNotSkipAll {
+                    Text("That didn’t go through. Try again.")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skipAll.retry")
+                }
+                if confirmingSkipAll {
+                    Text(StopSkipAll.confirmSentence(stop: stop))
+                        .font(.subheadline).multilineTextAlignment(.center).frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("stop.skipAll.confirm.text")
+                    StopActionButton(title: "Skip this stop", style: .destructive, height: 52, id: "stop.skipAll.confirm") {
+                        sendSkipAll(stop)
+                    }
+                    .disabled(skippingAll)
+                    StopActionButton(title: "Not now", style: .ghost, height: 44, id: "stop.skipAll.cancel") {
+                        confirmingSkipAll = false
+                    }
+                } else {
+                    VStack(spacing: Spacing.xs) {
+                        StopActionButton(title: "Skip this stop", style: .destructive, height: 50, id: "stop.skipAll") {
+                            couldNotSkipAll = false
+                            confirmingSkipAll = true
+                        }
+                        Text(StopSkipAll.caption)
+                            .font(.footnote).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
+                    }
+                }
+            }
+        } else if !isOrganizer, StopSkipAll.isSkippable(stop: stop, tripStarted: model.tripStarted, carReached: reached) {
+            Text(StopSkipAll.passengerLine(organizerName: organizerName, cars: model.cars))
+                .font(.footnote).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity).accessibilityIdentifier("stop.skipAll.others")
+        }
+    }
+
+    private func sendSkipAll(_ stop: PlannedStop) {
+        guard let skipAll, let id = stop.id, !skippingAll else { return }
+        skippingAll = true
+        couldNotSkipAll = false
+        skipAllQueued = false
+        Task {
+            let result = await skipAll(id)
+            skippingAll = false
+            // Sent: the stop is skipped, so the card closes by itself when the stop reaches this phone.
+            switch result {
+            case .sent: break
+            case .queued: skipAllQueued = true; confirmingSkipAll = false
+            case .refused: couldNotSkipAll = true; confirmingSkipAll = false
             }
         }
     }

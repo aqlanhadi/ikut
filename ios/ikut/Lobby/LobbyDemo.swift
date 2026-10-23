@@ -133,6 +133,10 @@ enum DemoScreens {
         case "road-skip-mine": return AnyView(StopArrivalDemo(.skipMine))
         case "road-skip-others": return AnyView(StopArrivalDemo(.skipOthers))
         case "road-skip-lead": return AnyView(StopArrivalDemo(.skipLead))
+        case "road-skip-all": return AnyView(StopArrivalDemo(.skipAll))
+        case "road-skip-all-confirm": return AnyView(StopArrivalDemo(.skipAllConfirm))
+        case "road-skip-all-others": return AnyView(StopArrivalDemo(.skipAllOthers))
+        case "road-skip-all-meet": return AnyView(StopArrivalDemo(.skipAllMeeting))
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":
