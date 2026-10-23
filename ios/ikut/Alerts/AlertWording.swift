@@ -23,6 +23,9 @@ struct TripAlert: Sendable, Equatable, Identifiable {
         /// before the nearest car behind reaches it. `eventId` is then that car's id. Shown as its own
         /// pill (`CatchUpPill`), never as a banner.
         case catchUp
+        /// "R&R Tapah in 2 km" (D25), a planned stop coming up. `eventId` is the stop's id. Shown as its
+        /// own pill (`StopApproachPill`), never as a banner.
+        case stopApproach
     }
 }
 

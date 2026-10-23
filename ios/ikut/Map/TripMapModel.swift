@@ -58,6 +58,12 @@ final class TripMapModel {
     @ObservationIgnored private var catchUpAt: Date?
     /// "Aisha’s car is 3.3 km behind you" while its pill is up (D26).
     private(set) var catchUp: TripAlert?
+    /// The trip's planned stops, from the session; only read for the approach pill.
+    @ObservationIgnored private(set) var stops: [PlannedStop] = []
+    @ObservationIgnored private var stopWatch = StopApproach()
+    @ObservationIgnored private var stopApproachAt: Date?
+    /// "R&R Tapah in 2 km" while its pill is up (D25 piece 3a).
+    private(set) var stopApproach: TripAlert?
     @ObservationIgnored private var approach: ApproachMonitor?
     @ObservationIgnored private var approachCarId: String?
     /// My joining route (nil once merged), decoded once per change.
@@ -117,6 +123,7 @@ final class TripMapModel {
     /// Reads trip, my car and positions from the session. Call when any of them changes.
     func sync() {
         guard let session else { return }
+        stops = session.stops
         apply(
             trip: session.trip, myCar: session.car, myCarId: session.member?.carId ?? session.car?.id,
             positions: session.positions, isTracker: session.isTracking, isEnded: session.isEnded)
@@ -155,7 +162,11 @@ final class TripMapModel {
         hazards.setPositions(positions)
         feedHazardServices(routeChanged: routeChanged)
         checkCatchUp()
+        checkStopApproach()
     }
+
+    /// Sets the planned stops without checking (tests, the demo); the next `apply` or `setCars` does.
+    func setStops(_ stops: [PlannedStop]) { self.stops = stops }
 
     /// New car list from the listener. Overlays are rebuilt only when a route or state changed.
     func setCars(_ cars: [Car]) {
@@ -164,6 +175,33 @@ final class TripMapModel {
         convoy.update(cars: cars, positions: positions)
         hazards.setCars(cars)
         checkCatchUp()
+        checkStopApproach()
+    }
+
+    // MARK: A planned stop ahead (D25)
+
+    /// After every convoy update: tells this phone once, about 2 km before a planned stop ahead, and keeps
+    /// the pill up until the car is nearly there, the stop is skipped or passed, or 5 minutes go by.
+    private func checkStopApproach() {
+        if let alert = stopApproach, !stopApproachShowing(alert) { stopApproach = nil }
+        guard !isEnded, let announcer = alertAnnouncer, let tripId = alertTripId,
+              let due = stopWatch.check(stops: stops, myOffset: myOffsetNow()).first else { return }
+        let alert = AlertWording.stopApproach(tripId: tripId, due: due)
+        stopApproach = alert
+        stopApproachAt = Date()
+        announcer.announce(alert: alert)
+    }
+
+    private func stopApproachShowing(_ alert: TripAlert) -> Bool {
+        guard let at = stopApproachAt, Date().timeIntervalSince(at) < 5 * 60 else { return false }
+        return StopApproach.isShowing(stops.first { $0.id == alert.eventId }, distance: stopDistance(alert.eventId))
+    }
+
+    /// Meters from my car to a planned stop along the main route, counting down between fixes; negative
+    /// once passed, nil while my car is off the convoy.
+    func stopDistance(_ stopId: String, now: Date = Date()) -> Double? {
+        guard let stop = stops.first(where: { $0.id == stopId }), let mine = myOffsetNow(now: now) else { return nil }
+        return stop.routeOffset - mine
     }
 
     // MARK: A car parked ahead (D26)

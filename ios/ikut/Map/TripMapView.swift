@@ -332,7 +332,7 @@ struct TripMapView: View {
     }
 
     private var bannerShowing: Bool {
-        if approach != nil || passedText != nil || model.catchUp != nil { return true }
+        if approach != nil || passedText != nil || model.catchUp != nil || model.stopApproach != nil { return true }
         guard let alert = alerts.current, alert.kind == .event else { return false }
         return !bannerHiding.contains(alert.category)
     }
@@ -411,6 +411,12 @@ struct TripMapView: View {
                 StopPillView(pill: stopPill, onButton: pillTapped)
             }
             if let catchUp = model.catchUp { CatchUpPill(alert: catchUp, model: model) }
+            // One pill at a time: a hazard 500 m ahead is more urgent than a stop 2 km ahead, which
+            // waits underneath (it was already spoken) and comes back once the hazard is passed.
+            if let stopApproach = model.stopApproach, approach == nil,
+               let kind = model.stops.first(where: { $0.id == stopApproach.eventId })?.kind {
+                StopApproachPill(alert: stopApproach, kind: kind, model: model)
+            }
             if let approach {
                 ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) }
             }
@@ -688,7 +694,7 @@ struct TripMapView: View {
     private var sessionSignature: SessionSignature {
         SessionSignature(
             trip: session.trip, car: session.car, positions: session.positions,
-            isTracking: session.isTracking, carId: session.member?.carId)
+            isTracking: session.isTracking, carId: session.member?.carId, stops: session.stops)
     }
 
     private struct SessionSignature: Equatable {
@@ -697,6 +703,7 @@ struct TripMapView: View {
         var positions: [String: Position]
         var isTracking: Bool
         var carId: String?
+        var stops: [PlannedStop]
     }
 
     private func appear() {

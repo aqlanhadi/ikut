@@ -54,6 +54,7 @@
 		4ABFF0E282D863E458E06571 /* RecapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 698FEDDD6491F2113B929776 /* RecapService.swift */; };
 		4AC34867A11F17F1141F7F70 /* MapDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3375CFBCC39B1C2F76B90699 /* MapDemo.swift */; };
 		4C2FA06DB04BD4142B933300 /* StopRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82641AA014018A19F3AFFE90 /* StopRouting.swift */; };
+		4CDFCFA89CBE14EB3CE2D9F7 /* StopApproach.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AF3B9CBA8F2BD599933F59C /* StopApproach.swift */; };
 		4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */; };
 		4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 644401FB5F0CAB8C10EF3B3B /* StopTests.swift */; };
 		514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */; };
@@ -136,6 +137,7 @@
 		D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D7B5FA67D691851818F691 /* ConvoyTests.swift */; };
 		D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991414E381145C07351D7F20 /* LocationDeniedView.swift */; };
 		D3FFEEEA36F0755779F7E846 /* TicketStops.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D1B602E823F847DF7D44B34 /* TicketStops.swift */; };
+		D4CA5EDCC3B15AAA09EEE71E /* StopApproachTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */; };
 		D53034881D28E618144A5117 /* CatchUpHeadsUp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */; };
 		D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D417D8CDD8A80CCF181936 /* TrackingTests.swift */; };
 		D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */; };
@@ -158,6 +160,7 @@
 		EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F2A2E1542D39038AFC98D /* AlwaysLocationExplainerView.swift */; };
 		F07B4F17815DB1F4736E7F78 /* TripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2769228FEE1D9534950492 /* TripService.swift */; };
 		F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519810884A2F43AD0A1C337 /* HomeView.swift */; };
+		FD0670372EDB335CD4F4D390 /* StopApproachDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */; };
 		FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DBB4EC8798CACA623AE229 /* IkutApp.swift */; };
 		FECAA7A47E4F47DC37B0083F /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE37346B0076B57911BFD71C /* ModelTests.swift */; };
 /* End PBXBuildFile section */
@@ -215,6 +218,7 @@
 		29D417D8CDD8A80CCF181936 /* TrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTests.swift; sourceTree = "<group>"; };
 		2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		2AEFFFA195297151E2DEE401 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
+		2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachTests.swift; sourceTree = "<group>"; };
 		2CD43B7DF7793A412F23CD58 /* Trip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trip.swift; sourceTree = "<group>"; };
 		2F08168BB70493362B6773C8 /* LocationAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationAccess.swift; sourceTree = "<group>"; };
 		301CCB7DC568D10AFB1C2B1B /* AlertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertTests.swift; sourceTree = "<group>"; };
@@ -232,6 +236,8 @@
 		4374E90353623C476DD233DD /* EventService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventService.swift; sourceTree = "<group>"; };
 		4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		48AAE1E4ECEB3FDD4AEE0F07 /* RecapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapView.swift; sourceTree = "<group>"; };
+		4AF3B9CBA8F2BD599933F59C /* StopApproach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproach.swift; sourceTree = "<group>"; };
+		4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachDemo.swift; sourceTree = "<group>"; };
 		53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillLogic.swift; sourceTree = "<group>"; };
 		55067EC070E1EB3342E091A2 /* StopPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPlanner.swift; sourceTree = "<group>"; };
 		55CC3926DEEA6AE07A394182 /* JoinTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTests.swift; sourceTree = "<group>"; };
@@ -473,6 +479,7 @@
 				4310BE369727B65548BADA52 /* ConvoyPanel.swift */,
 				3375CFBCC39B1C2F76B90699 /* MapDemo.swift */,
 				5D2DCD6B9BBE9B44F7A7D956 /* MapLogic.swift */,
+				4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */,
 				7F7DC3EDEBB7871FAFC1771F /* TripAsks.swift */,
 				5AD7663BE4B472EA27B284CC /* TripMapModel.swift */,
 				265DA41B16D79FE07ABF962B /* TripMapView.swift */,
@@ -561,6 +568,7 @@
 				826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */,
 				573A8FCA989FC37A95705367 /* LiveSpeechEngine.swift */,
 				C963869E69413A0E655BFED4 /* SpeechQueue.swift */,
+				4AF3B9CBA8F2BD599933F59C /* StopApproach.swift */,
 			);
 			path = Alerts;
 			sourceTree = "<group>";
@@ -650,6 +658,7 @@
 				3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */,
 				2392E5A1D08103853E77C151 /* ServerWriteTests.swift */,
 				1AD72135383C0C50AA7ECE9D /* SessionTests.swift */,
+				2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */,
 				13A17502ECF89C7385935BA5 /* StopRouteTests.swift */,
 				644401FB5F0CAB8C10EF3B3B /* StopTests.swift */,
 				29D417D8CDD8A80CCF181936 /* TrackingTests.swift */,
@@ -942,6 +951,8 @@
 				182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */,
 				57A2D5C5D587F6AECCC286A4 /* SheetDrag.swift in Sources */,
 				7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */,
+				4CDFCFA89CBE14EB3CE2D9F7 /* StopApproach.swift in Sources */,
+				FD0670372EDB335CD4F4D390 /* StopApproachDemo.swift in Sources */,
 				3C240B4486DA232F9E1504AA /* StopAskModel.swift in Sources */,
 				2BA5F8BF9D332EAB9287D796 /* StopCard.swift in Sources */,
 				896F02208FFDCCBE93C739BF /* StopCardDemo.swift in Sources */,
@@ -1017,6 +1028,7 @@
 				E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */,
 				16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */,
 				EDBF46FA09C4587FEFC09278 /* SessionTests.swift in Sources */,
+				D4CA5EDCC3B15AAA09EEE71E /* StopApproachTests.swift in Sources */,
 				7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
 				D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */,
