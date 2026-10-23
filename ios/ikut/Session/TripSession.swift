@@ -26,6 +26,8 @@ final class TripSession {
     /// True while leaving or ending; tracking is not restarted meanwhile.
     private(set) var isClosing = false
     private(set) var isTracking = false
+    /// Organizer only: rebuilds the main route mid-trip (a new destination, a stop skipped for everyone).
+    let rebuilder: RouteRebuilder
 
     /// True while this car's sharing is paused: the tracker paused it here, or the car doc says so
     /// (e.g. after a relaunch) and the pause has not expired.
@@ -94,12 +96,17 @@ final class TripSession {
         self.injectedDB = db
         self.carRouteFactory = carRouteFactory
         self.ensureTimeout = ensureTimeout
+        self.rebuilder = RouteRebuilder(tripId: tripId) { result, destination in
+            try await TripService.rebuildRoute(tripId: tripId, result: result, destination: destination)
+        }
         self.tracker.onFix = { [weak self] fix in self?.handle(fix: fix) }
+        self.rebuilder.input = { [weak self] in try await self?.rebuildInput() }
     }
 
     isolated deinit {
         startupTask?.cancel()
         expiryTask?.cancel()
+        rebuilder.cancel()
         tracker.onFix = nil
         tracker.stop()
         removeListeners()
@@ -117,6 +124,7 @@ final class TripSession {
                 if let trip { self.trip = trip }
                 if let message { self.errorMessage = message }
                 self.reevaluate()
+                if self.isOrganizer, trip?.startedAt != nil { self.rebuilder.resumeIfPending() }
             }
         }
 
@@ -163,6 +171,7 @@ final class TripSession {
     /// Stops tracking and detaches every listener.
     func stop() {
         stopTrackingNow()
+        rebuilder.cancel()
         removeListeners()
     }
 
@@ -452,6 +461,26 @@ final class TripSession {
             continuation.resume(returning: success)
             return true
         }
+    }
+
+    /// What the organizer's phone rebuilds the route from (D25 4d). Nil once there is nothing to rebuild here (not
+    /// the organizer, not started, ended); throws while there is no location yet, so the rebuilder tries again.
+    private func rebuildInput() async throws -> RouteRebuild.Input? {
+        guard isOrganizer, isLiveMember, let trip, trip.startedAt != nil else { return nil }
+        let own = member.flatMap { positions[$0.carId] }
+        let organizer: CLLocationCoordinate2D
+        if let here = try? await RouteBuilder.currentLocation() {
+            organizer = here
+        } else if let own {
+            organizer = CLLocationCoordinate2D(latitude: own.location.latitude, longitude: own.location.longitude)
+        } else {
+            throw RouteError.locationUnavailable
+        }
+        return RouteRebuild.Input(
+            route: trip.route, routeSeconds: trip.routeSeconds, stops: stops,
+            destination: CLLocationCoordinate2D(
+                latitude: trip.destination.coordinate.latitude, longitude: trip.destination.coordinate.longitude),
+            destinationName: trip.destination.name, organizer: organizer, organizerOffset: own?.convoyOffset)
     }
 
     /// Every published fix goes to the car-route service without blocking tracking. A reroute needs no

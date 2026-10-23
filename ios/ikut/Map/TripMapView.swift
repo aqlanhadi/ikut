@@ -329,7 +329,8 @@ struct TripMapView: View {
         }
         var toastHidden = false
         if case .hidden = toast.state { toastHidden = true }
-        let nothingBelowSlot = bannerSlotEmpty && passedText == nil && toastHidden && stopError == nil
+        let nothingBelowSlot = bannerSlotEmpty && passedText == nil && session.rebuilder.notice == nil && toastHidden
+            && stopError == nil
         return nothingBelowSlot ? topHeight : topHeight + Spacing.s
     }
 
@@ -424,6 +425,7 @@ struct TripMapView: View {
             }
             AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
             if let passedText { PassedBanner(text: passedText) }
+            if let notice = session.rebuilder.notice { RouteNoticeBanner(notice: notice) }
             ReportToastView(model: toast)
             if let stopError { errorBanner(stopError) }
         }
@@ -620,6 +622,8 @@ struct TripMapView: View {
     private func skipStopForEveryone(_ stopId: String) async -> StopLeave.Result {
         do {
             let sent = try await StopLeaveService.skipForEveryone(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            // The route stops going through it (D25 4d); offline, once there is signal again.
+            session.rebuilder.request()
             return sent ? .sent : .queued
         } catch { return .refused }
     }

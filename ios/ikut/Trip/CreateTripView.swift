@@ -109,6 +109,32 @@ final class CreateTripModel {
         }
     }
 
+    /// Mid-trip (D25 4d): `rebuild` builds the route from where the organizer is now and writes it.
+    func use(_ result: DestinationResult, rebuild: (DestinationResult) async throws -> Void) async -> Bool {
+        guard working == nil else { return false }
+        working = result.id
+        errorMessage = nil
+        defer { working = nil }
+        do {
+            try await rebuild(result)
+            return true
+        } catch {
+            errorMessage = Self.rebuildMessage(error)
+            return false
+        }
+    }
+
+    static let rebuildFallback = "Couldn't change the route. Check your signal and try again."
+
+    /// What the search says when a mid-trip rebuild did not work: Maps' own reasons in plain words, anything else
+    /// (MapKit's or Firestore's text, a refusal) one plain line.
+    static func rebuildMessage(_ error: Error) -> String {
+        switch (error as? LegFailure)?.reason ?? (error as? RouteError) {
+        case .failed, nil: rebuildFallback
+        case let reason?: reason.localizedDescription
+        }
+    }
+
     #if DEBUG
     /// Shows `results` for `query`, searched from `originName`, without searching or locating.
     func showForDemo(query: String, results: [DestinationResult], origin: CLLocationCoordinate2D, originName: String) {
@@ -159,11 +185,17 @@ struct CreateTripView: View {
     var changingTripId: String?
     /// The trip's planned stops when changing its destination: the new route goes through them.
     var keepingStops: [StopDraft]
+    /// Once the trip has started: the route is rebuilt from where the organizer is (D25 4d) instead.
+    var midTrip: ((DestinationResult) async throws -> Void)?
     var onDone: (String) -> Void
 
-    init(changingTripId: String? = nil, keepingStops: [StopDraft] = [], onDone: @escaping (String) -> Void) {
+    init(
+        changingTripId: String? = nil, keepingStops: [StopDraft] = [],
+        midTrip: ((DestinationResult) async throws -> Void)? = nil, onDone: @escaping (String) -> Void
+    ) {
         self.changingTripId = changingTripId
         self.keepingStops = keepingStops
+        self.midTrip = midTrip
         self.onDone = onDone
     }
 
@@ -307,6 +339,10 @@ struct CreateTripView: View {
     private func pick(_ result: DestinationResult) {
         searchFocused = false
         Task {
+            if let tripId = changingTripId, let midTrip {
+                if await model.use(result, rebuild: midTrip) { onDone(tripId) }
+                return
+            }
             if let tripId = changingTripId, !keepingStops.isEmpty {
                 let ok = await model.use(result, through: keepingStops) { route, stops in
                     try await TripService.changeDestination(

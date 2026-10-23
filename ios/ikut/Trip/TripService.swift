@@ -141,6 +141,31 @@ extension TripService {
         try await write(tripId: tripId, destination: nil, plan: plan)
     }
 
+    /// Organizer only (rules), mid-trip (D25 4d): the rebuilt route, the new destination when there is one, and the
+    /// new offsets of the stops ahead, in one batch. The stop count stays. Offline the batch is queued and false comes
+    /// back.
+    @MainActor
+    @discardableResult
+    static func rebuildRoute(tripId: String, result: RouteRebuild.Result, destination: DestinationResult?) async throws -> Bool {
+        let db = Firestore.firestore()
+        let tripRef = db.collection(FirestorePaths.trips).document(tripId)
+        var fields: [String: Any] = ["route": result.route.polyline, "routeSeconds": result.route.travelTime]
+        if let destination {
+            fields["destination"] = [
+                "name": destination.name,
+                "coordinate": GeoPoint(
+                    latitude: destination.coordinate.latitude, longitude: destination.coordinate.longitude),
+            ]
+        }
+        nonisolated(unsafe) let payload = fields
+        nonisolated(unsafe) let batch = db.batch()
+        batch.updateData(payload, forDocument: tripRef)
+        for (id, offset) in result.offsets {
+            batch.updateData(["routeOffset": offset], forDocument: tripRef.collection("stops").document(id))
+        }
+        return try await ServerWrite.commit { try await batch.commit() }
+    }
+
     @MainActor
     private static func write(tripId: String, destination: DestinationResult?, plan: StopPlanSave) async throws {
         let db = Firestore.firestore()

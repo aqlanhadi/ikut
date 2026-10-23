@@ -34,5 +34,19 @@ enum StopApproachDemo {
                         stopService: DemoStopService())
         }
     }
+
+    /// The organizer's map once the route was rebuilt mid-trip (D25 4d), or while the rebuild waits for signal.
+    static func routeNotice(waiting: Bool) -> some View {
+        Backend.configure()
+        let model = MapDemo.model()
+        model.setCars(model.cars)
+        let session = TripSession(tripId: "demo", userId: "u-c1")
+        session.rebuilder.showForDemo(RouteRebuilder.Notice(
+            text: waiting ? RouteRebuilder.waitingLine : RouteRebuild.sentence(through: ["R&R Tapah", "Ipoh"]),
+            waiting: waiting))
+        return NavigationStack {
+            TripMapView(session: session, model: model, stopService: DemoStopService())
+        }
+    }
 }
 #endif

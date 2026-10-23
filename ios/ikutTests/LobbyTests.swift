@@ -50,11 +50,10 @@ struct LobbyTests {
         #expect(image.size.width == image.size.height)
     }
 
-    @Test func changeDestinationIsHiddenOnAStartedTripThatHasStops() {
-        #expect(LobbyLogic.canChangeDestination(canEdit: true, started: false, hasStops: true))
-        #expect(LobbyLogic.canChangeDestination(canEdit: true, started: true, hasStops: false))
-        #expect(!LobbyLogic.canChangeDestination(canEdit: true, started: true, hasStops: true))
-        #expect(!LobbyLogic.canChangeDestination(canEdit: false, started: false, hasStops: false))
+    /// #189: the route is rebuilt from where the organizer is (D25 4d), so a started trip with stops offers it too.
+    @Test func changeDestinationIsTheOrganizersUntilTheTripEnds() {
+        #expect(LobbyLogic.canChangeDestination(canEdit: true))
+        #expect(!LobbyLogic.canChangeDestination(canEdit: false))
     }
 
     private func trip(status: TripStatus = .active, startedAt: Date? = nil) -> Trip {

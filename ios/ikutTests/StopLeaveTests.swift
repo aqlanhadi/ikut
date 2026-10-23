@@ -304,4 +304,55 @@ struct StopLeaveEmulatorTests {
         }
         try Auth.auth().signOut()
     }
+    /// D25 4d: after a skip for everyone the organizer writes the rebuilt route with the new offset of the stop still
+    /// ahead in one batch; the skipped stop keeps its offset, and a car that is not the organizer cannot rebuild.
+    @Test func theOrganizerRebuildsTheRouteAfterASkip() async throws {
+        let trip = try await EmulatorTrip.make(name: "Rebuild", route: Fixtures.longRoute)
+        let code = try await trip.code()
+        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
+        let bidor = PlannedStop(
+            id: "bidor", name: "Bidor", coordinate: GeoPoint(latitude: 4.1, longitude: 101.25), routeOffset: 40_000,
+            kind: .food, minutes: 30, order: 0)
+        let tapah = PlannedStop(
+            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
+            kind: .fuel, minutes: 20, order: 1)
+        try await TripService.saveStops(
+            tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [bidor, tapah], removedIds: []))
+        await TripService.markStarted(tripId: trip.tripId)
+        try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "bidor", userId: trip.uid)
+
+        let rebuilt = BuiltRoute(distance: 198_000, travelTime: 9_100, name: "E1", polyline: Polyline.encode([.init(latitude: 3.0, longitude: 101.5), .init(latitude: 4.6, longitude: 101.1)]))
+        let result = RouteRebuild.Result(route: rebuilt, offsets: ["tapah": 55_000], sentence: "")
+        let sent = try await TripService.rebuildRoute(tripId: trip.tripId, result: result, destination: nil)
+        #expect(sent)
+        let db = Firestore.firestore()
+        let after = try await db.document(FirestorePaths.trip(trip.tripId)).getDocument(as: Trip.self)
+        #expect(after.route == rebuilt.polyline && after.routeSeconds == 9_100 && after.stopCount == 2)
+        func offset(_ id: String) async throws -> Double {
+            try await db.document(FirestorePaths.stop(tripId: trip.tripId, stopId: id)).getDocument(as: PlannedStop.self).routeOffset
+        }
+        #expect(try await offset("tapah") == 55_000)
+        #expect(try await offset("bidor") == 40_000)
+
+        // A new destination goes in the same batch; the skipped stop's offset never moves.
+        let kampar = DestinationResult(name: "Kampar", subtitle: "", coordinate: .init(latitude: 4.3, longitude: 101.15))
+        let again = RouteRebuild.Result(route: Fixtures.longRoute, offsets: ["tapah": 60_000], sentence: "")
+        try await TripService.rebuildRoute(tripId: trip.tripId, result: again, destination: kampar)
+        #expect(try await db.document(FirestorePaths.trip(trip.tripId)).getDocument(as: Trip.self).destination.name == "Kampar")
+        let moveSkipped = RouteRebuild.Result(route: rebuilt, offsets: ["bidor": 1_000], sentence: "")
+        await #expect(throws: (any Error).self) {
+            try await TripService.rebuildRoute(tripId: trip.tripId, result: moveSkipped, destination: nil)
+        }
+        #expect(try await offset("bidor") == 40_000)
+
+        // A joined car that is not the organizer cannot rebuild the route.
+        try Auth.auth().signOut()
+        try await Auth.auth().signInAnonymously()
+        _ = try await LiveJoinAPI().join(
+            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        await #expect(throws: (any Error).self) {
+            try await TripService.rebuildRoute(tripId: trip.tripId, result: result, destination: nil)
+        }
+        try Auth.auth().signOut()
+    }
 }
