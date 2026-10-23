@@ -68,30 +68,65 @@ final class RecapModel {
     private(set) var recap: Recap?
     private(set) var originName: String?
     private(set) var errorMessage: String?
+    /// How the recap is fetched; tests give their own.
+    private let fetch: @MainActor (String) async throws -> RecapSnapshot
+    /// Whether a load writes the phone's cache and past-trips list (tests turn it off).
+    private let persist: Bool
 
-    init(tripId: String) {
+    /// Plain words, without the system's message.
+    static let couldntLoad = "Couldn’t load this recap. Check your connection and try again."
+
+    /// For tests: a failed load.
+    init(failedTripId: String) {
+        tripId = failedTripId
+        errorMessage = Self.couldntLoad
+        fetch = { try await RecapService.fetch(tripId: $0) }
+        persist = true
+    }
+
+    /// `fetch` and `persist` are for tests: a load that doesn't touch the server or the phone's files.
+    init(tripId: String, originName: String? = nil,
+         fetch: @escaping @MainActor (String) async throws -> RecapSnapshot = { try await RecapService.fetch(tripId: $0) },
+         persist: Bool = true) {
         self.tripId = tripId
-        if let cached = RecapService.cached(tripId: tripId) { apply(cached) }
+        self.originName = originName
+        self.fetch = fetch
+        self.persist = persist
+        if persist, let cached = RecapService.cached(tripId: tripId) { apply(cached) }
     }
 
     /// For previews and the screenshot test.
     init(snapshot: RecapSnapshot, originName: String? = nil) {
         tripId = snapshot.tripId
         self.originName = originName
+        fetch = { try await RecapService.fetch(tripId: $0) }
+        persist = true
         apply(snapshot)
+    }
+
+    /// Nothing to show yet: not loaded and not failed.
+    var isLoading: Bool { snapshot == nil && errorMessage == nil }
+
+    /// Try again after a load that couldn't finish: back to loading, then the same load.
+    func retry(myUserId: String?) async {
+        guard snapshot == nil else { return }
+        errorMessage = nil
+        await load(myUserId: myUserId)
     }
 
     func load(myUserId: String?) async {
         do {
-            let fresh = try await RecapService.fetch(tripId: tripId)
-            let merged = RecapLogic.merge(cached: RecapService.cached(tripId: tripId), fresh: fresh)
-            RecapService.save(merged)
-            PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt,
-                             others: merged.memberNames.isEmpty ? nil : PastTrips.others(from: merged.memberNames, excluding: myUserId))
+            let fresh = try await fetch(tripId)
+            let merged = persist ? RecapLogic.merge(cached: RecapService.cached(tripId: tripId), fresh: fresh) : fresh
+            if persist {
+                RecapService.save(merged)
+                PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt,
+                                 others: merged.memberNames.isEmpty ? nil : PastTrips.others(from: merged.memberNames, excluding: myUserId))
+            }
             apply(merged)
             errorMessage = nil
         } catch {
-            if snapshot == nil { errorMessage = "Couldn't load this trip. \(error.localizedDescription)" }
+            if snapshot == nil { errorMessage = Self.couldntLoad }
         }
         if originName == nil, let first = snapshot.flatMap({ Polyline.decode($0.route).first }) {
             originName = await RouteBuilder.placeName(at: first)

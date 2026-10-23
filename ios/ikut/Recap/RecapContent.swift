@@ -1,0 +1,230 @@
+import SwiftUI
+
+/// The timeline filter: All, Stops, Road Reports.
+enum RecapFilter: String, CaseIterable, Identifiable {
+    case all = "All", stops = "Stops", reports = "Road Reports"
+    var id: String { rawValue }
+
+    func matches(_ item: RecapTimelineItem) -> Bool {
+        switch self {
+        case .all: true
+        case .stops: item.kind == .stop
+        case .reports: item.kind == .hazard
+        }
+    }
+}
+
+/// What a recap says: the stat card, awards and the filtered timeline (design/project/Summary.dc.html).
+/// One view for both places a recap shows, so they can't drift apart: the full screen at the end of
+/// a trip (`RecapView`) and the sheet over Home's map when a past trip is picked (`PickedTripSheet`).
+struct RecapContent: View {
+    enum Layout: Equatable {
+        /// The screen after a trip: "Trip complete", name and subtitle on top, a route map card
+        /// above the stats, and Share and Done at the bottom.
+        case screen
+        /// Inside Home's sheet: the name is already pinned above, the map is Home's own.
+        case sheet
+    }
+
+    var recap: Recap
+    var snapshot: RecapSnapshot
+    var layout: Layout
+    @Binding var filter: RecapFilter
+    /// The screen's route map card.
+    var onOpenMap: () -> Void = {}
+    /// A timeline item was tapped (only items with a place on the map are tappable); nil leaves rows plain.
+    var onSelect: ((RecapTimelineItem) -> Void)?
+    var onDone: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// At the largest text sizes the sheet's tiles and awards go one to a row (the screen keeps two).
+    private var columns: Int { layout == .sheet && typeSize.isAccessibilitySize ? 1 : 2 }
+
+    var body: some View {
+        if layout == .screen {
+            Text("Trip complete")
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ikutAccent)
+                .padding(.horizontal, Spacing.xs).padding(.top, Spacing.cozy)
+            Text(recap.title)
+                .font(.largeTitle.bold())
+                .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)
+                .accessibilityAddTraits(.isHeader)
+            Text(recap.subtitle)
+                .font(.subheadline).foregroundStyle(.secondary)
+                .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)
+        }
+
+        VStack(spacing: 0) {
+            if layout == .screen {
+                Button(action: onOpenMap) {
+                    RecapRouteMap(recap: recap, snapshot: snapshot, interactive: false)
+                        .frame(height: 150)
+                        .overlay(alignment: .bottomTrailing) {
+                            Label("Route map", systemImage: "arrow.up.left.and.arrow.down.right")
+                                .font(.footnote.weight(.semibold))
+                                .padding(.horizontal, 11).frame(height: 30)
+                                .background(.regularMaterial, in: Capsule())
+                                .padding(Spacing.s)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open full route map")
+            }
+            statGrid(recap.stats)
+        }
+        .ikutCard()
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .padding(.top, layout == .screen ? Spacing.section : Spacing.l)
+
+        if !recap.awards.isEmpty {
+            sectionTitle("Road Trip Awards")
+            LazyVGrid(columns: columns == 1 ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible())], spacing: Spacing.gap) {
+                ForEach(recap.awards, id: \.kind) { award(of: $0, snapshot) }
+            }
+        }
+
+        sectionTitle("Timeline")
+        Picker("Filter timeline", selection: $filter) {
+            ForEach(RecapFilter.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        timeline(recap.timeline.filter(filter.matches))
+            .padding(.top, Spacing.m)
+
+        ForEach(recap.notes, id: \.self) { note in
+            InlineNote(note, systemImage: "info.circle", inset: Spacing.xs)
+                .padding(.top, Spacing.m)
+        }
+
+        VStack(spacing: Spacing.xs) {
+            ShareLink(item: Self.shareText(recap)) {
+                Label("Share Recap with Convoy", systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(PillButtonStyle())
+            if let onDone {
+                Button("Done", action: onDone).buttonStyle(LinkPillButtonStyle())
+            }
+        }
+        .padding(.top, Spacing.block)
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text).font(.title2.bold())
+            .padding(.horizontal, Spacing.xs).padding(.top, 26).padding(.bottom, Spacing.s)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func statGrid(_ stats: [RecapStat]) -> some View {
+        Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+            ForEach(Array(stride(from: 0, to: stats.count, by: columns)), id: \.self) { row in
+                if row > 0 { Divider() }
+                GridRow {
+                    statTile(stats[row])
+                    if columns == 2, row + 1 < stats.count {
+                        statTile(stats[row + 1]).overlay(alignment: .leading) { Rectangle().fill(Color(.separator)).frame(width: 0.5) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func statTile(_ s: RecapStat) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
+            Text(s.label).font(.footnote).foregroundStyle(.secondary)
+            (Text(s.value).font(.system(size: 28, weight: .bold, design: .rounded))
+                + Text(s.unit.isEmpty ? "" : " \(s.unit)").font(.system(size: 17, weight: .semibold)).foregroundStyle(.secondary))
+                .monospacedDigit()
+            Text(s.note.isEmpty ? " " : s.note).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.cozy)
+        .accessibilityElement(children: .combine)
+    }
+
+    private static let awardStyle: [RecapAward.Kind: (symbol: String, tint: Color)] = [
+        .lead: ("bolt.fill", Color(hex: "#C93400")!),
+        .firstIn: ("flag.checkered", Color(hex: "#1F7A35")!),
+        .reporter: ("eye.fill", Color(hex: "#B25000")!),
+        .stopCaller: ("fuelpump.fill", Color(hex: "#D70015")!),
+        .sweeper: ("shield.fill", Color(hex: "#5856D6")!),
+    ]
+
+    private func award(of a: RecapAward, _ s: RecapSnapshot) -> some View {
+        let style = Self.awardStyle[a.kind] ?? ("star.fill", .ikutAccent)
+        let car = s.cars.first { $0.id == a.carId }
+        return VStack(alignment: .leading, spacing: Spacing.gap) {
+            HStack {
+                Image(systemName: style.symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 40, height: 40).background(style.tint, in: Circle())
+                Spacer()
+                if let car { CarBadge(number: car.number, colorHex: car.color, size: 26) }
+            }
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text(a.title).font(.headline)
+                Text(a.detail).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.cozy)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .ikutCard()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func timeline(_ items: [RecapTimelineItem]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if items.isEmpty {
+                Text(filter == .all ? "Nothing to show." : "None on this trip, or no longer stored.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .padding(.bottom, Spacing.m)
+            }
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                timelineRow(item, isLast: index == items.count - 1)
+            }
+        }
+        .padding(.horizontal, Spacing.l).padding(.top, Spacing.l).padding(.bottom, Spacing.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ikutCard()
+    }
+
+    @ViewBuilder
+    private func timelineRow(_ item: RecapTimelineItem, isLast: Bool) -> some View {
+        if let onSelect, item.coordinate != nil {
+            Button { onSelect(item) } label: { rowBody(item, isLast: isLast).contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows it on the map")
+        } else {
+            rowBody(item, isLast: isLast)
+        }
+    }
+
+    private func rowBody(_ item: RecapTimelineItem, isLast: Bool) -> some View {
+                HStack(alignment: .top, spacing: Spacing.m) {
+                    Text(RecapLogic.clock(item.time))
+                        .font(.footnote.weight(.semibold)).foregroundStyle(.secondary).monospacedDigit()
+                        .frame(width: 42, alignment: .leading).padding(.top, 5)
+                    VStack(spacing: Spacing.xs) {
+                        RecapEventDot(kind: item.kind, symbol: item.symbol, size: 28)
+                        if !isLast {
+                            Capsule().fill(Color(.systemGray5)).frame(width: 2).frame(minHeight: 12)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.title).font(.subheadline.weight(.semibold))
+                        if !item.detail.isEmpty {
+                            Text(item.detail).font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, Spacing.xs).padding(.bottom, Spacing.l)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityElement(children: .combine)
+    }
+
+    /// What Share sends, from the screen's and the sheet's Share alike.
+    static func shareText(_ r: Recap) -> String {
+        var lines = ["\(r.title): trip complete", r.subtitle]
+        lines += r.stats.map { "\($0.label): \($0.value)\($0.unit.isEmpty ? "" : " \($0.unit)")" }
+        return lines.joined(separator: "\n")
+    }
+}
