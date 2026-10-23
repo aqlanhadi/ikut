@@ -44,4 +44,4 @@ POSTs (`/api/start`, `/api/stop`, `/api/command`) and `GET /api/config` need `Co
 
 **Screens tab** (`screens.mjs`): `GET /api/screens` returns `{simulators, groups}` (the `case "…":` names in `enum DemoScreens`, parsed at request time, grouped by prefix).
 `POST /api/screen {sim: "1"|"2", screen}` boots the simulator if it is shut down, then runs `SIMCTL_CHILD_IKUT_SCREEN=<screen> xcrun simctl launch --terminate-running-process <udid> dev.aqlan.ikut` (execFile, no shell).
-The simulator comes from a fixed list and the name must be one the parser found (404 otherwise); a simulator held through `qa/simlock.sh` answers 409 with its holder text (`/tmp/ikut-sim-<udid>.holder`); an app that is not installed answers 409 with the build and install command. Same POST checks as above.
+The simulator comes from a fixed list and the name must be one the parser found (404 otherwise); a simulator held through `qa/simlock.sh` (holder text in `/tmp/ikut-sim-<udid>.holder`) or running a plain `xcodebuild test` answers 409 saying so; an app that is not installed answers 409 with the build and install command. Same POST checks as above.

@@ -37,7 +37,7 @@ export function groupScreens(names) {
   return groups;
 }
 
-export const simByUdid = (id) => SIMULATORS.find((s) => s.id === String(id));
+export const simById = (id) => SIMULATORS.find((s) => s.id === String(id));
 export const lockPath = (udid) => `/tmp/ikut-sim-${udid}.lock`;
 export const holderPath = (udid) => `/tmp/ikut-sim-${udid}.holder`;
 
@@ -49,13 +49,29 @@ export async function simHolder(udid, exec = promisify(execFile), read = (p) => 
   }
 }
 
+/** The `xcodebuild test` (or test-without-building) aimed at this simulator, from `ps -axo pid=,etime=,command=` lines; null when none.
+ *  Mirrors the parse in tools/status.mjs (an xcodebuild command, its action, `id=<udid>` in the destination). */
+export function testingOn(udid, psLines) {
+  for (const line of psLines) {
+    const m = /^\s*\d+\s+\S+\s+(.*)$/.exec(line);
+    const cmd = m?.[1] ?? '';
+    if (!/^\S*xcodebuild\s/.test(cmd)) continue;
+    const action = /\s(test-without-building|build-for-testing|test|build|clean)(\s|$)/.exec(cmd)?.[1];
+    if ((action === 'test' || action === 'test-without-building') && cmd.includes(`id=${udid}`)) return `xcodebuild ${action}`;
+  }
+  return null;
+}
+const psLines = async (exec) => (await exec('ps', ['-axo', 'pid=,etime=,command='])).stdout.split('\n');
+
 /** The state of a launch request as plain words. Returns {ok, message, build?, hint?}. */
-export async function launchScreen({ sim, screen }, { names, exec = promisify(execFile), holder = simHolder, modified = async (p) => (await stat(p)).mtime } = {}) {
-  const s = simByUdid(sim);
+export async function launchScreen({ sim, screen }, { names, exec = promisify(execFile), holder = simHolder, ps = psLines, modified = async (p) => (await stat(p)).mtime } = {}) {
+  const s = simById(sim);
   if (!s) return { code: 404, ok: false, message: 'That simulator is not one of the two this page can use.' };
   if (!names.includes(screen)) return { code: 404, ok: false, message: 'The app has no screen with that name.' };
   const busy = await holder(s.udid, exec);
   if (busy) return { code: 409, ok: false, message: `${s.name} is busy with: ${busy}. Wait for it to finish, or use the other phone.` };
+  const testing = testingOn(s.udid, await ps(exec).catch(() => []));
+  if (testing) return { code: 409, ok: false, message: `${s.name} is running tests (${testing} …). Wait for it to finish, or use the other phone.` };
   let build = null;
   try { await boot(s, exec); } catch (e) { return { code: 500, ok: false, message: `${s.name} would not start (${String(e.stderr || e.message).trim().split('\n')[0]}).` }; }
   try {
