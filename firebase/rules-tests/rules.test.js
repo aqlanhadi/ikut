@@ -846,6 +846,45 @@ describe('a car\'s skip answer', () => {
     await seedAnswers({ posOffset: 61849 });
     await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
   });
+  it('exactly 150 m short of the stop is there: denied; just over 150 m short can skip', async () => {
+    await seedAnswers({ posOffset: 61850 });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await seedAnswers({ posOffset: 61849.5 });
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  describe('a meeting point', () => {
+    const seedMeet = async (carState, posOffset) => {
+      await seedAnswers({ posOffset });
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const f = ctx.firestore();
+        await setDoc(doc(f, `trips/${T}/stops/s1`), { name: 'Petronas', coordinate: pt, routeOffset: 5000, kind: 'meet', order: 0 });
+        await setDoc(doc(f, `trips/${T}/cars/carA`), carDoc({ trackerUserId: 'mem', state: carState }));
+      });
+    };
+    it('a car still joining (on its own way in) can skip it', async () => {
+      await seedMeet('joining', 100);
+      await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    });
+    it('a car already on the main route cannot skip it, however short of it', async () => {
+      await seedMeet('convoy', 100);
+      await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    });
+    it('at routeOffset 0, a joining car whose own offset is 0 can skip it; a convoy car cannot', async () => {
+      await seedMeet('joining', 0);
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), `trips/${T}/stops/s1`), { name: 'Petronas', coordinate: pt, routeOffset: 0, kind: 'meet', order: 0 }));
+      await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), `trips/${T}/cars/carA`), carDoc({ trackerUserId: 'mem', state: 'convoy' })));
+      await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    });
+    it('another kind of stop does not ask for a joining car', async () => {
+      await seedMeet('convoy', 100);
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), `trips/${T}/stops/s1`), stopDoc({ routeOffset: 5000 })));
+      await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    });
+  });
   it('a car that has reached the stop cannot skip it', async () => {
     await seedAnswers({ posOffset: 62000 });
     await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));

@@ -571,8 +571,10 @@ struct TripMapView: View {
                 .accessibilityHidden(panelAside)
             if arrivalOpen, !stopCardOpen, let id = arrivalStopId {
                 StopArrivalCard(
-                    model: model, stopId: id, frozenNow: nil, isOrganizer: session.isOrganizer,
-                    leave: liveServices ? { @MainActor stopId in await leaveStop(stopId) } : nil
+                    model: model, stopId: id, tripId: session.tripId, frozenNow: nil, isOrganizer: session.isOrganizer,
+                    leave: leaveHandler,
+                    skip: skipHandler,
+                    listensToAnswers: liveServices
                 ) {
                     withAnimation(.snappy) { arrivalStopId = nil }
                 }
@@ -598,11 +600,32 @@ struct TripMapView: View {
             onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } })
     }
 
+    private var leaveHandler: (@MainActor @Sendable (String) async -> StopLeave.Result)? {
+        guard liveServices else { return nil }
+        return { stopId in await leaveStop(stopId) }
+    }
+
+    private var skipHandler: (@MainActor @Sendable (String, Bool) async -> StopLeave.Result)? {
+        guard liveServices else { return nil }
+        return { stopId, skipping in await answerStop(stopId, skipping: skipping) }
+    }
+
     /// Leave on the who-is-here card (D25 4a): sent when the server took it, queued when it did not answer in time
     /// (no signal; Firestore keeps the write and sends it when the phone is back online), refused when the rules said no.
     private func leaveStop(_ stopId: String) async -> StopLeave.Result {
         do {
             let sent = try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            return sent ? .sent : .queued
+        } catch { return .refused }
+    }
+
+    /// "We'll skip this stop" / "We'll stop after all" on the who-is-here card (D25 5b), same three outcomes as Leave.
+    private func answerStop(_ stopId: String, skipping: Bool) async -> StopLeave.Result {
+        guard let carId = model.myCarId else { return .refused }
+        do {
+            let sent = skipping
+                ? try await StopAnswerService.skip(tripId: session.tripId, stopId: stopId, carId: carId, userId: session.userId)
+                : try await StopAnswerService.undo(tripId: session.tripId, stopId: stopId, carId: carId)
             return sent ? .sent : .queued
         } catch { return .refused }
     }

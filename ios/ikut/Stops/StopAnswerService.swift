@@ -8,25 +8,30 @@ import Foundation
 enum StopAnswerService {
     /// The viewer's car says it is skipping the stop. Writes the same document again if a second phone in the car
     /// says it too.
-    static func skip(tripId: String, stopId: String, carId: String, userId: String) async throws {
+    /// True once the server took it, false when it is queued (no signal; it goes through when back online).
+    @discardableResult
+    static func skip(tripId: String, stopId: String, carId: String, userId: String) async throws -> Bool {
         nonisolated(unsafe) let payload: [String: Any] = [
             "answer": StopAnswerKind.skip.rawValue, "userId": userId, "at": FieldValue.serverTimestamp(),
         ]
         let ref = Firestore.firestore().document(FirestorePaths.answer(tripId: tripId, stopId: stopId, carId: carId))
-        try await ServerWrite.commit { try await ref.setData(payload) }
+        return try await ServerWrite.commit { try await ref.setData(payload) }
     }
 
     /// "We'll stop after all": takes the car's answer back. Nothing to do if there is none.
-    static func undo(tripId: String, stopId: String, carId: String) async throws {
+    @discardableResult
+    static func undo(tripId: String, stopId: String, carId: String) async throws -> Bool {
         let ref = Firestore.firestore().document(FirestorePaths.answer(tripId: tripId, stopId: stopId, carId: carId))
-        try await ServerWrite.commit { try await ref.delete() }
+        return try await ServerWrite.commit { try await ref.delete() }
     }
 
     /// The answers on one stop, as they change.
     static func listen(tripId: String, stopId: String) -> AsyncStream<[StopAnswer]> {
         let query = Firestore.firestore().collection(FirestorePaths.answers(tripId: tripId, stopId: stopId))
         return AsyncStream { continuation in
-            nonisolated(unsafe) let registration = query.addSnapshotListener { snapshot, _ in
+            nonisolated(unsafe) let registration = query.addSnapshotListener { snapshot, error in
+                // A listener that errors (the rules said no) is over: end the stream instead of waiting forever.
+                if error != nil { continuation.finish(); return }
                 guard let snapshot else { return }
                 continuation.yield(snapshot.documents.compactMap { try? $0.data(as: StopAnswer.self) })
             }

@@ -10,7 +10,8 @@ const car = (id, offset, extra = {}) => ({ id, number: Number(id.slice(1)), loca
 
 test('here within 150 m either side, not beyond', () => {
   for (const o of [19_851, 19_900, 20_000, 20_149]) assert.equal(status(car('c1', o), target).kind, 'here', String(o));
-  for (const o of [19_800, 20_200]) assert.equal(status(car('c1', o), target).kind, 'away', String(o));
+  assert.equal(status(car('c1', 19_800), target).kind, 'away');
+  assert.equal(status(car('c1', 20_200), target).kind, 'passed');
 });
 
 test('a stale fix is never here, however close', () => {
@@ -42,4 +43,19 @@ test('3 of 4 here counts every car once, joining ones too, by badge number', () 
   assert.equal(t.title, '3 of 4 here');
   assert.deepEqual(t.rows.map((r) => r.id), ['c1', 'c2', 'c3', 'c4']);
   assert.equal(t.rows[3].status.seconds, 120);
+});
+
+test('a car past the stop is passed, not minutes away (150 m beyond is still here)', () => {
+  assert.equal(status(car('c1', 20_151), target).kind, 'passed');
+  assert.equal(status(car('c1', 20_150), target).kind, 'here');
+});
+
+test('a skipping car stays a row but leaves the count', () => {
+  const cars = [car('c1', 20_000), car('c2', 19_920), car('c3', 11_000), { id: 'c4', number: 4 }];
+  assert.equal(tally(target, cars).title, '2 of 4 here');
+  const t = tally(target, cars, { skipping: new Set(['c3']) });
+  assert.equal(t.title, '2 of 3 here');
+  assert.equal(t.rows.length, 4);
+  assert.equal(t.rows.find((r) => r.id === 'c3').skipping, true);
+  assert.equal(tally(target, cars, { skipping: new Set(['c3', 'c4']) }).title, '2 of 2 here');
 });

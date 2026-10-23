@@ -156,4 +156,38 @@ struct StopArrivalTests {
         s.id = "m"
         #expect(StopArrival.target(stopId: "m", in: [s])?.isMeeting == true)
     }
+
+    @Test func aSkippingCarLeavesTheCountAndStaysInTheList() {
+        let cars = [car("c1", number: 1), car("c2", number: 2), car("c3", number: 3)]
+        let positions = ["c1": position(offset: stopOffset), "c2": position(offset: stopOffset - 100),
+                         "c3": position(offset: stopOffset - 9_000)]
+        let snapshot = ConvoyOrdering.order(cars: cars, positions: positions, now: now)
+        func tally(_ skipping: Set<String>) -> StopArrival.Tally {
+            StopArrival.tally(target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now, skipping: skipping)
+        }
+        #expect(tally([]).title == "2 of 3 here")
+        let skipped = tally(["c3"])
+        #expect(skipped.title == "2 of 2 here" && skipped.allHere)
+        #expect(skipped.rows.count == 3 && skipped.rows.first { $0.id == "c3" }?.skipping == true)
+        #expect(StopArrival.words(skipped.rows[2]) == "Skipping")
+        // Leave does not wait for it.
+        #expect(StopLeave.waitingLine(skipped.rows, leaving: "c1") == nil)
+        #expect(StopLeave.waitingLine(tally([]).rows, leaving: "c1") != nil)
+    }
+
+    @Test func aCarPastTheStopReadsDrovePastAndACarNotReportedYetStillCounts() {
+        #expect(status(stopOffset + 151) == .passed)
+        #expect(StopArrival.words(status(stopOffset + 151)) == "Drove past")
+        #expect(status(stopOffset + 150) == .here)
+        let cars = [car("c1", number: 1), car("c2", number: 2)]
+        let snapshot = ConvoyOrdering.order(cars: cars, positions: ["c1": position(offset: stopOffset)], now: now)
+        // The tally is given the trip's cars: c2 has no position, is in neither list, and gets a row of its own.
+        let tally = StopArrival.tally(
+            target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now, cars: cars)
+        #expect(tally.title == "1 of 2 here" && !tally.allHere)
+        #expect(tally.rows.last?.status == .unknown)
+        #expect(StopArrival.words(tally.rows[1]) == "Waiting for location")
+        // Leave names it instead of saying everyone is here.
+        #expect(StopLeave.waitingLine(tally.rows, leaving: "c1") == "No location from Car 2 yet")
+    }
 }

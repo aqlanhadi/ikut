@@ -40,19 +40,27 @@ enum StopArrival {
         case lastSeenHere
         /// No position at all yet.
         case unknown
+        /// Past the stop along the route (more than the here-radius beyond it): it drove by, so no "N min away".
+        case passed
     }
 
     struct Row: Equatable, Identifiable, Sendable {
         var id: String
         var car: Car
         var status: Status
+        /// The car said it is skipping this stop (`SkipAnswers`): shown, but not counted and not waited for.
+        var skipping = false
         var isHere: Bool { status == .here }
     }
 
     struct Tally: Equatable, Sendable {
         var rows: [Row]
-        var here: Int { rows.filter(\.isHere).count }
-        var total: Int { rows.count }
+        /// Skipping cars leave the count: "3 of 3 here" with a fourth car skipping. A car with no position yet still
+        /// counts: it has a row of its own ("Waiting for location") because `tally` adds one for every trip car in
+        /// neither list.
+        var counted: [Row] { rows.filter { !$0.skipping } }
+        var here: Int { counted.filter(\.isHere).count }
+        var total: Int { counted.count }
         var allHere: Bool { total > 0 && here == total }
         /// "3 of 4 here".
         var title: String { "\(here) of \(total) here" }
@@ -83,6 +91,7 @@ enum StopArrival {
         let alongRoute = offset.map { abs(target.routeOffset - $0) }
         let near = straight <= NextStop.hereRadius || (alongRoute ?? .infinity) <= NextStop.hereRadius
         if near { return HazardLogic.isFresh(position, now: now, config: config) ? .here : .lastSeenHere }
+        if let offset, offset > target.routeOffset { return .passed }
         let perMeter = pace ?? (speed > 0 ? 1 / speed : nil)
         if let alongRoute { return .away(distance: alongRoute, seconds: perMeter.map { $0 * alongRoute }) }
         // A joining car: its way in goes to the meeting point, so its own time to merge is the time to it.
@@ -92,7 +101,8 @@ enum StopArrival {
 
     /// Every car in the trip once, convoy and joining, by badge number.
     static func tally(
-        target: Target, convoy: [ConvoyEntry], joining: [JoiningEntry], pace: Double?, now: Date
+        target: Target, convoy: [ConvoyEntry], joining: [JoiningEntry], pace: Double?, now: Date,
+        skipping: Set<String> = [], cars: [Car] = []
     ) -> Tally {
         var rows: [Row] = convoy.map {
             Row(id: $0.id, car: $0.car, status: status(
@@ -103,12 +113,22 @@ enum StopArrival {
                 position: $0.position, offset: nil, target: target, pace: pace, speed: $0.speed,
                 timeToMerge: $0.timeToMerge, now: now))
         }
+        // A convoy car that has not reported yet is in neither list: it still counts, waited for, with no position.
+        let listed = Set(rows.map(\.id))
+        rows += cars.compactMap { car in
+            guard let id = car.id, !listed.contains(id) else { return nil }
+            return Row(id: id, car: car, status: .unknown)
+        }
+        for i in rows.indices where skipping.contains(rows[i].id) { rows[i].skipping = true }
         rows.sort { a, b in
             let na = a.car.number ?? Int.max, nb = b.car.number ?? Int.max
             return na != nb ? na < nb : a.id < b.id
         }
         return Tally(rows: rows)
     }
+
+    /// What a row says: "Skipping" for a skipping car, else `words(status)`.
+    static func words(_ row: Row) -> String { row.skipping ? "Skipping" : words(row.status) }
 
     /// "Here", "3 min away", "9 km away" (no time to give), "Waiting for location".
     static func words(_ status: Status) -> String {
@@ -119,6 +139,61 @@ enum StopArrival {
         case .away: "On the way"
         case .lastSeenHere: "Last seen here"
         case .unknown: "Waiting for location"
+        case .passed: "Drove past"
+        }
+    }
+}
+
+/// Reading a stop's answers (D25 5a wrote them, 5b shows them). Pure.
+enum SkipAnswers {
+    /// The car ids that said they are skipping this stop. Pass `among` (the cars still in the trip) to leave out
+    /// answers from cars that are gone, or nil to take every answer as it is.
+    static func skipping(_ answers: [StopAnswer], among carIds: Set<String>? = nil) -> Set<String> {
+        Set(answers.compactMap { answer in
+            guard answer.answer == .skip, let id = answer.id else { return nil }
+            if let carIds, !carIds.contains(id) { return nil }
+            return id
+        })
+    }
+
+    /// Whether the car has said it is skipping.
+    static func isSkipping(carId: String, in answers: [StopAnswer]) -> Bool {
+        skipping(answers).contains(carId)
+    }
+
+    /// The viewer's car may say "we'll skip": it is not the lead car, the stop is not skipped for everyone, and
+    /// the car is still more than the here-radius short of it (the rules check the same, from the car's last
+    /// reported place: exactly 150 m short is already there). `carOffset` is its place on the main route, nil
+    /// before it has merged. A meeting point takes it from a joining car and no other (`isJoining`, #215; the rules
+    /// check the car's state).
+    static func canSkip(
+        stop: PlannedStop, isLeadCar: Bool, carOffset: Double?, tripStarted: Bool, isJoining: Bool
+    ) -> Bool {
+        guard tripStarted, !isLeadCar, stop.isOpen else { return false }
+        // A meeting point is decided by the car's state alone (the offset of a car with no way in of its own is
+        // about 0, the meet's own offset).
+        if stop.isMeeting { return isJoining }
+        guard let carOffset else { return true }
+        return carOffset < stop.routeOffset - NextStop.hereRadius
+    }
+
+    /// What everyone reads about the cars skipping, one line per car up to two; with more, one line.
+    /// "Daniel’s car is skipping R&R Tapah"; a car with no owner name in its name: "Myvi is skipping R&R Tapah";
+    /// the viewer's own: "You’re skipping R&R Tapah". At a meeting point (`meeting`): "Daniel will meet you along
+    /// the way", "You’ll meet the convoy along the way", "3 cars will meet you along the way".
+    static func lines(skippingCars cars: [Car], stopName: String, meeting: Bool = false, viewerCarId: String? = nil) -> [String] {
+        let sorted = cars.sorted { ($0.number ?? Int.max, $0.id ?? "") < ($1.number ?? Int.max, $1.id ?? "") }
+        if sorted.count > 2 {
+            return [meeting ? "\(sorted.count) cars will meet you along the way" : "\(sorted.count) cars are skipping \(stopName)"]
+        }
+        return sorted.map { car in
+            if car.id != nil, car.id == viewerCarId {
+                return meeting ? "You’ll meet the convoy along the way" : "You’re skipping \(stopName)"
+            }
+            let word = StopLeave.ownerWord(car)
+            let owned = word != car.name
+            if meeting { return "\(word) will meet you along the way" }
+            return owned ? "\(word)’s car is skipping \(stopName)" : "\(word) is skipping \(stopName)"
         }
     }
 }
