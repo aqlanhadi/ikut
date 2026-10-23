@@ -134,6 +134,15 @@ service cloud.firestore {
         || get(pos).data.convoyOffset < stop.routeOffset - 150;
     }
 
+    // The car may say "we'll skip" this stop (one read of the stop, passed in). A meeting point only takes it from a
+    // car that is still joining: a car with no way in of its own projects onto the main route and would read as
+    // past it, so it could never skip the meet; a car on the main route (state 'convoy') is not heading for it.
+    function carMaySkip(tripId, carId, stop) {
+      return stopTakesAnswers(stop)
+        && carNotThereYet(tripId, carId, stop)
+        && (stop.kind != 'meet' || get(carPath(tripId, carId)).data.get('state', null) == 'joining');
+    }
+
     function tripNotStarted(tripId) {
       return trip(tripId).get('startedAt', null) == null;
     }
@@ -425,8 +434,7 @@ service cloud.firestore {
             && !tripNotStarted(tripId)
             && get(memberPath(tripId, request.auth.uid)).data.carId == carId
             && get(carPath(tripId, carId)).data.get('isLead', false) != true
-            && stopTakesAnswers(get(/databases/$(database)/documents/trips/$(tripId)/stops/$(stopId)).data)
-            && carNotThereYet(tripId, carId, get(/databases/$(database)/documents/trips/$(tripId)/stops/$(stopId)).data)
+            && carMaySkip(tripId, carId, get(/databases/$(database)/documents/trips/$(tripId)/stops/$(stopId)).data)
             && request.resource.data.keys().hasOnly(['answer', 'userId', 'at'])
             && request.resource.data.keys().hasAll(['answer', 'userId', 'at'])
             && request.resource.data.answer == 'skip'
