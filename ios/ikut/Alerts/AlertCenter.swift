@@ -142,12 +142,14 @@ final class AlertCenter {
         return true
     }
 
-    /// Announces an alert that isn't about a trip event ("Aisha’s car is 3.3 km behind you") the same
-    /// way: banner slot or notification, and read aloud. Once per alert id while listening to its trip.
+    /// Announces an alert that isn't about a trip event ("Aisha’s car is 3.3 km behind you"): read
+    /// aloud, and a notification in the background. Never the banner slot: its own pill shows it on
+    /// the map, so a hazard or status banner already up stays. Once per alert id while listening to
+    /// its trip.
     @discardableResult
     func announce(alert: TripAlert) -> Bool {
         guard tripId == alert.tripId, announced.insert(alert.id).inserted else { return false }
-        deliver(alert)
+        deliver(alert, banner: false)
         return true
     }
 
@@ -158,9 +160,9 @@ final class AlertCenter {
         for event in fresh { await announce(event: event) }
     }
 
-    private func deliver(_ alert: TripAlert) {
+    private func deliver(_ alert: TripAlert, banner: Bool = true) {
         if isForeground() {
-            show(alert)
+            if banner { show(alert) }
         } else {
             let notifier = notifier
             Task { await notifier.post(alert) }
