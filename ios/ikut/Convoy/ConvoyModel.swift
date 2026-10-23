@@ -284,6 +284,12 @@ final class ConvoyModel {
         }
     }
 
+    /// Time to merge while the car moves, distance under the speed floor; nil without an estimate.
+    func joinAmount(_ e: JoiningEntry) -> ConvoyFormat.JoinAmount? {
+        ConvoyFormat.joinAmount(
+            timeToMerge: e.timeToMerge, distanceToMerge: e.distanceToMerge, speed: e.speed, parkedSpeed: config.parkedSpeed)
+    }
+
     var joiningRows: [JoiningRowText] { joiningRows(myCarId: nil) }
 
     func joiningRows(myCarId: String?) -> [JoiningRowText] {
@@ -296,7 +302,7 @@ final class ConvoyModel {
                     ? ConvoyFormat.lastSeen(age: e.age ?? 0)
                     : (e.position == nil ? "Waiting for location" : ConvoyFormat.speed(metersPerSecond: e.speed)),
                 subtitleIsWarning: e.isStale,
-                trailingPrimary: e.timeToMerge.map(ConvoyFormat.duration) ?? "--",
+                trailingPrimary: joinAmount(e)?.text ?? "--",
                 trailingSecondary: "to merge", isStale: e.isStale)
         }
     }

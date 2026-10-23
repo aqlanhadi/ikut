@@ -22,6 +22,8 @@ struct ConvoyPanel: View {
 
     @State private var listHeight: CGFloat = 0
     @State private var originName: String?
+    @State private var ownStartName: String?
+    @State private var joinPlaceName: String?
 
     private var convoy: ConvoyModel { model.convoy }
     private let maxListHeight: CGFloat = 220
@@ -51,6 +53,16 @@ struct ConvoyPanel: View {
             guard let start = model.mainRoute?.coordinates.first else { return }
             originName = await RouteBuilder.placeName(at: start)
         }
+        .task(id: ownKey) {
+            ownStartName = nil
+            guard let start = OwnWayLogic.start(car: model.myCar, phone: nil) else { return }
+            ownStartName = await RouteBuilder.placeName(at: start)
+        }
+        .task(id: joinKey) {
+            joinPlaceName = nil
+            guard let at = OwnWayLogic.joinCoordinate(ownJoin?.join, main: model.mainRoute ?? RouteLine([])) else { return }
+            joinPlaceName = await RouteBuilder.placeName(at: at)
+        }
     }
 
     // MARK: Derived values
@@ -58,6 +70,33 @@ struct ConvoyPanel: View {
     private var originKey: String {
         guard let c = model.mainRoute?.coordinates.first else { return "" }
         return "\(c.latitude),\(c.longitude)"
+    }
+
+    /// How my car meets the main route; nil before its route is known.
+    private var ownJoin: (join: OwnWayJoin, ownToJoin: Double, own: RouteLine?, viaMeeting: Bool)? {
+        guard let main = model.mainRoute else { return nil }
+        return OwnWayLogic.join(car: model.myCar, main: main)
+    }
+
+    private var ownKey: String {
+        guard let c = OwnWayLogic.start(car: model.myCar, phone: nil) else { return "" }
+        return "\(c.latitude),\(c.longitude)"
+    }
+
+    private var joinKey: String {
+        guard let main = model.mainRoute, let c = OwnWayLogic.joinCoordinate(ownJoin?.join, main: main) else { return "" }
+        return "\(c.latitude),\(c.longitude)"
+    }
+
+    private var myJoining: JoiningEntry? { convoy.joining.first(where: { $0.id == model.myCarId }) }
+
+    /// My own trip's words: start town, and the joining line while my car is joining.
+    private var headerText: ConvoyHeader.Text {
+        ConvoyHeader.text(
+            car: model.myCar, joinEntry: myJoining, join: ownJoin?.join,
+            ownStartTown: ownStartName.map(ConvoyFormat.placeShortName), mainStartTown: originShort,
+            joinPlace: joinPlaceName.map(ConvoyFormat.placeShortName), destination: destinationShort,
+            amount: myJoining.flatMap { convoy.joinAmount($0) })
     }
 
     private var routeLength: Double? {
@@ -102,14 +141,21 @@ struct ConvoyPanel: View {
     private var header: some View {
         let destination = convoy.destinationName ?? ""
         let arrive = frontArrival.map { ConvoyFormat.clock($0) }
+        let text = headerText
         return HStack(alignment: .top, spacing: Spacing.s) {
             VStack(alignment: .leading, spacing: 0) {
                 StatCaption("From")
-                Text(originShort ?? "Start")
+                Text(text.from)
                     .font(.system(size: endSize, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if let departed = model.departedAt {
+                if let joinLine = text.joinLine {
+                    Text(joinLine)
+                        .font(.footnote)
+                        .foregroundStyle(Color.surfaceSecondary)
+                        .monospacedDigit()
+                        .lineLimit(2)
+                } else if let departed = model.departedAt {
                     Text("Left \(ConvoyFormat.clock(departed))")
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
@@ -135,18 +181,9 @@ struct ConvoyPanel: View {
         .padding(.horizontal, Spacing.xs)
         .padding(.top, Spacing.xs)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(headerLabel(destination: destination, arrive: arrive))
+        .accessibilityLabel(ConvoyHeader.label(title: convoy.title, text: text, destination: destination, arrive: arrive))
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("convoy.header")
-    }
-
-    /// Starts with "3 in Convoy" (UI tests read it), then the route and arrival. The convoy's motion
-    /// is in the trip pill at the top of the map.
-    private func headerLabel(destination: String, arrive: String?) -> String {
-        var parts = [convoy.title]
-        if let originName { parts.append("from \(originName) to \(destination)") } else { parts.append("to \(destination)") }
-        if let arrive { parts.append("arrive \(arrive)") }
-        return parts.joined(separator: ", ")
     }
 
     @ViewBuilder
@@ -204,7 +241,8 @@ struct ConvoyPanel: View {
         let parts = ConvoyFormat.convoySummary(
             driving: convoy.convoy.count, joinerName: joiner?.car.name, joinIn: joiner?.timeToMerge,
             spread: convoy.convoy.count > 1 ? convoy.snapshot.spread : nil,
-            joinerIsMe: joiner != nil && joiner?.id == model.myCarId)
+            joinerIsMe: joiner != nil && joiner?.id == model.myCarId,
+            joinAmount: joiner.flatMap { convoy.joinAmount($0) })
         let warn = model.separationWarning != nil
         var text = Text(parts.driving).fontWeight(.semibold)
         if let joining = parts.joining { text = text + Text(" · \(joining)") }

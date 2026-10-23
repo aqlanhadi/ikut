@@ -110,20 +110,58 @@ enum ConvoyFormat {
         return placeShortForms[key] ?? name
     }
 
+    /// How far a joining car is from the convoy, in the unit that is honest: time while it moves, distance under
+    /// the speed floor (a parked car's "2 h" is the floor talking, not the car).
+    enum JoinAmount: Equatable {
+        case time(TimeInterval)
+        case distance(Double)
+
+        /// "20 min", "14 km".
+        var text: String {
+            switch self {
+            case .time(let t): return ConvoyFormat.duration(t)
+            case .distance(let d): return ConvoyFormat.distance(d)
+            }
+        }
+
+        /// "20 minutes", "14 km": for VoiceOver.
+        var spoken: String {
+            switch self {
+            case .distance(let d): return ConvoyFormat.distance(d)
+            case .time(let t):
+                let minutes = max(1, Int((max(0, t.isFinite ? t : 0) / 60).rounded()))
+                guard minutes >= 60 else { return minutes == 1 ? "1 minute" : "\(minutes) minutes" }
+                let h = minutes / 60, m = minutes % 60
+                let hours = h == 1 ? "1 hour" : "\(h) hours"
+                return m == 0 ? hours : "\(hours) \(m) minutes"
+            }
+        }
+    }
+
+    /// Nil without an estimate. `speed` and `parkedSpeed` in m/s: under the floor it is the distance.
+    static func joinAmount(timeToMerge: TimeInterval?, distanceToMerge: Double?, speed: Double, parkedSpeed: Double) -> JoinAmount? {
+        guard let timeToMerge else { return nil }
+        if speed < parkedSpeed, let distanceToMerge { return .distance(distanceToMerge) }
+        return .time(timeToMerge)
+    }
+
     /// The collapsed panel's summary parts: "3 cars driving", "Hafiz joins in 18 min",
     /// "6.4 km spread". The joiner is named by the first word of the car name, without "'s".
     /// When the joiner is my own car it reads in the second person: "You join in 18 min", "You're joining".
+    /// `joinAmount`, when given, replaces `joinIn`: a slow car says how far, not how long ("You join in 14 km").
     static func convoySummary(
-        driving: Int, joinerName: String?, joinIn: TimeInterval?, spread: Double?, joinerIsMe: Bool = false
+        driving: Int, joinerName: String?, joinIn: TimeInterval?, spread: Double?, joinerIsMe: Bool = false,
+        joinAmount: JoinAmount? = nil
     ) -> (driving: String, joining: String?, spread: String?) {
+        let joinText = joinAmount?.text ?? joinIn.map(duration)
         let drivingText = driving == 1 ? "1 car driving" : "\(driving) cars driving"
         var joining: String?
         if joinerIsMe {
-            joining = joinIn.map { "You join in \(duration($0))" } ?? "You\u{2019}re joining"
+            joining = joinText.map { "You join in \($0)" } ?? "You\u{2019}re joining"
         } else if let joinerName, !joinerName.isEmpty {
             var owner = joinerName.split(separator: " ").first.map(String.init) ?? joinerName
             for suffix in ["\u{2019}s", "'s"] where owner.hasSuffix(suffix) { owner = String(owner.dropLast(2)) }
-            joining = joinIn.map { "\(owner) joins in \(duration($0))" } ?? "\(owner) joining"
+            joining = joinText.map { "\(owner) joins in \($0)" } ?? "\(owner) joining"
         }
         return (drivingText, joining, spread.map { "\(distance($0)) spread" })
     }
