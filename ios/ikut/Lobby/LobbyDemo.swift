@@ -125,6 +125,10 @@ enum DemoScreens {
         case "road-arrival": return AnyView(StopArrivalDemo(.someHere))
         case "road-arrival-all": return AnyView(StopArrivalDemo(.allHere))
         case "road-arrival-meet": return AnyView(StopArrivalDemo(.meeting))
+        case "road-leave": return AnyView(StopArrivalDemo(.leave))
+        case "road-leave-confirm": return AnyView(StopArrivalDemo(.leaveConfirm))
+        case "road-leave-other": return AnyView(StopArrivalDemo(.leaveOther))
+        case "road-leave-meet": return AnyView(StopArrivalDemo(.leaveMeeting))
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":

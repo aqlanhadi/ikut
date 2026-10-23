@@ -38,7 +38,7 @@ enum SkipAnswers {
     /// the car is still more than the here-radius short of it (the rules check the same, from the car's last
     /// reported place). `carOffset` is its place on the main route, nil before it has merged.
     static func canSkip(stop: PlannedStop, isLeadCar: Bool, carOffset: Double?, tripStarted: Bool) -> Bool {
-        guard tripStarted, !isLeadCar, stop.isActive else { return false }
+        guard tripStarted, !isLeadCar, stop.isOpen else { return false }
         guard let carOffset else { return true }
         return carOffset < stop.routeOffset - NextStop.hereRadius
     }

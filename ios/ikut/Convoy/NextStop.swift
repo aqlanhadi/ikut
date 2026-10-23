@@ -30,7 +30,7 @@ enum NextStop {
     /// The first stop (by place on the route) that is not skipped and that `offset` has not left
     /// behind by more than the here-radius.
     static func next(in stops: [PlannedStop], from offset: Double) -> PlannedStop? {
-        stops.filter { $0.isActive && $0.routeOffset >= offset - hereRadius }
+        stops.filter { $0.isOpen && $0.routeOffset >= offset - hereRadius }
             .min { $0.routeOffset < $1.routeOffset }
     }
 
@@ -58,7 +58,7 @@ enum NextStop {
     /// with how far its own route has to go. Nil without a meeting point or a known distance, and for any other
     /// stop: a car that has not joined has no place on the route to measure them from.
     static func joiningCell(stops: [PlannedStop], distance: Double?, seconds: TimeInterval?) -> Cell? {
-        guard let distance, let meet = stops.first(where: { $0.isMeeting && $0.isActive }) else { return nil }
+        guard let distance, let meet = stops.first(where: { $0.isMeeting && $0.isOpen }) else { return nil }
         let here = distance <= hereRadius
         return Cell(
             name: meet.name, distance: here ? 0 : distance, seconds: here ? nil : seconds, isHere: here, stopId: meet.id)

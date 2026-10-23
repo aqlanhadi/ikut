@@ -79,6 +79,8 @@ struct StopActionButton: View {
     enum Style { case primary, secondary, positive, ghost, destructive }
 
     var title: String
+    /// A small second line under the title ("Hafiz is 3 min away").
+    var subtitle: String?
     var style: Style = .secondary
     var height: CGFloat = 50
     var disabled = false
@@ -91,10 +93,15 @@ struct StopActionButton: View {
         // At accessibility sizes a long title wraps to two lines and the button grows, not truncates.
         let large = typeSize.isAccessibilitySize
         Button(action: action) {
-            Text(title)
-                .font(.headline)
-                .lineLimit(large ? 2 : 1)
-                .minimumScaleFactor(large ? 1 : 0.8)
+            VStack(spacing: 0) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(large ? 2 : 1)
+                    .minimumScaleFactor(large ? 1 : 0.8)
+                if let subtitle {
+                    Text(subtitle).font(.caption).opacity(0.85).lineLimit(large ? 2 : 1)
+                }
+            }
                 .multilineTextAlignment(.center)
                 .padding(.vertical, large ? Spacing.s : 0)
                 .padding(.horizontal, large ? Spacing.l : 0)

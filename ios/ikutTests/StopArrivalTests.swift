@@ -36,10 +36,32 @@ struct StopArrivalTests {
     }
 
     @Test func aStaleFixIsNeverHere() {
-        // Exactly at the stop, but the last fix is 61 s old.
-        #expect(status(stopOffset, age: 61) != .here)
+        // Exactly at the stop, but the last fix is 61 s old: not here, and not "1 min away" either.
+        #expect(status(stopOffset, age: 61) == .lastSeenHere)
         #expect(status(stopOffset, age: 60) == .here)
-        if case .away(let distance, _) = status(stopOffset, age: 300) { #expect(distance == 0) } else { Issue.record("expected away") }
+        #expect(StopArrival.words(status(stopOffset, age: 300)) == "Last seen here")
+        // Stale and far from the stop it is just away, as before.
+        if case .away = status(stopOffset - 3_000, age: 300) {} else { Issue.record("expected away") }
+        // A stale car at the stop is not counted.
+        let cars = [car("c1", number: 1)]
+        let snapshot = ConvoyOrdering.order(cars: cars, positions: ["c1": position(offset: stopOffset, age: 300)], now: now)
+        let tally = StopArrival.tally(target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now)
+        #expect(tally.here == 0)
+    }
+
+    @Test func wordsForACarWithNoTimeToGive() {
+        #expect(StopArrival.words(.away(distance: 9_000, seconds: nil)) == "9.0 km away")
+        #expect(StopArrival.words(.away(distance: nil, seconds: nil)) == "On the way")
+        #expect(StopArrival.words(.here) == "Here")
+    }
+
+    @Test func hereByOffsetAloneWhenTheStraightLineIsFar() {
+        // The route bends: the car is 100 m short along the route, but its fix is far from the stop as the crow flies.
+        let far = position(offset: stopOffset - 100, along: stopOffset - 5_000)
+        let s = StopArrival.status(position: far, offset: stopOffset - 100, target: target, pace: nil, speed: 25, now: now)
+        #expect(s == .here)
+        let notThere = StopArrival.status(position: far, offset: stopOffset - 400, target: target, pace: nil, speed: 25, now: now)
+        #expect(notThere != .here)
     }
 
     @Test func minutesAwayFromOffsetAndPace() {
@@ -57,7 +79,9 @@ struct StopArrivalTests {
         let far = position(offset: nil, along: stopOffset - 9_000)
         let away = StopArrival.status(
             position: far, offset: nil, target: meet, pace: 0.04, speed: 25, timeToMerge: 420, now: now)
-        #expect(away == .away(distance: 9_000, seconds: 420) || { if case .away(_, 420) = away { true } else { false } }())
+        guard case .away(let distance?, let seconds?) = away else { Issue.record("expected away with a time"); return }
+        #expect(abs(distance - 9_000) < 5)
+        #expect(seconds == 420)
         #expect(StopArrival.words(away) == "7 min away")
         // Within 150 m of the meeting point on a fresh fix, the joining car is here without a main-route offset.
         let near = StopArrival.status(

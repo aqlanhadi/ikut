@@ -570,7 +570,10 @@ struct TripMapView: View {
                 .allowsHitTesting(!panelAside)
                 .accessibilityHidden(panelAside)
             if arrivalOpen, !stopCardOpen, let id = arrivalStopId {
-                StopArrivalCard(model: model, stopId: id, frozenNow: nil) {
+                StopArrivalCard(
+                    model: model, stopId: id, frozenNow: nil, isOrganizer: session.isOrganizer,
+                    leave: liveServices ? { stopId in await leaveStop(stopId) } : nil
+                ) {
                     withAnimation(.snappy) { arrivalStopId = nil }
                 }
                 .padding(.horizontal, Spacing.s)
@@ -593,6 +596,15 @@ struct TripMapView: View {
             stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: openReport, onStop: openStopCard,
             onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } })
+    }
+
+    /// Leave on the who-is-here card (D25 4a). True once the write is sent (offline it stays queued and the stop
+    /// shows as left right away); false when the server refused it.
+    private func leaveStop(_ stopId: String) async -> Bool {
+        do {
+            try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            return true
+        } catch { return false }
     }
 
     private func stopCard(_ context: StopContext) -> some View {
@@ -734,6 +746,7 @@ struct TripMapView: View {
                 isForeground: { UIApplication.shared.applicationState == .active })
         }
         model.start()
+        model.arrivalWriter = { tripId, stopId in try await StopLeaveService.markArrived(tripId: tripId, stopId: stopId) }
         model.startHazardAlerts(announcer: alerts, userId: session.userId)
         // Weak: the model holds `alerts` as its announcer, so a strong capture would keep every map opened.
         alerts.carDistance = { [weak model] in model?.convoy.distance(fromMyCarTo: $0) }
