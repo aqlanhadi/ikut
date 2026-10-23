@@ -119,8 +119,19 @@ final class CreateTripModel {
             try await rebuild(result)
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.rebuildMessage(error)
             return false
+        }
+    }
+
+    static let rebuildFallback = "Couldn't change the route. Check your signal and try again."
+
+    /// What the search says when a mid-trip rebuild did not work: Maps' own reasons in plain words, anything else
+    /// (MapKit's or Firestore's text, a refusal) one plain line.
+    static func rebuildMessage(_ error: Error) -> String {
+        switch (error as? LegFailure)?.reason ?? (error as? RouteError) {
+        case .failed, nil: rebuildFallback
+        case let reason?: reason.localizedDescription
         }
     }
 

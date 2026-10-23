@@ -4,8 +4,8 @@ import Observation
 
 /// The main route rebuilt mid-trip (D25 4d): after a new destination, or a stop skipped for everyone.
 ///
-/// The new route keeps the old one, point for point, up to where the organizer is, then goes from the organizer
-/// through the open stops still ahead to the destination. So every offset behind the organizer (the meeting point,
+/// The new route keeps the old one, point for point, up to where the organizer is, then goes from that point on
+/// the old line through the open stops still ahead to the destination. So every offset behind the organizer (the meeting point,
 /// stops passed or left, cars and hazards there) means the same on both lines, and only the stretch ahead moves.
 enum RouteRebuild {
     /// What the organizer's phone knows when it rebuilds.
@@ -30,10 +30,6 @@ enum RouteRebuild {
         var sentence: String
     }
 
-    /// The organizer closer than this to the old route starts the new legs where they are; further off, the
-    /// legs start on the old route where it is nearest, so the main route never jumps across country.
-    static let onRouteDistance = CarRouteLogic.nearMainThreshold
-
     /// Meters along `line` where the organizer is.
     static func cutOffset(on line: RouteLine, organizer: CLLocationCoordinate2D, organizerOffset: Double?) -> Double? {
         let hint = organizerOffset.flatMap { offset in line.cumulative.lastIndex { $0 <= offset } }
@@ -53,8 +49,10 @@ enum RouteRebuild {
               let cut = cutOffset(on: old, organizer: input.organizer, organizerOffset: input.organizerOffset)
         else { throw RouteError.noRoute }
         let prefix = CarRouteLogic.truncate(old, atOffset: cut)
-        let cutPoint = prefix[prefix.count - 1]
-        let start = RouteLine.haversine(cutPoint, input.organizer) <= onRouteDistance ? input.organizer : cutPoint
+        // The new legs start on the old line where the organizer is nearest, never at the organizer's own fix: the
+        // route is shared with every member, also while the organizer's sharing is paused, and it never jumps
+        // across country from a side road.
+        let start = prefix[prefix.count - 1]
         let via = ahead(input.stops, cut: cut)
         let legs = try await StopRouting.legs(
             from: start, via: via.map { CLLocationCoordinate2D(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }, to: input.destination, router: router)
@@ -90,6 +88,18 @@ final class RouteRebuilder {
     }
 
     nonisolated static let waitingLine = "The route will change once you have signal again"
+    nonisolated static let noFixLine = "The route will change once your phone finds where you are"
+    nonisolated static let noRoadLine = "Maps can't find a road for the new route yet. Trying again soon"
+
+    /// What the organizer reads while the rebuild waits, by what went wrong.
+    nonisolated static func waitingLine(for error: Error) -> String {
+        let reason = (error as? LegFailure)?.reason ?? (error as? RouteError)
+        switch reason {
+        case .locationUnavailable: return noFixLine
+        case .noRoute: return noRoadLine
+        default: return waitingLine
+        }
+    }
     nonisolated static let retryDelays: [Duration] = [.seconds(15), .seconds(30), .seconds(60), .seconds(120)]
     nonisolated static let noticeTime: Duration = .seconds(8)
 
@@ -106,6 +116,8 @@ final class RouteRebuilder {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    /// A new destination is being built and written: the retry loop waits for it, so the two never write at once.
+    @ObservationIgnored private var changing = false
 
     init(
         tripId: String, router: LegRouting = MapKitLegRouter(), defaults: UserDefaults = .standard,
@@ -125,7 +137,11 @@ final class RouteRebuilder {
     func request() {
         isPending = true
         defaults.set(true, forKey: pendingKey)
-        guard task == nil else { return }
+        startLoop()
+    }
+
+    private func startLoop() {
+        guard task == nil, !changing, isPending else { return }
         task = Task { [weak self] in await self?.retryLoop() }
     }
 
@@ -136,7 +152,18 @@ final class RouteRebuilder {
     }
 
     /// The organizer picked a new destination mid-trip: once, now. Throws so the search can say what went wrong.
+    /// A retry in flight is stopped and waited for first, so a route built for the old destination never lands after
+    /// this one; the new route also carries out any skip still waiting, and if it fails the retries go on.
     func changeDestination(to destination: DestinationResult) async throws {
+        changing = true
+        defer {
+            changing = false
+            startLoop()
+        }
+        if let running = task {
+            running.cancel()
+            await running.value
+        }
         guard var input = try await input() else { throw RouteError.locationUnavailable }
         input.destination = destination.coordinate
         input.destinationName = destination.name
@@ -165,7 +192,7 @@ final class RouteRebuilder {
             } catch is CancellationError {
                 break
             } catch {
-                notice = Notice(text: Self.waitingLine, waiting: true)
+                notice = Notice(text: Self.waitingLine(for: error), waiting: true)
                 let delay = Self.retryDelays[min(attempt, Self.retryDelays.count - 1)]
                 attempt += 1
                 do { try await sleep(delay) } catch { break }

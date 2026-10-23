@@ -94,7 +94,7 @@ struct LobbyView: View {
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
     private var canEdit: Bool { isOrganizer && canLeave }
-    /// Change destination: not on a started trip that has stops.
+    /// Change destination: the organizer, until the trip ends (mid-trip it rebuilds the route from where they are).
     private var canChangeDestination: Bool {
         LobbyLogic.canChangeDestination(canEdit: canEdit)
     }

@@ -26,12 +26,16 @@ private func line(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D, step
     }
 }
 
-/// Straight roads at 25 m/s; records where each leg starts. `failures` legs throw before the roads answer.
+/// Straight roads at 25 m/s; records where each leg starts. `failures` legs throw `error` before the roads answer.
 private final class Roads: LegRouting, @unchecked Sendable {
     private let lock = NSLock()
     private var _starts: [CLLocationCoordinate2D] = []
     private var _failures: Int
-    init(failures: Int = 0) { _failures = failures }
+    private let error: Error
+    init(failures: Int = 0, error: Error = RouteError.noRoute) {
+        _failures = failures
+        self.error = error
+    }
     var starts: [CLLocationCoordinate2D] { lock.withLock { _starts } }
 
     func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
@@ -40,7 +44,7 @@ private final class Roads: LegRouting, @unchecked Sendable {
             _starts.append(from)
             return false
         }
-        if fail { throw RouteError.noRoute }
+        if fail { throw error }
         let points = line(from, to)
         let length = RouteLine(points).length
         return RouteLeg(coordinates: points, distance: length, travelTime: length / 25, name: "E1")
@@ -175,16 +179,18 @@ struct RouteRebuildTests {
         #expect(result.sentence == "The route now goes straight to Ipoh")
     }
 
-    /// An organizer well off the route (a petrol station down a side road) does not drag the line across country:
-    /// the new legs start on the old route where it is nearest.
-    @Test func anOrganizerOffTheRouteStartsTheNewLegsOnIt() async throws {
-        let roads = Roads()
-        _ = try await RouteRebuild.build(input(organizer: at(north: 50_000, east: 1_000)), router: roads)
-        let first = try #require(roads.starts.first)
-        #expect(RouteLine.haversine(first, at(north: 50_000)) < 5)
-        let near = Roads()
-        _ = try await RouteRebuild.build(input(organizer: at(north: 50_000, east: 100)), router: near)
-        #expect(RouteLine.haversine(try #require(near.starts.first), at(north: 50_000, east: 100)) < 1)
+    /// The new legs start on the old route where the organizer is nearest: well off it (a petrol station down a side
+    /// road) the line does not jump across country, and close to it the organizer's own fix is never a point of the
+    /// shared route (their sharing may be paused).
+    @Test func theNewLegsStartOnTheRouteNeverAtTheOrganizer() async throws {
+        for east in [1_000.0, 100, 20] {
+            let roads = Roads()
+            let organizer = at(north: 50_000, east: east)
+            let result = try await RouteRebuild.build(input(organizer: organizer), router: roads)
+            #expect(RouteLine.haversine(try #require(roads.starts.first), at(north: 50_000)) < 5)
+            let points = Polyline.decode(result.route.polyline)
+            #expect(points.allSatisfy { RouteLine.haversine($0, organizer) > east - 5 })
+        }
     }
 
     @Test func sentences() {
@@ -254,13 +260,36 @@ struct RouteRebuilderTests {
     @Test func whileItWaitsTheOrganizerReadsOneLine() async throws {
         let store = defaults()
         let rebuilder = RouteRebuilder(
-            tripId: "t2", router: Roads(failures: 100), defaults: store, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+            tripId: "t2", router: Roads(failures: 100, error: RouteError.timedOut), defaults: store, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
         ) { _, _ in }
         rebuilder.input = { input() }
         rebuilder.request()
         for _ in 0..<2_000 where rebuilder.notice == nil { await Task.yield() }
         #expect(rebuilder.notice == RouteRebuilder.Notice(text: "The route will change once you have signal again", waiting: true))
         #expect(rebuilder.isPending)
+        rebuilder.cancel()
+    }
+
+    /// The waiting line says what it waits for: signal (Maps or the network), a location fix, or a road Maps finds.
+    @Test func theWaitingLineSaysWhatItWaitsFor() async throws {
+        let cases: [(Error, String)] = [
+            (LegFailure(index: 0, reason: .timedOut), "The route will change once you have signal again"),
+            (LegFailure(index: 1, reason: .failed("The Internet connection appears to be offline.")),
+             "The route will change once you have signal again"),
+            (NSError(domain: "FIRFirestoreErrorDomain", code: 14), "The route will change once you have signal again"),
+            (RouteError.locationUnavailable, "The route will change once your phone finds where you are"),
+            (LegFailure(index: 0, reason: .noRoute), "Maps can't find a road for the new route yet. Trying again soon"),
+        ]
+        for (error, line) in cases { #expect(RouteRebuilder.waitingLine(for: error) == line) }
+
+        // No fix yet: the input throws, and the organizer reads the location line.
+        let rebuilder = RouteRebuilder(
+            tripId: "t6", router: Roads(), defaults: defaults(), sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+        ) { _, _ in }
+        rebuilder.input = { throw RouteError.locationUnavailable }
+        rebuilder.request()
+        for _ in 0..<2_000 where rebuilder.notice == nil { await Task.yield() }
+        #expect(rebuilder.notice?.text == "The route will change once your phone finds where you are")
         rebuilder.cancel()
     }
 
@@ -299,5 +328,78 @@ struct RouteRebuilderTests {
         #expect(destination?.name == "Kampar")
         #expect(close(RouteLine(Polyline.decode(result.route.polyline)).length, 160_000, 50))
         #expect(result.sentence == "The route now goes through R&R Tapah and Kampar")
+    }
+
+    /// A retry still building with the old destination when the organizer picks a new one is stopped and waited
+    /// for: the last write carries the new destination and a route to it.
+    @Test func aNewDestinationIsNeverOverwrittenByARetryInFlight() async throws {
+        let roads = SlowRoads()
+        var writes: [(RouteRebuild.Result, DestinationResult?)] = []
+        let rebuilder = RouteRebuilder(tripId: "t7", router: roads, defaults: defaults(), sleep: { _ in }) {
+            writes.append(($0, $1))
+        }
+        rebuilder.input = { input() }
+        rebuilder.request()
+        // The retry is asking Maps for its first leg.
+        for _ in 0..<2_000 where roads.waiting == 0 { await Task.yield() }
+        #expect(roads.waiting == 1)
+        let kampar = DestinationResult(name: "Kampar", subtitle: "", coordinate: at(north: 160_000))
+        let change = Task { @MainActor in try await rebuilder.changeDestination(to: kampar) }
+        for _ in 0..<200 { await Task.yield() }
+        roads.open()
+        try await change.value
+        // Long enough for a stale retry, had it kept going, to finish and write.
+        try await Task.sleep(for: .milliseconds(300))
+        let (last, lastDestination) = try #require(writes.last)
+        #expect(lastDestination?.name == "Kampar")
+        #expect(close(RouteLine(Polyline.decode(last.route.polyline)).length, 160_000, 50))
+        #expect(writes.allSatisfy { $0.1?.name == "Kampar" })
+        #expect(!rebuilder.isPending)
+        rebuilder.cancel()
+    }
+
+    /// The search says what went wrong in plain words: Maps' own reasons, else one line, never Firestore's or
+    /// MapKit's text.
+    @Test func aMidTripChangeThatFailsSaysSoPlainly() async throws {
+        let model = CreateTripModel()
+        let kampar = DestinationResult(name: "Kampar", subtitle: "", coordinate: at(north: 160_000))
+        let cases: [(Error, String)] = [
+            (LegFailure(index: 0, reason: .noRoute), "No driving route found to that destination."),
+            (LegFailure(index: 1, reason: .failed("The operation couldn’t be completed.")),
+             "Couldn't change the route. Check your signal and try again."),
+            (RouteError.locationUnavailable, "Can't find your location. Check that location is on, then try again."),
+            (NSError(domain: "FIRFirestoreErrorDomain", code: 7, userInfo: [NSLocalizedDescriptionKey: "Missing or insufficient permissions."]),
+             "Couldn't change the route. Check your signal and try again."),
+        ]
+        for (error, message) in cases {
+            #expect(await model.use(kampar, rebuild: { _ in throw error }) == false)
+            #expect(model.errorMessage == message)
+        }
+        // Through the rebuilder with a router that fails: no LegFailure text on screen.
+        let rebuilder = RouteRebuilder(
+            tripId: "t8", router: Roads(failures: 1, error: NSError(domain: "MKErrorDomain", code: 1)),
+            defaults: defaults(), sleep: { _ in }
+        ) { _, _ in }
+        rebuilder.input = { input() }
+        #expect(await model.use(kampar, rebuild: { try await rebuilder.changeDestination(to: $0) }) == false)
+        #expect(model.errorMessage == "Couldn't change the route. Check your signal and try again.")
+    }
+}
+
+/// Roads that hold the first leg asked for until `open()`, so a test can act while a rebuild is asking Maps; the
+/// legs after it answer at once.
+private final class SlowRoads: LegRouting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _waiting = 0
+    private var _open = false
+    var waiting: Int { lock.withLock { _waiting } }
+    func open() { lock.withLock { _open = true } }
+
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        let first = lock.withLock { _waiting += 1; return _waiting == 1 }
+        while first, !lock.withLock({ _open }) { try await Task.sleep(for: .milliseconds(5)) }
+        let points = line(from, to)
+        let length = RouteLine(points).length
+        return RouteLeg(coordinates: points, distance: length, travelTime: length / 25, name: "E1")
     }
 }
