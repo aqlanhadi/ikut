@@ -78,18 +78,41 @@ export const STOP = { name: 'R&R Tapah', kind: 'fuel', minutes: 20, offset: 20_0
 export const STOP_NEXT = { name: 'Kopitiam Gopeng', kind: 'food', minutes: 45, offset: 50_000 };
 export const STOP_CARS = CARS.filter((c) => c.kind !== 'app').map((c, i) => ({ ...c, gpx: `${c.key}-stop`, stopAt: STOP.offset - 20 * i }));
 
-export const SCENARIOS = ['drive', 'parked', 'stop'];
+/**
+ * The rebuilt route (D25 4d, `--scenario rebuild`): the trip was planned with Lunch in Bidor, a town stop off the
+ * highway (the road leaves it at 15 km, loops 1.5 km out to the town and rejoins it at 19 km), and R&R Tapah on the
+ * highway at 22 km, past the loop. At T=120 the organizer (car 1, about 8.3 km along) skips Lunch for everyone and its
+ * phone rebuilds the route through R&R Tapah: the highway, so R&R Tapah moves up by what the loop added. Car 3 is
+ * parked at R&R Tapah all along; car 4 keeps to the highway, 1.9 km past the turn-off when the stop is skipped
+ * (so it is off the old route and on the new one); car 2 follows the organizer. The tracks are made in memory:
+ * constant speed from `startOffset` (0: parked), on the highway. No phone, no timeline (`--wait-app` and run-ui do
+ * not take this scenario). Car 4 passes car 3 at about T=305.
+ */
+export const REBUILD = {
+  skipAt: 120, duration: 420, turnOff: 15_000, rejoin: 19_000, bulge: 1500,
+  town: { name: 'Lunch in Bidor', kind: 'food', minutes: 45 },
+  next: { name: 'R&R Tapah', kind: 'fuel', minutes: 20, offset: 22_000 },
+};
+export const REBUILD_CARS = [
+  { key: 'car1', kind: 'main', name: 'Aisha’s Myvi', displayName: 'Aisha', color: '#2563EB', startOffset: 5000, speed: 27.9, organizer: true, synthetic: true },
+  { key: 'car2', kind: 'main', name: 'Wyna’s X70', displayName: 'Wyna', color: '#D9480F', startOffset: 4200, speed: 27.7, synthetic: true },
+  { key: 'car3', kind: 'main', name: 'Hafiz’s Hilux', displayName: 'Hafiz', color: '#0F766E', startOffset: REBUILD.next.offset, speed: 0, synthetic: true },
+  { key: 'car4', kind: 'main', name: 'Daniel’s City', displayName: 'Daniel', color: '#7C3AED', startOffset: 13_500, speed: 27.9, synthetic: true },
+];
+
+export const SCENARIOS = ['drive', 'parked', 'stop', 'rebuild'];
 
 /** The cars of a scenario: 'drive' (the default) or 'parked'. */
 export function scenarioCars(name = 'drive') {
   if (name === 'drive') return CARS;
   if (name === 'parked') return [...CARS.filter((c) => c.kind !== 'app'), ...PARKED_CARS];
   if (name === 'stop') return STOP_CARS;
+  if (name === 'rebuild') return REBUILD_CARS;
   throw new Error(`unknown scenario ${name} (${SCENARIOS.join(' or ')})`);
 }
 
 /** The scripted happenings of a scenario. */
-export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : name === 'stop' ? [] : TIMELINE);
+export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : name === 'stop' || name === 'rebuild' ? [] : TIMELINE);
 
 /** The phone's track in a scenario. */
 export const appKey = (name = 'drive') => scenarioCars(name).find((c) => c.kind === 'app')?.key;

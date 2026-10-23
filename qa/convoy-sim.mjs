@@ -25,6 +25,9 @@
 //      and park at it. Car 1's phone reads the stop and everyone's positions (lib/stoparrival.mjs) and must count each
 //      car as here when it is within 150 m, ending at "4 of 4 here". No phone car: no --wait-app.
 //
+//  10. With --scenario rebuild (D25 4d), the organizer skips a town stop off the highway for everyone and rebuilds the route
+//      through the stops ahead in one batch; the cars follow it. See qa/README.md, *The drive*.
+//
 // Source of each piece of logic is cited in lib/route.mjs and lib/tracking.mjs.
 //
 // Speed: without a phone (no --wait-app) it plays at 10x by default, slowing to 2x for car 2's signal drop, the one
@@ -48,7 +51,8 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
-import { DURATION, FIX_HZ, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { ON_ROUTE_TOLERANCE, distinctValues, rebuildRoute, staleReads, syntheticTrack, townDetour } from './lib/rebuild.mjs';
 import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referenceId, relativeDistance, spokenStopRequest, togetherPairs } from './lib/farahead.mjs';
 import { tally as stopTally } from './lib/stoparrival.mjs';
 import { isOpen, leavingAt, nextStop } from './lib/stopleave.mjs';
@@ -100,7 +104,7 @@ if (opts.help) {
   --deadline S      stop with RESULT: ABORT after S seconds (default: the wait, the scenario at --speed, and 300)
   --expect-app-ok   check that the phone's car said OK to the stop request (the UI test taps OK)
   --end-trip        end the trip when the scenario finishes (default: leave it active)
-  --scenario S      drive (default), parked (car 6 and the phone parked on the route far ahead, D26) or stop (the cars pull in at a planned stop, D25)
+  --scenario S      drive (default), parked (car 6 and the phone parked on the route far ahead, D26) stop (the cars pull in at a planned stop, D25) or rebuild (a skipped town stop rebuilds the route, D25 4d)
   --setup-only      create the trip and cars, print the code, write positions as a heartbeat and wait (Ctrl-C to stop)
   --host H          emulator host (default 127.0.0.1)
   --state-file F    JSON with code, tripId and phase, for scripts (default $TMPDIR/ikut-qa/state.json)
@@ -110,13 +114,18 @@ if (opts.help) {
 const CARS = scenarioCars(opts.scenario);
 const APP_KEY = appKey(opts.scenario);
 const STOPPING = opts.scenario === 'stop';
-if (STOPPING && opts.waitApp) throw new Error('the stop scenario has no phone car: run it without --wait-app');
+const REBUILDING = opts.scenario === 'rebuild';
+if ((STOPPING || REBUILDING) && opts.waitApp) throw new Error(`the ${opts.scenario} scenario has no phone car: run it without --wait-app`);
+// IKUT_QA_BREAK=<name> breaks the rebuild scenario on purpose, to see its check fail (qa/README.md, *What is checked*).
+const BREAK = REBUILDING ? process.env.IKUT_QA_BREAK ?? '' : '';
+/** Seconds of drive: the whole scripted drive, or the rebuild's. */
+const RUN = REBUILDING ? REBUILD.duration : DURATION;
 /** Cars parked on the route ahead of the convoy (the parked scenario). */
 const PARKED = CARS.filter((c) => c.waitOffset !== undefined);
 
 // The scenario clock. Without a phone, car 2's signal drop (and the checks just after it) plays at no more than 2x:
 // staleness is judged on the server clock after 60 real seconds, which a 3-minute gap only reaches at <= 2.5x.
-const dropGap = CARS.find((c) => c.key === 'car2').gap;
+const dropGap = CARS.find((c) => c.key === 'car2')?.gap;
 const speedAt = (T) => (!opts.waitApp && dropGap && T >= dropGap.from - 5 && T < dropGap.to + 15 ? Math.min(opts.speed, 2) : opts.speed);
 /** Real seconds from go to scenario time T. */
 function wallAt(T) {
@@ -126,7 +135,7 @@ function wallAt(T) {
 }
 
 const end = endsWithResult({
-  deadlineS: opts.setupOnly ? 0 : opts.deadline ?? (opts.waitApp ? opts.waitTimeout : opts.startIn) + wallAt(DURATION) + 300,
+  deadlineS: opts.setupOnly ? 0 : opts.deadline ?? (opts.waitApp ? opts.waitTimeout : opts.startIn) + wallAt(RUN) + 300,
   signals: true,
 });
 
@@ -159,9 +168,14 @@ function writeState(patch) {
 const { mainCoords, car4Coords } = loadRoutes();
 const mainRoute = new RouteLine(mainCoords);
 const mainPolyline = Polyline.encode(mainCoords); // Trip.route: precision-5 polyline of the main route
+// The rebuild scenario plans the trip through a town stop off the highway: the trip's route is the road with the loop
+// (`tripLine`, which each phone follows, and changes when the organizer rebuilds), the highway itself stays the truth.
+const detour = REBUILDING ? townDetour(mainRoute, { from: REBUILD.turnOff, to: REBUILD.rejoin, bulge: REBUILD.bulge }) : null;
+const tripPolyline = detour ? Polyline.encode(detour.coordinates) : mainPolyline;
+let tripLine = detour ? new RouteLine(Polyline.decode(tripPolyline)) : mainRoute;
 
-function loadTrack(key) {
-  const pts = withMotion(readGpx(path.join(here, 'gpx', `${key}.gpx`)));
+function loadTrack(key, spec) {
+  const pts = withMotion(spec.synthetic ? syntheticTrack(mainRoute, { startOffset: spec.startOffset, speed: spec.speed, seconds: RUN }) : readGpx(path.join(here, 'gpx', `${key}.gpx`)));
   // Fixes by second; a gap (car 2) simply has no entry.
   const bySecond = new Map();
   for (const p of pts) bySecond.set(Math.round(p.t * FIX_HZ), p);
@@ -223,7 +237,7 @@ class Phone {
     const carRef = doc(collection(this.db, `trips/${this.tripId}/cars`));
     const batch = writeBatch(this.db);
     batch.set(tripRef, {
-      name: TRIP.name, code, organizerId: this.uid, route: mainPolyline,
+      name: TRIP.name, code, organizerId: this.uid, route: tripPolyline,
       destination: { name: TRIP.destination.name, coordinate: new GeoPoint(TRIP.destination.latitude, TRIP.destination.longitude) },
       status: 'active', createdAt: serverTimestamp(),
     });
@@ -255,7 +269,7 @@ class Phone {
   }
 
   async ensureRoute(firstFix) {
-    let plan = CarRouteLogic.planIfOnMain(firstFix, mainRoute);
+    let plan = CarRouteLogic.planIfOnMain(firstFix, tripLine);
     if (!plan) {
       // The app asks MapKit for a route to the destination; the snapshot of the OSRM route stands in for it.
       plan = CarRouteLogic.makePlan(car4Coords, mainRoute);
@@ -265,7 +279,7 @@ class Phone {
     this.own = plan.route ? new RouteLine(Polyline.decode(plan.route)) : null;
     this.ownMergeOffset = this.own ? mainRoute.mergeOffset(this.own, CarRouteLogic.mergeTolerance)?.otherOffset ?? null : null;
     this.ownHint = null;
-    this.builder = new PositionBuilder(mainRoute, this.own);
+    this.builder = new PositionBuilder(tripLine, this.own);
     this.publisher = new PositionPublisher({ write: (p) => this.writePosition(p), now: () => clock.T });
     return plan;
   }
@@ -278,6 +292,7 @@ class Phone {
     };
     if (p.convoyOffset !== undefined) data.convoyOffset = p.convoyOffset;
     if (p.battery !== null && p.battery !== undefined) data.battery = p.battery;
+    (this.writes ??= []).push({ T: clock.T, wall: Date.now(), convoyOffset: p.convoyOffset });
     return setDoc(doc(this.db, `trips/${this.tripId}/positions/${this.carId}`), data);
   }
 
@@ -309,12 +324,9 @@ class Phone {
   /** The planned stop the cars pull in at (not the one after it). */
   get arrivalStop() { return this.allStops?.find((s) => s.routeOffset === STOP.offset && s.skipped !== true); }
 
-  judgeArrival() {
-    const stop = this.arrivalStop;
-    if (!stop || !this.positions?.size || !this.cars.size) return;
-    const now = Date.now();
-    const target = { latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude, routeOffset: stop.routeOffset, isMeeting: stop.kind === 'meet' };
-    const cars = [...this.cars.entries()].map(([id, c]) => {
+  /** Every car as StopArrival.tally takes it: where it is, its offset, how old the fix is. */
+  tallyCars(now) {
+    return [...this.cars.entries()].map(([id, c]) => {
       const p = this.positions.get(id);
       return {
         id, number: c.number, location: p ? { latitude: p.location.latitude, longitude: p.location.longitude } : undefined,
@@ -322,7 +334,48 @@ class Phone {
         age: p?.updatedAt ? Math.max(0, (now - p.updatedAt.toMillis()) / 1000) : null, speed: Math.max(5, p?.speed ?? 0),
       };
     });
-    const t = stopTally(target, cars);
+  }
+
+  // ---- The rebuilt route (D25 4d), as each phone sees it: the trip's route and every stop's offset as they change, and
+  // the route a car follows from then on (the session restarts on the new route).
+  watchRebuild() {
+    this.routes = []; // what trips/{id}.route read, each time it changed
+    this.stopDocs = new Map(); // id -> the stop as last read
+    this.stopOffsets = new Map(); // id -> every routeOffset it read, in order
+    this.unsubTrip = onSnapshot(doc(this.db, `trips/${this.tripId}`), (snap) => {
+      const route = snap.data()?.route;
+      if (!route || this.routes.at(-1)?.route === route) return;
+      this.routes.push({ T: clock.T, route });
+      if (this.routes.length < 2 || BREAK === 'nobody-swaps' || (BREAK === 'parked-stays-old' && this.key === 'car3')) return;
+      let line = new RouteLine(Polyline.decode(route));
+      // The line behind the organizer lost (the kept stretch not kept): car 2 reads offsets from the cut on.
+      if (BREAK === 'car2-prefix-lost' && this.key === 'car2') line = new RouteLine(line.coordinates.filter((_, i) => line.cumulative[i] >= 8_300));
+      const swap = () => { this.builder = new PositionBuilder(line); this.swapWall = Date.now(); };
+      if (BREAK === 'parked-late' && this.key === 'car3') setTimeout(swap, 8_000); else swap();
+    });
+    this.unsubRebuildStops = onSnapshot(collection(this.db, `trips/${this.tripId}/stops`), (snap) => {
+      for (const d of snap.docs) {
+        this.stopDocs.set(d.id, { id: d.id, ...d.data(), coordinate: { latitude: d.data().coordinate.latitude, longitude: d.data().coordinate.longitude } });
+        (this.stopOffsets.get(d.id) ?? this.stopOffsets.set(d.id, []).get(d.id)).push(d.data().routeOffset);
+      }
+    });
+  }
+
+  /** Car 1's phone, every tick: how the stop card would read the parked car at the stop ahead (StopArrival.status). */
+  judgeNext(parkedCarId) {
+    const stop = this.stopDocs?.get(rebuildPlan?.nextId);
+    if (!stop || !this.positions?.size || !this.cars.size) return;
+    const target = { latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude, routeOffset: stop.routeOffset, isMeeting: false };
+    const row = stopTally(target, this.tallyCars(Date.now())).rows.find((r) => r.id === parkedCarId);
+    (this.parkedReads ??= []).push({ T: clock.T, kind: row.status.kind });
+  }
+
+  judgeArrival() {
+    const stop = this.arrivalStop;
+    if (!stop || !this.positions?.size || !this.cars.size) return;
+    const now = Date.now();
+    const target = { latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude, routeOffset: stop.routeOffset, isMeeting: stop.kind === 'meet' };
+    const t = stopTally(target, this.tallyCars(now));
     for (const r of t.rows) {
       if (r.status.kind === 'here' && !this.arrivals.has(r.id)) { this.arrivals.set(r.id, clock.T); log(`${this.key}'s phone: ${this.names.get(r.id)} is here, "${t.title}"`); }
       // The lead car's phone marks when it first counted itself here (TripMapModel.checkLeadArrival), once.
@@ -394,7 +447,7 @@ class Phone {
       const i = ids.indexOf(id);
       const pair = `${keyOf(ids[i - 1])} | ${keyOf(id)}`;
       if (parkedIds.has(id) || parkedIds.has(ids[i - 1])) this.parkedWarnings.push({ T: clock.T, pair });
-      else if (!this.otherWarnings.has(pair)) { this.otherWarnings.add(pair); log(`${this.key}'s phone would warn about the gap ${pair}`); }
+      else if (!this.otherWarnings.has(pair)) { this.otherWarnings.add(pair); (this.warningTrail ??= []).push({ T: clock.T, pair }); log(`${this.key}'s phone would warn about the gap ${pair}`); }
     }
     const due = this.headsUp.check(convoy, this.carId);
     if (due) {
@@ -499,6 +552,8 @@ class Phone {
     this.unsubPositions?.();
     this.unsubCars?.();
     this.unsubStops?.();
+    this.unsubTrip?.();
+    this.unsubRebuildStops?.();
     this.publisher?.stop();
     await terminate(this.db).catch(() => {});
     await deleteApp(this.app).catch(() => {});
@@ -531,8 +586,8 @@ async function main() {
   const organizer = phones.get('car1');
   const code = generateCode();
 
-  const slowed = speedAt(dropGap.from) < opts.speed ? ` (${speedAt(dropGap.from)}x during car 2's signal drop)` : '';
-  console.log(`ikut convoy simulator, project ${PROJECT_ID}, emulators on ${opts.host}, speed ${opts.speed}x${slowed}, about ${Math.round(wallAt(DURATION) / 60)} min`);
+  const slowed = dropGap && speedAt(dropGap.from) < opts.speed ? ` (${speedAt(dropGap.from)}x during car 2's signal drop)` : '';
+  console.log(`ikut convoy simulator, project ${PROJECT_ID}, emulators on ${opts.host}, speed ${opts.speed}x${slowed}, about ${Math.round(wallAt(RUN) / 60)} min`);
   console.log(`main route ${(mainRoute.length / 1000).toFixed(1)} km, ${mainCoords.length} points, polyline ${mainPolyline.length} chars`);
 
   // ---- setup
@@ -553,7 +608,7 @@ async function main() {
   const tracks = {};
   const truth = {};
   for (const c of CARS) {
-    tracks[c.key] = loadTrack(c.gpx ?? c.key);
+    tracks[c.key] = loadTrack(c.gpx ?? c.key, c);
     truth[c.key] = truthOffsets(tracks[c.key].points);
   }
 
@@ -574,13 +629,29 @@ async function main() {
     await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
   }
 
+  // The rebuild scenario's plan, written before the start: the town stop on the loop, R&R Tapah on the highway past it.
+  if (REBUILDING) {
+    const plan = async (spec, coordinate, order) => {
+      const ref = doc(collection(organizer.db, `trips/${tripId}/stops`));
+      const routeOffset = tripLine.project(coordinate).offset;
+      await setDoc(ref, { name: spec.name, coordinate: new GeoPoint(coordinate.latitude, coordinate.longitude), routeOffset, kind: spec.kind, minutes: spec.minutes, order });
+      log(`the organizer plans ${spec.name} at ${routeOffset.toFixed(0)} m`);
+      return { id: ref.id, routeOffset };
+    };
+    const town = await plan(REBUILD.town, detour.town, 0);
+    const next = await plan(REBUILD.next, mainRoute.coordinateAtOffset(REBUILD.next.offset), 1);
+    rebuildPlan = { townId: town.id, townOffset: town.routeOffset, nextId: next.id, nextOffset: next.routeOffset, extra: detour.extra };
+    await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+  }
+
   // Tracker start-up: first fix, ensureRoute, then tracking (TripSession.runStartup).
   for (const p of phones.values()) {
     const first = tracks[p.key].points[0];
     const plan = await p.ensureRoute(first);
     log(`${p.key} (${p.spec.name}) ${p.carId}: ${plan.kind}, state ${plan.state}, mergeOffset ${plan.mergeOffset.toFixed(0)} m${plan.route ? `, own route ${plan.route.length} chars` : ''}`);
     p.startListening();
-    if (p.spec.waitOffset !== undefined || (STOPPING && p.key === 'car1')) p.watchConvoy(new Map([...phones.values()].map((q) => [q.carId, q.spec.displayName])));
+    if (REBUILDING) p.watchRebuild();
+    if (p.spec.waitOffset !== undefined || (STOPPING && p.key === 'car1') || (REBUILDING && (p.key === 'car1' || p.key === 'car2'))) p.watchConvoy(new Map([...phones.values()].map((q) => [q.carId, q.spec.displayName])));
     if (STOPPING && p.key === 'car1') p.watchStops();
   }
 
@@ -633,13 +704,13 @@ async function main() {
   clock.label = 'drive';
   const goWall = Date.now();
   const timeline = scenarioTimeline(opts.scenario).map((e) => ({ ...e, done: false }));
-  const scheduled = STOPPING ? [] : scheduleChecks({ phones, tracks, truth, tripId, organizer, getAppCarId: () => appCarId });
+  const scheduled = REBUILDING ? scheduleRebuildChecks({ phones, tripId, organizer }) : STOPPING ? [] : scheduleChecks({ phones, tracks, truth, tripId, organizer, getAppCarId: () => appCarId });
   const ctx = { phones, tripId, organizer, tracks, truth, stopEvent: null, hazard: null, hazardAt: null };
   let stopProbed = false;
   const gapCar = phones.get('car2');
   const gap = gapCar.spec.gap;
 
-  for (let sec = 0; sec <= DURATION * FIX_HZ; sec++) {
+  for (let sec = 0; sec <= RUN * FIX_HZ; sec++) {
     const T = sec / FIX_HZ;
     const wait = goWall + wallAt(T) * 1000 - Date.now();
     if (wait > 0) await sleep(wait);
@@ -658,6 +729,10 @@ async function main() {
       phones.get('car1').judgeArrival();
       if (T >= 100 && !stopProbed) { stopProbed = true; await stopProbesBefore(phones, tripId).catch((e) => check('rules: stop probes before Leave', false, `threw: ${e.message}`)); }
       await phones.get('car1').maybeLeave().catch((e) => check('car 1 taps Leave', false, `threw: ${e.message}`));
+    }
+    if (REBUILDING) {
+      phones.get('car1').judgeNext(phones.get('car3').carId);
+      phones.get('car2').judgeConvoy(new Set(), keyOfCar(phones, null));
     }
     if (PARKED.length) {
       const keyOf = keyOfCar(phones, appCarId);
@@ -694,6 +769,9 @@ async function main() {
 }
 
 // ---------------------------------------------------------------- timeline actions
+
+/** The rebuild scenario's stops once planned: {townId, townOffset, nextId, nextOffset, extra (what the loop adds)}. */
+let rebuildPlan = null;
 
 const STOP_LIFETIME_SECONDS = 30 * 60; // EventCategory.stopRequest.defaultExpiry
 
@@ -990,10 +1068,112 @@ function scheduleChecks({ phones, tripId, organizer }) {
   ];
 }
 
+// ---------------------------------------------------------------- the rebuilt route (D25 4d)
+
+/** The organizer's phone skips the town stop for everyone, then rebuilds the route and writes it with the offsets of the
+ *  stops ahead in one batch (StopService.skipForAll, then TripService.rebuildRoute with RouteRebuild.build). */
+async function skipAndRebuild(ctx) {
+  const phone = ctx.organizer;
+  const car4 = ctx.phones.get('car4');
+  ctx.rb = { T: clock.T, car4Off: tripLine.project(car4.lastFix).distance };
+  await updateDoc(doc(phone.db, `trips/${ctx.tripId}/stops/${rebuildPlan.townId}`), { skipped: true, skippedBy: phone.uid, skippedAt: serverTimestamp() });
+  log(`the organizer skips ${REBUILD.town.name} for everyone; the cars see ${rebuildPlan.townId} skipped`);
+  const stops = [...phone.stopDocs.values()].map((s) => (s.id === rebuildPlan.townId && BREAK !== 'moves-skipped' ? { ...s, skipped: true } : { ...s, skipped: BREAK === 'moves-skipped' ? undefined : s.skipped }));
+  const r = rebuildRoute({
+    oldLine: tripLine, directLine: mainRoute, stops, organizer: phone.lastFix, organizerOffset: phone.lastPosition.convoyOffset,
+    destination: { latitude: TRIP.destination.latitude, longitude: TRIP.destination.longitude },
+  });
+  const commitWall = Date.now();
+  const batch = writeBatch(phone.db);
+  batch.update(doc(phone.db, `trips/${ctx.tripId}`), { route: r.route, routeSeconds: r.routeSeconds });
+  for (const [id, routeOffset] of Object.entries(r.offsets)) batch.update(doc(phone.db, `trips/${ctx.tripId}/stops/${id}`), { routeOffset });
+  await batch.commit();
+  Object.assign(ctx.rb, { cut: r.cut, offsets: r.offsets, line: new RouteLine(Polyline.decode(r.route)), batches: 1, commitWall });
+  log(`the organizer's phone writes the rebuilt route (${r.route.length} chars, cut at ${r.cut.toFixed(0)} m) and ${Object.keys(r.offsets).length} stop offset(s) in one batch: ${JSON.stringify(r.offsets)}`);
+  if (BREAK === 'batch-twice') {
+    const again = writeBatch(phone.db);
+    again.update(doc(phone.db, `trips/${ctx.tripId}`), { route: Polyline.encode(ctx.rb.line.coordinates.slice(0, -1)) });
+    again.update(doc(phone.db, `trips/${ctx.tripId}/stops/${rebuildPlan.nextId}`), { routeOffset: r.offsets[rebuildPlan.nextId] + 10 });
+    await again.commit();
+    ctx.rb.batches = 2;
+  }
+}
+
+function scheduleRebuildChecks({ phones, tripId, organizer }) {
+  const orderAt = (at, label) => ({
+    at, name: label,
+    async run(ctx) {
+      const names = new Map([...phones.values()].map((p) => [p.carId, p.key]));
+      const actual = [...(await readPositions(organizer, tripId)).entries()]
+        .filter(([, p]) => typeof p.convoyOffset === 'number')
+        .map(([id, p]) => ({ key: names.get(id), offset: p.convoyOffset })).sort((a, b) => b.offset - a.offset);
+      const expected = expectedConvoyOrder(clock.T, { truth: ctx.truth, phones, appPresent: false });
+      const fmt = (rows) => rows.map((r) => `${r.key}@${(r.offset / 1000).toFixed(1)}k`).join(' > ');
+      check(label, sameOrder(actual, expected), `convoy ${fmt(actual)}; expected ${fmt(expected).replace(/@[\d.]+k/g, '')}`);
+    },
+  });
+  return [
+    orderAt(60, 'order before the skip, on the road with the loop: 3 (parked) > 4 > 1 > 2'),
+    { at: REBUILD.skipAt, name: 'skip for everyone and rebuild', run: skipAndRebuild },
+    orderAt(REBUILD.skipAt + 10, 'order just after the rebuild, on the new route: 3 > 4 > 1 > 2'),
+    orderAt(200, 'order on the new route: 3 > 4 > 1 > 2'),
+    orderAt(330, 'order after car 4 passes the parked car on the new route: 4 > 3 > 1 > 2'),
+    orderAt(410, 'order at the end: 4 > 3 > 1 > 2'),
+    {
+      at: RUN - 5, name: 'the rebuild, as every phone and the server read it',
+      async run(ctx) {
+        const rb = ctx.rb;
+        if (!rb?.line) return check('the organizer rebuilt the route', false, 'no rebuild was written');
+        const car3 = phones.get('car3');
+        const car4 = phones.get('car4');
+        const { townId, townOffset, nextId, nextOffset, extra } = rebuildPlan;
+        const newNext = rb.offsets[nextId];
+
+        // 5. The stop offsets move once, in one batch; the skipped stop's offset never moves.
+        check('the rebuild is one batch: the route and the stop ahead moved together, once', rb.batches === 1 && Object.keys(rb.offsets).join() === nextId, JSON.stringify({ batches: rb.batches, moved: Object.keys(rb.offsets) }));
+        for (const p of phones.values()) {
+          const next = distinctValues(p.stopOffsets.get(nextId));
+          const town = distinctValues(p.stopOffsets.get(townId));
+          check(`${p.key} reads the stop ahead move once, from the old route to the new, and the skipped stop never`, next.length === 2 && next[0] === nextOffset && next[1] === newNext && town.length === 1 && town[0] === townOffset && p.stopDocs.get(townId).skipped === true, JSON.stringify({ next, town, skipped: p.stopDocs.get(townId).skipped }));
+          check(`${p.key} reads the trip's route change once`, p.routes.length === 2 && p.routes[1].route === Polyline.encode(rb.line.coordinates), `${p.routes.length} routes`);
+        }
+        check(`R&R Tapah moves up by what the loop added (${extra.toFixed(0)} m) to its place on the highway`, Math.abs(nextOffset - newNext - extra) < 25 && Math.abs(newNext - REBUILD.next.offset) < 25, `${nextOffset.toFixed(0)} -> ${newNext.toFixed(0)} m, highway ${REBUILD.next.offset} m`);
+        const server = (await getDoc(doc(organizer.db, `trips/${tripId}/stops/${nextId}`))).data();
+        const serverTown = (await getDoc(doc(organizer.db, `trips/${tripId}/stops/${townId}`))).data();
+        check('the server holds the same: R&R Tapah at its new offset, Lunch skipped at its old one', server.routeOffset === newNext && serverTown.routeOffset === townOffset && serverTown.skipped === true && serverTown.skippedBy === organizer.uid, JSON.stringify({ next: server.routeOffset, town: serverTown.routeOffset, skipped: serverTown.skipped }));
+        check('the new route is the highway from the organizer on: the old line kept behind it, no loop', Math.abs(rb.line.length - mainRoute.length) < 40 && Math.abs(rb.cut - interpolate(ctx.truth.car1, rb.T)) < 400 && rb.cut < REBUILD.turnOff, `${rb.line.length.toFixed(0)} m long (highway ${mainRoute.length.toFixed(0)}), cut at ${rb.cut.toFixed(0)} m, car 1 is at ${interpolate(ctx.truth.car1, rb.T).toFixed(0)} m`);
+
+        // 2. No separation warning from the rebuild.
+        const warned = (phones.get('car2').warningTrail ?? []).filter((w) => w.T >= rb.T - 5 && w.T <= rb.T + 60);
+        check('no separation warning from the rebuild (car 2 phone, 60 s after it)', warned.length === 0, warned.length ? JSON.stringify(warned) : `car 2's phone judged the convoy every second; later ones: ${JSON.stringify(phones.get('car2').warningTrail ?? [])}`);
+
+        // 3. The parked car never reads Drove past for more than one republish.
+        // At --speed N a second of real time is N of the drive's, so how many republishes fit before the phone has the
+        // new route is counted in real time: one per 5 s of the app's own clock.
+        const latency = car3.swapWall === undefined ? Infinity : Math.max(0, car3.swapWall - rb.commitWall);
+        const allowed = 1 + Math.floor(latency / (5000 / opts.speed));
+        const stale = staleReads(car3.writes.filter((w) => w.wall >= rb.commitWall), { from: 0, stopOffset: newNext });
+        const reads = (phones.get('car1').parkedReads ?? []).filter((r) => r.T >= rb.T);
+        const passed = reads.filter((r) => r.kind === 'passed').length;
+        check('the parked car had the new route within 5 s and wrote at most one position on the old one in that time', latency < 5000 && stale <= allowed, `route after ${latency.toFixed(0)} ms, ${stale} stale of ${car3.writes.filter((w) => w.wall >= rb.commitWall).length} writes since, ${allowed} fit`);
+        check('the parked car never reads "Drove past" at R&R Tapah on the organizer\'s phone', reads.length > 100 && passed <= 1, `${passed} of ${reads.length} reads (${[...new Set(reads.map((r) => r.kind))].join(', ')})`);
+
+        // 4. The car on the direct road is on the new route and in the convoy.
+        const last = car4.lastPosition;
+        const carDoc = (await getDoc(doc(organizer.db, `trips/${tripId}/cars/${car4.carId}`))).data();
+        const onNew = rb.line.project(car4.lastFix).distance;
+        check('car 4 was off the old route when the stop was skipped, so the rebuild is what brings it back', rb.car4Off > ON_ROUTE_TOLERANCE, `${rb.car4Off.toFixed(0)} m from the old route`);
+        check('car 4 (the highway) is on the new route within the on-route tolerance, in the convoy at its true place', onNew <= ON_ROUTE_TOLERANCE && carDoc.state === 'convoy' && typeof last.convoyOffset === 'number' && Math.abs(last.convoyOffset - interpolate(ctx.truth.car4, clock.T)) < 300, `${onNew.toFixed(0)} m from the new route, state ${carDoc.state}, convoyOffset ${last.convoyOffset?.toFixed(0)} vs truth ${interpolate(ctx.truth.car4, clock.T).toFixed(0)}`);
+        log('car 4 joining the convoy again (OffRouteDetector) is not ported here: that step stays covered by the unit test');
+      },
+    },
+  ];
+}
+
 async function finalChecks(ctx, appCarId) {
   const { phones, tripId, organizer, truth } = ctx;
   clock.label = 'final';
-  const T = DURATION;
+  const T = RUN;
 
   // A planned stop (D25 piece 3b): car 1's phone counts who is here, from positions alone.
   if (STOPPING) {
