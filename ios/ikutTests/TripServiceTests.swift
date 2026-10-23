@@ -102,6 +102,44 @@ struct TripServiceEmulatorTests {
         try Auth.auth().signOut()
     }
 
+    @Test func savingStopsWritesTheRouteAndTheStopsTogetherAndRemovesTheOnesLeftOut() async throws {
+        let trip = try await EmulatorTrip.make(name: "Stops", route: Fixtures.longRoute)
+        let db = Firestore.firestore()
+        func stop(_ id: String, _ name: String, _ order: Int, offset: Double, kind: PlannedStopKind = .fuel, minutes: Int? = 20) -> PlannedStop {
+            PlannedStop(id: id, name: name, coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: offset,
+                        kind: kind, minutes: minutes, order: order)
+        }
+        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
+        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(
+            route: route, stops: [stop("a", "R&R Tapah", 0, offset: 62_000), stop("b", "Kopitiam", 1, offset: 120_000, kind: .food, minutes: nil)],
+            removedIds: []))
+
+        let saved = try await db.document(FirestorePaths.trip(trip.tripId)).getDocument(as: Trip.self)
+        #expect(saved.routeSeconds == 9_600)
+        let docs = try await db.collection(FirestorePaths.stops(tripId: trip.tripId)).order(by: "order").getDocuments()
+        let stops = docs.documents.compactMap { try? $0.data(as: PlannedStop.self) }
+        #expect(stops.map(\.name) == ["R&R Tapah", "Kopitiam"])
+        #expect(stops[0].routeOffset == 62_000 && stops[0].minutes == 20 && stops[1].minutes == nil)
+
+        // Remove the first, put a meeting point first: one batch.
+        let meet = PlannedStop(
+            id: "m", name: "Petronas Sungai Buloh", coordinate: GeoPoint(latitude: 3.2, longitude: 101.58), routeOffset: 0,
+            kind: .meet, meetAt: Date().addingTimeInterval(3_600), order: 0)
+        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(
+            route: route, stops: [meet, stop("b", "Kopitiam", 1, offset: 120_000, kind: .food, minutes: nil)], removedIds: ["a"]))
+        let after = try await db.collection(FirestorePaths.stops(tripId: trip.tripId)).order(by: "order").getDocuments()
+        let names = after.documents.compactMap { try? $0.data(as: PlannedStop.self) }
+        #expect(names.map(\.name) == ["Petronas Sungai Buloh", "Kopitiam"])
+        #expect(names[0].kind == .meet && names[0].meetAt != nil)
+
+        // Changing the destination keeps the stops and rewrites their offsets with the route.
+        try await TripService.changeDestination(
+            tripId: trip.tripId, to: Fixtures.ipoh, route: route,
+            stops: [meet, stop("b", "Kopitiam", 1, offset: 130_000, kind: .food, minutes: nil)])
+        let moved = try await db.document(FirestorePaths.stop(tripId: trip.tripId, stopId: "b")).getDocument(as: PlannedStop.self)
+        #expect(moved.routeOffset == 130_000)
+    }
+
     @Test func createTripWritesTripMemberAndCar() async throws {
         let auth = AuthModel()
         try await auth.signInAsGuest(name: "Aqlan")

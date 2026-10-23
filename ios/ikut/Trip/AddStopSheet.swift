@@ -52,7 +52,7 @@ extension PlaceKind {
         case .beach?: "Beach"
         case .publicTransport?: "Station"
         case .airport?: "Airport"
-        case .restroom?: "Toilets"
+        case .restroom?: "Rest area"
         default: "Place"
         }
     }

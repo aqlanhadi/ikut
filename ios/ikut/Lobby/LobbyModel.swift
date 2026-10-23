@@ -1,3 +1,4 @@
+import CoreLocation
 import FirebaseFirestore
 import Foundation
 import Observation
@@ -33,7 +34,7 @@ final class LobbyModel {
     }
 
     /// KL to Ipoh with four cars, Hafiz's still waiting for a tracker; `started` puts it on the road.
-    static func sample(started: Bool, now: Date = Date(), seconds: Double? = nil, stops: [PlannedStop] = []) -> LobbyModel {
+    static func sample(started: Bool, now: Date = Date(), seconds: Double? = nil, stops: [PlannedStop] = [], route: [CLLocationCoordinate2D]? = nil) -> LobbyModel {
         func car(_ id: String, _ name: String, _ color: String, _ number: Int, tracker: String?, lead: Bool = false) -> Car {
             Car(id: id, name: name, color: color, trackerUserId: tracker, isLead: lead, route: nil, mergeOffset: nil,
                 state: .convoy, number: number)
@@ -43,7 +44,7 @@ final class LobbyModel {
         }
         let trip = Trip(
             id: "sample", name: "Balik kampung raya", code: "K7M2QX", organizerId: "u1",
-            route: Polyline.encode(MapDemo.densify(MapDemo.mainWaypoints)),
+            route: Polyline.encode(route ?? MapDemo.densify(MapDemo.mainWaypoints)),
             destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 4.6, longitude: 101.09)),
             routeSeconds: seconds,
             status: .active, createdAt: now.addingTimeInterval(-900), lastActivityAt: now,

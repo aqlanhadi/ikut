@@ -9,6 +9,7 @@ struct LobbyView: View {
     /// The trip ended (by the organizer or the server): show the recap.
     var onEnded: (String) -> Void = { _ in }
     @Environment(LocationPermission.self) private var location
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var model: LobbyModel
     @State private var session: TripSession
     @State private var routeInfo = TripRouteInfo()
@@ -357,6 +358,7 @@ struct LobbyView: View {
                         .padding(Spacing.gap)
                 }
             }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: Radius.card, topTrailingRadius: Radius.card, style: .continuous))
             .cardSlice(top: true)
             .lobbyRow()
@@ -375,9 +377,10 @@ struct LobbyView: View {
         .lobbyRow()
 
         if showStops {
-            HStack {
+            let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
+            layout {
                 Text("STOPS ON THE WAY").font(.caption.weight(.semibold)).tracking(0.6).accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Spacing.s)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
                 if planner.isBuilding && canEditStops {
                     ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
                 } else if canEditStops, stops.count > 1 {

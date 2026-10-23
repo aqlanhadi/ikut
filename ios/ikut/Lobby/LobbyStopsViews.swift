@@ -94,12 +94,13 @@ struct StopRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: Spacing.m) {
+            HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: Spacing.m) {
                 Image(systemName: stop.kind.symbol)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(stop.kind.tint, in: Circle())
+                    .padding(.top, typeSize.isAccessibilitySize ? Spacing.s : 0)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(stop.name).foregroundStyle(failed ? .secondary : .primary)
@@ -118,7 +119,7 @@ struct StopRow: View {
                 if editable {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(.secondary)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 32, height: 44)
                         .accessibilityHidden(true)
                 }
             }
