@@ -9,6 +9,8 @@ final class LobbyModel {
     private(set) var trip: Trip?
     private(set) var cars: [Car] = []
     private(set) var members: [Member] = []
+    /// The planned stops, in driving order.
+    private(set) var stops: [PlannedStop] = []
     private(set) var errorMessage: String?
 
     var groupedCars: [LobbyCar] { LobbyLogic.group(cars: cars, members: members) }
@@ -22,11 +24,12 @@ final class LobbyModel {
 
     #if DEBUG
     /// A lobby on sample data, for previews. Don't `start()` it: the listeners would replace the data.
-    init(sampleTrip trip: Trip, cars: [Car], members: [Member]) {
+    init(sampleTrip trip: Trip, cars: [Car], members: [Member], stops: [PlannedStop] = []) {
         tripId = trip.id ?? "sample"
         self.trip = trip
         self.cars = cars
         self.members = members
+        self.stops = stops
     }
 
     /// KL to Ipoh with four cars, Hafiz's still waiting for a tracker; `started` puts it on the road.
@@ -85,6 +88,16 @@ final class LobbyModel {
                 let message = error?.localizedDescription
                 Task { @MainActor in
                     if let cars { self?.cars = cars }
+                    if let message { self?.errorMessage = message }
+                }
+            })
+
+        listeners.append(
+            db.collection(FirestorePaths.stops(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
+                let stops = snapshot?.decoded(PlannedStop.self)
+                let message = error?.localizedDescription
+                Task { @MainActor in
+                    if let stops { self?.stops = stops.sorted { $0.order < $1.order } }
                     if let message { self?.errorMessage = message }
                 }
             })

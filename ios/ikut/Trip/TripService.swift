@@ -47,6 +47,7 @@ enum TripService {
                 coordinate: GeoPoint(
                     latitude: destination.coordinate.latitude,
                     longitude: destination.coordinate.longitude)),
+            routeSeconds: route.travelTime,
             status: .active, createdAt: nil)
     }
 
@@ -123,22 +124,46 @@ extension TripService {
         _ = try? await ServerWrite.commit({ try await ref.updateData(["startedAt": FieldValue.serverTimestamp()]) })
     }
 
-    /// Organizer only (rules): points the trip at a new destination and main route.
+    /// Organizer only (rules): points the trip at a new destination and main route. With planned stops, `stops`
+    /// are the same stops with their offsets on the new route; they are written in the same batch.
     @MainActor
-    static func changeDestination(tripId: String, to destination: DestinationResult, route: BuiltRoute) async throws {
-        let ref = Firestore.firestore().collection(FirestorePaths.trips).document(tripId)
-        let data: [String: Any] = [
-            "destination": [
+    static func changeDestination(
+        tripId: String, to destination: DestinationResult, route: BuiltRoute, stops: [PlannedStop] = []
+    ) async throws {
+        try await write(
+            tripId: tripId, destination: destination, plan: StopPlanSave(route: route, stops: stops, removedIds: []))
+    }
+
+    /// Organizer only (rules), before the trip starts: the route through the stops and the stops themselves in
+    /// one batch, so nobody reads a route without its stops. Stops no longer in the plan are deleted.
+    @MainActor
+    static func saveStops(tripId: String, plan: StopPlanSave) async throws {
+        try await write(tripId: tripId, destination: nil, plan: plan)
+    }
+
+    @MainActor
+    private static func write(tripId: String, destination: DestinationResult?, plan: StopPlanSave) async throws {
+        let db = Firestore.firestore()
+        let tripRef = db.collection(FirestorePaths.trips).document(tripId)
+        var fields: [String: Any] = ["route": plan.route.polyline, "routeSeconds": plan.route.travelTime]
+        if let destination {
+            fields["destination"] = [
                 "name": destination.name,
                 "coordinate": GeoPoint(
                     latitude: destination.coordinate.latitude, longitude: destination.coordinate.longitude),
-            ],
-            "route": route.polyline,
-        ]
-        nonisolated(unsafe) let payload = data
-        guard try await ServerWrite.commit({ try await ref.updateData(payload) }) else {
-            throw ServerWrite.Offline()
+            ]
         }
+        nonisolated(unsafe) let payload = fields
+        nonisolated(unsafe) let batch = db.batch()
+        batch.updateData(payload, forDocument: tripRef)
+        for stop in plan.stops {
+            let ref = stop.id.map { tripRef.collection("stops").document($0) } ?? tripRef.collection("stops").document()
+            try batch.setData(from: stop, forDocument: ref)
+        }
+        for id in plan.removedIds {
+            batch.deleteDocument(tripRef.collection("stops").document(id))
+        }
+        guard try await ServerWrite.commit({ try await batch.commit() }) else { throw ServerWrite.Offline() }
     }
 }
 
