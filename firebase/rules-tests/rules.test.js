@@ -670,6 +670,58 @@ describe('planned stops', () => {
     it('a member can still read the stops', () => assertSucceeds(getDoc(doc(db('mem'), stopPath()))));
   });
 
+  // D25 4d: a rebuilt route moves the stops still ahead (open, not reached) to their place on it, in the same batch.
+  describe('the route rebuilt after the start', () => {
+    beforeEach(async () => {
+      await seedStops({ started: true });
+      await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { stopCount: 2 }));
+    });
+    const rebuild = (uid, stops, trip = { route: '_p~iF~ps|U_ulLnnqC', routeSeconds: 9000 }) => {
+      const f = db(uid);
+      const b = writeBatch(f);
+      if (trip) b.update(doc(f, `trips/${T}`), trip);
+      for (const [id, fields] of Object.entries(stops)) b.update(doc(f, stopPath(id)), fields);
+      return b.commit();
+    };
+    const mark = (id, fields) => env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), stopPath(id)), fields));
+    it('the organizer writes the route and the new offsets of the stops ahead together', () =>
+      assertSucceeds(rebuild('org', { s1: { routeOffset: 40000 }, s2: { routeOffset: 90000 } })));
+    it('an offset alone, without a new route in the batch, is refused', async () => {
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }, null));
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }, { name: 'Renamed' }));
+    });
+    it('a member who is not the organizer cannot move a stop', () =>
+      assertFails(rebuild('mem', { s1: { routeOffset: 40000 } })));
+    it('only the offset moves: nothing else on the stop changes with it', async () => {
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000, name: 'Elsewhere' } }));
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000, order: 1 } }));
+      await assertFails(rebuild('org', { s1: { routeOffset: -5 } }));
+      await assertFails(rebuild('org', { s1: { routeOffset: 'far' } }));
+    });
+    it('a skipped stop keeps its offset', async () => {
+      await mark('s1', { skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() });
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }));
+      await assertSucceeds(rebuild('org', { s2: { routeOffset: 90000 } }));
+    });
+    it('a stop the convoy has left keeps its offset', async () => {
+      await mark('s1', { leftAt: Timestamp.now(), leftBy: 'org' });
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }));
+    });
+    it('a stop the lead car has reached keeps its offset', async () => {
+      await mark('s1', { arrivedAt: Timestamp.now() });
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }));
+    });
+    it('a meeting point keeps its offset', async () => {
+      await mark('s1', { kind: 'meet', minutes: deleteField() });
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }));
+    });
+    it('not on an ended trip', async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), `trips/${T}`), { status: 'ended', endedAt: Timestamp.now() }));
+      await assertFails(rebuild('org', { s1: { routeOffset: 40000 } }));
+    });
+  });
+
   // D25 4a: the lead car's tracker or the organizer taps Leave (leftAt, leftBy); the lead car's tracker also writes
   // arrivedAt, once, when it first counts itself at the stop (the start of "Leaving at 12:40").
   describe('leaving a stop', () => {
@@ -936,12 +988,19 @@ describe('a trip with stops keeps its route once it has started', () => {
   const newDestination = { name: 'Ipoh', coordinate: new GeoPoint(4.6, 101.1) };
   describe('started, with stops', () => {
     beforeEach(() => seedTrip({ startedAt: ts(60000), stopCount: 2 }));
-    it('the organizer cannot change the route', () =>
-      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC', routeSeconds: 100 })));
-    it('the organizer cannot change the destination', () =>
-      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination })));
-    it('the organizer cannot change the stop count', () =>
-      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { stopCount: 0 })));
+    // D25 4d: the organizer rebuilds the route mid-trip (a new destination, or a stop skipped for everyone).
+    it('the organizer can change the route and the destination', async () => {
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC', routeSeconds: 100 }));
+      await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { destination: newDestination, route: '_ulLnnqC_p~iF~ps|U' }));
+    });
+    it('a member who is not the organizer cannot change the route or the destination', async () => {
+      await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC' }));
+      await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { destination: newDestination }));
+    });
+    it('the organizer cannot change the stop count', async () => {
+      await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { stopCount: 0 }));
+      await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { route: '_p~iF~ps|U_ulLnnqC', stopCount: 3 }));
+    });
     it('the organizer can still rename and end the trip', async () => {
       await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'New name' }));
       await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() }));

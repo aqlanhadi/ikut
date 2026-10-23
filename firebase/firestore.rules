@@ -266,13 +266,13 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['name', 'destination', 'route', 'routeSeconds', 'stopCount', 'status',
                        'lastActivityAt', 'endedAt'])
-        // Once the trip has started, a trip with planned stops keeps its route and destination: the stops sit at
-        // offsets on that route and are locked too. Rules cannot list the stops, so the trip counts them
-        // (stopCount, written in the same batch as the stops).
+        // Once the trip has started, a trip with planned stops keeps its stop count: stops are only skipped, never
+        // added or removed. Rules cannot list the stops, so the trip counts them (stopCount, written in the same batch
+        // as the stops). The route and destination may still change (D25 4d: the organizer's phone rebuilds the route
+        // through the stops still ahead and moves those stops onto it in the same batch, rule under stops/{stopId}).
         && (resource.data.get('startedAt', null) == null
             || resource.data.get('stopCount', 0) == 0
-            || !request.resource.data.diff(resource.data).affectedKeys()
-                 .hasAny(['route', 'destination', 'routeSeconds', 'stopCount']))
+            || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['stopCount']))
         && validTripShape(request.resource.data)
         && (request.resource.data.status == 'active'
             || (request.resource.data.status == 'ended'
@@ -395,6 +395,18 @@ service cloud.firestore {
               && request.resource.data.skipped == true
               && request.resource.data.skippedBy == request.auth.uid
               && request.resource.data.skippedAt == request.time)
+            // D25 4d: the route rebuilt mid-trip. A stop still ahead (open, not reached, not the meeting point the
+            // route starts from) moves to its place on the new route: only routeOffset, and only in the batch that
+            // writes the new route (getAfter sees the trip as the batch leaves it).
+            || (!tripNotStarted(tripId)
+              && resource.data.get('skipped', null) != true
+              && resource.data.get('leftAt', null) == null
+              && resource.data.get('arrivedAt', null) == null
+              && resource.data.kind != 'meet'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['routeOffset'])
+              && request.resource.data.routeOffset is number
+              && request.resource.data.routeOffset >= 0
+              && getAfter(tripPath(tripId)).data.route != trip(tripId).route)
           );
 
         allow update: if isLeadOrOrganizer(tripId)
