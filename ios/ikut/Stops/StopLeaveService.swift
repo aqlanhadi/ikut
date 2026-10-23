@@ -21,4 +21,15 @@ enum StopLeaveService {
         let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: tripId, stopId: stopId))
         return try await ServerWrite.commit { try await ref.updateData(payload) }
     }
+
+    /// The organizer skips a stop the convoy has not reached, for everyone (D25 4b). Once; the server's clock for
+    /// `skippedAt` (the rules ask for `request.time`). Offline, the write stays queued and the call returns false.
+    @discardableResult
+    static func skipForEveryone(tripId: String, stopId: String, userId: String) async throws -> Bool {
+        nonisolated(unsafe) let payload: [String: Any] = [
+            "skipped": true, "skippedBy": userId, "skippedAt": FieldValue.serverTimestamp(),
+        ]
+        let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: tripId, stopId: stopId))
+        return try await ServerWrite.commit { try await ref.updateData(payload) }
+    }
 }

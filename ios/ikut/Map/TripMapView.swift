@@ -574,6 +574,7 @@ struct TripMapView: View {
                     model: model, stopId: id, tripId: session.tripId, frozenNow: nil, isOrganizer: session.isOrganizer,
                     leave: leaveHandler,
                     skip: skipHandler,
+                    skipAll: skipAllHandler,
                     listensToAnswers: liveServices
                 ) {
                     withAnimation(.snappy) { arrivalStopId = nil }
@@ -608,6 +609,19 @@ struct TripMapView: View {
     private var skipHandler: (@MainActor @Sendable (String, Bool) async -> StopLeave.Result)? {
         guard liveServices else { return nil }
         return { stopId, skipping in await answerStop(stopId, skipping: skipping) }
+    }
+
+    private var skipAllHandler: (@MainActor @Sendable (String) async -> StopLeave.Result)? {
+        guard liveServices else { return nil }
+        return { stopId in await skipStopForEveryone(stopId) }
+    }
+
+    /// "Skip this stop" for everyone, the organizer's (D25 4b): the same three outcomes as Leave.
+    private func skipStopForEveryone(_ stopId: String) async -> StopLeave.Result {
+        do {
+            let sent = try await StopLeaveService.skipForEveryone(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            return sent ? .sent : .queued
+        } catch { return .refused }
     }
 
     /// Leave on the who-is-here card (D25 4a): sent when the server took it, queued when it did not answer in time

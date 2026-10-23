@@ -49,6 +49,7 @@
 		386D45F03FBA22A2820ED469 /* JoinDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECC11A32A566C739AFB09A4 /* JoinDemo.swift */; };
 		3948F54C6AB6FC2E960961D3 /* TrackingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFE7C740DA188C9EC84A837 /* TrackingService.swift */; };
 		39BF6A05E0C57D1E0848CAEB /* LobbyStopsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2029D17F25EE0C51578850D /* LobbyStopsUITests.swift */; };
+		3AD9AEB8B316FD22E3E27B49 /* StopSkipAllTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */; };
 		3AE7CB9FD6B10610505C93EE /* TripEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17EB484B1F7FD361B7EB9E11 /* TripEvent.swift */; };
 		3C240B4486DA232F9E1504AA /* StopAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B7CE38A043F2B0EBAC9A5 /* StopAskModel.swift */; };
 		3E02B8B76CF74C64C90ADFAD /* StopArrivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */; };
@@ -173,6 +174,7 @@
 		E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */; };
 		E65D046D442B93F1F5CBE70B /* PickedTripSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D336F2B85FEC1BD5D004993 /* PickedTripSheet.swift */; };
 		E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */; };
+		E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */; };
 		EA34025E916A7D1EF7A5734B /* StopContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEB2E053516041BB6ABA3EB /* StopContext.swift */; };
 		ED90BE38CF8197260613896B /* StopArrival.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EAE8F3DD34538653CD0A53 /* StopArrival.swift */; };
 		EDBF46FA09C4587FEFC09278 /* SessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD72135383C0C50AA7ECE9D /* SessionTests.swift */; };
@@ -245,6 +247,7 @@
 		29D417D8CDD8A80CCF181936 /* TrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTests.swift; sourceTree = "<group>"; };
 		2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		2AEFFFA195297151E2DEE401 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
+		2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAllTests.swift; sourceTree = "<group>"; };
 		2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachTests.swift; sourceTree = "<group>"; };
 		2CD43B7DF7793A412F23CD58 /* Trip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trip.swift; sourceTree = "<group>"; };
 		2F08168BB70493362B6773C8 /* LocationAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationAccess.swift; sourceTree = "<group>"; };
@@ -320,6 +323,7 @@
 		8EB8DC03DE6CE40C04670411 /* ConvoyFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyFormat.swift; sourceTree = "<group>"; };
 		8EEB2E053516041BB6ABA3EB /* StopContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopContext.swift; sourceTree = "<group>"; };
 		9256AE8480413335567EC1FC /* HazardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardModel.swift; sourceTree = "<group>"; };
+		9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAll.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
 		991414E381145C07351D7F20 /* LocationDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationDeniedView.swift; sourceTree = "<group>"; };
 		99320F601C724896FA7271D4 /* DemoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUITests.swift; sourceTree = "<group>"; };
@@ -486,6 +490,7 @@
 				0CC4119CE73F30EFCE720756 /* StopArrivalDemo.swift */,
 				E6DA41E66D3D8B93F91BEADF /* StopDelay.swift */,
 				01EE01CC4EDE188E0718E364 /* StopLeave.swift */,
+				9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */,
 			);
 			path = Convoy;
 			sourceTree = "<group>";
@@ -725,6 +730,7 @@
 				01E0F9C4A3658B6AB1A4B07F /* StopDelayTests.swift */,
 				3077A797F64E10D19A3B4D36 /* StopLeaveTests.swift */,
 				13A17502ECF89C7385935BA5 /* StopRouteTests.swift */,
+				2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */,
 				644401FB5F0CAB8C10EF3B3B /* StopTests.swift */,
 				29D417D8CDD8A80CCF181936 /* TrackingTests.swift */,
 				66FF5396649ED8B58EC123A7 /* TripAskTests.swift */,
@@ -1046,6 +1052,7 @@
 				19EFCDBD9C810050CAC5F065 /* StopPlanner.swift in Sources */,
 				4C2FA06DB04BD4142B933300 /* StopRouting.swift in Sources */,
 				303337D10340B4EF477BB00E /* StopService.swift in Sources */,
+				E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */,
 				5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */,
 				1D60D40F65E7155998DF0CAC /* TicketDrive.swift in Sources */,
 				D3FFEEEA36F0755779F7E846 /* TicketStops.swift in Sources */,
@@ -1118,6 +1125,7 @@
 				4EDC16B825285A145AFE88C1 /* StopDelayTests.swift in Sources */,
 				9BB6E062ECEC7EDADF1CA6D7 /* StopLeaveTests.swift in Sources */,
 				7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */,
+				3AD9AEB8B316FD22E3E27B49 /* StopSkipAllTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
 				D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */,
 				178973148E0EE42B411C79AC /* TripAskTests.swift in Sources */,
