@@ -35,9 +35,8 @@ struct HomeView: View {
                     TripsHomeView(
                         onNewTrip: { begin(.create) },
                         onJoin: { begin(.join(code: nil)) },
-                        onOpenTrip: { entry in
-                            path.append(entry.endedAt == nil ? .lobby(tripId: entry.id) : .recap(tripId: entry.id))
-                        }
+                        // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
+                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) }
                     )
                 } else {
                     WelcomeView(

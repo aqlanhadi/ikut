@@ -69,6 +69,15 @@ final class RecapModel {
     private(set) var originName: String?
     private(set) var errorMessage: String?
 
+    /// Plain words, without the system's message.
+    static let couldntLoad = "Couldn’t load this recap. Check your connection and try again."
+
+    /// For tests: a failed load.
+    init(failedTripId: String) {
+        tripId = failedTripId
+        errorMessage = Self.couldntLoad
+    }
+
     init(tripId: String) {
         self.tripId = tripId
         if let cached = RecapService.cached(tripId: tripId) { apply(cached) }
@@ -81,6 +90,16 @@ final class RecapModel {
         apply(snapshot)
     }
 
+    /// Nothing to show yet: not loaded and not failed.
+    var isLoading: Bool { snapshot == nil && errorMessage == nil }
+
+    /// Try again after a load that couldn't finish: back to loading, then the same load.
+    func retry(myUserId: String?) async {
+        guard snapshot == nil else { return }
+        errorMessage = nil
+        await load(myUserId: myUserId)
+    }
+
     func load(myUserId: String?) async {
         do {
             let fresh = try await RecapService.fetch(tripId: tripId)
@@ -91,7 +110,7 @@ final class RecapModel {
             apply(merged)
             errorMessage = nil
         } catch {
-            if snapshot == nil { errorMessage = "Couldn't load this trip. \(error.localizedDescription)" }
+            if snapshot == nil { errorMessage = Self.couldntLoad }
         }
         if originName == nil, let first = snapshot.flatMap({ Polyline.decode($0.route).first }) {
             originName = await RouteBuilder.placeName(at: first)

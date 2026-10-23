@@ -93,7 +93,9 @@ enum PastTripsMapService {
     }
 
     /// Routes for `entries` in the same order; trips that can't be read are skipped.
-    @MainActor static func load(_ entries: [PastTrips.Entry], db: Firestore = Firestore.firestore()) async -> [PastTripRoute] {
+    /// `keeping: false` is for a single trip outside the newest 12 (picked from the list): the file cache,
+    /// which holds only what Home draws, is left as it is.
+    @MainActor static func load(_ entries: [PastTrips.Entry], keeping: Bool = true, db: Firestore = Firestore.firestore()) async -> [PastTripRoute] {
         var cache = cachedRoutes()
         var result: [PastTripRoute] = []
         for entry in entries {
@@ -114,7 +116,7 @@ enum PastTripsMapService {
             }
         }
         // Keep only what Home still lists.
-        save(entries.compactMap { cache[$0.id] })
+        if keeping { save(entries.compactMap { cache[$0.id] }) }
         return result
     }
 }

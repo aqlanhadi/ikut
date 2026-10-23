@@ -1,3 +1,4 @@
+import FirebaseAuth
 import MapKit
 import SwiftUI
 
@@ -7,6 +8,7 @@ struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     var onNewTrip: () -> Void
     var onJoin: () -> Void
+    /// A trip that hasn't ended opens its lobby; an ended one is picked on this map instead.
     var onOpenTrip: (PastTrips.Entry) -> Void = { _ in }
 
     @State private var renaming = false
@@ -21,6 +23,16 @@ struct TripsHomeView: View {
     @State private var routes: [PastTripRoute] = []
     @State private var camera: MapCameraPosition
     @State private var mapHeight: CGFloat = 0
+    /// The past trip picked on the map, whose recap fills the sheet.
+    @State private var picked: PickedTrip?
+    /// Its route when it is older than the 12 drawn and the recap hasn't loaded yet.
+    @State private var fetchedRoute: PastTripRoute?
+    /// Where the camera was before picking, for Back.
+    @State private var cameraBeforePick: MapCameraPosition?
+    /// Height of the short sheet while a trip is picked: it holds the stats line, so it follows the text size.
+    @State private var pickedCompact: CGFloat = TripsHomeView.pickedCompactMinimum
+    /// Height of the pinned part of the sheet (grabber and header), measured.
+    @State private var pinnedHeight: CGFloat = 0
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }) {
@@ -51,6 +63,7 @@ struct TripsHomeView: View {
             sheet
         }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { await loadRoutes() }
+        .task(id: picked?.entry.id) { await loadPicked() }
         .overlay(alignment: .topTrailing) { profileButton }
         .alert("Your name", isPresented: $renaming) {
             TextField("Your name", text: $newName)
@@ -73,12 +86,18 @@ struct TripsHomeView: View {
     /// its name; older ones are fainter. Tapping a destination opens that trip's recap.
     private var map: some View {
         Map(position: $camera) {
-            UserAnnotation()
-            // Oldest first so the newest draws on top.
-            ForEach(Array(routes.enumerated().reversed()), id: \.element.id) { index, route in
-                routeContent(route, latest: index == 0)
+            if let picked {
+                pickedContent(picked)
+            } else {
+                UserAnnotation()
+                // Oldest first so the newest draws on top.
+                ForEach(Array(routes.enumerated().reversed()), id: \.element.id) { index, route in
+                    routeContent(route, latest: index == 0)
+                }
             }
         }
+        // Tapping the map away from the route goes back to the list.
+        .onTapGesture { if picked != nil { closePicked() } }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
@@ -86,7 +105,7 @@ struct TripsHomeView: View {
             guard height != mapHeight else { return }
             mapHeight = height
             // Refit for the real height while the camera is still ours.
-            if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
+            if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
         }
     }
 
@@ -123,7 +142,7 @@ struct TripsHomeView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(displayName(route)), to \(route.destinationName)")
-            .accessibilityHint("Opens the recap")
+            .accessibilityHint("Shows the trip on the map")
         }
         .annotationTitles(latest ? .automatic : .hidden)
     }
@@ -134,7 +153,132 @@ struct TripsHomeView: View {
     }
 
     private func open(_ route: PastTripRoute) {
-        if let entry = past.first(where: { $0.id == route.id }) { onOpenTrip(entry) }
+        if let entry = past.first(where: { $0.id == route.id }) { open(entry) }
+    }
+
+    /// An ended trip is picked here, on the map; one still running opens its lobby.
+    private func open(_ entry: PastTrips.Entry) {
+        guard entry.endedAt != nil else { onOpenTrip(entry); return }
+        pick(entry)
+    }
+
+    // MARK: Picked trip
+
+    /// Only the picked trip's route, with its stops and road reports, and a flag at the destination.
+    @MapContentBuilder
+    private func pickedContent(_ picked: PickedTrip) -> some MapContent {
+        if let route = pickedRoute(picked) {
+            let line = route.coordinates
+            if line.count > 1 {
+                MapPolyline(coordinates: line)
+                    .stroke(.white.opacity(0.9), style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
+                MapPolyline(coordinates: line)
+                    .stroke(Color.ikutAccent, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+            }
+            if let start = route.start {
+                Annotation("", coordinate: start, anchor: .center) {
+                    Circle().fill(.white).frame(width: 12, height: 12)
+                        .overlay(Circle().stroke(Color.ikutAccent, lineWidth: 3))
+                        .accessibilityHidden(true)
+                }
+                .annotationTitles(.hidden)
+            }
+            Annotation(route.destinationName, coordinate: route.destination, anchor: .center) {
+                Image(systemName: "flag.checkered")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Color.ikutAccent, in: Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 2))
+                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+                    .accessibilityHidden(true)
+            }
+            .annotationTitles(.visible)
+        }
+        ForEach(PickedTripLogic.markers(picked.model.recap)) { item in
+            let selected = picked.selectedItemId == item.id
+            Annotation(item.title, coordinate: item.coordinate!, anchor: .center) {
+                RecapEventDot(kind: item.kind, symbol: item.symbol, size: selected ? 30 : 22, selected: selected)
+                    .overlay(Circle().stroke(.white, lineWidth: 2))
+            }
+            .annotationTitles(selected ? .visible : .hidden)
+        }
+    }
+
+    private func pickedRoute(_ picked: PickedTrip) -> PastTripRoute? {
+        PickedTripLogic.route(for: picked.entry, snapshot: picked.model.snapshot, drawn: routes, fetched: fetchedRoute)
+    }
+
+    private func pick(_ entry: PastTrips.Entry) {
+        cameraBeforePick = camera
+        fetchedRoute = nil
+        withAnimation(.snappy) {
+            expanded = false
+            picked = PickedTrip(entry: entry)
+        }
+        refocus(animated: true)
+        AccessibilityNotification.Announcement("Showing \(entry.name) on the map. Back to trips is at the top of the sheet.").post()
+    }
+
+    /// Back to the list, with the camera where it was.
+    private func closePicked() {
+        guard picked != nil else { return }
+        withAnimation(.snappy) {
+            picked = nil
+            expanded = false
+        }
+        fetchedRoute = nil
+        if let before = cameraBeforePick {
+            withAnimation(.smooth(duration: 0.8)) { camera = before }
+        }
+        cameraBeforePick = nil
+    }
+
+    /// A timeline item: the map goes to it, and the sheet drops to short with the item in it.
+    private func selectItem(_ item: RecapTimelineItem) {
+        guard let picked else { return }
+        picked.select(item)
+        withAnimation(.snappy) { expanded = false }
+        refocus(animated: true)
+    }
+
+    /// The X on the item: back to the whole route.
+    private func showWholeTrip() {
+        picked?.clearSelection()
+        refocus(animated: true)
+    }
+
+    /// Camera for the picked trip: the selected item's spot, else the whole route, above the short sheet.
+    private func refocus(animated: Bool) {
+        guard let picked else { return }
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: pickedCompact)
+        let region: MKCoordinateRegion?
+        if let c = picked.selectedItem?.coordinate {
+            region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
+        } else if let route = pickedRoute(picked) {
+            region = PickedTripLogic.fit(route, bottomObscured: insets.bottom, topObscured: insets.top)
+        } else {
+            region = nil
+        }
+        guard let region else { return }
+        if animated { withAnimation(.smooth(duration: 0.8)) { camera = .region(region) } } else { camera = .region(region) }
+    }
+
+    /// Loads the picked trip's recap, and its route alone when it is older than the 12 drawn.
+    private func loadPicked() async {
+        guard let picked else { return }
+        let entry = picked.entry
+        async let recapLoaded: Void = picked.model.load(myUserId: Auth.auth().currentUser?.uid)
+        if !routes.contains(where: { $0.id == entry.id }), picked.model.snapshot == nil {
+            let one = await PastTripsMapService.load([entry], keeping: false).first
+            if !Task.isCancelled, self.picked?.entry.id == entry.id, let one {
+                fetchedRoute = one
+                refocus(animated: true)
+            }
+        }
+        await recapLoaded
+        // The recap's own route is the full one, and the dots arrive with it.
+        if !Task.isCancelled, self.picked?.entry.id == entry.id, picked.selectedItem == nil { refocus(animated: true) }
     }
 
     private func loadRoutes() async {
@@ -169,9 +313,9 @@ struct TripsHomeView: View {
     /// the top, and the compact sheet at the bottom (the map runs under both). Before the map has a
     /// height the typical phone height stands in, rather than dividing by zero (which pushed the
     /// fit far south).
-    nonisolated static func obscured(mapHeight: CGFloat) -> (top: Double, bottom: Double) {
-        let height = mapHeight > Self.compactHeight + Self.topObscured ? mapHeight : 874
-        return (Double(Self.topObscured / height), Double(Self.compactHeight / height))
+    nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = TripsHomeView.compactHeight) -> (top: Double, bottom: Double) {
+        let height = mapHeight > sheet + Self.topObscured ? mapHeight : 874
+        return (Double(Self.topObscured / height), Double(sheet / height))
     }
 
     /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
@@ -180,7 +324,9 @@ struct TripsHomeView: View {
     // MARK: Sheet
 
     /// Height of the sheet when collapsed: grabber, title, the two pills and the top of past trips.
-    nonisolated private static let compactHeight: CGFloat = 300
+    nonisolated static let compactHeight: CGFloat = 300
+    /// The short sheet of a picked trip (design/project/HomePicked.dc.html): back, name, date, stats line.
+    nonisolated static let pickedCompactMinimum: CGFloat = 172
     /// Room left above the expanded sheet for the profile button.
     private static let topClearance: CGFloat = 64
 
@@ -192,23 +338,43 @@ struct TripsHomeView: View {
             let bottomInset = geo.safeAreaInsets.bottom
             // From the top of the safe area to the bottom of the screen.
             let full = geo.size.height + bottomInset
-            let tall = max(Self.compactHeight, full - Self.topClearance)
-            let height = sheetHeight(compact: Self.compactHeight, tall: tall)
+            // A picked trip's short sheet is as tall as its header (the text size can wrap it).
+            let compact = picked == nil ? Self.compactHeight
+                : max(Self.pickedCompactMinimum, pinnedHeight + bottomInset + Spacing.l)
+            let tall = max(compact, full - Self.topClearance)
+            let height = sheetHeight(compact: compact, tall: tall)
 
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     grabber
-                    header
+                    if let picked {
+                        PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
+                    } else {
+                        header
+                    }
                 }
                 .contentShape(Rectangle())
-                .gesture(sheetDrag(compact: Self.compactHeight, tall: tall))
+                .gesture(sheetDrag(compact: compact, tall: tall))
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { pinnedHeight = $0 }
 
                 ScrollView {
-                    pastTrips
-                        .padding(.bottom, bottomInset + Spacing.l)
+                    if let picked {
+                        PickedTripBody(picked: picked, onSelect: selectItem)
+                            .padding(.bottom, bottomInset + Spacing.l)
+                    } else {
+                        pastTrips
+                            .padding(.bottom, bottomInset + Spacing.l)
+                    }
                 }
+                .id(picked?.entry.id)
                 .scrollDisabled(!expanded)
                 .scrollBounceBehavior(.basedOnSize)
+            }
+            .onChange(of: compact, initial: true) { _, new in
+                if picked != nil, pickedCompact != new {
+                    pickedCompact = new
+                    refocus(animated: false)
+                }
             }
             .padding(.horizontal, Spacing.l)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -249,7 +415,7 @@ struct TripsHomeView: View {
             .contentShape(Rectangle())
             .onTapGesture { withAnimation(.snappy) { expanded.toggle() } }
             .accessibilityElement()
-            .accessibilityLabel(expanded ? "Collapse trips" : "Expand trips")
+            .accessibilityLabel(picked != nil ? (expanded ? "Collapse recap" : "Expand recap") : (expanded ? "Collapse trips" : "Expand trips"))
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { withAnimation(.snappy) { expanded.toggle() } }
     }
@@ -287,7 +453,7 @@ struct TripsHomeView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(past.enumerated()), id: \.element.id) { index, entry in
                         if index > 0 { RowDivider() }
-                        Button { onOpenTrip(entry) } label: { pastRow(entry) }
+                        Button { open(entry) } label: { pastRow(entry) }
                             .buttonStyle(.plain)
                     }
                 }
@@ -315,12 +481,12 @@ struct TripsHomeView: View {
         .frame(minHeight: 58)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint(entry.endedAt == nil ? "Opens the trip" : "Opens the recap")
+        .accessibilityHint(entry.endedAt == nil ? "Opens the trip" : "Shows the trip on the map")
     }
 
     private func pastDetail(_ entry: PastTrips.Entry) -> String {
-        guard let ended = entry.endedAt else { return "To \(entry.destination) · in progress" }
-        return "To \(entry.destination) · \(ended.formatted(date: .abbreviated, time: .omitted))"
+        guard entry.endedAt != nil else { return "To \(entry.destination) · in progress" }
+        return PickedTripLogic.subtitle(entry)
     }
 
     @ViewBuilder
