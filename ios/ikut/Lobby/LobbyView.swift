@@ -188,7 +188,8 @@ struct LobbyView: View {
                 route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty, ownTrip: !isOrganizer)
         }
         // A participant's own way in, once their car doc has loaded (its route arrives from the car's tracker).
-        .task(id: OwnWayTaskKey(route: model.trip?.route, carRoute: session.car?.route, mergeOffset: session.car?.mergeOffset, loaded: session.car != nil, granted: locationGranted)) {
+        .task(id: OwnWayTaskKey(route: model.trip?.route, carRoute: session.car?.route, mergeOffset: session.car?.mergeOffset, loaded: session.car != nil, granted: locationGranted,
+            meeting: TripSessionLogic.meetingPoint(in: model.stops) != nil)) {
             guard !isSample, !isOrganizer, let trip = model.trip, let car = session.car else { return }
             let granted = locationGranted
             await ownWay.load(
@@ -751,4 +752,5 @@ private struct OwnWayTaskKey: Equatable {
     var mergeOffset: Double?
     var loaded: Bool
     var granted: Bool
+    var meeting: Bool
 }
