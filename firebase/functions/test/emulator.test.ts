@@ -291,12 +291,23 @@ describe("previewTrip (emulator)", () => {
       tripId: tripRef.id,
       name: "T",
       destinationName: "D",
+      destinationCoordinate: { latitude: 1, longitude: 1 },
       cars: [
         { id: "lead", name: "Lead", color: "blue", hasTracker: true, number: 1 },
         { id: "second", name: "Alpha", color: "green", hasTracker: false },
       ],
     });
     assert.ok(!JSON.stringify(r.body).includes(organizerId));
+  });
+
+  it("gives a stranger the destination coordinate and nothing of the route or where it starts", async () => {
+    const { tripRef } = await seedTrip();
+    await tripRef.update({ route: "_p~iF~ps|U_ulLnnqC", destination: { name: "Ipoh", coordinate: new GeoPoint(4.5975, 101.0901) } });
+    const r = await previewTripData(db, tripRef.id);
+    assert.deepEqual(r.destinationCoordinate, { latitude: 4.5975, longitude: 101.0901 });
+    const json = JSON.stringify(r);
+    assert.ok(!json.includes("_p~iF~ps|U_ulLnnqC"));
+    assert.ok(!("route" in r));
   });
 
   it("lists the planned stops in order as name, kind and minutes only, without skipped ones", async () => {
