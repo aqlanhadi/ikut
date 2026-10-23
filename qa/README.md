@@ -38,6 +38,11 @@ phone, and feed it the track with `xcrun simctl location <udid> start --speed=27
   so a killed run never leaves it held. Wrap other screen-driving commands the same way:
   `qa/simlock.sh <udid> -- xcodebuild test … -only-testing:ikutUITests/CreateTripUITests`.
 
+- **Don't run `convoy-sim --scenario stop` next to a `with-rules` or rule-mutant run on :8080.** Both use the shared
+  emulator: a swapped rules file makes the stop scenario's writes fail or its positions read stale, and its
+  FAIL then says nothing about the app (two false FAILs came that way in D25 3b). Run it with the emulator
+  otherwise idle, or put its rules in with `tools/with-rules.mjs <worktree> -- node qa/convoy-sim.mjs --scenario stop`.
+
 How agents wait on a run is in `CLAUDE.md`, *Long runs and waiting*.
 
 ## Drive one trip by hand
@@ -144,8 +149,10 @@ about 2 minutes before the lead reaches her (car 6 about T=704, the phone about 
 
 **A planned stop** (`--scenario stop`, D25 piece 3b): cars 1-4 drive as in the default scenario (car 2's drop, car 4's
 merge at 408) but each pulls in at R&R Tapah, 20 km along, and parks there (car 1 about T=532, car 2 565, car 4 598,
-car 3 616; tracks `car<N>-stop.gpx`). The organizer writes the stop before the start. No phone car, no timeline: it
-does not take `--wait-app` and `run-ui.mjs` does not run it.
+car 3 616; tracks `car<N>-stop.gpx`). The organizer writes the stop, a second stop (Kopitiam Gopeng, 50 km along) and
+the trip's `startedAt` before the cars set off. No phone car, no timeline: it does not take `--wait-app` and
+`run-ui.mjs` does not run it. D25 4a: car 1's phone writes `arrivedAt` when it first counts itself here and taps
+Leave once all four are here (`lib/stopleave.mjs` ports Next stop and Leaving at).
 
 ## What is checked
 
@@ -165,7 +172,11 @@ does not take `--wait-app` and `run-ui.mjs` does not run it.
   spoken with its distance ("Hafiz needs fuel, 17 km behind. Tap OK."), within 1.5 km of the GPX
 - stop (`--scenario stop`, car 1's phone as `lib/stoparrival.mjs` ports `StopArrival` from the app): the stop is stored
   with its place on the route, kind and minutes; each car is counted here within 10 s of the GPX coming within 150 m of
-  it, never before; "4 of 4 here" when the last car pulls in, and still at the end
+  it, never before (not more than 2 s early); "4 of 4 here" when the last car pulls in, and still at the end; car 1's
+  phone writes `arrivedAt` once and "Leaving at" is that plus 20 min; car 1 taps Leave (`leftAt`, `leftBy` car 1)
+  after the last car is here, Next stop moves on from R&R Tapah to Kopitiam Gopeng within 10 s, a skip answer, a
+  skip for everyone and a second Leave on the left stop are refused, and before it car 2 could not Leave or mark
+  the arrival and car 4, still short of the stop, could skip and undo
 
 `ConvoyScenarioUITests` (the panel as a person sees it, ids `convoy.row.N`, `joining.row.N`, `convoy.header`,
 `convoy.joining.header`, `hazard.marker`):

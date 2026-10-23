@@ -74,6 +74,8 @@ export const PARKED_TIMELINE = [
  * `--wait-app` and run-ui do not take this scenario. The tracks are `car<N>-stop.gpx`.
  */
 export const STOP = { name: 'R&R Tapah', kind: 'fuel', minutes: 20, offset: 20_000 };
+/** The stop after it (D25 4a): Next stop moves on to it once car 1 has left R&R Tapah. Offset is capped to the route. */
+export const STOP_NEXT = { name: 'Kopitiam Gopeng', kind: 'food', minutes: 45, offset: 50_000 };
 export const STOP_CARS = CARS.filter((c) => c.kind !== 'app').map((c, i) => ({ ...c, gpx: `${c.key}-stop`, stopAt: STOP.offset - 20 * i }));
 
 export const SCENARIOS = ['drive', 'parked', 'stop'];
