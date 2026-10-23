@@ -685,7 +685,7 @@ describe('a car\'s skip answer', () => {
       await setDoc(doc(f, `trips/${T}`), tripDoc(started ? { startedAt: ts(60000) } : {}));
       await setDoc(doc(f, `trips/${T}/stops/s1`), stopDoc(skipped ? { skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() } : {}));
       await setDoc(doc(f, `trips/${T}/stops/s2`), stopDoc({ name: 'Kopitiam', kind: 'food', order: 1, routeOffset: 90000 }));
-      await setDoc(doc(f, `trips/${T}/positions/carA`), position({ routeOffset: posOffset, updatedAt: Timestamp.now() }));
+      await setDoc(doc(f, `trips/${T}/positions/carA`), position({ routeOffset: 100, convoyOffset: posOffset, updatedAt: Timestamp.now() }));
     });
   };
   beforeEach(() => seedAnswers());
@@ -729,6 +729,17 @@ describe('a car\'s skip answer', () => {
     await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
   });
   it('another stop on the same trip still takes it', () => assertSucceeds(setDoc(doc(db('mem'), ansPath('carA', 's2')), skipAns())));
+  it('a car that has not merged onto the main route yet can skip, whatever its own offset', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), `trips/${T}/positions/carA`), position({ routeOffset: 99999, updatedAt: Timestamp.now() })));
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a car within 150 m of the stop is there, and cannot skip it', async () => {
+    await seedAnswers({ posOffset: 61851 });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await seedAnswers({ posOffset: 61849 });
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
   it('a car that has reached the stop cannot skip it', async () => {
     await seedAnswers({ posOffset: 62000 });
     await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
@@ -738,8 +749,8 @@ describe('a car\'s skip answer', () => {
     await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
     await assertSucceeds(setDoc(doc(db('mem'), ansPath('carA', 's2')), skipAns()));
   });
-  it('a car 1 m short of the stop can still skip it', async () => {
-    await seedAnswers({ posOffset: 61999 });
+  it('a car 200 m short of the stop can still skip it', async () => {
+    await seedAnswers({ posOffset: 61800 });
     await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
   });
   it('a non-member cannot write or undo', async () => {

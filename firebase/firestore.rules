@@ -125,10 +125,14 @@ service cloud.firestore {
       return stop.get('skipped', null) != true;
     }
 
-    // The car's last reported position is short of the stop; no position yet counts as short of it.
+    // The car is still short of the stop: its last reported place on the main route (convoyOffset) is more than
+    // 150 m (the app's "here" radius, NextStop.hereRadius) before the stop. A car with no position yet, or one
+    // that has not merged onto the main route (no convoyOffset), has not reached anything.
     function carNotThereYet(tripId, carId, stop) {
-      return !exists(/databases/$(database)/documents/trips/$(tripId)/positions/$(carId))
-        || get(/databases/$(database)/documents/trips/$(tripId)/positions/$(carId)).data.routeOffset < stop.routeOffset;
+      let pos = /databases/$(database)/documents/trips/$(tripId)/positions/$(carId);
+      return !exists(pos)
+        || get(pos).data.get('convoyOffset', null) == null
+        || get(pos).data.convoyOffset < stop.routeOffset - 150;
     }
 
     function tripNotStarted(tripId) {
@@ -385,8 +389,9 @@ service cloud.firestore {
         // document). One per car, keyed by car id, written by a member of that car once the trip has started:
         //  - not for the lead car (the organizer skips for everyone instead),
         //  - not on a stop already skipped for everyone, and (hook for 4a) not on a stop the convoy has left,
-        //  - only before the car reaches the stop: its last reported routeOffset is still short of the stop's.
-        //    A car that has not reported a position yet has not reached anything. The offset is the tracker's own
+        //  - only before the car reaches the stop: its last reported convoyOffset (place on the main route) is still
+        //    more than 150 m short of the stop's routeOffset.
+        //    A car that has not reported or merged yet has not reached anything. The offset is the tracker's own
         //    report, so this stops a late tap from an app that is out of date, not a determined cheat (who
         //    only hides their own car from a count); the app checks the same thing before it offers the button.
         // Undo is a delete of one's own car's answer, whenever the trip is active.
