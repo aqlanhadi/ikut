@@ -58,8 +58,9 @@ final class TripMapModel {
     @ObservationIgnored private var catchUpAt: Date?
     /// "Aisha’s car is 3.3 km behind you" while its pill is up (D26).
     private(set) var catchUp: TripAlert?
-    /// The trip's planned stops, from the session; only read for the approach pill.
-    @ObservationIgnored private(set) var stops: [PlannedStop] = []
+    /// The trip's planned stops, in route order (by `routeOffset`), from the session. Observable, for the
+    /// approach pill and the panel's Next stop.
+    private(set) var stops: [PlannedStop] = []
     @ObservationIgnored private var stopWatch = StopApproach()
     @ObservationIgnored private var stopApproachAt: Date?
     /// "R&R Tapah in 2 km" while its pill is up (D25 piece 3a).
@@ -123,7 +124,7 @@ final class TripMapModel {
     /// Reads trip, my car and positions from the session. Call when any of them changes.
     func sync() {
         guard let session else { return }
-        stops = session.stops
+        setStops(session.stops)
         apply(
             trip: session.trip, myCar: session.car, myCarId: session.member?.carId ?? session.car?.id,
             positions: session.positions, isTracker: session.isTracking, isEnded: session.isEnded)
@@ -166,7 +167,7 @@ final class TripMapModel {
     }
 
     /// Sets the planned stops without checking (tests, the demo); the next `apply` or `setCars` does.
-    func setStops(_ stops: [PlannedStop]) { self.stops = stops }
+    func setStops(_ stops: [PlannedStop]) { self.stops = stops.sorted { $0.routeOffset < $1.routeOffset } }
 
     /// New car list from the listener. Overlays are rebuilt only when a route or state changed.
     func setCars(_ cars: [Car]) {
@@ -184,7 +185,9 @@ final class TripMapModel {
     /// the pill up until the car is nearly there, the stop is skipped or passed, or 5 minutes go by.
     private func checkStopApproach() {
         if let alert = stopApproach, !stopApproachShowing(alert) { stopApproach = nil }
-        guard !isEnded, let announcer = alertAnnouncer, let tripId = alertTripId,
+        // A fix that is not fresh says nothing about where I am now: no pill and no speech from it.
+        guard !isEnded, let announcer = alertAnnouncer, let tripId = alertTripId, let myCarId,
+              let mine = positions[myCarId], HazardLogic.isFresh(mine, now: Date(), config: .default),
               let due = stopWatch.check(stops: stops, myOffset: myOffsetNow()).first else { return }
         let alert = AlertWording.stopApproach(tripId: tripId, due: due)
         stopApproach = alert

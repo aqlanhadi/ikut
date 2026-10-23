@@ -9,9 +9,12 @@ import Testing
 struct StopApproachTests {
     private func stop(_ id: String, at offset: Double, kind: PlannedStopKind = .fuel, minutes: Int? = 20,
                       name: String = "R&R Tapah", skipped: Bool? = nil, order: Int = 1) -> PlannedStop {
-        PlannedStop(
-            id: id, name: name, coordinate: GeoPoint(latitude: 4, longitude: 101), routeOffset: offset,
+        // Set the id after init: passing a non-nil @DocumentID to the initializer logs a Firestore warning.
+        var stop = PlannedStop(
+            id: nil, name: name, coordinate: GeoPoint(latitude: 4, longitude: 101), routeOffset: offset,
             kind: kind, minutes: minutes, order: order, skipped: skipped)
+        stop.id = id
+        return stop
     }
 
     @Test func firesOnceAtAboutTwoKilometresForAStopAhead() {
@@ -145,5 +148,25 @@ struct StopApproachTests {
             #expect(recorder.alerts.isEmpty)
             #expect(model.stopApproach == nil)
         }
+    }
+
+    @Test func aStaleFixOfMyCarNeitherSpeaksNorShowsThePill() {
+        let probe = MapDemo.model()
+        let lead = probe.convoy.convoy.first?.convoyOffset ?? 0
+        let (model, recorder, _) = demo([stop("s1", at: lead + 1_900)])
+        // The demo's lead fix is 4 s old; make it 90 s old.
+        let me = model.convoy.convoy[0]
+        var old = me.position
+        old.updatedAt = Date().addingTimeInterval(-90)
+        model.apply(trip: nil, myCar: model.myCar, myCarId: model.myCarId, positions: ["c1": old], isTracker: true)
+        model.setCars(model.cars)
+        #expect(recorder.alerts.isEmpty)
+        #expect(model.stopApproach == nil)
+    }
+
+    @Test func stopsAreKeptInRouteOrder() {
+        let model = MapDemo.model()
+        model.setStops([stop("b", at: 9_000), stop("a", at: 3_000)])
+        #expect(model.stops.map(\.id) == ["a", "b"])
     }
 }
