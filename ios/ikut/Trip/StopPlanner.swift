@@ -297,3 +297,11 @@ final class StopPlanner {
     }
     #endif
 }
+
+extension StopPlanner.Failure.Place {
+    /// The stop whose road failed; nil when it is the destination, the start or the save.
+    var stopId: String? {
+        if case .stop(let id) = self { return id }
+        return nil
+    }
+}

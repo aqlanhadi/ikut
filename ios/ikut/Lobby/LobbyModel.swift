@@ -33,7 +33,7 @@ final class LobbyModel {
     }
 
     /// KL to Ipoh with four cars, Hafiz's still waiting for a tracker; `started` puts it on the road.
-    static func sample(started: Bool, now: Date = Date()) -> LobbyModel {
+    static func sample(started: Bool, now: Date = Date(), seconds: Double? = nil, stops: [PlannedStop] = []) -> LobbyModel {
         func car(_ id: String, _ name: String, _ color: String, _ number: Int, tracker: String?, lead: Bool = false) -> Car {
             Car(id: id, name: name, color: color, trackerUserId: tracker, isLead: lead, route: nil, mergeOffset: nil,
                 state: .convoy, number: number)
@@ -45,6 +45,7 @@ final class LobbyModel {
             id: "sample", name: "Balik kampung raya", code: "K7M2QX", organizerId: "u1",
             route: Polyline.encode(MapDemo.densify(MapDemo.mainWaypoints)),
             destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: 4.6, longitude: 101.09)),
+            routeSeconds: seconds,
             status: .active, createdAt: now.addingTimeInterval(-900), lastActivityAt: now,
             startedAt: started ? now.addingTimeInterval(-600) : nil, endedAt: nil)
         return LobbyModel(
@@ -59,7 +60,8 @@ final class LobbyModel {
                 member("u1", "Aqlan", "c1", organizer: true), member("u5", "Faiz", "c1"),
                 member("u2", "Wyna", "c2"), member("u3", "Hafiz", "c3"),
                 member("u4", "Daniel", "c4"), member("u6", "Siti", "c4"), member("u7", "Aisha", "c4"),
-            ])
+            ],
+            stops: stops)
     }
     #endif
 
