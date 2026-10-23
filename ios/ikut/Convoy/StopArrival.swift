@@ -36,6 +36,8 @@ enum StopArrival {
         case here
         /// Meters and seconds left, each nil when it can't be told (no pace, no distance).
         case away(distance: Double?, seconds: TimeInterval?)
+        /// Within the here-radius, but on a fix older than 60 s: the car may have left, so it is not counted.
+        case lastSeenHere
         /// No position at all yet.
         case unknown
     }
@@ -58,12 +60,12 @@ enum StopArrival {
 
     /// The card for a stop exists only while the stop is still on: a skipped (or unknown) stop has none.
     static func target(stopId: String, in stops: [PlannedStop]) -> Target? {
-        stops.first { $0.id == stopId && $0.isActive }.map(Target.init)
+        stops.first { $0.id == stopId && $0.isOpen }.map(Target.init)
     }
 
     /// "stop 1 of 2": the place of a stop among those still on (not skipped), by route order; nil when it is off.
     static func place(of stopId: String, in stops: [PlannedStop]) -> (index: Int, count: Int)? {
-        let active = stops.filter(\.isActive).sorted { $0.routeOffset < $1.routeOffset }
+        let active = stops.filter(\.isOpen).sorted { $0.routeOffset < $1.routeOffset }
         guard let i = active.firstIndex(where: { $0.id == stopId }) else { return nil }
         return (i + 1, active.count)
     }
@@ -80,7 +82,7 @@ enum StopArrival {
             .init(latitude: position.location.latitude, longitude: position.location.longitude), target.coordinate)
         let alongRoute = offset.map { abs(target.routeOffset - $0) }
         let near = straight <= NextStop.hereRadius || (alongRoute ?? .infinity) <= NextStop.hereRadius
-        if near, HazardLogic.isFresh(position, now: now, config: config) { return .here }
+        if near { return HazardLogic.isFresh(position, now: now, config: config) ? .here : .lastSeenHere }
         let perMeter = pace ?? (speed > 0 ? 1 / speed : nil)
         if let alongRoute { return .away(distance: alongRoute, seconds: perMeter.map { $0 * alongRoute }) }
         // A joining car: its way in goes to the meeting point, so its own time to merge is the time to it.
@@ -115,6 +117,7 @@ enum StopArrival {
         case .away(_, let seconds?): "\(ConvoyFormat.duration(seconds)) away"
         case .away(let distance?, nil): "\(ConvoyFormat.distance(distance)) away"
         case .away: "On the way"
+        case .lastSeenHere: "Last seen here"
         case .unknown: "Waiting for location"
         }
     }

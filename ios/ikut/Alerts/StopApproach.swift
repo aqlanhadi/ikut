@@ -30,7 +30,7 @@ struct StopApproach: Sendable {
     mutating func check(stops: [PlannedStop], myOffset: Double?) -> [Due] {
         guard let myOffset else { return [] }
         let candidates = stops.compactMap { stop -> ApproachCore.Candidate? in
-            guard let id = stop.id, stop.isActive, !stop.isMeeting else { return nil }
+            guard let id = stop.id, stop.isOpen, !stop.isMeeting else { return nil }
             return .init(id: id, offset: stop.routeOffset)
         }
         return core.evaluate(candidates: candidates, myOffset: myOffset).compactMap { fire in
@@ -41,7 +41,7 @@ struct StopApproach: Sendable {
 
     /// True while the pill should stay: the stop is still active, ahead, and not yet at the door.
     static func isShowing(_ stop: PlannedStop?, distance: Double?) -> Bool {
-        guard let stop, stop.isActive, let distance else { return false }
+        guard let stop, stop.isOpen, let distance else { return false }
         return distance > arrivedDistance
     }
 }

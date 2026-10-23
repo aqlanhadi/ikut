@@ -13,7 +13,7 @@ enum PlannedStopKind: String, Codable, Sendable, Equatable, CaseIterable {
 /// `trips/{tripId}/stops/{stopId}`: a place on the main route that cars arrive at and leave.
 ///
 /// The organizer writes them in the lobby, before `startedAt`, together with the route that goes
-/// through them; after the start only `skipped` (with `skippedBy`, `skippedAt`) changes. The same
+/// through them; after the start only `skipped` (with `skippedBy`, `skippedAt`), `arrivedAt` and the leave fields change. The same
 /// shape is meant for a stop chosen mid-trip (D4): a stop request would carry the id of one of
 /// these documents, and arrival and leave work on a stop whatever put it on the route.
 struct PlannedStop: Codable, Sendable, Equatable, Identifiable {
@@ -34,9 +34,20 @@ struct PlannedStop: Codable, Sendable, Equatable, Identifiable {
     var skipped: Bool?
     var skippedBy: String?
     var skippedAt: Date?
+    /// Server time when the lead car's phone first counted its car at the stop (written once); "Leaving at" counts
+    /// `minutes` from it, so every phone shows the same time.
+    var arrivedAt: Date?
+    /// Set once when the lead car or the organizer taps Leave: the stop is done for everyone.
+    var leftAt: Date?
+    var leftBy: String?
 
     /// Not skipped.
     var isActive: Bool { skipped != true }
+    /// The rules write `leftAt` and `leftBy` together. A Leave still waiting to reach the server has `leftBy` but a
+    /// pending `leftAt` that reads as nil, so either one means left.
+    var isLeft: Bool { leftAt != nil || leftBy != nil }
+    /// Still to be done: not skipped and not left. Next stop, the card and the approach alert look at this.
+    var isOpen: Bool { isActive && !isLeft }
     var isMeeting: Bool { kind == .meet }
 
     static let maxCount = 8

@@ -669,6 +669,112 @@ describe('planned stops', () => {
     });
     it('a member can still read the stops', () => assertSucceeds(getDoc(doc(db('mem'), stopPath()))));
   });
+
+  // D25 4a: the lead car's tracker or the organizer taps Leave (leftAt, leftBy); the lead car's tracker also writes
+  // arrivedAt, once, when it first counts itself at the stop (the start of "Leaving at 12:40").
+  describe('leaving a stop', () => {
+    beforeEach(async () => {
+      await seedStops({ started: true });
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const f = ctx.firestore();
+        await setDoc(doc(f, `trips/${T}/members/lead`), memberDoc({ displayName: 'Lead', carId: 'carL' }));
+        await setDoc(doc(f, `trips/${T}/cars/carL`), carDoc({ name: 'Car L', isLead: true, trackerUserId: 'lead' }));
+      });
+    });
+    const leave = (uid = 'org', over = {}) => ({ leftAt: serverTimestamp(), leftBy: uid, ...over });
+    const arrive = (over = {}) => ({ arrivedAt: serverTimestamp(), ...over });
+    const seedLeft = () => env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), stopPath('s1')), { leftAt: Timestamp.now(), leftBy: 'org' }));
+
+    it('the organizer leaves a stop', () => assertSucceeds(updateDoc(doc(db('org'), stopPath('s1')), leave())));
+    it('the lead car\'s tracker leaves a stop', () => assertSucceeds(updateDoc(doc(db('lead'), stopPath('s1')), leave('lead'))));
+    it('another car cannot leave', () => assertFails(updateDoc(doc(db('mem'), stopPath('s1')), leave('mem'))));
+    it('a member of the lead car who is not its tracker cannot leave', async () => {
+      await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/pass`),
+        memberDoc({ displayName: 'Pass', carId: 'carL' })));
+      await assertFails(updateDoc(doc(db('pass'), stopPath('s1')), leave('pass')));
+    });
+    it('a stranger cannot leave', () => assertFails(updateDoc(doc(db('stranger'), stopPath('s1')), leave('stranger'))));
+    it('leave must name the caller and use server time', async () => {
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave('org', { leftBy: 'lead' })));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), leave('lead', { leftBy: 'org' })));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave('org', { leftAt: ts() })));
+    });
+    it('leave needs both fields and nothing else', async () => {
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { leftAt: serverTimestamp() }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { leftBy: 'org' }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave('org', { order: 5 })));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave('org', { routeOffset: 1 })));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave('org', { skipped: true })));
+    });
+    it('a stop is left once', async () => {
+      await seedLeft();
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave()));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), leave('lead')));
+    });
+    it('a stop skipped for everyone cannot be left', async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), stopPath('s1')), { skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave()));
+    });
+    it('a stop that was left cannot be skipped for everyone', async () => {
+      await seedLeft();
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), {
+        skipped: true, skippedBy: 'org', skippedAt: serverTimestamp() }));
+    });
+    it('a left stop cannot be taken back', async () => {
+      await seedLeft();
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { leftAt: deleteField(), leftBy: deleteField() }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { leftBy: 'lead' }));
+    });
+    it('before the start nobody can leave', async () => {
+      await seedStops({ started: false });
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave()));
+    });
+    it('the organizer cannot plan a stop as already left', async () => {
+      await seedStops({ started: false });
+      await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2, leftAt: Timestamp.now(), leftBy: 'org' })));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), stopDoc({ leftAt: Timestamp.now(), leftBy: 'org' })));
+    });
+    it('on an ended trip nobody leaves', async () => {
+      await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { status: 'ended' }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), leave()));
+    });
+
+    it('the lead car\'s tracker writes arrivedAt', () =>
+      assertSucceeds(updateDoc(doc(db('lead'), stopPath('s1')), arrive())));
+    it('the organizer writes arrivedAt', () => assertSucceeds(updateDoc(doc(db('org'), stopPath('s1')), arrive())));
+    it('another car cannot write arrivedAt', () => assertFails(updateDoc(doc(db('mem'), stopPath('s1')), arrive())));
+    it('arrivedAt is written once, in server time, alone', async () => {
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), arrive({ arrivedAt: ts() })));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), arrive({ order: 3 })));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), { arrivedAt: serverTimestamp(), leftAt: serverTimestamp(), leftBy: 'lead' }));
+      await assertSucceeds(updateDoc(doc(db('lead'), stopPath('s1')), arrive()));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), arrive()));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), { arrivedAt: deleteField() }));
+    });
+    it('arrivedAt is not written before the start, on a skipped stop or on a left stop', async () => {
+      await seedLeft();
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), arrive()));
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), stopPath('s2')), { skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() }));
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s2')), arrive()));
+      await seedStops({ started: false });
+      await assertFails(updateDoc(doc(db('lead'), stopPath('s1')), arrive()));
+    });
+    it('the organizer cannot plan a stop with an arrivedAt', async () => {
+      await seedStops({ started: false });
+      await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2, arrivedAt: Timestamp.now() })));
+    });
+    it('a left stop takes no more skip answers', async () => {
+      await seedLeft();
+      await assertFails(setDoc(doc(db('mem'), `trips/${T}/stops/s1/answers/carA`),
+        { answer: 'skip', userId: 'mem', at: serverTimestamp() }));
+      // Another stop still does.
+      await assertSucceeds(setDoc(doc(db('mem'), `trips/${T}/stops/s2/answers/carA`),
+        { answer: 'skip', userId: 'mem', at: serverTimestamp() }));
+    });
+  });
 });
 
 // A car's answer about a planned stop (D25 5a): trips/T/stops/s1/answers/{carId}.

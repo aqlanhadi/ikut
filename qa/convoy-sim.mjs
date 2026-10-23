@@ -42,15 +42,16 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth';
 import {
   GeoPoint, Timestamp, collection, connectFirestoreEmulator, deleteField, disableNetwork, doc, enableNetwork, setLogLevel,
-  getDoc, getDocs, initializeFirestore, onSnapshot, serverTimestamp, setDoc, terminate, updateDoc, writeBatch,
+  deleteDoc, getDoc, getDocs, initializeFirestore, onSnapshot, serverTimestamp, setDoc, terminate, updateDoc, writeBatch,
 } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
-import { DURATION, FIX_HZ, SCENARIOS, STOP, TRIP, appKey, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { DURATION, FIX_HZ, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
 import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referenceId, relativeDistance, spokenStopRequest, togetherPairs } from './lib/farahead.mjs';
 import { tally as stopTally } from './lib/stoparrival.mjs';
+import { isOpen, leavingAt, nextStop } from './lib/stopleave.mjs';
 import { loadRoutes } from './generate-gpx.mjs';
 import { endsWithResult } from './lib/shell.mjs';
 
@@ -292,17 +293,24 @@ class Phone {
 
   // ---- Who is at the planned stop (D25 piece 3b): StopArrival.tally on the stop and everyone's positions.
   watchStops() {
-    this.stops = [];
+    this.allStops = [];
     this.arrivals = new Map(); // carId -> first T it counted as here
     this.firstFull = null;
     this.lastTally = null;
+    this.nextTrail = []; // {T, name}: what Next stop read, each time it changed
+    this.stopsError = null;
     this.unsubStops = onSnapshot(collection(this.db, `trips/${this.tripId}/stops`), (snap) => {
-      this.stops = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => s.skipped !== true);
-    });
+      this.allStops = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const mine = this.allStops.find((s) => s.routeOffset === STOP.offset);
+      if (mine?.leftAt && !this.leftSeen) this.leftSeen = { T: clock.T, wall: Date.now() };
+    }, (err) => { this.stopsError = err; log(`${this.key}'s stops listener failed: ${err.code ?? err.message}`); });
   }
 
+  /** The planned stop the cars pull in at (not the one after it). */
+  get arrivalStop() { return this.allStops?.find((s) => s.routeOffset === STOP.offset && s.skipped !== true); }
+
   judgeArrival() {
-    const stop = this.stops?.[0];
+    const stop = this.arrivalStop;
     if (!stop || !this.positions?.size || !this.cars.size) return;
     const now = Date.now();
     const target = { latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude, routeOffset: stop.routeOffset, isMeeting: stop.kind === 'meet' };
@@ -317,9 +325,34 @@ class Phone {
     const t = stopTally(target, cars);
     for (const r of t.rows) {
       if (r.status.kind === 'here' && !this.arrivals.has(r.id)) { this.arrivals.set(r.id, clock.T); log(`${this.key}'s phone: ${this.names.get(r.id)} is here, "${t.title}"`); }
+      // The lead car's phone marks when it first counted itself here (TripMapModel.checkLeadArrival), once.
+      if (r.id === this.carId && r.status.kind === 'here' && !this.arrivedWrite) {
+        this.arrivedWrite = updateDoc(doc(this.db, `trips/${this.tripId}/stops/${stop.id}`), { arrivedAt: serverTimestamp() })
+          .then(() => { this.arrivedWall = Date.now(); log(`${this.key}'s phone marks its arrival at ${STOP.name}`); }, (e) => { this.arrivedError = e; });
+      }
     }
-    if (!this.firstFull && t.total > 0 && t.here === t.total) this.firstFull = { T: clock.T, title: t.title };
+    if (!this.firstFull && t.total > 0 && t.here === t.total) this.firstFull = { T: clock.T, title: t.title, wall: now };
     this.lastTally = t;
+    const mineOffset = this.positions.get(this.carId)?.convoyOffset;
+    if (typeof mineOffset === 'number') {
+      const name = nextStop(this.allStops, mineOffset)?.name ?? null;
+      if (this.nextTrail.at(-1)?.name !== name) this.nextTrail.push({ T: clock.T, name });
+    }
+  }
+
+  /** The lead car taps Leave once all four are here (StopLeaveService.leave): the stop is done for everyone. */
+  async maybeLeave() {
+    if (!this.firstFull || this.leaving || !this.arrivalStop) return;
+    this.leaving = true;
+    await this.arrivedWrite; // "Leaving at" counts from it; Leave is tapped after the lead car was counted
+    // arrivedAt is written once: a second write, even by the lead car, is refused.
+    setLogLevel('silent');
+    try { await updateDoc(doc(this.db, `trips/${this.tripId}/stops/${this.arrivalStop.id}`), { arrivedAt: serverTimestamp() }); this.arrivedTwice = true; } catch (e) { this.arrivedTwice = false; this.arrivedTwiceCode = e.code; }
+    setLogLevel('error');
+    this.leaveT = clock.T;
+    this.leaveWall = Date.now();
+    await updateDoc(doc(this.db, `trips/${this.tripId}/stops/${this.arrivalStop.id}`), { leftAt: serverTimestamp(), leftBy: this.uid });
+    log(`${this.key} (lead) taps Leave at ${STOP.name} with "${this.firstFull.title}"`);
   }
 
   // ---- A parked car's phone (D26): ConvoyModel / TripMapModel on every convoy update, from everyone's positions.
@@ -531,6 +564,14 @@ async function main() {
       name: STOP.name, coordinate: new GeoPoint(at.latitude, at.longitude), routeOffset: STOP.offset, kind: STOP.kind, minutes: STOP.minutes, order: 0,
     });
     log(`the organizer plans ${STOP.name} at ${STOP.offset} m`);
+    const nextOffset = Math.min(STOP_NEXT.offset, Math.floor(mainRoute.length * 0.8));
+    const after = mainRoute.coordinateAtOffset(nextOffset);
+    await setDoc(doc(collection(organizer.db, `trips/${tripId}/stops`)), {
+      name: STOP_NEXT.name, coordinate: new GeoPoint(after.latitude, after.longitude), routeOffset: nextOffset, kind: STOP_NEXT.kind, minutes: STOP_NEXT.minutes, order: 1,
+    });
+    log(`the organizer plans ${STOP_NEXT.name} at ${nextOffset} m`);
+    // Leave and arrivedAt are for a started trip (TripService.markStarted).
+    await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
   }
 
   // Tracker start-up: first fix, ensureRoute, then tracking (TripSession.runStartup).
@@ -594,6 +635,7 @@ async function main() {
   const timeline = scenarioTimeline(opts.scenario).map((e) => ({ ...e, done: false }));
   const scheduled = STOPPING ? [] : scheduleChecks({ phones, tracks, truth, tripId, organizer, getAppCarId: () => appCarId });
   const ctx = { phones, tripId, organizer, tracks, truth, stopEvent: null, hazard: null, hazardAt: null };
+  let stopProbed = false;
   const gapCar = phones.get('car2');
   const gap = gapCar.spec.gap;
 
@@ -612,7 +654,11 @@ async function main() {
       if (fix) p.onFix(fix, Math.max(0.2, 0.8 - T / 6000));
       p.publisher.tick();
     }
-    if (STOPPING) phones.get('car1').judgeArrival();
+    if (STOPPING) {
+      phones.get('car1').judgeArrival();
+      if (T >= 100 && !stopProbed) { stopProbed = true; await stopProbesBefore(phones, tripId).catch((e) => check('rules: stop probes before Leave', false, `threw: ${e.message}`)); }
+      await phones.get('car1').maybeLeave().catch((e) => check('car 1 taps Leave', false, `threw: ${e.message}`));
+    }
     if (PARKED.length) {
       const keyOf = keyOfCar(phones, appCarId);
       const parkedIds = new Set(PARKED.filter((c) => T < departAt(c, truth)).map((c) => (c.kind === 'app' ? appCarId : phones.get(c.key).carId)));
@@ -689,6 +735,44 @@ async function rulesProbes(phones, tripId) {
   await rejected('rules: a car cannot write another car\'s position', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car1.carId}`), base));
   await rejected('rules: heading 360 is rejected', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car2.carId}`), { ...base, heading: 360 }));
   await rejected('rules: a position with a client timestamp is rejected', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car2.carId}`), { ...base, updatedAt: Timestamp.now() }));
+  setLogLevel('error');
+}
+
+/** The planned stop's id by its offset (read by car 1's phone). */
+const stopIdOf = (phones, offset) => phones.get('car1').allStops.find((s) => s.routeOffset === offset)?.id;
+
+/** Before anyone has left (D25 4a rules, seen from the cars): a car that is not the lead car cannot Leave or mark an
+ *  arrival; a car still short of the stop can say it will skip it, and take that back. */
+async function stopProbesBefore(phones, tripId) {
+  const car2 = phones.get('car2');
+  const car4 = phones.get('car4');
+  const id = stopIdOf(phones, STOP.offset);
+  setLogLevel('silent');
+  const refused = async (name, fn) => {
+    try { await fn(); check(name, false, 'write was accepted'); } catch (e) { check(name, /permission|PERMISSION/.test(`${e.code} ${e.message}`), e.code); }
+  };
+  await refused('rules: car 2 is not the lead car and cannot Leave the stop', () => updateDoc(doc(car2.db, `trips/${tripId}/stops/${id}`), { leftAt: serverTimestamp(), leftBy: car2.uid }));
+  await refused('rules: car 2 cannot mark the lead car as arrived', () => updateDoc(doc(car2.db, `trips/${tripId}/stops/${id}`), { arrivedAt: serverTimestamp() }));
+  const answer = doc(car4.db, `trips/${tripId}/stops/${id}/answers/${car4.carId}`);
+  try {
+    await setDoc(answer, { answer: 'skip', userId: car4.uid, at: serverTimestamp() });
+    await deleteDoc(answer);
+    check('rules: car 4, still short of the stop, can say it will skip it and take it back', true);
+  } catch (e) { check('rules: car 4, still short of the stop, can say it will skip it and take it back', false, e.code); }
+  setLogLevel('error');
+}
+
+/** After car 1 left: nothing more can be said about the stop. */
+async function stopProbesAfter(phones, tripId, organizer) {
+  const car4 = phones.get('car4');
+  const id = stopIdOf(phones, STOP.offset);
+  setLogLevel('silent');
+  const refused = async (name, fn) => {
+    try { await fn(); check(name, false, 'write was accepted'); } catch (e) { check(name, /permission|PERMISSION/.test(`${e.code} ${e.message}`), e.code); }
+  };
+  await refused('rules: a stop that was left takes no skip answer', () => setDoc(doc(car4.db, `trips/${tripId}/stops/${id}/answers/${car4.carId}`), { answer: 'skip', userId: car4.uid, at: serverTimestamp() }));
+  await refused('rules: a stop that was left cannot be skipped for everyone', () => updateDoc(doc(organizer.db, `trips/${tripId}/stops/${id}`), { skipped: true, skippedBy: organizer.uid, skippedAt: serverTimestamp() }));
+  await refused('rules: a stop is left once', () => updateDoc(doc(organizer.db, `trips/${tripId}/stops/${id}`), { leftAt: serverTimestamp(), leftBy: organizer.uid }));
   setLogLevel('error');
 }
 
@@ -914,17 +998,32 @@ async function finalChecks(ctx, appCarId) {
   // A planned stop (D25 piece 3b): car 1's phone counts who is here, from positions alone.
   if (STOPPING) {
     const phone = phones.get('car1');
-    const stops = (await getDocs(collection(organizer.db, `trips/${tripId}/stops`))).docs.map((d) => d.data());
-    check('planned stop stored: name, place on the route, kind, minutes, order', stops.length === 1 && stops[0].name === STOP.name && stops[0].routeOffset === STOP.offset && stops[0].kind === STOP.kind && stops[0].minutes === STOP.minutes && stops[0].order === 0 && stops[0].skipped === undefined, JSON.stringify(stops.map((x) => ({ ...x, coordinate: undefined }))));
+    const all = (await getDocs(collection(organizer.db, `trips/${tripId}/stops`))).docs.map((d) => d.data());
+    const stops = all.filter((x) => x.name === STOP.name);
+    check('planned stop stored: name, place on the route, kind, minutes, order', stops.length === 1 && stops[0].routeOffset === STOP.offset && stops[0].kind === STOP.kind && stops[0].minutes === STOP.minutes && stops[0].order === 0 && stops[0].skipped === undefined, JSON.stringify(stops.map((x) => ({ ...x, coordinate: undefined }))));
     let last = 0;
     for (const key of ['car1', 'car2', 'car3', 'car4']) {
       const predicted = truth[key].find((p) => p.offset >= STOP.offset - 150)?.t ?? Infinity;
       const got = phone.arrivals.get(phones.get(key).carId);
       last = Math.max(last, predicted);
-      check(`${key} counts as here within 10 s of the GPX coming within 150 m of the stop, not before`, got !== undefined && Math.abs(got - predicted) <= 10, got !== undefined ? `at T=${got}, predicted T=${predicted}` : `never, predicted T=${predicted}`);
+      check(`${key} counts as here within 10 s of the GPX coming within 150 m of the stop, not before`, got !== undefined && got >= predicted - 2 && got - predicted <= 10, got !== undefined ? `at T=${got}, predicted T=${predicted}` : `never, predicted T=${predicted}`);
     }
-    check('car 1 phone reads "4 of 4 here" when the last car pulls in', phone.firstFull?.title === '4 of 4 here' && Math.abs(phone.firstFull.T - last) <= 10, phone.firstFull ? `at T=${phone.firstFull.T}, predicted T=${last}` : `never, last tally "${phone.lastTally?.title}"`);
+    check('car 1 phone reads "4 of 4 here" when the last car pulls in', phone.firstFull?.title === '4 of 4 here' && phone.firstFull.T >= last - 2 && phone.firstFull.T - last <= 10, phone.firstFull ? `at T=${phone.firstFull.T}, predicted T=${last}` : `never, last tally "${phone.lastTally?.title}"`);
     check('it still reads "4 of 4 here" at the end', phone.lastTally?.title === '4 of 4 here', `"${phone.lastTally?.title}"`);
+    check('car 1 phone: the stops listener ran without an error', !phone.stopsError, phone.stopsError ? String(phone.stopsError.code ?? phone.stopsError.message) : '');
+
+    // Leave (D25 4a): arrivedAt once from the lead car's phone, "Leaving at" counts from it, Leave once all are here.
+    const tapah = stops[0];
+    const arrived = tapah.arrivedAt?.toMillis();
+    check('Leaving at: car 1 phone wrote arrivedAt once, in server time, when it first counted itself here', typeof arrived === 'number' && phone.arrivedWall !== undefined && Math.abs(arrived - phone.arrivedWall) <= 15_000 && phone.arrivedTwice === false, `arrivedAt ${arrived}, written at ${phone.arrivedWall}, second write refused: ${phone.arrivedTwice === false} (${phone.arrivedTwiceCode})`);
+    const leaving = leavingAt(tapah);
+    check('Leaving at is arrivedAt plus the planned 20 minutes, one time for every phone', typeof arrived === 'number' && leaving === arrived + STOP.minutes * 60_000, `${leaving}`);
+    check('Leave: car 1 left once all four were here, leftBy car 1', Boolean(phone.firstFull) && tapah.leftAt !== undefined && tapah.leftBy === phone.uid && tapah.leftAt.toMillis() >= phone.firstFull.wall - 2_000 && tapah.leftAt.toMillis() <= Date.now(), JSON.stringify({ leftBy: tapah.leftBy, leftAt: tapah.leftAt?.toMillis(), fullAt: phone.firstFull?.wall }));
+    check('Leave: the next stop is untouched', all.filter((x) => x.name !== STOP.name).every((x) => x.leftAt === undefined && x.arrivedAt === undefined && x.skipped === undefined), '');
+    check('Leave reaches car 1 phone within 10 s', Boolean(phone.leftSeen) && phone.leftSeen.wall - phone.leaveWall <= 10_000, phone.leftSeen ? `${phone.leftSeen.wall - phone.leaveWall} ms` : 'never');
+    const trail = phone.nextTrail.map((x) => x.name);
+    check(`Next stop reads ${STOP.name} until Leave and ${STOP_NEXT.name} after it`, trail[0] === STOP.name && trail.at(-1) === STOP_NEXT.name && phone.nextTrail.at(-1).T >= phone.leaveT, JSON.stringify(phone.nextTrail));
+    await stopProbesAfter(phones, tripId, organizer);
   }
 
   // We've stopped: the lead car closed it.

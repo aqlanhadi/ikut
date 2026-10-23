@@ -52,7 +52,7 @@ export type PlannedStopKind = "meet" | "fuel" | "food" | "rest" | "toilet" | "si
 
 /**
  * trips/{tripId}/stops/{stopId}: a place on the main route that cars arrive at and leave.
- * The organizer writes them before `startedAt`; afterwards only `skipped`, `skippedBy`, `skippedAt` change.
+ * The organizer writes them before `startedAt`; afterwards only the skip fields, `arrivedAt` and the leave fields (`leftAt`, `leftBy`) change, each once.
  * A stop chosen mid-trip (D4) is meant to be a document of the same shape.
  */
 export interface PlannedStop {
@@ -71,6 +71,11 @@ export interface PlannedStop {
   skipped?: boolean;
   skippedBy?: string;
   skippedAt?: Timestamp;
+  /** When the lead car first counted itself at the stop (server time, written once); the start of "Leaving at 12:40". */
+  arrivedAt?: Timestamp;
+  /** Set once when the lead car or the organizer taps Leave: the stop is done for everyone. */
+  leftAt?: Timestamp;
+  leftBy?: string;
 }
 
 /** What a car said about a stop. D25 5a writes 'skip' ("we'll skip this stop"); D4 adds 'carryOn' to the same document. */

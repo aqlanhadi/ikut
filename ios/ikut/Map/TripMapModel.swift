@@ -36,6 +36,8 @@ final class TripMapModel {
     /// The phone's own fix, while it is being streamed (not the tracker).
     var device: DeviceFix?  // set by the location stream; tests set it directly
     private(set) var isEnded = false
+    /// The trip has started (`startedAt`): stops can then be left, and the lead car marks when it arrived.
+    var tripStarted = false
 
     @ObservationIgnored private let session: TripSession?
     @ObservationIgnored private let db: Firestore?
@@ -144,6 +146,7 @@ final class TripMapModel {
         self.positions = positions
         var routeChanged = false
         if let trip {
+            tripStarted = trip.startedAt != nil
             tripName = trip.name
             departedAt = trip.startedAt ?? trip.createdAt
             tripCode = Self.formatCode(trip.code)
@@ -164,6 +167,7 @@ final class TripMapModel {
         feedHazardServices(routeChanged: routeChanged)
         checkCatchUp()
         checkStopApproach()
+        checkLeadArrival()
     }
 
     /// Sets the planned stops without checking (tests, the demo); the next `apply` or `setCars` does.
@@ -177,6 +181,27 @@ final class TripMapModel {
         hazards.setCars(cars)
         checkCatchUp()
         checkStopApproach()
+        checkLeadArrival()
+    }
+
+    // MARK: The lead car at a stop (D25 4a)
+
+    /// Writes a stop's `arrivedAt`; set by the live map. Nil in tests and demos.
+    @ObservationIgnored var arrivalWriter: (@Sendable (_ tripId: String, _ stopId: String) async throws -> Void)?
+    @ObservationIgnored private var arrivalMarked: Set<String> = []
+
+    /// The lead car's tracker phone writes `arrivedAt` the first time it counts its car at a stop with a planned
+    /// length: one server time for every phone to count "Leaving at" from. Once per stop per run; the rules refuse
+    /// a second write, so a second phone or a retry is harmless.
+    private func checkLeadArrival() {
+        guard !isEnded, isTracker, myCar?.isLead == true, let write = arrivalWriter,
+              let tripId = alertTripId ?? session?.tripId, let myCarId else { return }
+        let offset = convoy.convoy.first { $0.id == myCarId }?.convoyOffset
+        guard let stop = StopLeave.stopToMarkArrived(
+                  stops: stops, isLeadTracker: true, tripStarted: tripStarted, position: positions[myCarId],
+                  offset: offset, now: Date()),
+              let stopId = stop.id, arrivalMarked.insert(stopId).inserted else { return }
+        Task { try? await write(tripId, stopId) }
     }
 
     // MARK: A planned stop ahead (D25)

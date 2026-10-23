@@ -320,6 +320,7 @@ describe("previewTrip (emulator)", () => {
     await tripRef.collection("stops").doc("z").set(stop(0, "Petronas SB", { meetAt: Timestamp.now(), kind: "meet" }));
     await tripRef.collection("stops").doc("x").set(stop(2, "Skipped one", { skipped: true, skippedBy: "someone", skippedAt: Timestamp.now() }));
     await tripRef.collection("stops").doc("w").set(stop(3, "Kuala Kangsar", { minutes: 10, kind: "toilet" }));
+    await tripRef.collection("stops").doc("v").set(stop(4, "Left one", { leftAt: Timestamp.now(), leftBy: "someone" }));
     const r = await previewTripData(db, tripRef.id);
     assert.deepEqual(r.stops, [
       { name: "Petronas SB", kind: "meet" },
@@ -327,7 +328,7 @@ describe("previewTrip (emulator)", () => {
       { name: "Kuala Kangsar", kind: "toilet", minutes: 10 },
     ]);
     const json = JSON.stringify(r);
-    for (const secret of ["coordinate", "routeOffset", "note", "skipped", "meetAt", "order", "ask for Sam"]) {
+    for (const secret of ["Left one", "coordinate", "routeOffset", "note", "skipped", "meetAt", "order", "ask for Sam"]) {
       assert.ok(!json.includes(secret), secret);
     }
   });
@@ -491,6 +492,41 @@ describe("purgeTripData (emulator)", () => {
     assert.equal(after.exists, true);
     assert.equal(after.data()!.status, "ended");
     assert.ok(after.data()!.endedAt.isEqual(before.endedAt));
+  });
+
+  it("clears arrivedAt, leftAt and leftBy on an old trip's stops and deletes the skip answers, keeping the stops", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    const stop = (name: string, extra: object = {}) => ({
+      name, kind: "fuel", coordinate: point, routeOffset: 1000, minutes: 20, order: 0, ...extra,
+    });
+    await ref.collection("stops").doc("left").set(stop("R&R Tapah", { arrivedAt: at(200), leftAt: at(199), leftBy: "u1" }));
+    await ref.collection("stops").doc("plain").set(stop("Kopitiam", { order: 1 }));
+    await ref.collection("stops").doc("skipped").set(stop("Skipped", { order: 2, skipped: true, skippedBy: "org", skippedAt: at(200) }));
+    await ref.collection("stops/left/answers").doc("carB").set({ answer: "skip", userId: "u2", at: at(200) });
+    const result = await purgeTripData(db, NOW);
+    assert.ok(result.failed === 0);
+    const left = (await ref.collection("stops").doc("left").get()).data()!;
+    for (const f of ["arrivedAt", "leftAt", "leftBy"]) assert.equal(f in left, false, f);
+    assert.equal(left.name, "R&R Tapah");
+    assert.equal(left.kind, "fuel");
+    // A stop with none of the three is untouched and does not fail the sweep.
+    assert.equal((await ref.collection("stops").doc("plain").get()).data()!.name, "Kopitiam");
+    assert.equal((await ref.collection("stops").doc("skipped").get()).data()!.skipped, true);
+    assert.equal((await ref.collection("stops/left/answers").get()).size, 0);
+    // A second sweep finds nothing more to do.
+    const again = await purgeTripData(db, NOW);
+    assert.equal(again.stopsCleared, 0);
+  });
+
+  it("keeps the leave times and skip answers of a trip ended 2 days ago", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 2 });
+    await ref.collection("stops").doc("left").set({
+      name: "R&R", kind: "fuel", coordinate: point, routeOffset: 1000, order: 0, leftAt: at(5), leftBy: "u1",
+    });
+    await ref.collection("stops/left/answers").doc("carB").set({ answer: "skip", userId: "u2", at: at(5) });
+    await purgeTripData(db, NOW);
+    assert.equal((await ref.collection("stops").doc("left").get()).data()!.leftBy, "u1");
+    assert.equal((await ref.collection("stops/left/answers").get()).size, 1);
   });
 
   it("keeps a trip ended 2 days ago intact", async () => {

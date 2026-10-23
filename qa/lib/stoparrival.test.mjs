@@ -14,7 +14,8 @@ test('here within 150 m either side, not beyond', () => {
 });
 
 test('a stale fix is never here, however close', () => {
-  assert.equal(status(car('c1', 20_000, { age: 61 }), target).kind, 'away');
+  assert.equal(status(car('c1', 20_000, { age: 61 }), target).kind, 'lastSeenHere');
+  assert.equal(status(car('c1', 17_000, { age: 300 }), target).kind, 'away');
   assert.equal(status(car('c1', 20_000, { age: 60 }), target).kind, 'here');
   assert.equal(status(car('c1', 20_000, { age: null }), target).kind, 'here');
 });

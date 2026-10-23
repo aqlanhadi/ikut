@@ -2,10 +2,12 @@
 import FirebaseFirestore
 import SwiftUI
 
-/// The "who is here" card on its own (`IKUT_SCREEN=road-arrival`, `road-arrival-all`, `road-arrival-meet`,
+/// The "who is here" card on its own (`IKUT_SCREEN=road-arrival`, `road-arrival-all`, `road-arrival-meet`; with
+/// Leave, D25 4a: `road-leave` (lead car or organizer, "Leaving at 12:40"), `road-leave-confirm` (after tapping
+/// Leave), `road-leave-other` (another car: no button), `road-leave-meet` (meeting point, "Leaving at 9:00");
 /// RoadStops.dc.html), over the demo convoy. The clock is fixed, so the cars never go stale while it is looked at.
 struct StopArrivalDemo: View {
-    enum Scene { case someHere, allHere, meeting }
+    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting }
 
     var scene: Scene
     @State private var map: TripMapModel
@@ -24,7 +26,8 @@ struct StopArrivalDemo: View {
         let model = MapDemo.model(now: now)
         let main = RouteLine(MapDemo.densify(MapDemo.mainWaypoints))
         let bidor = main.project(MapDemo.joiningWaypoints.last ?? .init(latitude: 4.1, longitude: 101.29))?.offset ?? 0
-        let stopOffset = scene == .meeting ? bidor : (main.project(.init(latitude: 4.2, longitude: 101.26))?.offset ?? 0)
+        let meets = scene == .meeting || scene == .leaveMeeting
+        let stopOffset = meets ? bidor : (main.project(.init(latitude: 4.2, longitude: 101.26))?.offset ?? 0)
         let at = main.coordinate(atOffset: stopOffset) ?? main.coordinates[0]
 
         func fix(_ offset: Double, joining: Bool, speed: Double = 25) -> Position {
@@ -37,34 +40,41 @@ struct StopArrivalDemo: View {
         cars.sort { ($0.number ?? 99) < ($1.number ?? 99) }
         var positions: [String: Position] = [:]
         switch scene {
-        case .someHere:
+        case .someHere, .leave, .leaveConfirm, .leaveOther:
             positions = ["c1": fix(stopOffset, joining: false), "c2": fix(stopOffset - 80, joining: false),
                          "c4": fix(stopOffset - 4_000, joining: false), "c3": fix(stopOffset - 12_000, joining: true)]
         case .allHere:
             positions = ["c1": fix(stopOffset, joining: false), "c2": fix(stopOffset - 80, joining: false),
                          "c4": fix(stopOffset + 60, joining: false), "c3": fix(stopOffset - 30, joining: true)]
-        case .meeting:
+        case .meeting, .leaveMeeting:
             // Everyone joins: the organizer is at the meeting point, the others are still on their way in.
             for i in cars.indices where cars[i].id != "c1" { cars[i].state = .joining }
             positions = ["c1": fix(stopOffset, joining: true), "c2": fix(stopOffset - 3_000, joining: true),
                          "c4": fix(stopOffset - 9_000, joining: true), "c3": fix(stopOffset - 12_000, joining: true)]
         }
         var stop = PlannedStop(
-            id: "s1", name: scene == .meeting ? "Petronas Tapah Road" : "R&R Tapah",
+            id: "s1", name: meets ? "Petronas Tapah Road" : "R&R Tapah",
             coordinate: GeoPoint(latitude: at.latitude, longitude: at.longitude), routeOffset: stopOffset,
-            kind: scene == .meeting ? .meet : .fuel, minutes: scene == .meeting ? nil : 20,
-            meetAt: scene == .meeting ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: now) : nil, order: 0)
+            kind: meets ? .meet : .fuel, minutes: meets ? nil : 20,
+            meetAt: meets ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: now) : nil, order: 0)
         stop.id = "s1"
+        let leaveScene = [.leave, .leaveConfirm, .leaveOther, .leaveMeeting].contains(scene)
+        // The lead car got there at 12:20; 20 planned minutes make "Leaving at 12:40".
+        if leaveScene, !meets { stop.arrivedAt = Calendar.current.date(bySettingHour: 12, minute: 20, second: 0, of: now) }
         model.setStops([stop])
         model.setCars(cars)
-        model.apply(trip: nil, myCar: cars.first, myCarId: "c1", positions: positions, isTracker: true)
+        model.tripStarted = leaveScene
+        let viewer = scene == .leaveOther ? "c2" : "c1"
+        model.apply(trip: nil, myCar: cars.first { $0.id == viewer }, myCarId: viewer, positions: positions, isTracker: true)
         return (model, "s1")
     }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
-            StopArrivalCard(model: map, stopId: stopId, frozenNow: now, onClose: {})
+            StopArrivalCard(
+                model: map, stopId: stopId, frozenNow: now, isOrganizer: scene != .leaveOther, leave: nil,
+                onClose: {}, startConfirming: scene == .leaveConfirm)
                 .padding(.horizontal, Spacing.s)
                 .padding(.bottom, Spacing.s)
         }
