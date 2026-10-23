@@ -25,10 +25,9 @@ struct NextStopDemo: View {
         meet.leftBy = "u-c1"
         let offset = merge + 18_000
         let at = main?.coordinate(atOffset: offset) ?? .init(latitude: 4.2, longitude: 101.25)
-        var stop = PlannedStop(
+        let stop = PlannedStop(
             id: "s1", name: "R&R Tapah", coordinate: GeoPoint(latitude: at.latitude, longitude: at.longitude),
             routeOffset: offset, kind: .fuel, minutes: 20, order: 1)
-        stop.id = "s1"
         map.setStops([meet, stop])
         return map
     }

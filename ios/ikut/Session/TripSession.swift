@@ -53,6 +53,8 @@ final class TripSession {
     @ObservationIgnored private var answerListener: ListenerRegistration?
     /// The stop and car `answerListener` is on, so it moves only when either does.
     @ObservationIgnored private var listeningAnswer: [String]?
+    /// The stop and car whose answer has had its first snapshot (or failed), so a session may be keyed on it.
+    @ObservationIgnored private var answerReadFor: [String]?
     @ObservationIgnored private var listeningCarId: String?
     /// The tracking session in progress (same car and main route); nil when not the tracker.
     @ObservationIgnored private var sessionKey: SessionKey?
@@ -373,8 +375,20 @@ final class TripSession {
             isTracking = tracker.isTracking
             return
         }
+        let started = trip.startedAt != nil
+        if tripListener != nil,
+           TripSessionLogic.waitsForAnswer(
+               stops: stops, carState: car.state, tripStarted: started, answerRead: answerReadFor == listeningAnswer
+                   && listeningAnswer != nil) {
+            isTracking = tracker.isTracking
+            return
+        }
+        let running = sessionKey.flatMap { key -> (meetingPoint: CLLocationCoordinate2D?, Void)? in
+            guard key.carId == carId, key.tripRoute == trip.route else { return nil }
+            return (key.meetingPoint.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) }, ())
+        }
         let meetingPoint = TripSessionLogic.sessionMeetingPoint(
-            in: stops, skippingAlong: skipsMeetingPoint, carState: car.state, tripStarted: trip.startedAt != nil)
+            in: stops, skippingAlong: skipsMeetingPoint, carState: car.state, tripStarted: started, running: running)
         let key = SessionKey(
             carId: carId, tripRoute: trip.route, meetingPoint: meetingPoint.map { [$0.latitude, $0.longitude] })
         if key != sessionKey {
@@ -516,6 +530,7 @@ final class TripSession {
             answerListener?.remove()
             answerListener = nil
             listeningAnswer = nil
+            answerReadFor = nil
             skipsMeetingPoint = false
             return
         }
@@ -523,14 +538,29 @@ final class TripSession {
         guard listeningAnswer != target else { return }
         answerListener?.remove()
         listeningAnswer = target
-        skipsMeetingPoint = false
+        if answerReadFor != target { skipsMeetingPoint = false }
         answerListener = db.document(FirestorePaths.answer(tripId: tripId, stopId: stopId, carId: carId))
-            .addSnapshotListener { [weak self] snapshot, _ in
-                guard let snapshot else { return }
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let snapshot else {
+                    // Firestore ends a listener that errors: log it, let the next reevaluate attach a new one, and
+                    // don't hold the session back for an answer that can't be read.
+                    let reason = error?.localizedDescription ?? "no snapshot"
+                    Task { @MainActor in
+                        guard let self, self.listeningAnswer == target else { return }
+                        self.log.error("meeting point answer listener ended: \(reason, privacy: .public)")
+                        self.answerListener = nil
+                        self.listeningAnswer = nil
+                        self.answerReadFor = target
+                        self.reevaluate()
+                    }
+                    return
+                }
                 let skipping = (try? snapshot.data(as: StopAnswer.self))?.answer == .skip
                 Task { @MainActor in
                     guard let self, self.listeningAnswer == target else { return }
-                    if self.skipsMeetingPoint != skipping {
+                    let first = self.answerReadFor != target
+                    self.answerReadFor = target
+                    if first || self.skipsMeetingPoint != skipping {
                         self.skipsMeetingPoint = skipping
                         self.reevaluate()
                     }

@@ -103,14 +103,23 @@ enum TripSessionLogic {
         return meetingPoint(in: stops)
     }
 
-    /// The meeting point that keys a tracking session. A car that has already merged after the start (state not
-    /// `joining`) keeps what it had, so a Leave does not restart the session of a car that is in the convoy; a car
-    /// still joining, or any car before the start, follows `joiningMeetingPoint`.
+    /// The meeting point that keys a tracking session. After the start, a car that is no longer joining keeps what
+    /// its running session was started with (`running`, when that session is this car's on this route), so neither
+    /// a Leave nor its own merge restarts it; with no running session it follows `joiningMeetingPoint`. A car still
+    /// joining, or any car before the start, follows `joiningMeetingPoint`.
     static func sessionMeetingPoint(
-        in stops: [PlannedStop], skippingAlong: Bool, carState: CarState, tripStarted: Bool
+        in stops: [PlannedStop], skippingAlong: Bool, carState: CarState, tripStarted: Bool,
+        running: (meetingPoint: CLLocationCoordinate2D?, Void)? = nil
     ) -> CLLocationCoordinate2D? {
-        if tripStarted, carState != .joining { return meetingPoint(in: stops) }
+        if tripStarted, carState != .joining, let running { return running.meetingPoint }
         return joiningMeetingPoint(in: stops, skippingAlong: skippingAlong)
+    }
+
+    /// A session for a joining car is not keyed until this car's answer on the meeting point has been read once:
+    /// after a relaunch the answer starts unknown, and a route started toward the meet could land after the right one.
+    static func waitsForAnswer(stops: [PlannedStop], carState: CarState, tripStarted: Bool, answerRead: Bool) -> Bool {
+        guard tripStarted, carState == .joining, !answerRead else { return false }
+        return stops.min(by: { $0.order < $1.order })?.kind == .meet
     }
 
     /// What a tracking session starts from. While a trip with a meeting point has not started, the car doc's state and
