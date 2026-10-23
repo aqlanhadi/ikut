@@ -12,6 +12,11 @@ enum FirestorePaths {
 
     static func stops(tripId: String) -> String { "\(trip(tripId))/stops" }
     static func stop(tripId: String, stopId: String) -> String { "\(stops(tripId: tripId))/\(stopId)" }
+    /// A car's answer about a stop (skip now, carry on in D4); the document id is the car id.
+    static func answers(tripId: String, stopId: String) -> String { "\(stop(tripId: tripId, stopId: stopId))/answers" }
+    static func answer(tripId: String, stopId: String, carId: String) -> String {
+        "\(answers(tripId: tripId, stopId: stopId))/\(carId)"
+    }
 
     static func positions(tripId: String) -> String { "\(trip(tripId))/positions" }
     /// One position document per car, keyed by car id and overwritten on each update.

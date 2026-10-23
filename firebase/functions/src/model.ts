@@ -73,6 +73,21 @@ export interface PlannedStop {
   skippedAt?: Timestamp;
 }
 
+/** What a car said about a stop. D25 5a writes 'skip' ("we'll skip this stop"); D4 adds 'carryOn' to the same document. */
+export type StopAnswerKind = 'skip';
+
+/**
+ * trips/{tripId}/stops/{stopId}/answers/{carId}: a car's answer about one stop; one per car (the id is the car id,
+ * so a second phone in the car writes the same document). Undo deletes it. Same shape as a stop vote.
+ */
+export interface StopAnswer {
+  answer: StopAnswerKind;
+  /** Who tapped it for the car. */
+  userId: string;
+  /** Server time. */
+  at: Timestamp;
+}
+
 /** trips/{tripId}/cars/{carId} */
 export interface Car {
   name: string;

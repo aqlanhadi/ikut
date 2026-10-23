@@ -671,6 +671,118 @@ describe('planned stops', () => {
   });
 });
 
+// A car's answer about a planned stop (D25 5a): trips/T/stops/s1/answers/{carId}.
+describe('a car\'s skip answer', () => {
+  const stopDoc = (over = {}) => ({
+    name: 'R&R Tapah', coordinate: pt, routeOffset: 62000, kind: 'fuel', minutes: 20, order: 0, ...over,
+  });
+  const ansPath = (carId = 'carA', stopId = 's1') => `trips/${T}/stops/${stopId}/answers/${carId}`;
+  const skipAns = (uid = 'mem', over = {}) => ({ answer: 'skip', userId: uid, at: serverTimestamp(), ...over });
+  const seedAnswers = async ({ started = true, posOffset = 100, skipped = false } = {}) => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const f = ctx.firestore();
+      await setDoc(doc(f, `trips/${T}`), tripDoc(started ? { startedAt: ts(60000) } : {}));
+      await setDoc(doc(f, `trips/${T}/stops/s1`), stopDoc(skipped ? { skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() } : {}));
+      await setDoc(doc(f, `trips/${T}/stops/s2`), stopDoc({ name: 'Kopitiam', kind: 'food', order: 1, routeOffset: 90000 }));
+      await setDoc(doc(f, `trips/${T}/positions/carA`), position({ routeOffset: 100, convoyOffset: posOffset, updatedAt: Timestamp.now() }));
+    });
+  };
+  beforeEach(() => seedAnswers());
+
+  it('a member skips the stop for their own car', () => assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns())));
+  it('the car can change its mind again and again (a second phone writes the same document)', async () => {
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a car with no position yet can skip', async () => {
+    await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), `trips/${T}/positions/carA`)));
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('undo deletes the car\'s own answer', async () => {
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await assertSucceeds(deleteDoc(doc(db('mem'), ansPath())));
+    assert.equal((await getDoc(doc(db('mem'), ansPath()))).exists(), false);
+  });
+  it('undoing an answer that is not there is harmless', () => assertSucceeds(deleteDoc(doc(db('mem'), ansPath()))));
+  it('a member answers for another car: denied', () => assertFails(setDoc(doc(db('mem'), ansPath('carB')), skipAns())));
+  it('the other car\'s member can answer for their own car, so the denial above is about the car', () =>
+    assertSucceeds(setDoc(doc(db('other'), ansPath('carB')), skipAns('other'))));
+  it('a member cannot undo another car\'s answer', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), ansPath('carB')), { answer: 'skip', userId: 'other', at: Timestamp.now() }));
+    await assertFails(deleteDoc(doc(db('mem'), ansPath('carB'))));
+    await assertSucceeds(deleteDoc(doc(db('other'), ansPath('carB'))));
+  });
+  it('the lead car cannot skip', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/lead`),
+      memberDoc({ displayName: 'Lead', carId: 'carO', role: 'member' })));
+    await assertFails(setDoc(doc(db('lead'), ansPath('carO')), skipAns('lead')));
+    await assertFails(setDoc(doc(db('org'), ansPath('carO')), skipAns('org')));
+  });
+  it('before the trip starts: denied', async () => {
+    await seedAnswers({ started: false });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a stop the organizer skipped for everyone takes no answer', async () => {
+    await seedAnswers({ skipped: true });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('another stop on the same trip still takes it', () => assertSucceeds(setDoc(doc(db('mem'), ansPath('carA', 's2')), skipAns())));
+  it('a car that has not merged onto the main route yet can skip, whatever its own offset', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), `trips/${T}/positions/carA`), position({ routeOffset: 99999, updatedAt: Timestamp.now() })));
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a car within 150 m of the stop is there, and cannot skip it', async () => {
+    await seedAnswers({ posOffset: 61851 });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await seedAnswers({ posOffset: 61849 });
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a car that has reached the stop cannot skip it', async () => {
+    await seedAnswers({ posOffset: 62000 });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a car that has passed the stop cannot skip it', async () => {
+    await seedAnswers({ posOffset: 70000 });
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath('carA', 's2')), skipAns()));
+  });
+  it('a car 200 m short of the stop can still skip it', async () => {
+    await seedAnswers({ posOffset: 61800 });
+    await assertSucceeds(setDoc(doc(db('mem'), ansPath()), skipAns()));
+  });
+  it('a non-member cannot write or undo', async () => {
+    await assertFails(setDoc(doc(db('stranger'), ansPath()), skipAns('stranger')));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), ansPath()), { answer: 'skip', userId: 'mem', at: Timestamp.now() }));
+    await assertFails(deleteDoc(doc(db('stranger'), ansPath())));
+    await assertFails(deleteDoc(doc(db(null), ansPath())));
+  });
+  it('a non-member reads nothing, a member reads the answers', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), ansPath()), { answer: 'skip', userId: 'mem', at: Timestamp.now() }));
+    await assertFails(getDoc(doc(db('stranger'), ansPath())));
+    await assertFails(getDocs(collection(db('stranger'), `trips/${T}/stops/s1/answers`)));
+    await assertSucceeds(getDoc(doc(db('other'), ansPath())));
+    await assertSucceeds(getDocs(collection(db('other'), `trips/${T}/stops/s1/answers`)));
+  });
+  it('only answer, userId and at, with the caller\'s id, server time and "skip"', async () => {
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns('mem', { extra: 1 })));
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns('other')));
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns('mem', { at: ts() })));
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns('mem', { answer: 'sulk' })));
+    await assertFails(setDoc(doc(db('mem'), ansPath()), { answer: 'skip', userId: 'mem' }));
+  });
+  it('an ended trip takes no answer and no undo', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc({ startedAt: ts(60000), status: 'ended' })));
+    await assertFails(setDoc(doc(db('mem'), ansPath()), skipAns()));
+    await assertFails(deleteDoc(doc(db('mem'), ansPath())));
+  });
+  it('a stop that is not there takes no answer', () => assertFails(setDoc(doc(db('mem'), ansPath('carA', 'nope')), skipAns())));
+  it('answers cannot be made through the stop document', () =>
+    assertFails(updateDoc(doc(db('mem'), `trips/${T}/stops/s1`), { answers: { carA: 'skip' } })));
+});
+
 describe('a trip with stops keeps its route once it has started', () => {
   const seedTrip = async (over) => {
     await seed();
