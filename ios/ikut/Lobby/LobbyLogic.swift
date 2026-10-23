@@ -50,11 +50,9 @@ enum LobbyLogic {
         return trip.startedAt != nil
     }
 
-    /// Change destination is the organizer's before the trip ends, and once the trip has started only on a trip
-    /// with no stops: the stops are locked then, and the route goes through them (the rules refuse it too).
-    static func canChangeDestination(canEdit: Bool, started: Bool, hasStops: Bool) -> Bool {
-        canEdit && !(started && hasStops)
-    }
+    /// Change destination is the organizer's until the trip ends; once it has started, the route is rebuilt from
+    /// where the organizer is through the stops still ahead (D25 4d, #189).
+    static func canChangeDestination(canEdit: Bool) -> Bool { canEdit }
 
     /// "On the road since 9:35 PM"; nil when the start time wasn't recorded.
     static func onTheRoadLine(startedAt: Date?, locale: Locale = .current, timeZone: TimeZone = .current) -> String? {

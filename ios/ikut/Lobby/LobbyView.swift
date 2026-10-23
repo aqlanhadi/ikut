@@ -96,7 +96,7 @@ struct LobbyView: View {
     private var canEdit: Bool { isOrganizer && canLeave }
     /// Change destination: not on a started trip that has stops.
     private var canChangeDestination: Bool {
-        LobbyLogic.canChangeDestination(canEdit: canEdit, started: isStarted, hasStops: !model.stops.isEmpty)
+        LobbyLogic.canChangeDestination(canEdit: canEdit)
     }
     /// Add, move and remove stops: the organizer, before the trip has started.
     private var canEditStops: Bool { canEdit && !isStarted }
@@ -162,7 +162,10 @@ struct LobbyView: View {
             TripMapView(session: session, onExit: onExit, onEnded: { onEnded(model.tripId) })
         }
         .navigationDestination(isPresented: $showChangeDestination) {
-            CreateTripView(changingTripId: model.trip?.id, keepingStops: planner.items) { _ in showChangeDestination = false }
+            CreateTripView(
+                changingTripId: model.trip?.id, keepingStops: planner.items,
+                midTrip: LobbyLogic.isStarted(trip: model.trip) ? { [session] in try await session.rebuilder.changeDestination(to: $0) } : nil
+            ) { _ in showChangeDestination = false }
         }
         .navigationTitle("Trip Lobby")
         .onChange(of: session.isEnded, initial: true) { _, ended in
