@@ -17,9 +17,10 @@ struct PreviewStop: Sendable, Equatable {
     var kind: PlannedStopKind
     var minutes: Int? = nil
 
-    /// "R&R Tapah · fuel · 20 min", or "R&R Tapah · fuel" without a length.
+    /// "R&R Tapah · fuel · 20 min", or "R&R Tapah · fuel" without a length. A meeting point reads
+    /// "· meeting point": "meet" alone reads like a verb to someone with only the code (owner, #204).
     var line: String {
-        var parts = [name, StopFormat.kind(kind).lowercased()]
+        var parts = [name, kind == .meet ? "meeting point" : StopFormat.kind(kind).lowercased()]
         if let minutes { parts.append(StopFormat.length(minutes: minutes)) }
         return parts.joined(separator: " · ")
     }

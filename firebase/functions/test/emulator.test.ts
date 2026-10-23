@@ -301,13 +301,14 @@ describe("previewTrip (emulator)", () => {
 
   it("lists the planned stops in order as name, kind and minutes only, without skipped ones", async () => {
     const { tripRef } = await seedTrip();
+    // Doc ids sort opposite to `order` (Firestore returns by id), so this fails without the sort.
     const stop = (order: number, name: string, extra: object = {}) => ({
       name, kind: "fuel", coordinate: new GeoPoint(4.2, 101.2), routeOffset: 1000 * (order + 1), order, ...extra,
     });
-    await tripRef.collection("stops").doc("b").set(stop(1, "R&R Tapah", { minutes: 20, note: "ask for Sam", kind: "food" }));
-    await tripRef.collection("stops").doc("a").set(stop(0, "Petronas SB", { meetAt: Timestamp.now(), kind: "meet" }));
-    await tripRef.collection("stops").doc("c").set(stop(2, "Skipped one", { skipped: true, skippedBy: "someone", skippedAt: Timestamp.now() }));
-    await tripRef.collection("stops").doc("d").set(stop(3, "Kuala Kangsar", { minutes: 10, kind: "toilet" }));
+    await tripRef.collection("stops").doc("y").set(stop(1, "R&R Tapah", { minutes: 20, note: "ask for Sam", kind: "food" }));
+    await tripRef.collection("stops").doc("z").set(stop(0, "Petronas SB", { meetAt: Timestamp.now(), kind: "meet" }));
+    await tripRef.collection("stops").doc("x").set(stop(2, "Skipped one", { skipped: true, skippedBy: "someone", skippedAt: Timestamp.now() }));
+    await tripRef.collection("stops").doc("w").set(stop(3, "Kuala Kangsar", { minutes: 10, kind: "toilet" }));
     const r = await previewTripData(db, tripRef.id);
     assert.deepEqual(r.stops, [
       { name: "Petronas SB", kind: "meet" },

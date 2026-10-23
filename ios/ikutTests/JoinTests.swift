@@ -120,7 +120,7 @@ struct JoinStopsTests {
         #expect(PreviewStop(name: "R&R Tapah", kind: .fuel).line == "R&R Tapah · fuel")
         #expect(PreviewStop(name: "A", kind: .food, minutes: 60).line == "A · food · 1 h")
         let words = PlannedStopKind.allCases.map { PreviewStop(name: "A", kind: $0).line }
-        #expect(words == ["A · meet", "A · fuel", "A · food", "A · rest", "A · toilet", "A · sight"])
+        #expect(words == ["A · meeting point", "A · fuel", "A · food", "A · rest", "A · toilet", "A · sight"])
     }
 }
 
