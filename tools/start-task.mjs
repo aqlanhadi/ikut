@@ -8,7 +8,8 @@
 //   agent started with isolation "worktree"), it renames that branch instead, and moves it onto main if it has no
 //   commits yet.
 // - The task's build folder /tmp/ikut-dd-<id>, with SourcePackages cloned from the newest other build folder (an
-//   APFS clone: instant, and no extra disk until files change), so the first build doesn't fetch the packages.
+//   APFS clone: instant, and no extra disk until files change), so the first build doesn't fetch the packages
+//   (its workspace-state.json is rewritten to this folder's paths).
 // - A log folder /tmp/ikut-logs-<id> for this task's run logs (tools/finish-task.mjs removes both).
 // - The task marked `doing` on the board (not with --no-board).
 
@@ -71,6 +72,13 @@ if (!fs.existsSync(path.join(dd, 'SourcePackages'))) {
     .sort((a, b) => b.t - a.t);
   if (donors.length) {
     const r = spawnSync('cp', ['-cR', donors[0].d, path.join(dd, 'SourcePackages')], { encoding: 'utf8' });
+    // workspace-state.json records each checkout and artifact by absolute path inside the donor's folder; left as it
+    // is, SwiftPM would look for them there. Point the paths at this folder rather than deleting the file: without
+    // it SwiftPM forgets the binary artifacts (their checksums) and downloads them again.
+    const state = path.join(dd, 'SourcePackages', 'workspace-state.json');
+    if (r.status === 0 && fs.existsSync(state)) {
+      fs.writeFileSync(state, fs.readFileSync(state, 'utf8').replaceAll(donors[0].d, path.join(dd, 'SourcePackages')));
+    }
     console.log(r.status === 0 ? `seeded ${dd}/SourcePackages from ${donors[0].d}` : `couldn't seed the packages (${r.stderr.trim()}); the first build fetches them`);
   } else {
     console.log(`no build folder to seed the packages from; the first build fetches them into ${dd}`);
