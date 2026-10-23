@@ -55,6 +55,8 @@ final class TripSession {
     @ObservationIgnored private var listeningAnswer: [String]?
     /// The stop and car whose answer has had its first snapshot (or failed), so a session may be keyed on it.
     @ObservationIgnored private var answerReadFor: [String]?
+    /// The last error on the answer listener; the same listener waits `answerRetryDelay` before attaching again.
+    @ObservationIgnored private var answerFailure: TripSessionLogic.AnswerFailure?
     @ObservationIgnored private var listeningCarId: String?
     /// The tracking session in progress (same car and main route); nil when not the tracker.
     @ObservationIgnored private var sessionKey: SessionKey?
@@ -383,9 +385,10 @@ final class TripSession {
             isTracking = tracker.isTracking
             return
         }
-        let running = sessionKey.flatMap { key -> (meetingPoint: CLLocationCoordinate2D?, Void)? in
+        let running = sessionKey.flatMap { key -> TripSessionLogic.RunningSession? in
             guard key.carId == carId, key.tripRoute == trip.route else { return nil }
-            return (key.meetingPoint.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) }, ())
+            return TripSessionLogic.RunningSession(
+                meetingPoint: key.meetingPoint.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) })
         }
         let meetingPoint = TripSessionLogic.sessionMeetingPoint(
             in: stops, skippingAlong: skipsMeetingPoint, carState: car.state, tripStarted: started, running: running)
@@ -535,7 +538,9 @@ final class TripSession {
             return
         }
         let target = [stopId, carId]
-        guard listeningAnswer != target else { return }
+        guard listeningAnswer != target,
+              TripSessionLogic.mayAttachAnswer(target: target, lastFailure: answerFailure, now: clock())
+        else { return }
         answerListener?.remove()
         listeningAnswer = target
         if answerReadFor != target { skipsMeetingPoint = false }
@@ -551,6 +556,7 @@ final class TripSession {
                         self.answerListener = nil
                         self.listeningAnswer = nil
                         self.answerReadFor = target
+                        self.answerFailure = TripSessionLogic.AnswerFailure(target: target, at: self.clock())
                         self.reevaluate()
                     }
                     return

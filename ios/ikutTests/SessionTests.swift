@@ -246,12 +246,12 @@ struct MeetingPointLogicTests {
         #expect(TripSessionLogic.sessionMeetingPoint(in: open, skippingAlong: false, carState: .joining, tripStarted: true) != nil)
         #expect(TripSessionLogic.sessionMeetingPoint(in: left, skippingAlong: false, carState: .joining, tripStarted: true) == nil)
         // A car in the convoy keeps the session it is running through the Leave and through its own merge.
-        let running = (meetingPoint: Optional(CLLocationCoordinate2D(latitude: 38.55, longitude: -120.1)), ())
+        let running = TripSessionLogic.RunningSession(meetingPoint: CLLocationCoordinate2D(latitude: 38.55, longitude: -120.1))
         #expect(TripSessionLogic.sessionMeetingPoint(
             in: left, skippingAlong: false, carState: .convoy, tripStarted: true, running: running) != nil)
         // A joining car that has just merged after answering: its session had no meet, and keeps none.
         #expect(TripSessionLogic.sessionMeetingPoint(
-            in: open, skippingAlong: false, carState: .convoy, tripStarted: true, running: (meetingPoint: nil, ())) == nil)
+            in: open, skippingAlong: false, carState: .convoy, tripStarted: true, running: .init(meetingPoint: nil)) == nil)
         // With no running session it follows the joining rule.
         #expect(TripSessionLogic.sessionMeetingPoint(in: left, skippingAlong: false, carState: .convoy, tripStarted: true) == nil)
         // Before the start every car follows the meet (and an answer cannot exist yet).
@@ -265,6 +265,18 @@ struct MeetingPointLogicTests {
         #expect(!TripSessionLogic.waitsForAnswer(stops: stops, carState: .convoy, tripStarted: true, answerRead: false))
         #expect(!TripSessionLogic.waitsForAnswer(stops: stops, carState: .joining, tripStarted: false, answerRead: false))
         #expect(!TripSessionLogic.waitsForAnswer(stops: [fuelStop(order: 0)], carState: .joining, tripStarted: true, answerRead: false))
+    }
+
+    @Test func aFailedAnswerListenerWaitsTenSecondsBeforeAttachingAgain() {
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        let target = ["m", "c1"]
+        let failure = TripSessionLogic.AnswerFailure(target: target, at: t0)
+        #expect(TripSessionLogic.mayAttachAnswer(target: target, lastFailure: nil, now: t0))
+        #expect(!TripSessionLogic.mayAttachAnswer(target: target, lastFailure: failure, now: t0))
+        #expect(!TripSessionLogic.mayAttachAnswer(target: target, lastFailure: failure, now: t0.addingTimeInterval(9.9)))
+        #expect(TripSessionLogic.mayAttachAnswer(target: target, lastFailure: failure, now: t0.addingTimeInterval(10)))
+        // Another stop or car is not held back by it.
+        #expect(TripSessionLogic.mayAttachAnswer(target: ["m", "c2"], lastFailure: failure, now: t0))
     }
 
     @Test func aCarDocIsNotTrustedWhileATripWithAMeetingPointHasNotStarted() {
