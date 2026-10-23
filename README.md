@@ -82,5 +82,10 @@ Multi-car simulated drives (4 scripted cars plus a real simulator as the fifth) 
 Security rules tests (Firestore emulator, needs Java):
 
 ```sh
-cd firebase/rules-tests && npm install && npm run test:emulator
+cd firebase/rules-tests && npm install && npm run test:emulator   # starts an emulator on :8080
+tools/rules-tests.mjs [worktree]   # same tests on a free port and a scratch config: safe while the shared emulator is in use
 ```
+
+The app's emulator tests (`TEST_RUNNER_IKUT_EMULATOR_TESTS=1`) use the shared emulator at :8080, which serves main's rules. To run them
+against a branch that changes `firestore.rules`: `tools/with-rules.mjs <worktree> -- xcodebuild test …`. It loads the branch's rules, runs the
+command and always puts main's back; only one such run at a time.

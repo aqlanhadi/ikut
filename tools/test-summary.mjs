@@ -66,6 +66,32 @@ for (let i = 0; i < failures.length; i++) {
   const m = /^(\S+?)\.(\S+): failed$/.exec(failures[i]);
   if (m && issues.has(`${m[1]} ${m[2]}`)) failures[i] = `${m[1]}.${m[2]}: ${issues.get(`${m[1]} ${m[2]}`)}`;
 }
+// Counts come from the frameworks' own summary lines when they're there: Swift Testing's "Test run with N tests in M
+// suites passed|failed after …" and XCTest's last "Executed N tests, with … failures" (the grand total). The per-test
+// lines above are only the fallback for a run still going, and the source of the failure list.
+const st = lines.findLast((l) => /^\S+ Test run with \d+ tests? in \d+ suites? (passed|failed)/.test(l));
+const xt = lines.findLast((l) => /^\s*Executed \d+ tests?, with /.test(l));
+if (st || xt) {
+  let total = 0;
+  let totalFailed = 0;
+  let totalSkipped = 0;
+  if (st) {
+    const m = /Test run with (\d+) tests?/.exec(st);
+    total += Number(m[1]);
+    if (/ failed after /.test(st)) totalFailed += Math.max(failures.filter((f) => !/^\S+\.\S+: /.test(f)).length, 1);
+  }
+  if (xt) {
+    const m = /Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?/.exec(xt);
+    total += Number(m[1]);
+    totalSkipped += Number(m[2] ?? 0);
+    totalFailed += Number(m[3]);
+  }
+  const swiftSkipped = lines.filter((l) => /^\S+ Test (?!run with).+ skipped/.test(l)).length;
+  totalSkipped += st ? swiftSkipped : 0;
+  passed = Math.max(total - totalFailed - totalSkipped, 0);
+  failed = totalFailed;
+  skipped = totalSkipped;
+}
 const verdict = lines.findLast((l) => /\*\* (TEST|BUILD|TEST BUILD) (SUCCEEDED|FAILED|INTERRUPTED) \*\*/.test(l))?.trim();
 if (verdict === '** BUILD FAILED **' || verdict === '** TEST BUILD FAILED **' || (!passed && !failed && lines.some((l) => /: error: /.test(l)))) {
   const errs = [...new Set(lines.filter((l) => /^\/\S+:\d+:\d+: error: /.test(l)).map((l) => l.replace(/^.*\/(\S+:\d+:\d+): error: /, '$1 ')))];
@@ -78,5 +104,5 @@ if (!verdict && !passed && !failed) {
   process.exit(2);
 }
 failures.push(...checkFails.map((f) => `QA CHECK ${f}`));
-out(failures, `tests: ${passed} passed, ${failed} failed, ${skipped} skipped${verdict ? ` (${verdict.replaceAll('*', '').trim()})` : ' (no verdict line yet)'}`);
+out(failures, `tests: ${passed} passed, ${failed} failed, ${skipped} skipped (${passed + failed + skipped} in all)${verdict ? ` (${verdict.replaceAll('*', '').trim()})` : ' (no verdict line yet)'}`);
 process.exit(failed || /FAILED/.test(verdict ?? '') ? 1 : 0);
