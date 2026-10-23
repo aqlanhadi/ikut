@@ -597,6 +597,15 @@ struct MapStopContextTests {
         #expect(context.snapshot() != nil)
     }
 
+    /// The D26 screenshot states: Mei's far row, and her heads-up as the lead comes within 2 minutes.
+    @Test func parkedDemoStates() throws {
+        let far = MapDemo.model(parked: "far")
+        #expect(far.convoy.convoy.first?.id == "c6")
+        #expect((far.convoy.distance(fromMyCarTo: "c6") ?? 0) > 29_000)
+        let alert = try #require(MapDemo.model(parked: "catchup").catchUp)
+        #expect(alert.eventId == "c1")
+    }
+
     @Test func noContextUntilMyCarIsKnown() {
         let model = TripMapModel(session: nil)
         #expect(model.stopContext(tripId: "t", userId: "u", isOrganizer: false) == nil)
