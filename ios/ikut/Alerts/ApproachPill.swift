@@ -6,12 +6,19 @@ extension TripMapModel {
     /// isn't in the convoy yet. Negative once passed.
     func approachDistance(eventId: String, now: Date = Date()) -> Double? {
         guard let hazard = hazards.markers.first(where: { $0.id == eventId })?.mainOffset,
-              let myCarId, let me = convoy.convoy.first(where: { $0.id == myCarId }) else { return nil }
+              let mine = myOffsetNow(now: now) else { return nil }
+        return hazard - mine
+    }
+
+    /// My car's offset on the main route, carried forward from my last fix at my speed (at most 30 s), and
+    /// only while that fix is fresh: a fix older than `HazardLogic.Config.staleAfter` is returned as it was.
+    func myOffsetNow(now: Date = Date()) -> Double? {
+        guard let myCarId, let me = convoy.convoy.first(where: { $0.id == myCarId }) else { return nil }
         var mine = me.convoyOffset
-        if let at = me.position.updatedAt, !me.isPaused {
+        if let at = me.position.updatedAt, !me.isPaused, now.timeIntervalSince(at) <= HazardLogic.Config.default.staleAfter {
             mine += me.speed * min(max(now.timeIntervalSince(at), 0), 30)
         }
-        return hazard - mine
+        return mine
     }
 
     /// Seconds to cover `distance` at my current speed; nil when unknown or barely moving.
@@ -49,6 +56,36 @@ struct ApproachPill: View {
         }
         .transition(.move(edge: .top).combined(with: .opacity))
     }
+}
+
+/// The planned stop coming up (RoadStops.dc.html): "R&R Tapah in 2 km" over "Take the exit · Fuel · 20 min",
+/// with the live distance. It is info, not a hazard: it has no action and the map is left alone.
+struct StopApproachPill: View {
+    let alert: TripAlert
+    let kind: PlannedStopKind
+    let model: TripMapModel
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let distance = max(0, model.stopDistance(alert.eventId, now: context.date) ?? alert.distance ?? 0)
+            DarkBanner(title: alert.title, subtitle: alert.body, symbol: kind.symbol, circle: .ikutPillBlue) {
+                Text(ConvoyFormat.distance(distance))
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.ikutPillBlue)
+                    .padding(.trailing, Spacing.tight)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(alert.title), \(alert.body), \(ConvoyFormat.distance(distance))")
+            .accessibilityIdentifier("stopapproach.pill")
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+}
+
+extension Color {
+    /// Blue of the planned-stop pill on its dark banner (#64B5FF on the canvas).
+    static let ikutPillBlue = Color(red: 0.39, green: 0.71, blue: 1.0)
 }
 
 /// "Aisha’s car is behind you" (D26), on the phones of a car parked ahead on the route, from about 2
