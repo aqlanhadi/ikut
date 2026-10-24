@@ -4,7 +4,7 @@ import SwiftUI
 /// its content up to `maxBodyHeight` and scrolls past it, and the actions fixed at the bottom.
 /// Opaque, with the convoy panel's inset and corner radius, because it sits on top of the panel.
 struct StopCardFrame<Content: View, Actions: View>: View {
-    /// The convoy list's own cap (`ConvoyPanel.maxListHeight`); the card body never grows past it.
+    /// How tall the card body grows before it scrolls.
     static var maxBodyHeight: CGFloat { 220 }
 
     var title: String

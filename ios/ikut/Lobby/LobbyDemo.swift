@@ -188,6 +188,9 @@ enum DemoScreens {
         case "road-panel-you-online": return AnyView(MapDemo.view(expanded: true))
         case "road-panel-you-offline": return AnyView(MapDemo.view(expanded: true, online: false))
         case "road-panel-tall": return AnyView(MapDemo.view(expanded: true))
+        // Five cars: the list is longer than the sheet's room, so the whole panel scrolls as one (D34 7a).
+        case "road-panel-tall-5": return AnyView(MapDemo.view(expanded: true, fiveCars: true))
+        case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true))
         case "road-next-stop": return AnyView(NextStopDemo())
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))
         case "join-with-location": return nav(JoinDemo.ticket(withStops: true, drive: TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60)))
