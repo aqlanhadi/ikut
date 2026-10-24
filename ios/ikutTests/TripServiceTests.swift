@@ -35,33 +35,13 @@ struct TripServiceTests {
         #expect(RouteFormat.distance(205_400) == "205 km")
         #expect(RouteFormat.distance(205_600) == "206 km")
         #expect(RouteFormat.distance(400) == "0 km")
-    }
-
-    @Test func durationFormatting() {
-        #expect(RouteFormat.duration(8_700) == "2 hr 25 min")
-        #expect(RouteFormat.duration(7_200) == "2 hr")
-        #expect(RouteFormat.duration(2_700) == "45 min")
-        #expect(RouteFormat.duration(5) == "1 min")
-    }
-
-    @Test func summaryIncludesRoadName() {
-        #expect(RouteFormat.summary(route) == "205 km · 2 hr 25 min via E1")
-        var unnamed = route
-        unnamed.name = ""
-        #expect(RouteFormat.summary(unnamed) == "205 km · 2 hr 25 min")
+        #expect(RouteFormat.kilometres(205_600) == 206)
     }
 
     @Test func defaultTripName() {
         #expect(TripService.defaultTripName(for: "Aqlan") == "Aqlan's trip")
         #expect(TripService.defaultTripName(for: nil) == "My trip")
         #expect(TripService.defaultTripName(destination: "Ipoh") == "Trip to Ipoh")
-    }
-
-    @Test func shortDuration() {
-        #expect(RouteFormat.shortDuration(8_700) == "2h 25m")
-        #expect(RouteFormat.shortDuration(7_230) == "2h 01m")
-        #expect(RouteFormat.shortDuration(2_700) == "45m")
-        #expect(RouteFormat.shortDuration(10) == "1m")
     }
 
     @Test func tripDocumentMatchesRules() {

@@ -377,7 +377,7 @@ final class ConvoyModel {
         }
         for e in convoy where e.isParked && e.id != myCarId && !e.hasArrived && placeTasks[e.id] == nil {
             guard let meters = snapshot.distance(from: myCarId, to: e.id), abs(meters) > config.groupRadius else { continue }
-            let here = CLLocationCoordinate2D(latitude: e.position.location.latitude, longitude: e.position.location.longitude)
+            let here = e.position.location.coordinate
             if let last = placeLookedUpAt[e.id], RouteLine.haversine(last, here) < 2000 { continue }
             placeLookedUpAt[e.id] = here
             let id = e.id

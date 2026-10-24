@@ -39,10 +39,10 @@ struct TripPreview: Sendable, Equatable {
     var tripId: String
     var name: String
     var destinationName: String
-    /// Only used to ask MapKit for the drive from here; nil from an older server.
+    /// Only used to ask MapKit for the drive from here; nil when the trip has no coordinate.
     var destinationCoordinate: PreviewCoordinate? = nil
     var cars: [PreviewCar]
-    /// In the organizer's order, skipped ones already left out; empty on trips without stops (and older servers).
+    /// In the organizer's order, skipped ones already left out; empty on trips without stops.
     var stops: [PreviewStop] = []
 }
 

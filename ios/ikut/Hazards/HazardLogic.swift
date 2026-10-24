@@ -18,12 +18,7 @@ enum HazardGeometry {
     }
 
     static func coordinate(of event: TripEvent) -> CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: event.location.latitude, longitude: event.location.longitude)
-    }
-
-    /// A decoded joining route for `car`, or nil when it has none.
-    static func ownRoute(of car: Car) -> RouteLine? {
-        car.route.flatMap(ConvoyOrdering.ownRoute)
+        event.location.coordinate
     }
 
     static func key(for event: TripEvent) -> String {

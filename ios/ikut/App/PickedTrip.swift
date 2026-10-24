@@ -18,7 +18,7 @@ enum PickedTripLogic {
     /// can mean none kept).
     static func statsLine(_ recap: Recap) -> String? {
         var parts: [String] = []
-        if let meters = recap.routeDistance { parts.append("\(Int((meters / 1000).rounded())) km") }
+        if let meters = recap.routeDistance { parts.append(RouteFormat.distance(meters)) }
         if let duration = recap.duration, let text = hoursMinutes(duration) { parts.append(text) }
         if recap.carCount > 0 { parts.append(recap.carCount == 1 ? "1 car" : "\(recap.carCount) cars") }
         if recap.stopCount > 0 { parts.append(recap.stopCount == 1 ? "1 stop" : "\(recap.stopCount) stops") }
@@ -29,7 +29,9 @@ enum PickedTripLogic {
     static func hoursMinutes(_ seconds: TimeInterval) -> String? {
         let total = Int((seconds / 60).rounded())
         guard total > 0 else { return nil }
-        return total < 60 ? "\(total) min" : "\(total / 60) h \(String(format: "%02d", total % 60))"
+        // `drive` reads a whole hour as "2 h"; this sheet has always said "2 h 00".
+        if total >= 60, total % 60 == 0 { return "\(total / 60) h 00" }
+        return StopFormat.drive(seconds: seconds)
     }
 
     /// The route to draw for the picked trip, best first: the recap's own full route once it has loaded;

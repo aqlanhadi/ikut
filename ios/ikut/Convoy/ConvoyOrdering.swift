@@ -345,7 +345,7 @@ enum ConvoyOrdering {
         }
         guard let mainRoute, let offset = car.mergeOffset, let point = mainRoute.coordinate(atOffset: offset)
         else { return nil }
-        let here = CLLocationCoordinate2D(latitude: position.location.latitude, longitude: position.location.longitude)
+        let here = position.location.coordinate
         return RouteLine.haversine(here, point)
     }
 

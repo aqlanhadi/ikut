@@ -127,7 +127,7 @@ enum RequestPlaces {
 
     /// "18 km ahead · about 12 min", the RequestStop canvas's words for a place on the route ahead of the front.
     static func requestWhere(_ meters: Double, _ secs: Double) -> String {
-        "\(Swift.max(1, Int((meters / 1000).rounded()))) km ahead · about \(Swift.max(1, Int((secs / 60).rounded()))) min"
+        "\(Swift.max(1, RouteFormat.kilometres(meters))) km ahead · about \(Swift.max(1, Int((secs / 60).rounded()))) min"
     }
 
     /// "toilets" or "toilets, no fuel": what the place has and lacks of what was asked for ("parking" for a rest).

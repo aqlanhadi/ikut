@@ -144,6 +144,16 @@ struct ConvoyTests {
         #expect(fresh.convoy.map(\.timeBehindReference) == [nil, 0, 100])
     }
 
+    @Test func agoText() {
+        #expect(ConvoyFormat.ago(0) == "just now")
+        #expect(ConvoyFormat.ago(59) == "just now")
+        #expect(ConvoyFormat.ago(60) == "1 min ago")
+        #expect(ConvoyFormat.ago(3 * 3600) == "3 h ago")
+        #expect(ConvoyFormat.ago(3 * 86_400) == "3 d ago")
+        #expect(ConvoyFormat.ago(3 * 3600, hourUnit: "hr") == "3 hr ago")
+        #expect(ConvoyFormat.ago(30 * 3600, hourUnit: "hr", days: false) == "30 hr ago")
+    }
+
     @Test func lastSeenText() {
         #expect(ConvoyFormat.lastSeen(age: 30) == "Last seen just now")
         #expect(ConvoyFormat.lastSeen(age: 61) == "Last seen 1 min ago")

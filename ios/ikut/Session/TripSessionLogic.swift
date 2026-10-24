@@ -94,7 +94,7 @@ enum TripSessionLogic {
     /// The meeting point: the first stop when it is of kind `meet` and not skipped. Nil for a trip without one.
     static func meetingPoint(in stops: [PlannedStop]) -> CLLocationCoordinate2D? {
         guard let first = stops.min(by: { $0.order < $1.order }), first.kind == .meet, first.isActive else { return nil }
-        return CLLocationCoordinate2D(latitude: first.coordinate.latitude, longitude: first.coordinate.longitude)
+        return first.coordinate.coordinate
     }
 
     /// The meeting point a car's own route goes to (D25 4d-2). The same as `meetingPoint(in:)` until the lead car

@@ -150,7 +150,6 @@ final class StopPlanner {
     }
 
     var isBuilding: Bool { status == .building }
-    var hasStops: Bool { !items.isEmpty }
 
     /// Follows the trip and its stops as Firestore reports them, unless an edit is being built or has failed.
     func sync(trip: Trip?, stops: [PlannedStop]) {

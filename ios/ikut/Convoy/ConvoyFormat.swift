@@ -55,14 +55,18 @@ enum ConvoyFormat {
     /// Subtitle of a car whose tracker paused sharing.
     static let paused = "Paused"
 
-    /// "Last seen 2 min ago" for a stale position `age` seconds old. Under a minute is "just now".
-    static func lastSeen(age: TimeInterval) -> String {
+    /// "just now", "2 min ago", "3 h ago", "2 d ago" for something `age` seconds old. Under a minute is "just now".
+    /// `hourUnit` is how hours read ("h" here, "hr" in an alert's words); `days: false` keeps counting in hours.
+    static func ago(_ age: TimeInterval, hourUnit: String = "h", days: Bool = true) -> String {
         let a = max(0, age.isFinite ? age : 0)
-        if a < 60 { return "Last seen just now" }
-        if a < 3600 { return "Last seen \(Int(a / 60)) min ago" }
-        if a < 86_400 { return "Last seen \(Int(a / 3600)) h ago" }
-        return "Last seen \(Int(a / 86_400)) d ago"
+        if a < 60 { return "just now" }
+        if a < 3600 { return "\(Int(a / 60)) min ago" }
+        if a < 86_400 || !days { return "\(Int(a / 3600)) \(hourUnit) ago" }
+        return "\(Int(a / 86_400)) d ago"
     }
+
+    /// "Last seen 2 min ago" for a stale position `age` seconds old. Under a minute is "just now".
+    static func lastSeen(age: TimeInterval) -> String { "Last seen \(ago(age))" }
 
     /// Short clock time in the given locale ("14:52" in en_GB, "2:52 PM" in en_US).
     static func clock(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
