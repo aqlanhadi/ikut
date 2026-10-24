@@ -191,8 +191,9 @@ struct AlertWordingTests {
         #expect(alert(alertEvent(.runningLate, id: "1"), name: nil).spoken == "Another car is running late.")
         let m = alert(alertEvent(.message, id: "1", message: "Makan dulu?"))
         #expect(m.body == "Aqlan’s car: “Makan dulu?” · just now")
-        #expect(m.spoken == "Message from Aqlan’s car: Makan dulu?")
-        #expect(alert(alertEvent(.other("x"), id: "1")).spoken == "Message from Aqlan’s car.")
+        #expect(m.spoken == "New message from Aqlan’s car.")
+        #expect(!m.spoken.contains("Makan"))
+        #expect(alert(alertEvent(.other("x"), id: "1")).spoken == "New message from Aqlan’s car.")
     }
 }
 
@@ -371,6 +372,27 @@ struct AlertCenterTests {
         rig.source.emit([alertEvent(.debris, id: "1")])
         await waitUntil { rig.center.current != nil }
         #expect(rig.speaker.spoken.isEmpty)
+    }
+
+    @Test func readAloudSwitchedOffStopsSpeech() async {
+        let rig = Rig()
+        rig.center.readAloudChanged()
+        #expect(rig.speaker.stops == 0)
+        rig.state.readAloud = false
+        rig.center.readAloudChanged()
+        #expect(rig.speaker.stops == 1)
+    }
+
+    @Test func readAloudIsReadAtEachAlert() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        rig.source.emit([alertEvent(.debris, id: "1")])
+        await waitUntil { rig.speaker.spoken.count == 1 }
+        rig.state.readAloud = false
+        rig.source.emit([alertEvent(.debris, id: "1"), alertEvent(.stopFuel, id: "2")])
+        await waitUntil { rig.center.current?.id == "2" }
+        #expect(rig.speaker.spoken.count == 1)
     }
 
     @Test func backlogIsSkippedExceptRecentHigh() async {

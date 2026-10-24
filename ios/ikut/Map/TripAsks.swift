@@ -25,16 +25,15 @@ enum TripAsk: String, Equatable {
     case roadAlerts
     /// Notifications turned off in Settings: leads to the Settings app.
     case roadAlertsOff
-    /// An in-app choice (iOS has no permission for it).
-    case keepScreenOn
 }
 
-/// What was already asked on one trip, kept as a single string ("tripId|roadAlerts,keepScreenOn") so leaving the
+/// What was already asked on one trip, kept as a single string ("tripId|roadAlerts") so leaving the
 /// map and coming back doesn't ask again.
 enum TripAskMemory {
     static func asked(in stored: String, tripId: String) -> Set<TripAsk> {
         let parts = stored.split(separator: "|", maxSplits: 1).map(String.init)
         guard parts.count == 2, parts[0] == tripId else { return [] }
+        // Unknown parts (an old "keepScreenOn") are ignored.
         return Set(parts[1].split(separator: ",").compactMap { TripAsk(rawValue: String($0)) })
     }
 
@@ -48,20 +47,19 @@ enum TripAskMemory {
     }
 }
 
-/// Decides which ask comes next, so two never stack and the order is always road alerts, then screen.
+/// Decides which ask comes next: only road alerts. The screen stays on by default (`ScreenAwake.preference`), so
+/// there is no second question.
 enum TripAskPlanner {
     static func next(
-        notifications: NotificationAccess, keepAwakeAnswered: Bool, asked: Set<TripAsk>, explainerShowing: Bool
+        notifications: NotificationAccess, asked: Set<TripAsk>, explainerShowing: Bool
     ) -> TripAsk? {
         // The Always-location sheet is up; ask once it's gone.
         if explainerShowing { return nil }
         switch notifications {
         case .notDetermined where !asked.contains(.roadAlerts): return .roadAlerts
         case .denied where !asked.contains(.roadAlertsOff) && !asked.contains(.roadAlerts): return .roadAlertsOff
-        default: break
+        default: return nil
         }
-        if !keepAwakeAnswered && !asked.contains(.keepScreenOn) { return .keepScreenOn }
-        return nil
     }
 }
 
@@ -74,6 +72,10 @@ final class ScreenAwake {
     init(setIdleTimerDisabled: @escaping @MainActor (Bool) -> Void = { UIApplication.shared.isIdleTimerDisabled = $0 }) {
         self.setIdleTimerDisabled = setIdleTimerDisabled
     }
+
+    /// On for a person who never chose; whoever answered the old "Keep the screen on?" or flipped the menu switch
+    /// keeps that answer.
+    static func preference(answered: Bool, stored: Bool) -> Bool { answered ? stored : true }
 
     static func shouldHold(preference: Bool, onScreen: Bool, tripRunning: Bool, appActive: Bool) -> Bool {
         preference && onScreen && tripRunning && appActive

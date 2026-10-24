@@ -5,9 +5,9 @@ import UserNotifications
 @Suite("Trip asks") @MainActor
 struct TripAskTests {
     private func next(
-        _ n: NotificationAccess, answered: Bool = false, asked: Set<TripAsk> = [], explainer: Bool = false
+        _ n: NotificationAccess, asked: Set<TripAsk> = [], explainer: Bool = false
     ) -> TripAsk? {
-        TripAskPlanner.next(notifications: n, keepAwakeAnswered: answered, asked: asked, explainerShowing: explainer)
+        TripAskPlanner.next(notifications: n, asked: asked, explainerShowing: explainer)
     }
 
     @Test func notificationStatusMapping() {
@@ -21,18 +21,33 @@ struct TripAskTests {
     @Test func roadAlertsComeFirst() {
         #expect(next(.notDetermined) == .roadAlerts)
         #expect(next(.denied) == .roadAlertsOff)
-        #expect(next(.allowed) == .keepScreenOn)
+        #expect(next(.allowed) == nil)
     }
 
-    @Test func screenAskFollowsTheAlertsAsk() {
-        #expect(next(.notDetermined, asked: [.roadAlerts]) == .keepScreenOn)
-        #expect(next(.denied, asked: [.roadAlertsOff]) == .keepScreenOn)
+    @Test func neverAsksAboutTheScreen() {
+        for n in [NotificationAccess.notDetermined, .denied, .allowed] {
+            for asked in [Set<TripAsk>(), [.roadAlerts], [.roadAlertsOff], [.roadAlerts, .roadAlertsOff]] {
+                let ask = next(n, asked: asked)
+                #expect(ask == nil || ask == .roadAlerts || ask == .roadAlertsOff)
+            }
+        }
+    }
+
+    @Test func keepAwakeIsOnUntilThePersonChooses() {
+        #expect(ScreenAwake.preference(answered: false, stored: false))
+        #expect(ScreenAwake.preference(answered: true, stored: true))
+        #expect(!ScreenAwake.preference(answered: true, stored: false))
+    }
+
+    @Test func oldStoredAsksStillParse() {
+        #expect(TripAskMemory.asked(in: "T1|keepScreenOn,roadAlerts", tripId: "T1") == [.roadAlerts])
+        #expect(TripAskMemory.asked(in: "T1|keepScreenOn", tripId: "T1").isEmpty)
     }
 
     @Test func nothingLeftToAsk() {
-        #expect(next(.allowed, answered: true) == nil)
-        #expect(next(.allowed, asked: [.keepScreenOn]) == nil)
-        #expect(next(.denied, answered: true, asked: [.roadAlertsOff]) == nil)
+        #expect(next(.allowed) == nil)
+        #expect(next(.denied, asked: [.roadAlertsOff]) == nil)
+        #expect(next(.notDetermined, asked: [.roadAlerts]) == nil)
     }
 
     @Test func nothingWhileTheLocationExplainerIsUp() {
@@ -42,26 +57,23 @@ struct TripAskTests {
 
     @Test func deniedAfterTheSystemPromptIsNotAskedAgainThisTrip() {
         // The system prompt was shown and refused: the status flips to denied, but road alerts was already asked.
-        #expect(next(.denied, asked: [.roadAlerts]) == .keepScreenOn)
+        #expect(next(.denied, asked: [.roadAlerts]) == nil)
     }
 
     @Test func refusingTheSystemPromptNeverLeadsToTheSettingsAsk() {
         // What the app really stores after answering road alerts, then the status reading denied.
         let stored = TripAskMemory.recording(.roadAlerts, in: "", tripId: "T1")
         let asked = TripAskMemory.asked(in: stored, tripId: "T1")
-        #expect(next(.denied, asked: asked) == .keepScreenOn)
+        #expect(next(.denied, asked: asked) == nil)
     }
 
     @Test func asksAreRememberedPerTrip() {
-        var stored = TripAskMemory.recording(.keepScreenOn, in: "", tripId: "T1")
-        #expect(TripAskMemory.asked(in: stored, tripId: "T1") == [.keepScreenOn])
+        var stored = TripAskMemory.recording(.roadAlerts, in: "", tripId: "T1")
+        #expect(TripAskMemory.asked(in: stored, tripId: "T1") == [.roadAlerts, .roadAlertsOff])
         #expect(TripAskMemory.asked(in: stored, tripId: "T2").isEmpty)
-        stored = TripAskMemory.recording(.roadAlertsOff, in: stored, tripId: "T1")
-        #expect(TripAskMemory.asked(in: stored, tripId: "T1") == [.keepScreenOn, .roadAlertsOff])
-        stored = TripAskMemory.recording(.keepScreenOn, in: stored, tripId: "T2")
+        stored = TripAskMemory.recording(.roadAlertsOff, in: "", tripId: "T2")
         #expect(TripAskMemory.asked(in: stored, tripId: "T1").isEmpty)
-        // Coming back to the map: nothing left to ask for T2 once the screen ask is remembered.
-        #expect(next(.allowed, asked: TripAskMemory.asked(in: stored, tripId: "T2")) == nil)
+        #expect(next(.denied, asked: TripAskMemory.asked(in: stored, tripId: "T2")) == nil)
     }
 
     @Test func theSheetWaitsWhileAnAskIsUp() {

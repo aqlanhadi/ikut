@@ -78,9 +78,13 @@ struct TripMapView: View {
     /// The approach folded the convoy list away; it opens again once the hazard is passed.
     @State private var unfoldAfterApproach = false
     @State private var passedText: String?
-    /// Kept screen on while the map is up. `keepAwakeAnswered` is false until the first ask is answered.
+    /// Kept screen on while the map is up. Until `keepAwakeAnswered` (the person chose, by the menu or the old ask)
+    /// the screen stays on (`ScreenAwake.preference`).
     @AppStorage("ikut.map.keepAwake") private var keepAwake = false
     @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
+    @AppStorage(AlertSettings.readAloudKey) private var readAloud = AlertSettings.readAloudDefault
+
+    private var keepAwakeOn: Bool { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) }
     /// What was asked on the last trip (`TripAskMemory`), so leaving the map and coming back doesn't nag.
     @AppStorage("ikut.map.askedTrip") private var askedTrip = ""
     @Environment(\.dismiss) private var dismiss
@@ -158,7 +162,8 @@ struct TripMapView: View {
             }
             .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk() }
             .onChange(of: ask) { _, now in session.askShowing = now != nil }
-            .onChange(of: keepAwake) { _, _ in updateAwake() }
+            .onChange(of: keepAwakeOn) { _, _ in updateAwake() }
+            .onChange(of: readAloud) { _, _ in alerts.readAloudChanged() }
             .onChange(of: scenePhase) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, ended in if ended { onEnded() } }
@@ -436,8 +441,10 @@ struct TripMapView: View {
             Menu {
                 Button("Back to lobby", systemImage: "chevron.backward") { exit { dismiss() } }
                 if liveServices {
-                    Toggle("Keep screen on", systemImage: "sun.max", isOn: $keepAwake)
-                        .onChange(of: keepAwake) { _, _ in keepAwakeAnswered = true }
+                    Toggle("Keep screen on", systemImage: "sun.max", isOn: Binding(
+                        get: { keepAwakeOn },
+                        set: { keepAwake = $0; keepAwakeAnswered = true }))
+                    Toggle("Read alerts aloud", systemImage: "speaker.wave.2", isOn: $readAloud)
                 }
                 if canEnd {
                     Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
@@ -633,21 +640,6 @@ struct TripMapView: View {
         } message: {
             Text("Turn them on in Settings to hear about debris, breakdowns and stops ahead.")
         }
-        .alert("Keep the screen on?", isPresented: asking(.keepScreenOn)) {
-            Button("Keep it on") {
-                keepAwake = true
-                keepAwakeAnswered = true
-                answer(.keepScreenOn)
-            }
-            Button("Not now", role: .cancel) {
-                keepAwake = false
-                keepAwakeAnswered = true
-                answer(.keepScreenOn)
-            }
-        } message: {
-            Text("So the map stays up while you drive. Uses more battery.")
-        }
-
     }
 
     /// One motion for a tap and a drag: the list and the summary cross-fade in the same transaction as the
@@ -906,7 +898,7 @@ struct TripMapView: View {
             let access = await NotificationAccess.current()
             guard ask == nil, onScreen else { return }
             let next = TripAskPlanner.next(
-                notifications: access, keepAwakeAnswered: keepAwakeAnswered,
+                notifications: access,
                 asked: TripAskMemory.asked(in: askedTrip, tripId: session.tripId),
                 explainerShowing: session.alwaysExplainerShowing)
             ask = next
@@ -916,7 +908,7 @@ struct TripMapView: View {
     private func updateAwake() {
         guard liveServices else { return }
         screenAwake.update(
-            preference: keepAwake, onScreen: onScreen, tripRunning: !session.isEnded,
+            preference: keepAwakeOn, onScreen: onScreen, tripRunning: !session.isEnded,
             appActive: scenePhase == .active)
     }
 
