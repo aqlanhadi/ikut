@@ -25,11 +25,16 @@ struct HomeView: View {
     @State private var afterName: Route?
     /// A route is being opened (a permission prompt may be up), so Home's sheet stays away.
     @State private var opening = false
+    /// Home's sheet is on screen (it reports its own appear and dismiss). The name and denied sheets wait for it to go.
+    @State private var homeSheetUp = false
+    /// The route to open once the name sheet has gone (its dismissal is the signal, so a permission prompt can't collide).
+    @State private var routeAfterName: Route?
 
     /// Home's sheet is presented over Home, so it steps aside for everything that is pushed or presented
     /// from here, and comes back when they are gone.
     private var homeSheetCovered: Bool {
-        !path.isEmpty || showName || showDenied || afterName != nil || opening
+        HomeSheet.isCovered(pathCount: path.count, showName: showName, showDenied: showDenied,
+                            afterName: afterName != nil, opening: opening)
     }
 
     init(pendingJoinCode: Binding<String?> = .constant(nil)) {
@@ -45,7 +50,8 @@ struct HomeView: View {
                         onJoin: { begin(.join(code: nil)) },
                         // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
                         onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) },
-                        covered: homeSheetCovered
+                        covered: homeSheetCovered,
+                        sheetUp: $homeSheetUp
                     )
                 } else {
                     WelcomeView(
@@ -83,26 +89,28 @@ struct HomeView: View {
                     RecapView(tripId: tripId, onDone: { path = [] })
                 }
             }
-            .sheet(isPresented: $showName) {
-                NameEntryView {
-                    // Opening from here on, so Home's sheet stays away until the route is pushed.
-                    opening = true
-                    showName = false
-                    guard let route = afterName else { opening = false; return }
+            .sheet(isPresented: Binding(get: { HomeSheet.presents(wanted: showName, homeSheetUp: homeSheetUp) },
+                                        set: { showName = $0 }),
+                   onDismiss: {
+                // Home's sheet is held back until the route is open; a swipe-down instead of Continue drops the trip.
+                if let route = routeAfterName {
+                    routeAfterName = nil
+                    Task { await open(route) }
+                } else {
                     afterName = nil
-                    Task {
-                        // Let the sheet finish dismissing before a permission prompt appears.
-                        try? await Task.sleep(for: .milliseconds(400))
-                        await open(route)
-                    }
+                }
+            }) {
+                NameEntryView {
+                    routeAfterName = afterName
+                    afterName = nil
+                    // Opening from here on, so Home's sheet stays away until the route is pushed.
+                    opening = routeAfterName != nil
+                    showName = false
                 }
                 .presentationDetents([.medium])
             }
-            .onChange(of: showName) { _, shown in
-                // Dismissed by a swipe instead of Continue: the trip it was for isn't going anywhere.
-                if !shown, !opening { afterName = nil }
-            }
-            .sheet(isPresented: $showDenied) {
+            .sheet(isPresented: Binding(get: { HomeSheet.presents(wanted: showDenied, homeSheetUp: homeSheetUp) },
+                                        set: { showDenied = $0 })) {
                 LocationDeniedView { location.openSettings() }
             }
             .onChange(of: pendingJoinCode, initial: true) {
@@ -123,11 +131,7 @@ struct HomeView: View {
             Task { await open(route) }
         } else {
             afterName = route
-            Task {
-                // Home's sheet leaves first: a sheet can't be presented while another is still on its way down.
-                if hasSeenWelcome { try? await Task.sleep(for: .milliseconds(400)) }
-                showName = true
-            }
+            showName = true
         }
     }
 
@@ -140,12 +144,10 @@ struct HomeView: View {
                 if await location.requestWhenInUse() == .notDetermined { return }
             case .requestFullAccuracy:
                 if await location.requestFullAccuracy() == .reduced {
-                    try? await Task.sleep(for: .milliseconds(400))
                     showDenied = true
                     return
                 }
             case .showSettingsPrompt:
-                try? await Task.sleep(for: .milliseconds(400))
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:

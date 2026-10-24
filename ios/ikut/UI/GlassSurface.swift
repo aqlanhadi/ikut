@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// The surface behind a floating sheet: the trips sheet on the home screen, the convoy panel and the
-/// stop card. One place decides how they look; `GlassSurface.useGlass` is the switch.
+/// The surface behind a floating card: the convoy panel and the stop card. One place decides how they look; `GlassSurface.useGlass` is the switch.
 enum GlassSurface {
     /// Liquid Glass on iOS 26 and later for the floating convoy panel and stop card. False gives them
-    /// the frosted material, as before iOS 26. The home trips sheet is glass on iOS 26 either way.
+    /// the frosted material, as before iOS 26.
     static let useGlass = true
 
     /// True when the glass look is showing (the switch above, on iOS 26 or later).
@@ -14,8 +13,6 @@ enum GlassSurface {
     }
 
     enum Kind {
-        /// Full-width sheet with bottom corners that follow the screen's (home trips sheet, glass only).
-        case sheet
         /// Inset card floating over the map, with a plain Radius.panel rectangle.
         case floating
         /// The trip pill at the top of the map: a capsule with a lighter shadow.
@@ -30,7 +27,7 @@ private struct GlassSurfaceModifier: ViewModifier {
 
     private var plain: AnyShape {
         switch kind {
-        case .sheet, .floating: AnyShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+        case .floating: AnyShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
         case .pill: AnyShape(Capsule())
         case .control: AnyShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
@@ -38,7 +35,7 @@ private struct GlassSurfaceModifier: ViewModifier {
 
     private var shadow: (opacity: Double, radius: CGFloat, y: CGFloat) {
         switch kind {
-        case .sheet, .floating: (0.16, 20, 10)
+        case .floating: (0.16, 20, 10)
         case .pill, .control: (0.12, 12, 6)
         }
     }
@@ -46,10 +43,7 @@ private struct GlassSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         // Clipped to the same shape: a ScrollView draws on under the safe area and past the rounded
         // corners, and a folding list draws outside a shrinking panel.
-        if kind == .sheet, #available(iOS 26, *) {
-            let shape = ConcentricRectangle(corners: .concentric(minimum: .fixed(Radius.panel)), isUniform: false)
-            content.clipShape(shape).glassEffect(.regular, in: shape)
-        } else if kind != .sheet, GlassSurface.useGlass, #available(iOS 26, *) {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
             content.clipShape(plain).glassEffect(.regular, in: plain)
         } else {
             content

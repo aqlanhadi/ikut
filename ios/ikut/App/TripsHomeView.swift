@@ -3,7 +3,7 @@ import MapKit
 import SwiftUI
 
 /// Home after the welcome screen, as in Home.dc.html: a map of where you are and the routes of
-/// your past trips, under a floating glass sheet with New Trip, Join Trip and past trips.
+/// your past trips, under Apple's own sheet with New Trip, Join Trip and past trips.
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     var onNewTrip: () -> Void
@@ -13,6 +13,8 @@ struct TripsHomeView: View {
     /// A pushed screen or a sheet of the parent is up: Home's sheet steps aside (a sheet is presented
     /// over Home, so it would sit over them) and comes back when this is false again.
     var covered = false
+    /// Follows whether the sheet is on screen (set when it appears, cleared once it has gone), for the parent.
+    var sheetUp: Binding<Bool> = .constant(false)
 
     @State private var renaming = false
     @State private var newName = ""
@@ -40,8 +42,10 @@ struct TripsHomeView: View {
     @State private var isDemo = false
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
-         onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }, covered: Bool = false) {
+         onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }, covered: Bool = false,
+         sheetUp: Binding<Bool> = .constant(false)) {
         self.covered = covered
+        self.sheetUp = sheetUp
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
         self.onOpenTrip = onOpenTrip
@@ -106,7 +110,13 @@ struct TripsHomeView: View {
                                               cameraMovedByUser: camera.positionedByUser) else { return }
             refocus(animated: true)
         }
-        .sheet(isPresented: Binding(get: { !covered }, set: { _ in })) { sheetContent }
+        .sheet(isPresented: Binding(get: { !covered }, set: { _ in }), onDismiss: { sheetUp.wrappedValue = false }) {
+            sheetContent.onAppear { sheetUp.wrappedValue = true }
+        }
+        // The name alert belongs to the sheet; when the sheet steps aside it must not come back on its own later.
+        .onChange(of: covered) { _, now in
+            if now { renaming = false; renameError = nil }
+        }
     }
 
     // MARK: Map
@@ -360,10 +370,6 @@ struct TripsHomeView: View {
 
     // MARK: Sheet
 
-    /// Height of the sheet when collapsed: grabber, title, the two pills and the top of past trips.
-    nonisolated static let compactHeight: CGFloat = 300
-    /// The short sheet of a picked trip (design/project/HomePicked.dc.html): back, name, date, stats line.
-    nonisolated static let pickedCompactMinimum: CGFloat = 172
     /// The short detent's height now (a picked trip's follows its header).
     private var compact: CGFloat {
         HomeSheet.compact(picked: picked != nil, pinnedHeight: pinnedHeight, bottomInset: bottomInset, margin: Spacing.l)

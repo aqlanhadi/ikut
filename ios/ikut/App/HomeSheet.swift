@@ -29,4 +29,14 @@ enum HomeSheet {
 
     /// Whatever detent the sheet settles on, tall or not (a dragged sheet reports only its detent).
     static func isExpanded(_ detent: PresentationDetent) -> Bool { detent == tall }
+
+    /// Home's sheet steps aside while anything else is pushed or presented from the root: a pushed screen,
+    /// the name or location-denied sheet (wanted, or waiting for the name), or a route being opened.
+    static func isCovered(pathCount: Int, showName: Bool, showDenied: Bool, afterName: Bool, opening: Bool) -> Bool {
+        pathCount > 0 || showName || showDenied || afterName || opening
+    }
+
+    /// A sheet of the root is presented only once Home's sheet is gone: one sheet can't come up while
+    /// another is still on its way down. `homeSheetUp` follows the sheet's own appear and dismiss.
+    static func presents(wanted: Bool, homeSheetUp: Bool) -> Bool { wanted && !homeSheetUp }
 }

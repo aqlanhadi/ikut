@@ -108,6 +108,25 @@ struct PastTripsMapTests {
 }
 
 struct HomeSheetTests {
+    @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {
+        func covered(path: Int = 0, name: Bool = false, denied: Bool = false, after: Bool = false, opening: Bool = false) -> Bool {
+            HomeSheet.isCovered(pathCount: path, showName: name, showDenied: denied, afterName: after, opening: opening)
+        }
+        #expect(!covered())
+        #expect(covered(path: 1))
+        #expect(covered(path: 2))
+        #expect(covered(name: true))
+        #expect(covered(denied: true))
+        #expect(covered(after: true))
+        #expect(covered(opening: true))
+    }
+
+    @Test func aRootSheetWaitsForHomeSheetToGo() {
+        #expect(!HomeSheet.presents(wanted: true, homeSheetUp: true))
+        #expect(HomeSheet.presents(wanted: true, homeSheetUp: false))
+        #expect(!HomeSheet.presents(wanted: false, homeSheetUp: false))
+    }
+
     @Test func listSheetIsShortUntilPulledUp() {
         let compact = HomeSheet.compact(picked: false, pinnedHeight: 120, bottomInset: 34, margin: 16)
         #expect(compact == HomeSheet.compactHeight)
