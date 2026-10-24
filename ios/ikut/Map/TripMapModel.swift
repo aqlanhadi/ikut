@@ -29,6 +29,8 @@ final class TripMapModel {
     /// "K7M 2QX".
     private(set) var tripCode = ""
     private(set) var mainRoute: RouteLine?
+    /// Driving time along `mainRoute`, when the trip stores it.
+    private(set) var routeSeconds: Double?
     private(set) var myCarId: String?
     private(set) var myCar: Car?
     /// I am the tracker of my car, so my phone is what reports its position.
@@ -153,6 +155,7 @@ final class TripMapModel {
         if let trip {
             tripStarted = trip.startedAt != nil
             organizerId = trip.organizerId
+            routeSeconds = trip.routeSeconds
             tripName = trip.name
             departedAt = trip.startedAt ?? trip.createdAt
             tripCode = Self.formatCode(trip.code)

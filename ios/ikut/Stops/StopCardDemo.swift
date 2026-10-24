@@ -20,9 +20,25 @@ extension StopCardModel {
             ask.choose(StopReason.all[0])
             ask.message = "Low on fuel, next R&R please"
             screen = .message
+        case "places": places.showForDemo(StopPlacesDemo.three)
+        case "places-two-reasons": places.showForDemo(StopPlacesDemo.twoReasons)
+        case "no-places": places.showForDemo([])
         default: break
         }
     }
+}
+
+/// The lists the demo states show (the card has no route behind it in a demo).
+enum StopPlacesDemo {
+    static let three = [
+        RequestPlace(id: "d1", name: "R&R Tapah", minutes: 12, whereText: "18 km ahead · about 12 min", whyText: "Fuel, toilets, food"),
+        RequestPlace(id: "d2", name: "R&R Bidor", minutes: 25, whereText: "37 km ahead · about 25 min", whyText: "Fuel, toilets, food"),
+        RequestPlace(id: "d3", name: "Lay-by", minutes: 30, whereText: "45 km ahead · about 30 min", whyText: "Toilets, no fuel"),
+    ]
+    static let twoReasons = [
+        RequestPlace(id: "d1", name: "R&R Tapah", minutes: 12, whereText: "18 km ahead · about 12 min", whyText: "Fuel, food"),
+        RequestPlace(id: "d2", name: "Petrol station", minutes: 20, whereText: "30 km ahead · about 20 min", whyText: "Fuel, no food"),
+    ]
 }
 
 /// Sends nothing: the demo has no backend behind the card.
