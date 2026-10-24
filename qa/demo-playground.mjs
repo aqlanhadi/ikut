@@ -23,6 +23,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { GeoPoint, deleteField, doc, setLogLevel, updateDoc } from 'firebase/firestore';
 import { START, Car, PROJECT_ID, emit, firebaseConfig, parseArgs, repo, standInRoute } from './lib/demo-common.mjs';
+import { holdSimulators } from './lib/shell.mjs';
 import { loadRoutes } from './generate-gpx.mjs';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
@@ -74,6 +75,8 @@ if (o.backend === 'production') {
 }
 
 if (o.dryRun) process.exit(dryRun());
+// Both phones are held while the playground runs (qa/simlock.sh): a run-ui or demo started meanwhile waits for it.
+if (!NO_SIM) await holdSimulators([o.udid, o.udid2]);
 
 // ---------------------------------------------------------------- state
 

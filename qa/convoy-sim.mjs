@@ -437,6 +437,10 @@ class Phone {
       .map(([id, p]) => ({
         id, name: this.cars.get(id).name, isLead: Boolean(this.cars.get(id).isLead), offset: p.convoyOffset, speed: p.speed,
         age: p.updatedAt ? Math.max(0, (now - p.updatedAt.toMillis()) / 1000) : 0,
+        // TripSessionLogic.isPaused (pausedAt younger than 30 min) and ConvoyArrival.hasArrived (within 150 m of the end):
+        // the app leaves both out of the ETA reference, and a paused car is not fresh.
+        paused: isPausedAt(this.cars.get(id).pausedAt, now),
+        arrived: p.convoyOffset >= mainRoute.length - 150,
       })));
     this.together = new Set([...this.together, ...togetherPairs(convoy)]);
     const ref = referenceId(convoy);
@@ -918,7 +922,13 @@ async function readPositions(organizer, tripId) {
   return new Map(snap.docs.map((d) => [d.id, d.data({ serverTimestamps: 'estimate' })]));
 }
 
-function scheduleChecks({ phones, tripId, organizer }) {
+/** TripSessionLogic.isPaused: pausedAt is set and younger than pauseExpiry (30 minutes). */
+function isPausedAt(pausedAt, now) {
+  const ms = pausedAt?.toMillis?.();
+  return typeof ms === 'number' && now - ms < 30 * 60_000;
+}
+
+function scheduleChecks({ phones, tripId, organizer, getAppCarId }) {
   const keyByCar = () => new Map([...phones.values()].map((p) => [p.carId, p.key]));
   const gap = CARS.find((c) => c.key === 'car2').gap;
   const speedOk = speedAt(gap.to - 5) <= 2.5;
@@ -928,7 +938,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
     name: label,
     async run(ctx) {
       const positions = await readPositions(organizer, tripId);
-      const appCarId = readAppCarId();
+      const appCarId = getAppCarId() ?? null;
       const names = keyByCar();
       if (appCarId) names.set(appCarId, APP_KEY);
       const actual = [...positions.entries()]
@@ -942,9 +952,6 @@ function scheduleChecks({ phones, tripId, organizer }) {
       check(label, ok, `convoy ${fmt(actual)}; joining [${joining.join(', ')}]; expected ${fmt(expected).replace(/@[\d.]+k/g, '')}`);
     },
   });
-  const readAppCarId = () => {
-    try { return JSON.parse(fs.readFileSync(opts.state, 'utf8')).appCarId ?? null; } catch { return null; }
-  };
 
   // Every 30 scenario seconds: where the phone is relative to its GPX, to see how far simctl playback lags.
   const progress = [];
@@ -952,7 +959,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
     progress.push({
       at, name: `progress at T=${at}`,
       async run(ctx) {
-        const appCarId = readAppCarId();
+        const appCarId = getAppCarId() ?? null;
         if (!appCarId) return;
         const d = (await readPositions(organizer, tripId)).get(appCarId);
         if (!d) return log('phone has no position yet');
@@ -1059,7 +1066,7 @@ function scheduleChecks({ phones, tripId, organizer }) {
     {
       at: 790, name: 'phone car says OK to the stop request',
       async run(ctx) {
-        const appCarId = readAppCarId();
+        const appCarId = getAppCarId() ?? null;
         if (!opts.expectAppOk || !appCarId || !ctx.stopEvent) return skip('phone car said OK to the stop request', 'no phone, or --expect-app-ok not given');
         const v = await getDoc(doc(organizer.db, `trips/${tripId}/events/${ctx.stopEvent.id}/votes/${appCarId}`));
         check('phone car said OK to the stop request', v.exists(), v.exists() ? JSON.stringify({ userId: v.data().userId }) : 'no vote document');

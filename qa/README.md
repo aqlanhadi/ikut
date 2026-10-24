@@ -32,7 +32,7 @@ phone, and feed it the track with `xcrun simctl location <udid> start --speed=27
   with one `RESULT: PASS`, `RESULT: FAIL` or `RESULT: ABORT (why)` line, also when it exits early, crashes, is
   stopped, or runs past its `--deadline` (seconds; the default fits its build and scenario). Stopping kills its
   xcodebuild and `convoy-sim` children.
-- **The simulators are locked while a run drives them.** `run-ui`, `run-convoy2`, the demos and `drive-trip` hold
+- **The simulators are locked while a run drives them.** `run-ui`, `run-convoy2`, the demos, the playground and `drive-trip` hold
   theirs through `simlock.sh` (a `lockf` on `/tmp/ikut-sim-<udid>.lock`). A second run prints who has the simulator
   and waits up to 30 minutes, then ends with `RESULT: ABORT (simulator … busy …)`. The lock goes with the process,
   so a killed run never leaves it held. Wrap other screen-driving commands the same way:
@@ -258,7 +258,8 @@ A gap means no signal or a suspended app; the two look the same from here.
 
 `node prod-smoke.mjs` runs one short trip against the real Firebase project (from
 `ios/ikut/Resources/GoogleService-Info.plist`): anonymous sign-in, create, `previewTrip`, `joinTrip`,
-positions, end. It deletes its two anonymous users; the ended trip is purged by `purgeTripDataJob`.
+positions, end. Whatever fails, it ends the trip and deletes its two anonymous users, and it ends in a `RESULT` line
+(300 s deadline); the ended trip is purged by `purgeTripDataJob`.
 
 ## Live demo
 
@@ -328,7 +329,8 @@ on the real app without a 9 minute scripted demo: **you tap the phones**, the pl
    so a phone that is not following is flagged; plus the trip's events with their OKs, message and closed state.
 
 Close the playground (SIGTERM) stops the players, clears the locations of the simulators it started and closes the generated cars. The trip is
-left as it is; end it from phone 1's menu. Emulators only (`--backend production` is refused).
+left as it is; end it from phone 1's menu. Emulators only (`--backend production` is refused). It holds both simulators from the moment it starts (`simlock.sh`), so a
+`run-ui` or demo started meanwhile waits for it, and it waits for them (up to 30 minutes) if another run has them.
 
 Not covered: background tracking, push, off-route rerouting, MapKit ETAs. After a merge the generated car reports on the main route (the app keeps
 its own route offset).
