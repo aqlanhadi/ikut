@@ -125,9 +125,14 @@ class ConvoyUITestCase: XCTestCase {
         if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
             sheetName.tap()
             sheetName.typeText(name)
-            app.buttons["Continue"].tap()
+            let continueButton = app.buttons["Continue"]
+            continueButton.tap()
+            // The keyboard going down can move the sheet under that tap: tap again if it's still there.
+            if !sheetName.waitForNonExistence(timeout: 5), continueButton.isHittable { continueButton.tap() }
+            _ = sheetName.waitForNonExistence(timeout: 15)
         }
-        app.tap()
+        // Wakes the permission monitor; at the top edge, so it can't land on a sheet's dimmed area or a control.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
     }
 
     /// Welcome (first run) or Home to the name sheet and on: taps New Trip.
