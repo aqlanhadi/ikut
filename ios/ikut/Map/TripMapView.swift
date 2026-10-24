@@ -24,6 +24,8 @@ struct TripMapView: View {
     @State private var toast = ReportToastModel()
     @State private var camera: MapCameraPosition = .automatic
     @State private var cameraHeading = 0.0
+    /// The car the driver tapped (D34 7b): its marker is ringed and the panel shows its row. It never moves the camera.
+    @State private var selectedCar: String?
     /// The convoy list starts folded on every arrival at the map; the driver opens it when they want it.
     @State private var panelExpanded = false
     @State private var reportContext: ReportContext?
@@ -100,7 +102,7 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
-        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
+        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil, demoSelected: String? = nil,
         stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
     ) {
@@ -113,6 +115,7 @@ struct TripMapView: View {
         _glanceError = State(initialValue: demoError.map { var e = GlanceError(); e.show($0, cause: .send); return e } ?? GlanceError())
         _stopCardOpen = State(initialValue: demoCard != nil)
         _panelExpanded = State(initialValue: demoExpanded)
+        _selectedCar = State(initialValue: demoSelected)
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
         _stopBoard = State(initialValue: stopBoard)
         _model = State(initialValue: model)
@@ -195,6 +198,7 @@ struct TripMapView: View {
             }
             .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
+            .onChange(of: model.markers.map(\.id)) { _, ids in selectedCar = CarSelection.kept(selectedCar, among: ids) }
             .task(id: approach?.id) { await watchApproach() }
             .task(id: passedText) { await expirePassed() }
     }
@@ -202,7 +206,11 @@ struct TripMapView: View {
     // MARK: Map
 
     private var map: some View {
-        Map(position: $camera) {
+        Map(position: $camera, selection: Binding(
+            get: { selectedCar },
+            // MapKit reports a tap on a car, or nil for a tap on the map; the same car again clears it.
+            set: { selectCar(CarSelection.afterTap(on: $0, current: selectedCar)) }
+        )) {
             if model.mainRouteCoordinates.count > 1 {
                 MapPolyline(coordinates: model.mainRouteCoordinates)
                     .stroke(MapPalette.routeCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
@@ -233,9 +241,12 @@ struct TripMapView: View {
             }
             ForEach(model.markers) { marker in
                 Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
-                    MapMarkerView(marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX)
+                    MapMarkerView(
+                        marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX,
+                        selected: marker.id == selectedCar)
                 }
                 .annotationTitles(.hidden)
+                .tag(marker.id)
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
@@ -254,6 +265,12 @@ struct TripMapView: View {
         .onChange(of: camera.positionedByUser) { _, byUser in
             if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
         }
+    }
+
+    /// Rings a car and points the panel at its row; the camera and the follow mode stay as they are.
+    private func selectCar(_ id: String?) {
+        selectedCar = id
+        if CarSelection.opensPanel(selected: id, shown: shownNow) { setExpanded(true) }
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
@@ -688,6 +705,7 @@ struct TripMapView: View {
             stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: openReport, onStop: openStopCard,
             onNextStop: { id in withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { arrivalStopId = id } },
+            selectedCar: selectedCar,
             onHeight: { if panelExpanded { unfoldedContent = $0 } else { foldedContent = $0 } })
     }
 
@@ -1002,6 +1020,8 @@ struct MapMarkerView: View {
     var cameraHeading: Double
     /// Width of the map, so the chip can flip to the left near the right edge.
     var containerWidth: CGFloat = 0
+    /// The driver tapped this car: a ring in the accent around the badge.
+    var selected = false
 
     @State private var markerX: CGFloat?
     @State private var chipWidth: CGFloat = 120
@@ -1031,6 +1051,11 @@ struct MapMarkerView: View {
                     .background(Color(mapHex: marker.colorHex), in: Circle())
                     .overlay(Circle().strokeBorder(.white, lineWidth: 3))
                     .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    .overlay {
+                        if selected {
+                            Circle().strokeBorder(MapPalette.accent, lineWidth: 3.5 * scale).padding(-5 * scale)
+                        }
+                    }
                     .overlay(alignment: .bottomTrailing) {
                         if marker.hasArrived {
                             glyph("checkmark", weight: .heavy, size: 15, fill: Color.ikutPositive, ring: 1.5)
@@ -1078,6 +1103,7 @@ struct MapMarkerView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var side: MapChipPlacement.Side {
@@ -1096,6 +1122,7 @@ struct MapMarkerView: View {
 
     private var accessibilityText: String {
         var text = marker.name
+        if selected { text += ", selected" }
         if marker.isMine { text += ", " + YouOnline.spoken(online: marker.youOnline) }
         if marker.hasArrived { text += ", arrived" }
         if marker.isLead { text += ", lead" }

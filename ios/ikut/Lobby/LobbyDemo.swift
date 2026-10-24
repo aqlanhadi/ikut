@@ -190,6 +190,10 @@ enum DemoScreens {
         case "road-panel-tall": return AnyView(MapDemo.view(expanded: true))
         // Five cars: the list is longer than the sheet's room, so the whole panel scrolls as one (D34 7a).
         case "road-panel-tall-5": return AnyView(MapDemo.view(expanded: true, fiveCars: true))
+        // A car tapped on the map (D34 7b): ringed on the map, its row highlighted. Folded keeps the panel short;
+        // tall-5 selects the fifth car, whose row is below the sheet's fold and is scrolled to.
+        case "road-car-selected": return AnyView(MapDemo.view(selected: "c2"))
+        case "road-car-selected-tall-5": return AnyView(MapDemo.view(expanded: true, fiveCars: true, selected: "c5"))
         case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true))
         case "road-next-stop": return AnyView(NextStopDemo())
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))
