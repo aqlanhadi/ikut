@@ -38,7 +38,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         NSLocationWhenInUseUsageDescription: ikut shows your car to the others in your trip while the trip is active.
-        NSLocationAlwaysAndWhenInUseUsageDescription: ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.
+        NSLocationAlwaysAndWhenInUseUsageDescription: ikut keeps sharing your car’s location with your trip while the screen is off or you’re using another app. Sharing stops when the trip ends.
         # Debug-only: lets a phone reach the emulators on the Mac. Empty in normal builds.
         # NSLocalNetworkUsageDescription and NSAllowsLocalNetworking are for the emulators too: the
         # "Strip local-network keys" phase below removes them from the built Info.plist in Release.
@@ -47,12 +47,12 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UIBackgroundModes: [location]
-        NSCameraUsageDescription: ikut uses the camera to scan a trip's QR code.
+        NSCameraUsageDescription: ikut uses the camera to scan a trip’s QR code.
         CFBundleURLTypes:
           - CFBundleURLName: dev.aqlan.ikut
             CFBundleURLSchemes: [ikut]
         NSLocationTemporaryUsageDescriptionDictionary:
-          ConvoyTracking: Your exact position lets the others in your trip see where your car is.
+          ConvoyTracking: Your exact location lets the others in your trip see where your car is.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikut

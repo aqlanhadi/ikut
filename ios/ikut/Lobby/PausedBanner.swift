@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "Sharing paused · resumes automatically in 28 min" with a Resume button. Reads `session.isPaused`;
+/// "Sharing paused · back on in 28 min" with a Resume button. Reads `session.isPaused`;
 /// the owner decides when to show it. Failures go to `onError`, or are shown under the banner
 /// when no handler is given.
 struct PausedBanner: View {
@@ -63,10 +63,10 @@ struct PausedBanner: View {
 }
 
 enum PausedBannerText {
-    /// "Sharing paused · resumes automatically in 28 min". Whole minutes, rounded up, at least 1.
+    /// "Sharing paused · back on in 28 min". Whole minutes, rounded up, at least 1.
     static func message(remaining: TimeInterval) -> String {
         let minutes = max(1, Int((max(0, remaining) / 60).rounded(.up)))
-        return "Sharing paused · resumes automatically in \(minutes) min"
+        return "Sharing paused · back on in \(minutes) min"
     }
 }
 

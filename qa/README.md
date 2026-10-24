@@ -48,7 +48,7 @@ How agents wait on a run is in `CLAUDE.md`, *Long runs and waiting*.
 ## Drive one trip by hand
 
 `node drive-trip.mjs [CODE]` plays a trip's main route on the simulator (the newest active trip in the emulators if no code
-is given), so you can create a trip in the app, tap Start Trip and watch yourself drive to the destination. `--kmh 100`,
+is given), so you can create a trip in the app, tap Start trip and watch yourself drive to the destination. `--kmh 100`,
 `--speed 20` (time multiplier), `--from 30` (start 30 km along). Set the simulator's location first
 (`xcrun simctl location C0A40D2A-0607-4B95-A1BE-F8C9190D81C1 set 3.139,101.687`), since Where to? builds the route from it.
 
@@ -56,7 +56,7 @@ On a real iPhone: `node drive-trip.mjs CODE --gpx trip.gpx` writes a timed GPX. 
 Debug > Simulate Location > Add GPX File to Workspace... and pick it. For a production trip, pass the route with
 `--route <encoded polyline>` instead of a code.
 
-`ConvoyScenarioUITests`' sibling `CreateTripUITests` walks name, New Trip, Where to?, lobby and Start Trip;
+`ConvoyScenarioUITests`' sibling `CreateTripUITests` walks name, New Trip, Where to?, lobby and Start trip;
 `TEST_RUNNER_IKUT_HOLD_SECONDS=420` leaves it on the map for a drive.
 
 ## Two-phone convoy
@@ -86,7 +86,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
 
 1. A creates the trip in the UI (name, New Trip, Where to? Ipoh, lobby) and reads the code off the lobby.
 2. B joins with the code as a new car; the script joins cars 3 and 4; both lobbies read "4 of 4 ready"; numbers 1, 2, 3, 4.
-3. Both tap Start Trip. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
+3. Both tap Start trip. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
 4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.

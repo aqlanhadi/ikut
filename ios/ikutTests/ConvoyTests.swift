@@ -616,9 +616,9 @@ struct ConvoyTests {
     }
 
     @Test func pausedBannerCountsDownInWholeMinutes() {
-        #expect(PausedBannerText.message(remaining: 28 * 60 - 20) == "Sharing paused · resumes automatically in 28 min")
-        #expect(PausedBannerText.message(remaining: 5) == "Sharing paused · resumes automatically in 1 min")
-        #expect(PausedBannerText.message(remaining: -3) == "Sharing paused · resumes automatically in 1 min")
+        #expect(PausedBannerText.message(remaining: 28 * 60 - 20) == "Sharing paused · back on in 28 min")
+        #expect(PausedBannerText.message(remaining: 5) == "Sharing paused · back on in 1 min")
+        #expect(PausedBannerText.message(remaining: -3) == "Sharing paused · back on in 1 min")
     }
 }
 

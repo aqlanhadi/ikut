@@ -34,7 +34,7 @@ extension View {
         .confirmationDialog("End the trip for everyone?", isPresented: confirmEnd, titleVisibility: .visible) {
             Button("End trip", role: .destructive, action: end)
         } message: {
-            Text("Everyone stops sharing their location. This can't be undone.")
+            Text("Everyone stops sharing their location. This can’t be undone.")
         }
     }
 }

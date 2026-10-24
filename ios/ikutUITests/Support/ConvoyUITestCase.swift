@@ -74,9 +74,9 @@ class ConvoyUITestCase: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    /// "Start Trip" in a lobby that hasn't started, "Back to Map" once the trip is on the road.
+    /// "Start trip" in a lobby that hasn't started, "Back to map" once the trip is on the road.
     var lobbyActionButton: XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
+        app.buttons.matching(NSPredicate(format: "label IN %@", ["Start trip", "Back to map"])).firstMatch
     }
 
     /// Badge numbers of the convoy rows, front of the convoy first (top of the list). Read from one snapshot of
