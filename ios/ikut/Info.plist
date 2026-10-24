@@ -41,15 +41,15 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>ikut uses the camera to scan a trip's QR code.</string>
+	<string>ikut uses the camera to scan a trip’s QR code.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>ikut connects to a development server on your local network.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.</string>
+	<string>ikut keeps sharing your car’s location with your trip while the screen is off or you’re using another app. Sharing stops when the trip ends.</string>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>ConvoyTracking</key>
-		<string>Your exact position lets the others in your trip see where your car is.</string>
+		<string>Your exact location lets the others in your trip see where your car is.</string>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ikut shows your car to the others in your trip while the trip is active.</string>

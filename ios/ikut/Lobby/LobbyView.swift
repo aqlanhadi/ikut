@@ -153,7 +153,7 @@ struct LobbyView: View {
                 }
                 showMap = true
             } label: {
-                Text(started ? "Back to Map" : "Start Trip").frame(maxWidth: .infinity)
+                Text(started ? "Back to map" : "Start trip").frame(maxWidth: .infinity)
             }
             .actionButton(.primary)
             .ikutBottomBar()
@@ -168,7 +168,7 @@ struct LobbyView: View {
                 midTrip: LobbyLogic.isStarted(trip: model.trip) ? { [session] in try await session.rebuilder.changeDestination(to: $0) } : nil
             ) { _ in showChangeDestination = false }
         }
-        .navigationTitle("Trip Lobby")
+        .navigationTitle("Trip lobby")
         .onChange(of: session.isEnded, initial: true) { _, ended in
             if ended { onEnded(model.tripId) }
         }
@@ -291,7 +291,7 @@ struct LobbyView: View {
         if session.isEnded {
             exitBanner("Trip ended", systemImage: "flag.checkered")
         } else if session.membershipLost && model.trip != nil {
-            exitBanner("You're no longer in this trip", systemImage: "person.fill.xmark")
+            exitBanner("You’re no longer in this trip", systemImage: "person.fill.xmark")
         } else if isStarted {
             VStack(spacing: Spacing.xxs) {
                 Label("Trip in progress", systemImage: "car.fill")
@@ -318,7 +318,7 @@ struct LobbyView: View {
     private func exitBanner(_ title: String, systemImage: String) -> some View {
         VStack(spacing: Spacing.m) {
             Label(title, systemImage: systemImage).font(.headline)
-            Button("Back to Home", action: onExit).buttonStyle(.bordered)
+            Button("Back to trips", action: onExit).buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
         .padding(Spacing.l)
@@ -399,7 +399,7 @@ struct LobbyView: View {
         if showStops {
             let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
             layout {
-                Text("STOPS ON THE WAY").font(.caption.weight(.semibold)).tracking(0.6).accessibilityAddTraits(.isHeader)
+                Text("Stops on the way").font(.caption.weight(.semibold)).tracking(0.6).textCase(.uppercase).accessibilityAddTraits(.isHeader)
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
                 if planner.isBuilding && canEditStops {
                     ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
@@ -414,7 +414,7 @@ struct LobbyView: View {
             .lobbyRow()
 
             if stops.isEmpty {
-                Text("No stops yet. Tap Add a stop for petrol, lunch, or a place to meet.")
+                Text("No stops yet. Add one for fuel, food or a place to meet.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
                     .cardSlice()

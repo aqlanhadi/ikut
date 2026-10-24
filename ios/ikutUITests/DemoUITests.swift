@@ -86,7 +86,7 @@ class DemoBase: TwoPhoneConvoyBase {
     /// Lobby to the map (no "Fit whole convoy": the map keeps following the car).
     func openDemoMap() {
         let start = lobbyActionButton
-        // Start Trip turns into Back to Map once the trip is on the road: tap until the map shows.
+        // Start trip turns into Back to map once the trip is on the road: tap until the map shows.
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline, !app.buttons["Report"].exists {
             if app.buttons["Not now"].exists { app.buttons["Not now"].tap() }
@@ -215,7 +215,7 @@ final class DemoOrganizerUITests: DemoBase {
             mark("a.code", code)
         }
 
-        try step("2. lobby with the other cars; Start Trip opens the map") {
+        try step("2. lobby with the other cars; Start trip opens the map") {
             try waitMark("cars.joined", timeout: 420)
             soft("lobby shows Faiz and the scripted cars", timeout: 60) {
                 labelled("label CONTAINS %@", "Hafiz").exists && labelled("label CONTAINS %@", "Faiz").exists

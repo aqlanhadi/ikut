@@ -71,14 +71,14 @@ extension LobbyLogic {
         return "\(code.prefix(3)) \(code.suffix(3))"
     }
 
-    /// "You (organizer, tracker) · Siti", "Wyna (tracker) · 3 others", "Daniel · no tracker yet".
+    /// "You (organiser, sharing location) · Siti", "Wyna (sharing location) · 3 others", "Daniel · no one sharing yet".
     static func peopleLine(members: [Member], trackerUserId: String?, currentUserId: String?) -> String {
         guard !members.isEmpty else { return "No one yet" }
         let ordered = members.filter { $0.id == currentUserId } + members.filter { $0.id != currentUserId }
         func label(_ m: Member) -> String {
             var roles: [String] = []
-            if m.role == .organizer { roles.append("organizer") }
-            if let id = m.id, id == trackerUserId { roles.append("tracker") }
+            if m.role == .organizer { roles.append("organiser") }
+            if let id = m.id, id == trackerUserId { roles.append("sharing location") }
             let name = m.id == currentUserId ? "You" : m.displayName
             return roles.isEmpty ? name : "\(name) (\(roles.joined(separator: ", ")))"
         }
@@ -89,7 +89,7 @@ extension LobbyLogic {
             parts = ordered.prefix(1).map(label)
             parts.append("\(ordered.count - 1) others")
         }
-        if trackerUserId == nil { parts.append("no tracker yet") }
+        if trackerUserId == nil { parts.append("no one sharing yet") }
         return parts.joined(separator: " · ")
     }
 }

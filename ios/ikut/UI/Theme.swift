@@ -330,8 +330,8 @@ struct IconTile: View {
 
 #Preview("Buttons") {
     VStack(spacing: Spacing.m) {
-        Button { } label: { Text("Start Trip").frame(maxWidth: .infinity) }.actionButton(.primary)
-        Button { } label: { Text("Start Trip").frame(maxWidth: .infinity) }.actionButton(.primary).disabled(true)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.actionButton(.primary)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.actionButton(.primary).disabled(true)
         HStack(spacing: Spacing.gap) {
             Button { } label: { Text("Share").frame(maxWidth: .infinity) }.actionButton(.primary)
             Button { } label: { Text("Done").frame(maxWidth: .infinity) }.actionButton(.secondary)

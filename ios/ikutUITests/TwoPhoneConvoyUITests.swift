@@ -152,7 +152,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             let result = button(beginningWith: "Ipoh")
             XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
             result.tap()
-            if !app.buttons["Start Trip"].waitForExistence(timeout: 45) {
+            if !app.buttons["Start trip"].waitForExistence(timeout: 45) {
                 let error = labelled("identifier == %@", "createTripError")
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
                 throw WaitFailure()
@@ -171,7 +171,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             mark("a.lobby4")
         }
 
-        try step("3. Start Trip opens the map; convoy order 1, 3, 2, 4") {
+        try step("3. Start trip opens the map; convoy order 1, 3, 2, 4") {
             try waitMark("b.lobby4", timeout: 120)
             try openMap()
             mark("a.map")
@@ -307,7 +307,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             mark("b.lobby4")
         }
 
-        try step("3. Start Trip opens the map; convoy order 1, 3, 2, 4") {
+        try step("3. Start trip opens the map; convoy order 1, 3, 2, 4") {
             try waitMark("a.lobby4", timeout: 120)
             try openMap()
             mark("b.map")

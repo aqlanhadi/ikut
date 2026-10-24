@@ -24,7 +24,7 @@ struct CarRow: View {
             }
             Spacer(minLength: Spacing.s)
             let color = item.hasTracker ? Color.ikutPositive : Color.ikutWarning
-            Text(item.hasTracker ? "Tracking" : "Waiting")
+            Text(item.hasTracker ? "Sharing" : "Waiting")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(color)
                 .padding(.horizontal, Spacing.chipX)
