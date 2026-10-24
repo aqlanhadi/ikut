@@ -23,6 +23,19 @@ struct HomeView: View {
     @State private var showName = false
     /// Where to go once the name step finishes.
     @State private var afterName: Route?
+    /// A route is being opened (a permission prompt may be up), so Home's sheet stays away.
+    @State private var opening = false
+    /// Home's sheet is on screen (it reports its own appear and dismiss). The name and denied sheets wait for it to go.
+    @State private var homeSheetUp = false
+    /// The route to open once the name sheet has gone (its dismissal is the signal, so a permission prompt can't collide).
+    @State private var routeAfterName: Route?
+
+    /// Home's sheet is presented over Home, so it steps aside for everything that is pushed or presented
+    /// from here, and comes back when they are gone.
+    private var homeSheetCovered: Bool {
+        HomeSheet.isCovered(pathCount: path.count, showName: showName, showDenied: showDenied,
+                            afterName: afterName != nil, opening: opening)
+    }
 
     init(pendingJoinCode: Binding<String?> = .constant(nil)) {
         _pendingJoinCode = pendingJoinCode
@@ -36,7 +49,9 @@ struct HomeView: View {
                         onNewTrip: { begin(.create) },
                         onJoin: { begin(.join(code: nil)) },
                         // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
-                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) }
+                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) },
+                        covered: homeSheetCovered,
+                        sheetUp: $homeSheetUp
                     )
                 } else {
                     WelcomeView(
@@ -74,20 +89,28 @@ struct HomeView: View {
                     RecapView(tripId: tripId, onDone: { path = [] })
                 }
             }
-            .sheet(isPresented: $showName) {
-                NameEntryView {
-                    showName = false
-                    guard let route = afterName else { return }
+            .sheet(isPresented: Binding(get: { HomeSheet.presents(wanted: showName, homeSheetUp: homeSheetUp) },
+                                        set: { showName = $0 }),
+                   onDismiss: {
+                // Home's sheet is held back until the route is open; a swipe-down instead of Continue drops the trip.
+                if let route = routeAfterName {
+                    routeAfterName = nil
+                    Task { await open(route) }
+                } else {
                     afterName = nil
-                    Task {
-                        // Let the sheet finish dismissing before a permission prompt appears.
-                        try? await Task.sleep(for: .milliseconds(400))
-                        await open(route)
-                    }
+                }
+            }) {
+                NameEntryView {
+                    routeAfterName = afterName
+                    afterName = nil
+                    // Opening from here on, so Home's sheet stays away until the route is pushed.
+                    opening = routeAfterName != nil
+                    showName = false
                 }
                 .presentationDetents([.medium])
             }
-            .sheet(isPresented: $showDenied) {
+            .sheet(isPresented: Binding(get: { HomeSheet.presents(wanted: showDenied, homeSheetUp: homeSheetUp) },
+                                        set: { showDenied = $0 })) {
                 LocationDeniedView { location.openSettings() }
             }
             .onChange(of: pendingJoinCode, initial: true) {
@@ -113,12 +136,17 @@ struct HomeView: View {
     }
 
     private func open(_ route: Route, replacing: Bool = false) async {
+        opening = true
+        defer { opening = false }
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
                 if await location.requestWhenInUse() == .notDetermined { return }
             case .requestFullAccuracy:
-                if await location.requestFullAccuracy() == .reduced { showDenied = true; return }
+                if await location.requestFullAccuracy() == .reduced {
+                    showDenied = true
+                    return
+                }
             case .showSettingsPrompt:
                 showDenied = true
                 return

@@ -107,42 +107,53 @@ struct PastTripsMapTests {
     }
 }
 
-struct SheetDragTests {
-    @Test func travelStartsFromTheFirstTranslation() {
-        // The drag reports 8 pt as soon as it begins; the sheet must not jump by that.
-        #expect(SheetDrag.travel(translation: 8, start: 8) == 0)
-        #expect(SheetDrag.travel(translation: -8, start: -8) == 0)
-        #expect(SheetDrag.travel(translation: -58, start: -8) == -50)
-        #expect(SheetDrag.travel(translation: 5, start: nil) == 0)
+struct HomeSheetTests {
+    @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {
+        func covered(path: Int = 0, name: Bool = false, denied: Bool = false, after: Bool = false, opening: Bool = false) -> Bool {
+            HomeSheet.isCovered(pathCount: path, showName: name, showDenied: denied, afterName: after, opening: opening)
+        }
+        #expect(!covered())
+        #expect(covered(path: 1))
+        #expect(covered(path: 2))
+        #expect(covered(name: true))
+        #expect(covered(denied: true))
+        #expect(covered(after: true))
+        #expect(covered(opening: true))
     }
 
-    @Test func heightFollowsTheFingerBetweenDetentsAndBandsBeyond() {
-        #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: -100) == 400)
-        #expect(SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: 100) == 600)
-        // Past tall: only a fifth of the extra shows. Below compact likewise.
-        #expect(SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: -100) == 720)
-        #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: 100) == 280)
+    @Test func aRootSheetWaitsForHomeSheetToGo() {
+        #expect(!HomeSheet.presents(wanted: true, homeSheetUp: true))
+        #expect(HomeSheet.presents(wanted: true, homeSheetUp: false))
+        #expect(!HomeSheet.presents(wanted: false, homeSheetUp: false))
     }
 
-    @Test func contentIsLaidOutAtOneHeightAboveEveryVisibleHeight() {
-        let layout = SheetDrag.layoutHeight(tall: 700)
-        for height in [300, 500, 700, 700 + SheetDrag.rubberRoom] as [CGFloat] { #expect(layout >= height) }
+    @Test func listSheetIsShortUntilPulledUp() {
+        let compact = HomeSheet.compact(picked: false, pinnedHeight: 120, bottomInset: 34, margin: 16)
+        #expect(compact == HomeSheet.compactHeight)
+        #expect(HomeSheet.detent(expanded: false, compact: compact) == .height(300))
+        #expect(HomeSheet.detent(expanded: true, compact: compact) == .large)
+        #expect(HomeSheet.detents(compact: compact) == [.height(300), .large])
     }
 
-    @Test func aHugeOverPullStaysInsideWhatIsLaidOut() {
-        // 300 pt (and 3000) past either detent: the band caps, so the glass never outruns the content.
-        let up = SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: -3000)
-        #expect(up == 700 + SheetDrag.rubberRoom)
-        #expect(up <= SheetDrag.layoutHeight(tall: 700))
-        #expect(SheetDrag.height(expanded: true, compact: 300, tall: 700, travel: -300) == 700 + SheetDrag.rubberRoom)
-        #expect(SheetDrag.height(expanded: false, compact: 300, tall: 700, travel: 3000) == 300 - SheetDrag.rubberRoom)
+    @Test func pickedSheetFollowsItsHeaderButNeverGoesBelowTheDesign() {
+        // A short header: the design's height stands.
+        #expect(HomeSheet.compact(picked: true, pinnedHeight: 80, bottomInset: 34, margin: 16) == HomeSheet.pickedCompactMinimum)
+        // The largest text wraps the header: the sheet grows with it, past the home indicator.
+        let big = HomeSheet.compact(picked: true, pinnedHeight: 260, bottomInset: 34, margin: 16)
+        #expect(big == 260 + HomeSheet.indicatorRoom + 34 + 16)
+        #expect(big > HomeSheet.pickedCompactMinimum)
     }
 
-    @Test func aFlickSettlesOnTheNearerDetentInItsDirection() {
-        #expect(SheetDrag.settlesExpanded(expanded: false, compact: 300, tall: 700, predicted: -300, start: -8))
-        #expect(!SheetDrag.settlesExpanded(expanded: false, compact: 300, tall: 700, predicted: -60, start: -8))
-        #expect(!SheetDrag.settlesExpanded(expanded: true, compact: 300, tall: 700, predicted: 300, start: 8))
-        #expect(SheetDrag.settlesExpanded(expanded: true, compact: 300, tall: 700, predicted: 60, start: 8))
+    @Test func theSelectedDetentIsWhatTheSheetReportsBack() {
+        // Dragged to the top: tall. Dragged down, or the picked trip's short height: not tall.
+        #expect(HomeSheet.isExpanded(.large))
+        #expect(!HomeSheet.isExpanded(.height(300)))
+        #expect(!HomeSheet.isExpanded(.height(172)))
+        // A new short height after the text size changes still reads as short.
+        let before = HomeSheet.detent(expanded: false, compact: 172)
+        let after = HomeSheet.detent(expanded: false, compact: 230)
+        #expect(before != after)
+        #expect(!HomeSheet.isExpanded(after))
     }
 }
 

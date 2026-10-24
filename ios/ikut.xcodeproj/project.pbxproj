@@ -77,7 +77,6 @@
 		5626212E868D041FB840F37F /* HazardRegionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FFC0A7C9CC4F4FA9D59983 /* HazardRegionMonitor.swift */; };
 		56AD3DB484BF8EFED6033D2E /* ETARefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F504AF6A067112D2A409082 /* ETARefresh.swift */; };
 		56F65EF34C546F42247FD052 /* TripComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091C79B7B0A90381F07CB73D /* TripComponents.swift */; };
-		57A2D5C5D587F6AECCC286A4 /* SheetDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08F8F075604584E9A319923 /* SheetDrag.swift */; };
 		57F8B464EC89FCDCF61E28B2 /* TripsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */; };
 		582410C7C30935CFC992CE36 /* QRCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178127AA3169E8E115308E18 /* QRCode.swift */; };
 		584A3D742D1E46142E1B6A44 /* CarRouteLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4365C32AF91E6D4FEA8C34F4 /* CarRouteLogic.swift */; };
@@ -149,6 +148,7 @@
 		B80DAA47953098D10019E756 /* DeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69797704602A7657261A60C /* DeepLink.swift */; };
 		B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E26FDD008B015443CC328 /* AlertWording.swift */; };
 		BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D43EA449C4A10B16261D617 /* HazardMapContent.swift */; };
+		BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56D59AA9467F430D986EC9F /* HomeSheet.swift */; };
 		BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34759F3D28A64C5908B2C7D /* AuthTests.swift */; };
 		BEFD37A841FAEB09281F0EDB /* JoinModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DD0AB1BDC90D15EA18EE2B /* JoinModel.swift */; };
 		BF856415E97C93CCF1248A8E /* MapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D7948AC8E4880C3065A836 /* MapTests.swift */; };
@@ -370,7 +370,6 @@
 		CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachMonitor.swift; sourceTree = "<group>"; };
 		CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameEntryView.swift; sourceTree = "<group>"; };
 		CF4929E443213AF6C3151555 /* OwnWay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnWay.swift; sourceTree = "<group>"; };
-		D08F8F075604584E9A319923 /* SheetDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetDrag.swift; sourceTree = "<group>"; };
 		D0D7948AC8E4880C3065A836 /* MapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTests.swift; sourceTree = "<group>"; };
 		D219AF64C8F12910D7096FED /* LobbyStopsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyStopsViews.swift; sourceTree = "<group>"; };
 		D34759F3D28A64C5908B2C7D /* AuthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTests.swift; sourceTree = "<group>"; };
@@ -390,6 +389,7 @@
 		EF0803549353B1CD91367C85 /* LobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyView.swift; sourceTree = "<group>"; };
 		F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportTests.swift; sourceTree = "<group>"; };
 		F56C3DA55D52C315FF1422E4 /* ConvoyOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyOrdering.swift; sourceTree = "<group>"; };
+		F56D59AA9467F430D986EC9F /* HomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSheet.swift; sourceTree = "<group>"; };
 		F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModel.swift; sourceTree = "<group>"; };
 		FBFE7C740DA188C9EC84A837 /* TrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingService.swift; sourceTree = "<group>"; };
 		FC25F12D0D5B216081BE3808 /* RouteBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteBuilder.swift; sourceTree = "<group>"; };
@@ -417,13 +417,13 @@
 			children = (
 				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
 				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
+				F56D59AA9467F430D986EC9F /* HomeSheet.swift */,
 				2519810884A2F43AD0A1C337 /* HomeView.swift */,
 				59DBB4EC8798CACA623AE229 /* IkutApp.swift */,
 				276A665B881911A49A9C38D7 /* PastTripsMap.swift */,
 				322ED2F251FFDF594FC7D83E /* PickedTrip.swift */,
 				8D336F2B85FEC1BD5D004993 /* PickedTripSheet.swift */,
 				56BDE68F366CE545C453468B /* ServerWrite.swift */,
-				D08F8F075604584E9A319923 /* SheetDrag.swift */,
 				AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */,
 				2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */,
 			);
@@ -991,6 +991,7 @@
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
 				27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */,
 				5626212E868D041FB840F37F /* HazardRegionMonitor.swift in Sources */,
+				BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */,
 				F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */,
 				FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */,
 				386D45F03FBA22A2820ED469 /* JoinDemo.swift in Sources */,
@@ -1041,7 +1042,6 @@
 				941BE30C2A87EF38E26515B6 /* RouteGeometry.swift in Sources */,
 				32D5CB1E75D2326709EBB6BE /* RouteRebuild.swift in Sources */,
 				182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */,
-				57A2D5C5D587F6AECCC286A4 /* SheetDrag.swift in Sources */,
 				7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */,
 				843411F16EA0BC70B57A05EB /* StopAnswer.swift in Sources */,
 				5C5315B337B1E03783D95E49 /* StopAnswerService.swift in Sources */,

@@ -89,6 +89,9 @@ enum DemoScreens {
         func nav<V: View>(_ view: V) -> AnyView {
             AnyView(NavigationStack { view }.environment(LocationPermission()).environment(AuthModel()))
         }
+        func home(_ state: String) -> AnyView {
+            AnyView(HomePickedDemo.view(state).environment(AuthModel()))
+        }
         func sheet(query: String, picked: DestinationResult?, kind: PlannedStopKind, minutes: Int?, canMeet: Bool, meet: Bool = false) -> AnyView {
             let model = CreateTripModel()
             model.along = AlongRoute(
@@ -192,6 +195,14 @@ enum DemoScreens {
         case "add-meet":
             let place = DestinationResult(name: "Petronas Sungai Buloh", subtitle: "Selangor", coordinate: .init(latitude: 3.2, longitude: 101.58), category: MKPointOfInterestCategory.gasStation.rawValue)
             return sheet(query: "", picked: place, kind: .meet, minutes: nil, canMeet: true, meet: true)
+        // Home's sheet (D32): the list short and tall, and a picked trip short, tall, on a stop, loading, failed.
+        case "home-compact": return home("list")
+        case "home-tall": return home("list-tall")
+        case "home-picked": return home("short")
+        case "home-picked-tall": return home("tall")
+        case "home-picked-item": return home("item")
+        case "home-picked-loading": return home("loading")
+        case "home-picked-failed": return home("failed")
         case "stop-approach": return AnyView(StopApproachDemo.view())
         case "stop-approach-food": return AnyView(StopApproachDemo.view(food: true))
         case "road-route-rebuilt": return AnyView(StopApproachDemo.routeNotice(waiting: false))
