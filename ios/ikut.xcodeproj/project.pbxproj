@@ -65,6 +65,7 @@
 		4151B4E056B2B1144C676055 /* PlacesKLIpohTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7E06B398795C1AC5DEE699 /* PlacesKLIpohTests.swift */; };
 		41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */; };
 		441D6445951053C29F1E89A0 /* ReportToastModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B897B8297B6CD8B5B2ED04 /* ReportToastModel.swift */; };
+		45BAED86337E8591BE1EEE93 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FD88D2E34D13FB464F448E3D /* PrivacyInfo.xcprivacy */; };
 		48A0796725D089ABD3E90FD1 /* LobbyStopsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D219AF64C8F12910D7096FED /* LobbyStopsViews.swift */; };
 		4A62431BEA2E9F01E17A2CE2 /* LocationAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F08168BB70493362B6773C8 /* LocationAccess.swift */; };
 		4ABFF0E282D863E458E06571 /* RecapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 698FEDDD6491F2113B929776 /* RecapService.swift */; };
@@ -447,6 +448,7 @@
 		F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModel.swift; sourceTree = "<group>"; };
 		FBFE7C740DA188C9EC84A837 /* TrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingService.swift; sourceTree = "<group>"; };
 		FC25F12D0D5B216081BE3808 /* RouteBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteBuilder.swift; sourceTree = "<group>"; };
+		FD88D2E34D13FB464F448E3D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FE37346B0076B57911BFD71C /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyLogic.swift; sourceTree = "<group>"; };
 		FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkTests.swift; sourceTree = "<group>"; };
@@ -652,6 +654,7 @@
 			isa = PBXGroup;
 			children = (
 				7DC390858FBBDA52C3ED0823 /* Info.plist */,
+				FD88D2E34D13FB464F448E3D /* PrivacyInfo.xcprivacy */,
 				A45C54A8C84EB3562F40722B /* Alerts */,
 				0C3C6779B68FE359CFD8B4DB /* App */,
 				343E40F373297D410D74CD72 /* Auth */,
@@ -952,6 +955,7 @@
 				738D3C7B6C3BEA2E152158EC /* Sources */,
 				EBFDC60EE273FA430AD4B9D9 /* Resources */,
 				05C61F26E499BD79273FEDAF /* Frameworks */,
+				ECB051EAB1D15495CBD574D6 /* Strip local-network keys (Release) */,
 			);
 			buildRules = (
 			);
@@ -1052,6 +1056,7 @@
 			files = (
 				41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */,
 				6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */,
+				45BAED86337E8591BE1EEE93 /* PrivacyInfo.xcprivacy in Resources */,
 				875D0079B62FB671E73E3916 /* README-places.md in Resources */,
 				B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */,
 				79EE97E9F7D463AF192C5156 /* places.json in Resources */,
@@ -1059,6 +1064,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		ECB051EAB1D15495CBD574D6 /* Strip local-network keys (Release) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip local-network keys (Release)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" != \"Debug\" ]; then\n  PLIST=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n  /usr/libexec/PlistBuddy -c \"Delete :NSLocalNetworkUsageDescription\" \"$PLIST\" || true\n  /usr/libexec/PlistBuddy -c \"Delete :NSAppTransportSecurity\" \"$PLIST\" || true\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		738D3C7B6C3BEA2E152158EC /* Sources */ = {
