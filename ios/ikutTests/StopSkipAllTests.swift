@@ -73,7 +73,7 @@ struct StopSkipAllTests {
         // Member not loaded yet: car number 1, never the lead car.
         #expect(StopSkipAll.passengerLine(organizerName: nil, cars: cars) == "Aqlan can skip this stop for everyone.")
         #expect(StopSkipAll.passengerLine(organizerName: "", cars: cars) == "Aqlan can skip this stop for everyone.")
-        #expect(StopSkipAll.passengerLine(organizerName: nil, cars: []) == "The organizer can skip this stop for everyone.")
+        #expect(StopSkipAll.passengerLine(organizerName: nil, cars: []) == "The organiser can skip this stop for everyone.")
     }
 
     // MARK: The highway jump (4b check 1)
