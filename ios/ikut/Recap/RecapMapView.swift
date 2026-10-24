@@ -2,7 +2,7 @@ import MapKit
 import SwiftUI
 
 /// Full-screen route map after the trip (design/project/RecapMap.dc.html). The design animates the
-/// cars along their drive; ikut keeps only each car's last position, so instead this steps through
+/// cars along their drive; ikut keeps only each car’s last position, so instead this steps through
 /// the timeline: each step highlights its marker and moves the map there, and cars sit where they
 /// finished.
 struct RecapMapView: View {
@@ -28,7 +28,7 @@ struct RecapMapView: View {
         HStack(spacing: Spacing.m) {
             MapCloseButton(action: onClose)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Route Map").font(.headline)
+                Text("Route map").font(.headline)
                 Text([snapshot.name, recap.routeDistance.map(RouteFormat.distance)].compactMap { $0 }.joined(separator: " · "))
                     .font(.footnote).foregroundStyle(.secondary)
             }
@@ -65,7 +65,7 @@ struct RecapMapView: View {
                     .disabled(index >= steps.count - 1)
                     .accessibilityLabel("Next")
             }
-            Text("Cars are shown where they finished. ikut doesn't keep the path each car drove.")
+            Text("Cars are shown where they finished. ikut doesn’t keep the path each car drove.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(Spacing.l)

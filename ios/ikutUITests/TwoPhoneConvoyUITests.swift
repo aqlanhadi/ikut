@@ -277,7 +277,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             openTripMenuItem("Trip menu", "End trip")
             confirm("End trip")
             // Ending the trip opens its recap (ae9efbb), not Home.
-            try waitFor("recap after ending", timeout: 30) { labelled("label CONTAINS %@", "Share Recap").exists }
+            try waitFor("recap after ending", timeout: 30) { labelled("label CONTAINS %@", "Share recap").exists }
             shot("15-ended-recap")
             mark("a.ended")
         }

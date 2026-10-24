@@ -235,7 +235,7 @@ final class DemoOrganizerUITests: DemoBase {
         guard app.buttons["Trip menu"].exists else { note("Trip menu to end the trip", false, core: true); return }
         openTripMenuItem("Trip menu", "End trip")
         confirm("End trip")
-        soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share Recap"].exists }
+        soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share recap"].exists }
     }
 
     /// The organizer's Pit stop button shows the stop. If her car is asked, she taps OK on the pill (or the card);
