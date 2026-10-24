@@ -28,6 +28,8 @@ final class StopPlacesModel {
         let list = await Task.detached(priority: .utility) {
             RequestPlaces.list(reasons: reasons, front: front, route: route)
         }.value
+        // A refresh that was cancelled (new reasons, a new route) never overwrites a newer one.
+        guard !Task.isCancelled else { return }
         if list != places { places = list }
     }
 

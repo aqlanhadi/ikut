@@ -156,4 +156,60 @@ struct RequestPlacesTests {
         await model.refresh(reasons: [.fuel], context: context)
         #expect(model.places.count == 3)
     }
+
+    // MARK: Fix round
+
+    @Test(arguments: [(RequestNeed.fuel, 40.0), (.rest, 45.0), (.food, 60.0)])
+    func eachReasonsWindowListsJustInsideAndNotJustOutside(need: RequestNeed, minutes: Double) {
+        let km = minutes * 60 * Self.speed / 1000
+        let rows = RequestPlaces.rank(
+            [Self.place("Inside", km - 0.5), Self.place("Outside", km + 0.5)],
+            frontOffset: 0, reasons: [need], speed: Self.speed)
+        #expect(Self.names(rows) == ["Inside"])
+    }
+
+    @Test func equalPlacesComeOutInTheOrderTheyWereGiven() {
+        let a = [Self.place("A", 10), Self.place("B", 10), Self.place("C", 10)]
+        #expect(Self.names(RequestPlaces.rank(a, frontOffset: 0, reasons: [.fuel], speed: Self.speed)) == ["A", "B", "C"])
+        #expect(Self.names(RequestPlaces.rank(a.reversed(), frontOffset: 0, reasons: [.fuel], speed: Self.speed)) == ["C", "B", "A"])
+    }
+
+    private func entry(_ id: String, offset: Double, lead: Bool = false, stale: Bool = false, speed: Double = 25) -> ConvoyEntry {
+        let car = Car(id: id, name: id, color: "#2563EB", trackerUserId: nil, isLead: lead, route: nil, mergeOffset: nil,
+                      state: .convoy, number: nil)
+        let position = Position(
+            location: .init(latitude: 3, longitude: 101), speed: speed, heading: 0, routeOffset: offset,
+            convoyOffset: offset, battery: nil, updatedAt: nil)
+        return ConvoyEntry(
+            id: id, car: car, position: position, convoyOffset: offset, speed: speed, movingSpeed: speed,
+            isFront: false, isLead: lead, isStale: stale)
+    }
+
+    @Test func theFrontIsTheReferenceCarNotAStaleOrParkedAheadFirstCar() {
+        let ahead = entry("ahead", offset: 90_000, stale: true, speed: 0)
+        let reference = entry("ref", offset: 40_000, lead: true)
+        let behind = entry("behind", offset: 35_000)
+        let snapshot = ConvoySnapshot(convoy: [ahead, reference, behind], joining: [], referenceId: "ref")
+        #expect(RequestFront.of(snapshot, plannedSpeed: nil)?.offset == 40_000)
+        // No reference: the designated lead, then the first car.
+        let noRef = ConvoySnapshot(convoy: [ahead, reference, behind], joining: [], referenceId: nil)
+        #expect(RequestFront.of(noRef, plannedSpeed: nil)?.offset == 40_000)
+        let noLead = ConvoySnapshot(convoy: [ahead, behind], joining: [], referenceId: nil)
+        #expect(RequestFront.of(noLead, plannedSpeed: nil)?.offset == 90_000)
+        #expect(RequestFront.of(.empty, plannedSpeed: nil) == nil)
+    }
+
+    @MainActor @Test func aCancelledRefreshNeverOverwritesTheList() async throws {
+        let (line, _) = PlacesKLIpohTests.drive("kl-ipoh-north")
+        let model = StopPlacesModel()
+        let context = StopContext(
+            tripId: "t", userId: "u", carId: "c", isOrganizer: false, snapshot: { nil }, mainRoute: line,
+            front: { RequestFront(offset: 20_000, speed: 25, plannedSpeed: nil) })
+        let task = Task { await model.refresh(reasons: [.fuel], context: context) }
+        task.cancel()
+        await task.value
+        #expect(model.places.isEmpty)
+        await model.refresh(reasons: [.fuel], context: context)
+        #expect(!model.places.isEmpty)
+    }
 }

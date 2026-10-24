@@ -448,12 +448,10 @@ extension TripMapModel {
             front: { [weak self] in self?.requestFront() })
     }
 
-    /// The convoy's front on the main route, for the places a stop request lists. The front car's speed counts
-    /// only while it is really moving; else the trip's planned average.
+    /// The convoy's front on the main route, for the places a stop request lists (`RequestFront.of`).
     func requestFront() -> RequestFront? {
-        guard let front = convoy.convoy.first else { return nil }
         let planned = routeSeconds.flatMap { s in mainRoute.map { $0.length / s } }
-        return RequestFront(offset: front.convoyOffset, speed: front.movingSpeed, plannedSpeed: planned)
+        return RequestFront.of(convoy.snapshot, plannedSpeed: planned)
     }
 
     /// This phone's own speed in m/s, or nil while it is unknown or old. The tracker's phone is its

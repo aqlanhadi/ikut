@@ -79,6 +79,14 @@ struct RequestFront: Sendable, Equatable {
         return PlaceRules.fallbackSpeed
     }
 
+    /// The car the convoy is measured from: the ETA reference (the fresh designated lead, else the biggest fresh
+    /// group), else the designated lead, else the first car. The first car alone can be a stale, paused, parked-ahead
+    /// or arrived one. Its speed counts only while it is really moving.
+    static func of(_ snapshot: ConvoySnapshot, plannedSpeed: Double?) -> RequestFront? {
+        guard let car = snapshot.etaReference ?? snapshot.lead ?? snapshot.convoy.first else { return nil }
+        return RequestFront(offset: car.convoyOffset, speed: car.movingSpeed, plannedSpeed: plannedSpeed)
+    }
+
     /// About 18 km/h: slower than that the car is parked or crawling, and says nothing about the pace.
     static let moving: Double = 5
 }
@@ -102,10 +110,15 @@ enum RequestPlaces {
             .filter { $0.ours && $0.routeOffset > frontOffset + PlaceRules.minAhead }
             .map { (place: $0, secs: ($0.routeOffset - frontOffset) / speed) }
             .filter { $0.secs <= limit }
+            .enumerated()
+            // The original index breaks a tie, so every phone lists equal places in the same order.
             .sorted { a, b in
-                let (ca, cb) = (covers(a.place), covers(b.place))
-                return ca != cb ? ca : cost(a) < cost(b)
+                let (ca, cb) = (covers(a.element.place), covers(b.element.place))
+                if ca != cb { return ca }
+                let (xa, xb) = (cost(a.element), cost(b.element))
+                return xa != xb ? xa < xb : a.offset < b.offset
             }
+            .map(\.element)
         return rows.prefix(max).map { row in
             (row.place, Int((row.secs / 60).rounded()), requestWhere(row.place.routeOffset - frontOffset, row.secs),
              requestWhy(row.place, reasons))

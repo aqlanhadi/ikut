@@ -73,7 +73,7 @@ struct StopCard: View {
                 try? await Task.sleep(for: .seconds(8))
                 if !Task.isCancelled { model.sentWaiting = false }
             }
-            .task(id: needs) { await model.places.keepFresh(reasons: needs, context: context) }
+            .task(id: PlacesKey(needs: needs, route: context.mainRoute)) { await model.places.keepFresh(reasons: needs, context: context) }
             .onChange(of: board.requests.map(\.eventId)) { _, ids in
                 guard !ids.isEmpty else { return }
                 // A request is open, mine or someone's: whatever was being asked is over.
@@ -81,6 +81,19 @@ struct StopCard: View {
                 model.ask.clearReason()
                 model.backHome()
             }
+    }
+
+    /// What the places list depends on besides the front car: the reasons and the trip's route, so a rebuilt route
+    /// (or one that arrives after the card opened) refreshes it.
+    private struct PlacesKey: Hashable {
+        var needs: [RequestNeed]
+        var routeCount: Int
+        var routeLength: Int
+        init(needs: [RequestNeed], route: RouteLine?) {
+            self.needs = needs
+            routeCount = route?.coordinates.count ?? 0
+            routeLength = Int(route?.length ?? 0)
+        }
     }
 
     /// What the open requests ask for, together: one list covers every reason.
