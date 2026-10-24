@@ -504,3 +504,22 @@ test('a deviation is over only after the car has driven it; replacing it forgets
   assert.equal(seenAfterChange(dev2, dev2, true), true, 'an unchanged deviation keeps it');
   assert.equal(deviationStep({ deviation: null, seen: true }, 'onRoute').seen, false);
 });
+
+test('ownerQuery asks the emulator of the project as its owner and returns only the documents', async () => {
+  const { ownerQuery } = await import('./playground.mjs');
+  const real = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    return { ok: true, json: async () => [{ document: { name: 'a/b/c' } }, { readTime: 'x' }] };
+  };
+  try {
+    const q = { from: [{ collectionId: 'trips' }] };
+    assert.deepEqual(await ownerQuery('h', q), [{ name: 'a/b/c' }]);
+    assert.equal(calls[0].url, 'http://h:8080/v1/projects/ikut-b1083/databases/(default)/documents:runQuery');
+    assert.equal(calls[0].init.headers.Authorization, 'Bearer owner');
+    assert.deepEqual(JSON.parse(calls[0].init.body), { structuredQuery: q });
+    globalThis.fetch = async () => ({ ok: false, status: 503, text: async () => 'down' });
+    await assert.rejects(ownerQuery('h', q), (e) => e.status === 503);
+  } finally { globalThis.fetch = real; }
+});

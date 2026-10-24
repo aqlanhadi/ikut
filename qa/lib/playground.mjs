@@ -2,6 +2,7 @@
 // car that starts off the route takes to its merge point, the points a simulator plays, who votes on which stop, and
 // reading Firestore's REST format. Pure functions, tested in playground.test.mjs.
 
+import { PROJECT_ID } from './firebase-config.mjs';
 import { CarRouteLogic, EARTH_RADIUS, Polyline, RouteLine, bearing, haversine, simplifyToFit, truncate } from './route.mjs';
 
 export const MAX_KMH = 200;
@@ -125,6 +126,18 @@ export function decodeFields(fields = {}) {
 }
 /** A REST document to { id, ...fields }; timestamps become ms since the epoch. */
 export const decodeDoc = (d) => ({ id: d.name.split('/').pop(), ...decodeFields(d.fields) });
+
+/**
+ * A structured query against the Firestore emulator as its owner (no sign-in, rules bypassed): the matching documents,
+ * raw (decode with `decodeDoc`). Throws an Error with `.status` when the emulator answers with an error.
+ */
+export async function ownerQuery(host, structuredQuery, projectId = PROJECT_ID) {
+  const res = await fetch(`http://${host}:8080/v1/projects/${projectId}/databases/(default)/documents:runQuery`, {
+    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery }),
+  });
+  if (!res.ok) throw Object.assign(new Error(`Firestore emulator: ${res.status} ${await res.text()}`), { status: res.status });
+  return (await res.json()).filter((r) => r.document).map((r) => r.document);
+}
 
 /** Whole seconds since `ms`, or null. */
 export const ageSeconds = (ms, now) => (typeof ms === 'number' ? Math.max(0, Math.round((now - ms) / 1000)) : null);

@@ -14,6 +14,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { writeGpx } from './lib/gpx.mjs';
 import { holdSimulators, simctl } from './lib/shell.mjs';
 import { Polyline, haversine } from './lib/route.mjs';
+import { ownerQuery } from './lib/playground.mjs';
 
 const o = { udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', kmh: 90, speed: 1, from: 0, host: '127.0.0.1', code: null, gpx: null, route: null };
 for (let i = 2; i < process.argv.length; i++) {
@@ -36,20 +37,14 @@ async function findTrip() {
   const where = o.code
     ? { fieldFilter: { field: { fieldPath: 'code' }, op: 'EQUAL', value: { stringValue: o.code } } }
     : { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'active' } } };
-  const url = `http://${o.host}:8080/v1/projects/ikut-b1083/databases/(default)/documents:runQuery`;
-  let res;
+  let docs;
   try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'trips' }], where } }),
-    });
-  } catch {
+    docs = await ownerQuery(o.host, { from: [{ collectionId: 'trips' }], where });
+  } catch (e) {
+    if (e.status) throw e;
     throw new Error(`no Firestore emulator at ${o.host}:8080 (cd firebase && firebase emulators:start), or pass --route`);
   }
-  if (!res.ok) throw new Error(`Firestore emulator: ${res.status} ${await res.text()}`);
-  const trips = (await res.json()).filter((r) => r.document).map((r) => r.document)
-    .sort((a, b) => (b.fields.createdAt?.timestampValue ?? '').localeCompare(a.fields.createdAt?.timestampValue ?? ''));
+  const trips = docs.sort((a, b) => (b.fields.createdAt?.timestampValue ?? '').localeCompare(a.fields.createdAt?.timestampValue ?? ''));
   if (!trips.length) throw new Error(o.code ? `no trip with code ${o.code}` : 'no active trip; create one in the app first');
   const f = trips[0].fields;
   return { name: f.name?.stringValue, code: f.code?.stringValue, route: f.route?.stringValue ?? '' };

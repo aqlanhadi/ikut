@@ -41,13 +41,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth';
+import { deleteApp } from 'firebase/app';
 import {
-  GeoPoint, Timestamp, collection, connectFirestoreEmulator, deleteField, disableNetwork, doc, enableNetwork, setLogLevel,
-  deleteDoc, getDoc, getDocs, initializeFirestore, onSnapshot, serverTimestamp, setDoc, terminate, updateDoc, writeBatch,
+  GeoPoint, Timestamp, collection, deleteField, disableNetwork, doc, enableNetwork, setLogLevel,
+  deleteDoc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, terminate, updateDoc, writeBatch,
 } from 'firebase/firestore';
-import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
@@ -57,11 +56,11 @@ import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referen
 import { tally as stopTally } from './lib/stoparrival.mjs';
 import { isOpen, leavingAt, nextStop } from './lib/stopleave.mjs';
 import { loadRoutes } from './generate-gpx.mjs';
+import { PROJECT_ID } from './lib/firebase-config.mjs';
 import { endsWithResult } from './lib/shell.mjs';
+import { connectEmulators, writePosition } from './lib/demo-common.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ID = 'ikut-b1083';
-const REGION = 'asia-southeast1';
 
 // ---------------------------------------------------------------- CLI
 
@@ -218,15 +217,7 @@ class Phone {
   }
 
   async connect(tripId = null) {
-    this.app = initializeApp({ apiKey: 'qa-fake-key', projectId: PROJECT_ID, appId: `qa-${this.key}` }, `qa-${this.key}`);
-    const auth = getAuth(this.app);
-    connectAuthEmulator(auth, `http://${opts.host}:9099`, { disableWarnings: true });
-    this.db = initializeFirestore(this.app, {});
-    connectFirestoreEmulator(this.db, opts.host, 8080);
-    this.fns = getFunctions(this.app, REGION);
-    connectFunctionsEmulator(this.fns, opts.host, 5001);
-    const cred = await signInAnonymously(auth);
-    this.uid = cred.user.uid;
+    Object.assign(this, await connectEmulators({ host: opts.host, backend: 'emulators' }, `qa-${this.key}`));
     this.tripId = tripId;
   }
 
@@ -286,14 +277,8 @@ class Phone {
 
   // ---- FirestorePositionWriter (ios/ikut/Tracking/TrackingTypes.swift): setData, updatedAt = server timestamp
   writePosition(p) {
-    const data = {
-      location: new GeoPoint(p.latitude, p.longitude), speed: p.speed, heading: p.heading, routeOffset: p.routeOffset,
-      updatedAt: serverTimestamp(),
-    };
-    if (p.convoyOffset !== undefined) data.convoyOffset = p.convoyOffset;
-    if (p.battery !== null && p.battery !== undefined) data.battery = p.battery;
     (this.writes ??= []).push({ T: clock.T, wall: Date.now(), convoyOffset: p.convoyOffset });
-    return setDoc(doc(this.db, `trips/${this.tripId}/positions/${this.carId}`), data);
+    return writePosition(this.db, this.tripId, this.carId, p);
   }
 
   startListening() {

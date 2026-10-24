@@ -3,6 +3,10 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+// The project every runner talks to: the emulators run it under this id, production is the same project.
+export const PROJECT_ID = 'ikut-b1083';
+export const REGION = 'asia-southeast1';
+
 const plist = fileURLToPath(new URL('../../ios/ikut/Resources/GoogleService-Info.plist', import.meta.url));
 const read = (key) => execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, plist], { encoding: 'utf8' }).trim();
 

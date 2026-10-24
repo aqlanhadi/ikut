@@ -22,14 +22,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { GeoPoint, deleteField, doc, setLogLevel, updateDoc } from 'firebase/firestore';
-import { START, Car, PROJECT_ID, emit, firebaseConfig, parseArgs, repo, standInRoute } from './lib/demo-common.mjs';
+import { START, Car, PROJECT_ID, emit, feedLocation, firebaseConfig, locStr, parseArgs, standInRoute, xcodeArgs } from './lib/demo-common.mjs';
 import { holdSimulators } from './lib/shell.mjs';
 import { loadRoutes } from './generate-gpx.mjs';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
   MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
-  encodeLine, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
+  encodeLine, ownerQuery, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
   messageIn, openStopSnapshot, optionalCoords, oksByCar, deviationStep, seenAfterChange, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
   stepTrack, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
 } from './lib/playground.mjs';
@@ -125,7 +125,6 @@ const phone = (c) => phones.find((p) => p.id === c.key);
 
 const simctl = (...args) => (NO_SIM ? { status: 0, stdout: '', stderr: '' } : spawnSync('xcrun', ['simctl', ...args], { encoding: 'utf8' }));
 const simctlAsync = (...args) => { if (!NO_SIM) execFile('xcrun', ['simctl', ...args], () => {}); };
-const locStr = (c) => `${c.latitude.toFixed(6)},${c.longitude.toFixed(6)}`;
 
 /** Who is using a simulator right now (other demos, UI tests, location playback). Empty when it is free. */
 function inUse() {
@@ -182,10 +181,7 @@ function feedPhone(c) {
   const points = trackFeedPoints(c.track, c.st.d, { stopAt });
   if (!c.playing || c.speed <= 0 || c.st.waiting || shouldPark(c.st.d, c.track.length) || points.length < 2) { simctlAsync('location', p.udid, 'set', locStr(at)); return; }
   if (NO_SIM) return;
-  const loc = spawn('xcrun', ['simctl', 'location', p.udid, 'start', `--speed=${(c.speed / 3.6).toFixed(2)}`, '--interval=1', '-']);
-  loc.stdin.end(`${points.map(locStr).join('\n')}\n`);
-  loc.stderr.on('data', (x) => { if (!/Parsed \d+ waypoints/.test(String(x))) say(`${p.label} location: ${x}`.trim()); });
-  c.player = loc;
+  c.player = feedLocation({ udid: p.udid, points, mps: c.speed / 3.6, onStderr: (x) => say(`${p.label} location: ${x}`.trim()) });
 }
 
 // ---------------------------------------------------------------- the emulator, over REST as the owner
@@ -198,12 +194,9 @@ async function restList(p) {
   return ((await r.json()).documents ?? []).map(decodeDoc);
 }
 async function activeTrips() {
-  const res = await fetch(`${REST}:runQuery`, {
-    method: 'POST', headers,
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'trips' }], where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'active' } } } } }),
-  });
-  if (!res.ok) throw new Error(`the Firestore emulator answered ${res.status}`);
-  return (await res.json()).filter((r) => r.document).map((r) => decodeDoc(r.document)).filter((t) => t.route && t.code);
+  const docs = await ownerQuery(o.host, { from: [{ collectionId: 'trips' }], where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'active' } } } })
+    .catch((e) => { throw e.status ? new Error(`the Firestore emulator answered ${e.status}`) : e; });
+  return docs.map(decodeDoc).filter((t) => t.route && t.code);
 }
 /** New active trips since Prepare, newest first, with what tells a phone-made trip from a script's: its cars and where the first one is. */
 async function scanTrips() {
@@ -510,8 +503,7 @@ async function prepare({ start, starts, skipBuild, derivedData }) {
       emit({ type: 'phase', phase: 'building', detail: 'xcodebuild build-for-testing' });
       fs.mkdirSync(o.logs, { recursive: true });
       const buildLog = path.join(o.logs, 'playground-build.log');
-      const xc = spawn('xcodebuild', ['build-for-testing', '-project', path.join(repo, 'ios', 'ikut.xcodeproj'), '-scheme', 'ikut', '-derivedDataPath', dd,
-        '-clonedSourcePackagesDirPath', path.join(dd, 'SourcePackages'), '-destination', 'generic/platform=iOS Simulator'], { stdio: ['ignore', fs.openSync(buildLog, 'w'), 'inherit'] });
+      const xc = spawn('xcodebuild', ['build-for-testing', ...xcodeArgs({ derivedData: dd }), '-destination', 'generic/platform=iOS Simulator'], { stdio: ['ignore', fs.openSync(buildLog, 'w'), 'inherit'] });
       const code = await new Promise((r) => xc.on('exit', r));
       if (code !== 0) throw new Error(`The build did not work, see ${buildLog}`);
     }

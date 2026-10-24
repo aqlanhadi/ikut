@@ -21,7 +21,7 @@
 // Reuse: lib/route.mjs, lib/tracking.mjs, the 20 s simctl location resync of run-ui.mjs, the REST read and
 // marker handshake of run-convoy2.mjs.
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,15 +35,13 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './route.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher } from './tracking.mjs';
-import { productionFirebaseConfig } from './firebase-config.mjs';
-import { endsWithResult, simctl, sleep } from './shell.mjs';
+import { PROJECT_ID, REGION, productionFirebaseConfig } from './firebase-config.mjs';
+import { endsWithResult, run, simctl, sleep } from './shell.mjs';
 import { loadRoutes } from '../generate-gpx.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repo = path.dirname(path.dirname(here));
-export const PROJECT_ID = 'ikut-b1083';
-export const REGION = 'asia-southeast1';
-export { sleep };
+export { PROJECT_ID, REGION, sleep };
 export const km = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 10) * 10} m`);
 /** One line for a program watching the run (the dashboard): `DEMO {json}`. */
 export const emit = (obj) => console.log(`DEMO ${JSON.stringify(obj)}`);
@@ -90,6 +88,31 @@ export function firebaseConfig(o, appId) {
 
 // ---------------------------------------------------------------- scripted cars
 
+/**
+ * One Firebase client as an anonymous user: the emulators on `o.host` (the default ports), or production when
+ * `o.backend` is 'production'. Returns { app, db, fns, uid }. Every runner's scripted car or phone connects through it.
+ */
+export async function connectEmulators(o, appId) {
+  const app = initializeApp(firebaseConfig(o, appId), appId);
+  const auth = getAuth(app);
+  const db = initializeFirestore(app, {});
+  const fns = getFunctions(app, REGION);
+  if (o.backend !== 'production') {
+    connectAuthEmulator(auth, `http://${o.host}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, o.host, 8080);
+    connectFunctionsEmulator(fns, o.host, 5001);
+  }
+  return { app, db, fns, uid: (await signInAnonymously(auth)).user.uid };
+}
+
+/** FirestorePositionWriter (ios/ikut/Tracking/TrackingTypes.swift): setData, updatedAt = the server's time. */
+export function writePosition(db, tripId, carId, p) {
+  const data = { location: new GeoPoint(p.latitude, p.longitude), speed: p.speed, heading: p.heading, routeOffset: p.routeOffset, updatedAt: serverTimestamp() };
+  if (p.convoyOffset !== undefined) data.convoyOffset = p.convoyOffset;
+  if (p.battery !== null && p.battery !== undefined) data.battery = p.battery;
+  return setDoc(doc(db, `trips/${tripId}/positions/${carId}`), data);
+}
+
 /** A scripted car: joins through the joinTrip callable like a phone does. */
 export class Car {
   constructor(spec, o, say) {
@@ -100,18 +123,9 @@ export class Car {
     this.approach = new ApproachCore();
   }
 
+  /** The Firebase app is named `<appPrefix>-<key>` (spec.appPrefix, default demo). */
   async connect() {
-    const { o } = this;
-    this.app = initializeApp(firebaseConfig(o, `demo-${this.key}`), `demo-${this.key}`);
-    const auth = getAuth(this.app);
-    this.db = initializeFirestore(this.app, {});
-    this.fns = getFunctions(this.app, REGION);
-    if (o.backend !== 'production') {
-      connectAuthEmulator(auth, `http://${o.host}:9099`, { disableWarnings: true });
-      connectFirestoreEmulator(this.db, o.host, 8080);
-      connectFunctionsEmulator(this.fns, o.host, 5001);
-    }
-    this.uid = (await signInAnonymously(auth)).user.uid;
+    Object.assign(this, await connectEmulators(this.o, `${this.appPrefix ?? 'demo'}-${this.key}`));
   }
 
   async join(code) {
@@ -139,12 +153,7 @@ export class Car {
     this.publisher = new PositionPublisher({ write: (p) => this.writePosition(p), now });
   }
 
-  writePosition(p) {
-    const data = { location: new GeoPoint(p.latitude, p.longitude), speed: p.speed, heading: p.heading, routeOffset: p.routeOffset, updatedAt: serverTimestamp() };
-    if (p.convoyOffset !== undefined) data.convoyOffset = p.convoyOffset;
-    if (p.battery !== null && p.battery !== undefined) data.battery = p.battery;
-    return setDoc(doc(this.db, `trips/${this.tripId}/positions/${this.carId}`), data);
-  }
+  writePosition(p) { return writePosition(this.db, this.tripId, this.carId, p); }
 
   /** A fix: publish it, and log the approach alert a car behind a hazard would get (ApproachMonitor). */
   onFix(fix, battery = 0.8) {
@@ -274,39 +283,77 @@ export class World {
 
 // ---------------------------------------------------------------- simulators, xcodebuild
 
-const locStr = (c) => `${c.latitude.toFixed(6)},${c.longitude.toFixed(6)}`;
+export const locStr = (c) => `${c.latitude.toFixed(6)},${c.longitude.toFixed(6)}`;
 
-function prepareSimulator(udid, say) {
+/**
+ * Boots the simulator if needed and puts it in a known state: the app uninstalled (a fresh install every run: the app keeps
+ * its anonymous user in the Keychain, and one left over from an earlier emulator session can't refresh its token, so every
+ * write would hang), location permission granted, the location set.
+ * Options: start (default START), uninstall (default true: terminate and uninstall the app), textSize (a `simctl ui
+ * content_size`, e.g. 'large': a leftover accessibility size breaks taps), askLocation (reset the permission so the app
+ * asks, instead of granting it), privacy (the service granted, default 'location-always'), bootText (the log line).
+ */
+export function prepareSimulator(udid, say, { start = START, uninstall = true, textSize = null, askLocation = false, privacy = 'location-always', bootText = `booting simulator ${udid}` } = {}) {
   const line = simctl('list', 'devices').stdout.split('\n').find((l) => l.includes(udid));
   if (!line) { console.error(`simulator ${udid} not found`); process.exit(1); }
-  if (!line.includes('(Booted)')) { say(`booting simulator ${udid}`); simctl('boot', udid); simctl('bootstatus', udid, '-b'); }
-  // A fresh install every run: the app keeps its anonymous user in the Keychain, and one left over from an earlier
-  // emulator session can't refresh its token, so every write would hang ("No connection to the server").
-  simctl('terminate', udid, 'dev.aqlan.ikut');
-  simctl('uninstall', udid, 'dev.aqlan.ikut');
-  simctl('privacy', udid, 'grant', 'location-always', 'dev.aqlan.ikut');
-  simctl('location', udid, 'set', locStr(START));
+  if (!line.includes('(Booted)')) { say(bootText); simctl('boot', udid); }
+  simctl('bootstatus', udid, '-b');
+  if (uninstall) {
+    simctl('terminate', udid, 'dev.aqlan.ikut');
+    simctl('uninstall', udid, 'dev.aqlan.ikut');
+  }
+  if (textSize) simctl('ui', udid, 'content_size', textSize);
+  if (askLocation) simctl('privacy', udid, 'reset', 'location', 'dev.aqlan.ikut');
+  else simctl('privacy', udid, 'grant', privacy, 'dev.aqlan.ikut');
+  simctl('location', udid, 'set', locStr(start));
 }
 
-function xcodeArgs(o) {
+/**
+ * Plays `points` on a simulator at `mps` with `simctl location start`; returns the child (kill it to stop). The caller
+ * restarts it every 20 s from where the car should be now: the playback drifts and once stalled for minutes (qa/README.md).
+ * `label` tags the stderr lines (`  loc <label>! …`; simctl's "Parsed N waypoints" notes are dropped), `onStderr`
+ * replaces them.
+ */
+export function feedLocation({ udid, points, mps, label = '', onStderr = null }) {
+  const loc = spawn('xcrun', ['simctl', 'location', udid, 'start', `--speed=${mps.toFixed(2)}`, '--interval=1', '-']);
+  loc.stdin.end(`${points.map(locStr).join('\n')}\n`);
+  loc.stderr.on('data', (x) => {
+    if (/Parsed \d+ waypoints/.test(String(x))) return;
+    if (onStderr) onStderr(x); else console.log(`  loc${label ? ` ${label}` : ''}! ${x}`);
+  });
+  return loc;
+}
+
+export function xcodeArgs(o) {
   return ['-project', path.join(repo, 'ios', 'ikut.xcodeproj'), '-scheme', 'ikut', '-derivedDataPath', o.derivedData,
     '-clonedSourcePackagesDirPath', path.join(o.derivedData, 'SourcePackages')];
 }
 
-/** One UI test on one simulator. Collects the QA CHECK lines; `exit` resolves with xcodebuild's exit code. */
-function startTest(o, tag, phone, syncDir, say, onFail) {
-  const endTrip = o.endTrip || o.backend === 'production'; // phone 1 ends the trip from its Trip menu once `end` is written
-  const logPath = path.join(o.logs, `${tag}-xcodebuild-${phone.id}.log`);
+/** `xcodebuild build-for-testing` for the app (all simulators); the whole output goes to `logPath`. Returns { ok, logPath }. */
+export function buildForTesting(o, logPath) {
+  const r = run('xcodebuild', ['build-for-testing', ...xcodeArgs(o), '-destination', 'generic/platform=iOS Simulator'], { maxBuffer: 1 << 28 });
+  fs.writeFileSync(logPath, `${r.stdout ?? ''}\n${r.stderr ?? ''}`);
+  return { ok: r.status === 0, logPath };
+}
+
+/**
+ * One UI test on one simulator (`test-without-building`). Collects the QA CHECK lines as { kind: PASS|FAIL|NOTE, name };
+ * `exit` resolves with xcodebuild's exit code, `ok` says whether the test passed (also when xcodebuild never exits after
+ * its suite passed: the suite line decides, and it is killed 60 s later).
+ * spec: { udid, only (the test class), id, label, logPath, bundle (.xcresult), env, say, onFail(why) }, and optionally
+ *   onLine(line, t)    every output line (the demos emit a dashboard event per check)
+ *   abortOn(line)      a reason (string) when the line means the test has failed: onFail is called with it
+ *   echo               the lines worth printing (a regex), prefixed `  <id> | `
+ *   track(child)       registers the child (run-convoy2: killed when the script exits); returns it
+ */
+export function startUiTest(o, spec) {
+  const { udid, only, id, label, logPath, bundle, env, say, onFail, onLine, abortOn, track = (c) => c,
+    echo = /QA (STEP|CHECK)|Test Case .*(passed|failed|skipped)|error:|\*\* TEST|Timed out/ } = spec;
   const log = fs.createWriteStream(logPath);
-  const bundle = path.join(o.logs, `${tag}-${phone.id}.xcresult`);
   fs.rmSync(bundle, { recursive: true, force: true });
-  const xc = spawn('xcodebuild', ['test-without-building', ...xcodeArgs(o), '-destination', `platform=iOS Simulator,id=${phone.udid}`,
-    `-only-testing:ikutUITests/${phone.test}`, '-resultBundlePath', bundle, '-collect-test-diagnostics', 'never'], {
-    env: { ...process.env, TEST_RUNNER_IKUT_SYNC_DIR: syncDir, TEST_RUNNER_IKUT_QA_SCREENS: path.join(o.logs, `${tag}-screens`),
-      ...(o.backend === 'production' ? { TEST_RUNNER_IKUT_USE_PRODUCTION: '1' } : {}),
-      ...(phone.id === 'a' && endTrip ? { TEST_RUNNER_IKUT_END_TRIP: '1' } : {}), ...phone.env },
-  });
-  const t = { id: phone.id, label: phone.label, logPath, checks: [], xc };
+  const xc = track(spawn('xcodebuild', ['test-without-building', ...xcodeArgs(o), '-destination', `platform=iOS Simulator,id=${udid}`,
+    `-only-testing:ikutUITests/${only}`, '-resultBundlePath', bundle, '-collect-test-diagnostics', 'never'], { env: { ...process.env, ...env } }));
+  const t = { id, label, logPath, checks: [], xc };
   let buf = '';
   const onData = (d) => {
     log.write(d);
@@ -316,22 +363,42 @@ function startTest(o, tag, phone, syncDir, say, onFail) {
       const l = buf.slice(0, nl);
       buf = buf.slice(nl + 1);
       const c = /QA CHECK: (PASS|FAIL|NOTE) (.*)$/.exec(l);
-      if (c) { t.checks.push({ kind: c[1], name: c[2] }); emit({ type: 'check', phone: phone.id === 'a' ? 1 : 2, status: c[1] === 'PASS' ? 'PASS' : 'FAIL', name: c[2] }); }
-      if (/QA (STEP|CHECK)|Test Case .*(passed|failed|skipped)|error:|\*\* TEST|Timed out/.test(l)) process.stdout.write(`  ${phone.id} | ${l}\n`);
+      if (c) t.checks.push({ kind: c[1], name: c[2] });
+      const why = abortOn?.(l);
+      if (why) onFail(why);
+      onLine?.(l, t);
+      if (echo.test(l)) process.stdout.write(`  ${id} | ${l}\n`);
       if (/\*\* TEST (SUCCEEDED|FAILED) \*\*/.test(l)) t.result ??= l.trim();
       // xcodebuild on a second simulator sometimes never exits after the suite finishes; the suite line decides.
       const suite = /Test Suite 'Selected tests' (passed|failed)/.exec(l);
       if (suite && !t.suite) {
         t.suite = suite[1];
-        setTimeout(() => { if (t.code === undefined) { say(`${phone.id}'s xcodebuild still running 60 s after its suite ${t.suite}; killing it`); xc.kill('SIGKILL'); } }, 60_000);
+        setTimeout(() => { if (t.code === undefined) { say(`${id}'s xcodebuild still running 60 s after its suite ${t.suite}; killing it`); xc.kill('SIGKILL'); } }, 60_000);
       }
     }
   };
   xc.stdout.on('data', onData);
   xc.stderr.on('data', onData);
   t.exit = new Promise((r) => xc.on('exit', (code) => { t.code = code; t.ok = code === 0 || (code === null && t.suite === 'passed'); r(code); }));
-  t.exit.then((code) => { say(`${phone.label}'s test exited ${code} (${t.result ?? `suite ${t.suite ?? 'unfinished'}`})`); if (!t.ok) onFail(`${phone.label}'s test failed`); });
+  t.exit.then((code) => { say(`${label}'s test exited ${code} (${t.result ?? `suite ${t.suite ?? 'unfinished'}`})`); if (!t.ok) onFail(`${label}'s test failed`); });
   return t;
+}
+
+/** The demos' UI test: log and result bundle named after the tag and the phone, check events for the dashboard. */
+function startTest(o, tag, phone, syncDir, say, onFail) {
+  const endTrip = o.endTrip || o.backend === 'production'; // phone 1 ends the trip from its Trip menu once `end` is written
+  return startUiTest(o, {
+    udid: phone.udid, only: phone.test, id: phone.id, label: phone.label, say, onFail,
+    logPath: path.join(o.logs, `${tag}-xcodebuild-${phone.id}.log`),
+    bundle: path.join(o.logs, `${tag}-${phone.id}.xcresult`),
+    env: { TEST_RUNNER_IKUT_SYNC_DIR: syncDir, TEST_RUNNER_IKUT_QA_SCREENS: path.join(o.logs, `${tag}-screens`),
+      ...(o.backend === 'production' ? { TEST_RUNNER_IKUT_USE_PRODUCTION: '1' } : {}),
+      ...(phone.id === 'a' && endTrip ? { TEST_RUNNER_IKUT_END_TRIP: '1' } : {}), ...phone.env },
+    onLine: (l) => {
+      const c = /QA CHECK: (PASS|FAIL|NOTE) (.*)$/.exec(l);
+      if (c) emit({ type: 'check', phone: phone.id === 'a' ? 1 : 2, status: c[1] === 'PASS' ? 'PASS' : 'FAIL', name: c[2] });
+    },
+  });
 }
 
 // ---------------------------------------------------------------- the show
@@ -449,10 +516,8 @@ async function runDemoInner(config, o) {
   for (const p of phones) prepareSimulator(p.udid, say);
   if (!o.skipBuild) {
     say('building (build-for-testing)');
-    const r = spawnSync('xcodebuild', ['build-for-testing', ...xcodeArgs(o), '-destination', 'generic/platform=iOS Simulator'], { encoding: 'utf8', maxBuffer: 1 << 28 });
-    const buildLog = path.join(o.logs, `${tag}-build.log`);
-    fs.writeFileSync(buildLog, (r.stdout ?? '') + (r.stderr ?? ''));
-    if (r.status !== 0) throw new Error(`build failed, see ${buildLog}`);
+    const build = buildForTesting(o, path.join(o.logs, `${tag}-build.log`));
+    if (!build.ok) throw new Error(`build failed, see ${build.logPath}`);
   }
   emit({ type: 'phase', phase: 'joining', detail: 'phones start their UI tests' });
   tests = phones.map((p) => startTest(o, tag, p, sync.dir, say, (why) => sync.abort(why)));
@@ -513,10 +578,7 @@ async function runDemoInner(config, o) {
     const pts = [r.coordinateAtOffset(m)];
     for (let off = m + 80; off < Math.min(r.length, m + 25_000); off += 80) pts.push(r.coordinateAtOffset(off));
     players[p.id]?.kill();
-    const loc = spawn('xcrun', ['simctl', 'location', p.udid, 'start', `--speed=${config.cast[p.follows].motion.speed.toFixed(2)}`, '--interval=1', '-']);
-    loc.stdin.end(`${pts.map(locStr).join('\n')}\n`);
-    loc.stderr.on('data', (x) => { if (!/Parsed \d+ waypoints/.test(String(x))) console.log(`  loc ${p.id}! ${x}`); });
-    players[p.id] = loc;
+    players[p.id] = feedLocation({ udid: p.udid, points: pts, mps: config.cast[p.follows].motion.speed, label: p.id });
   };
   emit({ type: 'phase', phase: 'running', detail: 'go' });
   console.log('\n================ DEMO START ================');
