@@ -1,4 +1,5 @@
 import CoreLocation
+import FirebaseFirestore
 import Foundation
 import Testing
 @testable import ikut
@@ -9,10 +10,14 @@ private func c(_ lat: Double, _ lon: Double) -> CLLocationCoordinate2D { .init(l
 private final class Recording: LegRouting, @unchecked Sendable {
     private let lock = NSLock()
     private var _ends: [CLLocationCoordinate2D] = []
+    /// The road for the one leg that reaches the end of this line, when it is given (the direct route to a destination).
+    private let direct: [CLLocationCoordinate2D]?
+    init(direct: [CLLocationCoordinate2D]? = nil) { self.direct = direct }
     var ends: [CLLocationCoordinate2D] { lock.withLock { _ends } }
     func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
         lock.withLock { _ends.append(to) }
-        let points = [from, to]
+        var points = [from, to]
+        if let direct, to.latitude == direct.last?.latitude, from.latitude == direct.first?.latitude { points = direct }
         let length = RouteLine.haversine(from, to)
         return RouteLeg(coordinates: points, distance: length, travelTime: length / 25, name: "E1")
     }
@@ -116,6 +121,105 @@ struct StopOurSideTests {
             items: [Self.stop(other.coordinate)], destination: end, origin: { Self.north.coordinates.first },
             fallbackStart: nil, router: plain)
         #expect(plain.ends[0].latitude == other.coordinate.latitude)
+    }
+
+    @Test func theBundledFileLoadsAndTheDefaultSitesMoveAStop() async throws {
+        #expect(OurSide.bundledSites.count > 300)
+        #expect(OurSide.bundledSites.contains { $0.name == "Tapah Rest Area" })
+        let (ours, other) = (Self.tapah(Self.north).ours, Self.tapah(Self.south).ours)
+        let built = try await StopPlanner.build(
+            items: [Self.stop(other.coordinate)], destination: Self.north.coordinates.last!,
+            origin: { Self.north.coordinates.first }, fallbackStart: nil, router: Recording(), ourSide: Self.north)
+        #expect(built.items[0].latitude == ours.coordinate.latitude && built.items[0].longitude == ours.coordinate.longitude)
+    }
+
+    @Test func aStopAbout250mFromTheOutlineMovesAndAbout350mDoesNot() {
+        let (ours, other) = (Self.tapah(Self.north).ours, Self.tapah(Self.north).other)
+        // Walk away from our twin, past the other one, until the outline is the given distance off.
+        let dLat = other.coordinate.latitude - ours.coordinate.latitude
+        let dLon = other.coordinate.longitude - ours.coordinate.longitude
+        let norm = (dLat * dLat + dLon * dLon).squareRoot()
+        func away(_ meters: Double) -> CLLocationCoordinate2D {
+            var k = 0.0
+            while true {
+                let p = c(other.coordinate.latitude + dLat / norm * k * 0.00001, other.coordinate.longitude + dLon / norm * k * 0.00001)
+                if OurSide.distance(from: p, to: other) >= meters { return p }
+                k += 1
+            }
+        }
+        let near = Self.stop(away(250)), far = Self.stop(away(350))
+        let nearAt = OurSide.distance(from: near.coordinate, to: other)
+        #expect(nearAt >= 250 && nearAt < 270)
+        #expect(OurSide.snap([near], on: Self.north, sites: Self.sites)[0].coordinate.latitude == ours.coordinate.latitude)
+        #expect(OurSide.snap([far], on: Self.north, sites: Self.sites)[0] == far)
+    }
+
+    @Test func aSnapChangesOnlyTheCoordinate() {
+        let (ours, other) = (Self.tapah(Self.north).ours, Self.tapah(Self.south).ours)
+        let meetAt = Date(timeIntervalSince1970: 5_000)
+        var stop = StopDraft(id: "keep-me", name: "R&R Tapah", coordinate: other.coordinate, kind: .toilet, minutes: 25, meetAt: meetAt, routeOffset: 12_345)
+        stop.meetAt = meetAt
+        let out = OurSide.snap([stop], on: Self.north, sites: Self.sites)[0]
+        #expect(out.latitude == ours.coordinate.latitude)
+        #expect(out.id == "keep-me" && out.kind == .toilet && out.minutes == 25 && out.name == "R&R Tapah")
+        #expect(out.meetAt == stop.meetAt && out.routeOffset == 12_345)
+        var restored = out
+        restored.latitude = stop.latitude; restored.longitude = stop.longitude
+        #expect(restored == stop)
+    }
+
+    /// Going north the stop is at the southbound Tapah; a new destination back in KL reverses the trip, and the
+    /// direct route to it decides the side again.
+    @Test func aNewDestinationThatReversesTheTripMovesTheStopToTheOtherTwin() async throws {
+        let (northOurs, southOurs) = (Self.tapah(Self.north).ours, Self.tapah(Self.south).ours)
+        let ipoh = Self.north.coordinates.last!, kl = Self.north.coordinates.first!
+        let roads = Recording(direct: Self.south.coordinates)
+        let meet = StopDraft(name: "Meet", coordinate: ipoh, kind: .meet)
+        let built = try await StopPlanner.build(
+            items: [meet, Self.stop(northOurs.coordinate)], destination: kl, fallbackStart: nil, router: roads,
+            snapOnDirectRoute: true, sites: Self.sites)
+        #expect(built.items[1].latitude == southOurs.coordinate.latitude)
+        // The direct route, then the two legs through the stop.
+        #expect(roads.ends.count == 3)
+        #expect(roads.ends[1].latitude == southOurs.coordinate.latitude)
+        // No stop at a site: no direct route asked for.
+        let plain = Recording(direct: Self.south.coordinates)
+        _ = try await StopPlanner.build(
+            items: [meet, Self.stop(Self.north.coordinate(atOffset: Self.north.length * 0.3)!)], destination: kl,
+            fallbackStart: nil, router: plain, snapOnDirectRoute: true, sites: Self.sites)
+        #expect(plain.ends.count == 2)
+    }
+
+    @MainActor
+    @Test func theLobbyPlannerSnapsOnItsRouteAndASecondRunLeavesTheStopWhereItIs() async throws {
+        let (ours, other) = (Self.tapah(Self.north).ours, Self.tapah(Self.south).ours)
+        let end = Self.north.coordinates.last!
+        let roads = Recording()
+        final class Saved { var plans: [StopPlanSave] = [] }
+        let saved = Saved()
+        let planner = StopPlanner(
+            router: roads, delay: .zero, origin: { Self.north.coordinates.first }, save: { saved.plans.append($0) })
+        let trip = Trip.fixture(
+            organizerId: "u", route: Polyline.encode(Self.north.coordinates),
+            destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: end.latitude, longitude: end.longitude)))
+        planner.sync(trip: trip, stops: [])
+        planner.add(Self.stop(other.coordinate))
+        for _ in 0..<500 where planner.status != .saved { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(planner.status == .saved)
+        let first = try #require(saved.plans.last)
+        #expect(first.stops[0].coordinate.latitude == ours.coordinate.latitude)
+        #expect(roads.ends[0].latitude == ours.coordinate.latitude)
+        // A second edit builds again with the stop already on our side: it stays, and the leg still ends there.
+        let before = roads.ends.count
+        planner.add(Self.stop(Self.north.coordinate(atOffset: Self.north.length * 0.3)!, kind: .food, name: "Lunch"))
+        for _ in 0..<500 where planner.status != .saved { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<500 where saved.plans.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        let second = try #require(saved.plans.last)
+        #expect(second.stops.count == 2)
+        let tapah = try #require(second.stops.first { $0.name == "R&R Tapah" })
+        #expect(tapah.coordinate.latitude == ours.coordinate.latitude && tapah.coordinate.longitude == ours.coordinate.longitude)
+        #expect(roads.ends.count > before)
+        #expect(roads.ends[before...].contains { $0.latitude == ours.coordinate.latitude })
     }
 
     @Test func howOftenOurTwinHasAMappedGate() {

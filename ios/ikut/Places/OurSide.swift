@@ -14,6 +14,14 @@ enum OurSide {
     /// The places file inside the app, read once.
     static let bundledSites: [PlaceSite] = (try? PlacesLoader.bundled())?.sites ?? []
 
+    /// Reads the places file on a background thread so the first stop edit doesn't decode it on the main one.
+    static func warm() { Task.detached(priority: .utility) { _ = bundledSites } }
+
+    /// Whether any stop would be looked at by `snap`: a rest-area stop at a site.
+    static func hasRestAreaStop(_ items: [StopDraft], sites: [PlaceSite] = bundledSites) -> Bool {
+        items.contains { !$0.isMeeting && StopNoteText.isRestArea($0.kind) && site(at: $0.coordinate, in: sites) != nil }
+    }
+
     /// "Tapah Rest Area Arah Utara" and "Tapah Rest Area (Southbound)" are one name: the way of travel, the brackets
     /// and "Hentian Sebelah" (Malay for lay-by) are left out. Nil for a site with no name to compare.
     static func baseName(_ name: String?) -> String? {
