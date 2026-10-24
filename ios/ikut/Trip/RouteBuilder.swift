@@ -81,22 +81,28 @@ struct MapKitLegRouter: LegRouting {
 ///
 /// Never asks for location permission; the caller is expected to have done that.
 enum RouteBuilder {
+    /// Every match for `query` in `region` (MapKit gives up to about 25), nearest the region first as MapKit ranks them.
     @MainActor
-    static func searchDestinations(query: String) async throws -> [DestinationResult] {
+    static func searchDestinations(query: String, region: MKCoordinateRegion = SearchRegion.malaysia) async throws -> [DestinationResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = trimmed
+        request.region = region
+        request.resultTypes = [.pointOfInterest, .address]
         let response = try await MKLocalSearch(request: request).start()
-        return response.mapItems.compactMap { item in
-            guard let name = item.name else { return nil }
-            return DestinationResult(
-                name: name,
-                subtitle: item.placemark.title ?? "",
-                coordinate: item.placemark.coordinate,
-                category: item.pointOfInterestCategory?.rawValue
-            )
-        }
+        return response.mapItems.compactMap(destination)
+    }
+
+    /// A map item as a destination; nil without a name.
+    static func destination(_ item: MKMapItem) -> DestinationResult? {
+        guard let name = item.name else { return nil }
+        return DestinationResult(
+            name: name,
+            subtitle: item.placemark.title ?? "",
+            coordinate: item.placemark.coordinate,
+            category: item.pointOfInterestCategory?.rawValue
+        )
     }
 
     static let locationTimeout: Duration = .seconds(10)
