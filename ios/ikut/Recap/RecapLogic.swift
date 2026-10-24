@@ -81,7 +81,7 @@ struct RecapStat: Equatable, Sendable {
     var note: String
 }
 
-/// One "Road Trip Awards" card.
+/// One "Road trip awards" card.
 struct RecapAward: Equatable, Sendable {
     enum Kind: String, Sendable { case lead, firstIn, reporter, stopCaller, sweeper }
     var kind: Kind
@@ -360,12 +360,12 @@ enum RecapLogic {
         var notes: [String] = []
         if s.positions.isEmpty {
             if let end = s.endedAt, now.timeIntervalSince(end) > retention {
-                notes.append("Car positions are deleted 7 days after a trip, so arrivals and spread aren't shown.")
+                notes.append("Car positions are deleted 7 days after a trip, so arrivals and spread aren’t shown.")
             } else {
                 notes.append("No car positions were shared on this trip.")
             }
         }
-        notes.append("ikut keeps only each car's last position, so the map shows where cars finished, not the path they drove.")
+        notes.append("ikut keeps only each car’s last position, so the map shows where cars finished, not the path they drove.")
 
         return Recap(
             title: s.name, subtitle: subtitle.joined(separator: " · "), startedAt: s.createdAt, endedAt: s.endedAt,

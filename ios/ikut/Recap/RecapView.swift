@@ -45,7 +45,7 @@ struct RecapView: View {
                     ShareLink(item: RecapContent.shareText(recap)) {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .accessibilityLabel("Share Recap")
+                    .accessibilityLabel("Share recap")
                 }
             }
         }

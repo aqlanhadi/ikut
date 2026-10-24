@@ -74,7 +74,7 @@ final class RecapModel {
     private let persist: Bool
 
     /// Plain words, without the system's message.
-    static let couldntLoad = "Couldn’t load this recap. Check your connection and try again."
+    static let couldntLoad = "Couldn’t load this recap. Check your signal and try again."
 
     /// For tests: a failed load.
     init(failedTripId: String) {

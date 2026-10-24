@@ -186,7 +186,7 @@ struct PickedTripTests {
     @Test func couldntLoadSaysSoInPlainWords() {
         let p = PickedTrip(entry: entry(), model: RecapModel(failedTripId: "demo"))
         #expect(!p.model.isLoading)
-        #expect(p.model.errorMessage == "Couldn’t load this recap. Check your connection and try again.")
+        #expect(p.model.errorMessage == "Couldn’t load this recap. Check your signal and try again.")
         #expect(p.model.recap == nil)
     }
 

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The timeline filter: All, Stops, Road Reports.
+/// The timeline filter: All, Stops, Road reports.
 enum RecapFilter: String, CaseIterable, Identifiable {
-    case all = "All", stops = "Stops", reports = "Road Reports"
+    case all = "All", stops = "Stops", reports = "Road reports"
     var id: String { rawValue }
 
     func matches(_ item: RecapTimelineItem) -> Bool {
@@ -75,7 +75,7 @@ struct RecapContent: View {
         .padding(.top, layout == .screen ? Spacing.section : Spacing.l)
 
         if !recap.awards.isEmpty {
-            sectionTitle("Road Trip Awards")
+            sectionTitle("Road trip awards")
             LazyVGrid(columns: columns == 1 ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible())], spacing: Spacing.gap) {
                 ForEach(recap.awards, id: \.kind) { award(of: $0, snapshot) }
             }
@@ -96,7 +96,7 @@ struct RecapContent: View {
 
         VStack(spacing: Spacing.xs) {
             ShareLink(item: Self.shareText(recap)) {
-                Label("Share Recap with Convoy", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+                Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
             }
             .actionButton(.primary)
             if let onDone {
