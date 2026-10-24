@@ -231,8 +231,8 @@ struct AddStopSheet: View {
                 }
             }
 
-            Button("Add to the trip") { add(place) }
-                .buttonStyle(PillButtonStyle())
+            Button { add(place) } label: { Text("Add to the trip").frame(maxWidth: .infinity) }
+                .actionButton(.primary)
                 .padding(.top, Spacing.s)
                 .accessibilityIdentifier("addStop.add")
         }

@@ -84,18 +84,18 @@ struct JoinTripView: View {
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let taken = model.trackerTakenResult {
-                Button("Continue") { onJoined(taken.tripId, taken.carId) }
-                    .buttonStyle(PillButtonStyle())
+                Button { onJoined(taken.tripId, taken.carId) } label: { Text("Continue").frame(maxWidth: .infinity) }
+                    .actionButton(.primary)
                     .ikutBottomBar()
             } else if model.preview != nil {
                 Button(action: join) {
                     if model.isJoining {
-                        ProgressView().tint(.white).accessibilityLabel("Joining trip")
+                        ProgressView().tint(.white).accessibilityLabel("Joining trip").frame(maxWidth: .infinity)
                     } else {
-                        Text(joinLabel)
+                        Text(joinLabel).frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(PillButtonStyle())
+                .actionButton(.primary)
                 .disabled(!model.canJoin || auth.userID == nil)
                 .ikutBottomBar()
             }

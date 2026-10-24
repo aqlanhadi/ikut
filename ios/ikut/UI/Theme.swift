@@ -100,43 +100,39 @@ extension View {
     }
 }
 
-/// Full-width accent capsule, 50 pt high.
-struct PillButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(Color.ikutAccent.opacity(isEnabled ? 1 : 0.35), in: Capsule())
-            .opacity(configuration.isPressed ? 0.8 : 1)
-            .contentShape(Capsule())
-    }
+/// The three looks of a full-width action. Each is Apple's own button style, so pressed, disabled
+/// and Dynamic Type come from the system.
+enum ActionButtonRole {
+    /// Accent filled capsule (`.borderedProminent`).
+    case primary
+    /// The quiet one beside it (`.bordered`).
+    case secondary
+    /// Accent text with no fill, under a primary (`.borderless`).
+    case link
 }
 
-/// Card-colored capsule with accent text, 50 pt high: the second of two side-by-side pills.
-struct SecondaryPillButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(Color.ikutAccent)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(Color.ikutCard, in: Capsule())
-            .opacity(configuration.isPressed ? 0.7 : 1)
-            .contentShape(Capsule())
-    }
-}
-
-/// Borderless accent text button, 50 pt high, for the secondary action under a pill.
-struct LinkPillButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(Color.ikutAccent)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .opacity(configuration.isPressed ? 0.6 : 1)
-            .contentShape(Rectangle())
+extension View {
+    /// Apply to a `Button` (or `ShareLink`) whose label has `.frame(maxWidth: .infinity)` so it spans the
+    /// row. `onGlass`: the button sits on a Liquid Glass sheet, so on iOS 26 it uses the glass styles
+    /// (the same rule as `surfaceButton`).
+    @ViewBuilder
+    func actionButton(_ role: ActionButtonRole, onGlass: Bool = false) -> some View {
+        if onGlass, role != .link, GlassSurface.useGlass, #available(iOS 26, *) {
+            if role == .primary {
+                buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
+            } else {
+                buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
+            }
+        } else {
+            switch role {
+            case .primary:
+                buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
+            case .secondary:
+                buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
+            case .link:
+                buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
+            }
+        }
     }
 }
 
@@ -341,13 +337,13 @@ struct IconTile: View {
 
 #Preview("Buttons") {
     VStack(spacing: Spacing.m) {
-        Button("Start Trip") {}.buttonStyle(PillButtonStyle())
-        Button("Start Trip") {}.buttonStyle(PillButtonStyle()).disabled(true)
+        Button { } label: { Text("Start Trip").frame(maxWidth: .infinity) }.actionButton(.primary)
+        Button { } label: { Text("Start Trip").frame(maxWidth: .infinity) }.actionButton(.primary).disabled(true)
         HStack(spacing: Spacing.gap) {
-            Button("Share") {}.buttonStyle(PillButtonStyle())
-            Button("Done") {}.buttonStyle(SecondaryPillButtonStyle())
+            Button { } label: { Text("Share").frame(maxWidth: .infinity) }.actionButton(.primary)
+            Button { } label: { Text("Done").frame(maxWidth: .infinity) }.actionButton(.secondary)
         }
-        Button("Join a trip") {}.buttonStyle(LinkPillButtonStyle())
+        Button { } label: { Text("Join a trip").frame(maxWidth: .infinity) }.actionButton(.link)
     }
     .padding(Spacing.l)
     .frame(maxHeight: .infinity)

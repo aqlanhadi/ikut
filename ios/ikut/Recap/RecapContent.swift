@@ -98,11 +98,11 @@ struct RecapContent: View {
 
         VStack(spacing: Spacing.xs) {
             ShareLink(item: Self.shareText(recap)) {
-                Label("Share Recap with Convoy", systemImage: "square.and.arrow.up")
+                Label("Share Recap with Convoy", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
             }
-            .buttonStyle(PillButtonStyle())
+            .actionButton(.primary)
             if let onDone {
-                Button("Done", action: onDone).buttonStyle(LinkPillButtonStyle())
+                Button(action: onDone) { Text("Done").frame(maxWidth: .infinity) }.actionButton(.link)
             }
         }
         .padding(.top, Spacing.block)

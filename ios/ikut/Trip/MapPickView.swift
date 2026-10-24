@@ -87,8 +87,8 @@ struct MapPickView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
             .safeAreaInset(edge: .bottom) {
-                Button("Use this place") { onUse(spot) }
-                    .buttonStyle(PillButtonStyle())
+                Button { onUse(spot) } label: { Text("Use this place").frame(maxWidth: .infinity) }
+                    .actionButton(.primary)
                     .disabled(moving)
                     .ikutBottomBar()
             }
