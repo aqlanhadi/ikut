@@ -179,6 +179,7 @@ enum DemoScreens {
         case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))
         case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
+        case "road-markers": return AnyView(MapMarkersDemo())
         case "road-header-moving": return AnyView(PanelHeaderDemo(.moving))
         case "road-header-parked": return AnyView(PanelHeaderDemo(.parked))
         case "road-header-never": return AnyView(PanelHeaderDemo(.never))

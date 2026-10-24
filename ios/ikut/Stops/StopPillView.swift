@@ -47,7 +47,7 @@ struct StopPillView: View {
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 64)
-                    .background(Color(red: 0.12, green: 0.55, blue: 0.25), in: Capsule())
+                    .background(Color.ikutOK, in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)

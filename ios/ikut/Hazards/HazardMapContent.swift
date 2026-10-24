@@ -13,13 +13,15 @@ struct HazardMapContent: View {
     /// Rings spread out from it while its approach alert is up.
     var pinging = false
 
-    private static let size: CGFloat = 32
+    @ScaledMetric(relativeTo: .subheadline) private var textScale: CGFloat = 1
+    private var scale: CGFloat { MarkerMetrics.scale(textScale) }
+    private var size: CGFloat { 32 * scale }
 
     var body: some View {
         Image(systemName: marker.symbol)
-            .font(.system(size: 14, weight: .bold))
+            .font(.system(size: 14 * scale, weight: .bold))
             .foregroundStyle(marker.tone.symbolColor)
-            .frame(width: Self.size, height: Self.size)
+            .frame(width: size, height: size)
             .background(marker.tone.fill, in: Circle())
             .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
             .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
@@ -27,7 +29,7 @@ struct HazardMapContent: View {
             .overlay(alignment: .leading) {
                 if showsChip {
                     Text(marker.chipText)
-                        .font(.caption2.weight(.semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .fixedSize()
@@ -80,19 +82,21 @@ private struct HazardPing: View {
 }
 
 extension HazardTone {
-    /// High is the mockup's hazard yellow; medium orange; low grey.
+    /// High is the hazard yellow (the lead star's too); medium the system orange; low a grey dark enough for a
+    /// white glyph.
     var fill: Color {
         switch self {
-        case .high: Color(red: 1, green: 0.8, blue: 0)
-        case .medium: Color(red: 1, green: 0.58, blue: 0)
-        case .low: Color(red: 0.56, green: 0.56, blue: 0.58)
+        case .high: .ikutLeadYellow
+        case .medium: .orange
+        case .low: MapColors.hazardLow.color
         }
     }
 
+    /// Black on the bright fills, white on the grey: 4.5:1 or better in both modes.
     var symbolColor: Color {
         switch self {
-        case .high: .black
-        case .medium, .low: .white
+        case .high, .medium: .black
+        case .low: .white
         }
     }
 }

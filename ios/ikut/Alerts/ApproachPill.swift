@@ -85,11 +85,6 @@ struct StopApproachPill: View {
     }
 }
 
-extension Color {
-    /// Blue of the planned-stop pill on its dark banner (#64B5FF on the canvas).
-    static let ikutPillBlue = Color(red: 0.39, green: 0.71, blue: 1.0)
-}
-
 /// "Aisha’s car is behind you" (D26), on the phones of a car parked ahead on the route, from about 2
 /// minutes before the nearest car behind reaches it until it has: that car's live distance, and the
 /// time while it is moving. Spoken once as "Aisha’s car is 3.3 km behind you."
