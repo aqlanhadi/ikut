@@ -52,12 +52,12 @@ struct NameEntryView: View {
 
                 Button(action: submit) {
                     if isWorking {
-                        ProgressView().accessibilityLabel("Signing in")
+                        ProgressView().accessibilityLabel("Signing in").frame(maxWidth: .infinity)
                     } else {
-                        Text("Continue")
+                        Text("Continue").frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(PillButtonStyle())
+                .actionButton(.primary)
                 .disabled(!isValid || isWorking)
             }
             .padding(Spacing.l)

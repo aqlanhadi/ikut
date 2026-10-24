@@ -152,9 +152,9 @@ struct LobbyView: View {
                 }
                 showMap = true
             } label: {
-                Text(started ? "Back to Map" : "Start Trip")
+                Text(started ? "Back to Map" : "Start Trip").frame(maxWidth: .infinity)
             }
-            .buttonStyle(PillButtonStyle())
+            .actionButton(.primary)
             .ikutBottomBar()
         }
         // The map shares this lobby's session; the lobby stays on the stack underneath it.

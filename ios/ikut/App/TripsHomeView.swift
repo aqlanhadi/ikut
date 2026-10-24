@@ -452,13 +452,13 @@ struct TripsHomeView: View {
 
             HStack(spacing: Spacing.gap) {
                 Button(action: onNewTrip) {
-                    Label("New Trip", systemImage: "plus")
+                    Label("New Trip", systemImage: "plus").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(PillButtonStyle())
+                .actionButton(.primary, onGlass: true)
                 Button(action: onJoin) {
-                    Label("Join Trip", systemImage: "qrcode.viewfinder")
+                    Label("Join Trip", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(GlassPillButtonStyle())
+                .actionButton(.secondary, onGlass: true)
             }
             .padding(.top, Spacing.m)
         }
@@ -554,19 +554,6 @@ struct TripsHomeView: View {
         Task {
             do { try await auth.updateDisplayName(trimmed) } catch { renameError = error.localizedDescription }
         }
-    }
-}
-
-/// `SecondaryPillButtonStyle` for a glass background: the opaque card fill would read as a slab.
-private struct GlassPillButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(Color.ikutAccent)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(.fill.quaternary, in: Capsule())
-            .opacity(configuration.isPressed ? 0.7 : 1)
-            .contentShape(Capsule())
     }
 }
 
