@@ -645,14 +645,14 @@ struct TripMapView: View {
     /// The other layout, laid out out of sight, so its height is known before the first fold or unfold.
     private var probe: some View {
         ConvoyPanel(
-            model: model, expanded: .constant(!panelExpanded), canReport: false,
+            model: model, expanded: .constant(!panelExpanded), canReport: model.myCarId != nil,
+            stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: {}, onStop: {},
             onHeight: { if panelExpanded { foldedContent = $0 } else { unfoldedContent = $0 } },
             probe: true)
             .fixedSize(horizontal: false, vertical: true)
-            .opacity(0)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+            // Laid out but not drawn, and left out of the accessibility tree (UI tests would find its buttons twice).
+            .hidden()
     }
 
     @ViewBuilder private var cardView: some View {
