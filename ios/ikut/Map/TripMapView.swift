@@ -26,6 +26,8 @@ struct TripMapView: View {
     @State private var cameraHeading = 0.0
     /// The car the driver tapped (D34 7b): its marker is ringed and the panel shows its row. It never moves the camera.
     @State private var selectedCar: String?
+    /// When a car's marker last took a tap, so the map's own tap handler can tell a tap on a car from one on the map.
+    @State private var carTappedAt = Date.distantPast
     /// The convoy list starts folded on every arrival at the map; the driver opens it when they want it.
     @State private var panelExpanded = false
     @State private var reportContext: ReportContext?
@@ -206,11 +208,7 @@ struct TripMapView: View {
     // MARK: Map
 
     private var map: some View {
-        Map(position: $camera, selection: Binding(
-            get: { selectedCar },
-            // MapKit reports a tap on a car, or nil for a tap on the map; the same car again clears it.
-            set: { selectCar(CarSelection.afterTap(on: $0, current: selectedCar)) }
-        )) {
+        Map(position: $camera) {
             if model.mainRouteCoordinates.count > 1 {
                 MapPolyline(coordinates: model.mainRouteCoordinates)
                     .stroke(MapPalette.routeCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
@@ -244,12 +242,27 @@ struct TripMapView: View {
                     MapMarkerView(
                         marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX,
                         selected: marker.id == selectedCar)
+                        // Handled here, not by `Map(selection:)`: MapKit reports no second tap on the car it already has
+                        // selected, so a re-tap could never clear it.
+                        .onTapGesture {
+                            // One tap can reach the marker twice; the second is not a re-tap.
+                            guard Date().timeIntervalSince(carTappedAt) > 0.4 else { return }
+                            carTappedAt = Date()
+                            selectCar(CarSelection.afterTap(on: marker.id, current: selectedCar))
+                        }
                 }
                 .annotationTitles(.hidden)
-                .tag(marker.id)
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+        // A tap on the empty map clears the selection. The map's gesture also fires for a tap on a car, a moment
+        // before the car's own, so it waits and stands down when a car took the tap.
+        .simultaneousGesture(TapGesture().onEnded {
+            Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                if Date().timeIntervalSince(carTappedAt) > 0.4 { selectCar(nil) }
+            }
+        })
         // MapKit centers the camera, and fits regions, inside the safe area; `cameraRoom` does the
         // same for the rest of what covers the map, so my car is in the middle of what can be seen.
         .safeAreaPadding(.bottom, legalInset)
@@ -529,6 +542,8 @@ struct TripMapView: View {
         model.stopContext(tripId: session.tripId, userId: session.userId, isOrganizer: session.isOrganizer)
     }
 
+    private struct SelectionScrollKey: Equatable { var car: String?; var expanded: Bool }
+
     private struct StopListenKey: Equatable {
         var carId: String?
         var routeLength: Double?
@@ -607,7 +622,16 @@ struct TripMapView: View {
             if shown == .card {
                 ScrollView { cardView }.scrollBounceBehavior(.basedOnSize)
             } else {
-                ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+                ScrollViewReader { proxy in
+                    ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+                        // The list is laid out after the sheet has grown, so wait for it before scrolling to the row.
+                        .task(id: SelectionScrollKey(car: selectedCar, expanded: panelExpanded)) {
+                            guard panelExpanded, let car = selectedCar else { return }
+                            try? await Task.sleep(for: .milliseconds(350))
+                            guard !Task.isCancelled else { return }
+                            withAnimation(.smooth) { proxy.scrollTo(CarSelection.rowId(car), anchor: .center) }
+                        }
+                }
             }
         }
         .environment(\.inPanelSheet, true)

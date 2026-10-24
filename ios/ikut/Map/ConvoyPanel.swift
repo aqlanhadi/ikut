@@ -40,20 +40,6 @@ struct ConvoyPanel: View {
     private var convoy: ConvoyModel { model.convoy }
 
     var body: some View {
-        ScrollViewReader { proxy in content
-            // The list is laid out after the sheet has grown, so wait for it before scrolling to the row.
-            .task(id: ScrollKey(car: selectedCar, expanded: expanded)) {
-                guard !probe, expanded, let car = selectedCar else { return }
-                try? await Task.sleep(for: .milliseconds(350))
-                guard !Task.isCancelled else { return }
-                withAnimation(.smooth) { proxy.scrollTo(CarSelection.rowId(car), anchor: .center) }
-            }
-        }
-    }
-
-    private struct ScrollKey: Equatable { var car: String?; var expanded: Bool }
-
-    private var content: some View {
         VStack(spacing: 0) {
             header
             progress
