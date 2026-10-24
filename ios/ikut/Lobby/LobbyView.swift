@@ -10,6 +10,7 @@ struct LobbyView: View {
     var onEnded: (String) -> Void = { _ in }
     @Environment(LocationPermission.self) private var location
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .title) private var codeSize: CGFloat = 30
     @State private var model: LobbyModel
     @State private var session: TripSession
     @State private var routeInfo = TripRouteInfo()
@@ -579,9 +580,10 @@ struct LobbyView: View {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 StatCaption("Join code")
                 Text(LobbyLogic.displayCode(code))
-                    .font(.system(size: 30, weight: .bold, design: .monospaced))
+                    .font(.system(size: ScaledSize.capped(codeSize, base: 30, cap: 1.5), weight: .bold, design: .monospaced))
                     .kerning(2)
-                    .minimumScaleFactor(0.6)
+                    // The code is one token that must stay on one line, so it shrinks rather than wraps.
+                    .minimumScaleFactor(0.5)
                     .lineLimit(1)
                     .textSelection(.enabled)
                     .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")

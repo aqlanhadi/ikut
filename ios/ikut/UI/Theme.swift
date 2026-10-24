@@ -219,7 +219,7 @@ struct MapCloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark").font(.system(size: 15, weight: .bold))
+            Image(systemName: "xmark").font(.subheadline.weight(.bold))
                 .frame(width: 44, height: 44)
                 .background(.regularMaterial, in: Circle())
         }

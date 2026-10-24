@@ -8,6 +8,7 @@ struct JoinTripView: View {
     @State private var codeText = ""
     @State private var showScanner = false
     @State private var role: Role = .driver
+    @ScaledMetric(relativeTo: .title2) private var codeBoxSize: CGFloat = 26
     @FocusState private var codeFocused: Bool
     var onJoined: (_ tripId: String, _ carId: String) -> Void
 
@@ -140,7 +141,10 @@ struct JoinTripView: View {
             ForEach(0..<length, id: \.self) { index in
                 let active = codeFocused && index == min(characters.count, length - 1)
                 Text(index < characters.count ? String(characters[index]) : "")
-                    .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                    .font(.system(size: ScaledSize.capped(codeBoxSize, base: 26, cap: 1.4), weight: .semibold, design: .monospaced))
+                    // One letter per box: it can't wrap, so it shrinks a little at the largest sizes.
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity, minHeight: 56)
                     .ikutCard(radius: Radius.control)
                     .overlay {
@@ -332,9 +336,8 @@ struct JoinTripView: View {
                     Text(name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .wrapsAtAccessibilitySizes(lines: 2)
+                    Text(detail).font(.caption).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
                 }
                 Spacer(minLength: 0)
             }

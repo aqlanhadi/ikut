@@ -1,5 +1,29 @@
 import SwiftUI
 
+/// One line at normal text sizes, as many as it needs at the accessibility sizes, so text wraps instead of
+/// shrinking or cutting off. Use it in place of `.lineLimit(1)` + `.minimumScaleFactor`.
+enum LineLimit {
+    nonisolated static func lines(_ normal: Int, accessibility: Bool) -> Int? { accessibility ? nil : normal }
+}
+
+private struct WrapsAtAccessibilitySizes: ViewModifier {
+    var lines: Int
+    @Environment(\.dynamicTypeSize) private var typeSize
+    func body(content: Content) -> some View {
+        content.lineLimit(LineLimit.lines(lines, accessibility: typeSize.isAccessibilitySize))
+    }
+}
+
+extension View {
+    func wrapsAtAccessibilitySizes(lines: Int = 1) -> some View { modifier(WrapsAtAccessibilitySizes(lines: lines)) }
+}
+
+/// A display size that follows the text size up to `cap` times its base, so a big number grows but a
+/// short token still fits on one line at the largest sizes.
+enum ScaledSize {
+    nonisolated static func capped(_ scaled: CGFloat, base: CGFloat, cap: CGFloat) -> CGFloat { min(scaled, base * cap) }
+}
+
 /// Small uppercase caption above a value: "FROM", "DISTANCE", "JOIN CODE".
 struct StatCaption: View {
     var text: String
@@ -63,12 +87,16 @@ struct StatGrid: View {
     var items: [Item]
     var background: Color
     var valueSize: CGFloat = 17
+    @ScaledMetric private var scaledValue: CGFloat
 
     init(_ items: [Item], background: Color, valueSize: CGFloat = 17) {
         self.items = items
         self.background = background
         self.valueSize = valueSize
+        _scaledValue = ScaledMetric(wrappedValue: valueSize, relativeTo: .title3)
     }
+
+    private var scaledValueSize: CGFloat { ScaledSize.capped(scaledValue, base: valueSize, cap: 1.6) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -98,17 +126,15 @@ struct StatGrid: View {
         VStack(spacing: 0) {
             StatCaption(item.caption)
             Text(item.value ?? "–")
-                .font(.system(size: valueSize, weight: .bold, design: .rounded))
+                .font(.system(size: scaledValueSize, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .wrapsAtAccessibilitySizes()
                 .foregroundStyle(item.color ?? (item.value == nil ? Color.secondary : Color.primary))
             if let detail = item.detail {
                 Text(detail)
                     .font(.caption)
                     .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .wrapsAtAccessibilitySizes()
                     .foregroundStyle(Color.surfaceSecondary)
             }
         }
