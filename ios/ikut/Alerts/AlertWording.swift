@@ -162,8 +162,8 @@ enum AlertWording {
         case .status:
             return "\(capitalized(car)) \(statement(for: event.type))."
         case .message:
-            if let text = event.message { return "Message from \(car): \(text)" }
-            return "Message from \(car)."
+            // Never the typed text: a driver is not read a message. The banner shows it for a passenger.
+            return "New message from \(car)."
         }
     }
 

@@ -117,6 +117,11 @@ final class AlertCenter {
         policy = nil
     }
 
+    /// The "Read alerts aloud" switch changed: turning it off cuts off what is being said and drops what waits.
+    func readAloudChanged() {
+        if !readAloud() { speaker.stop() }
+    }
+
     func dismiss() {
         dismissTask?.cancel()
         dismissTask = nil
