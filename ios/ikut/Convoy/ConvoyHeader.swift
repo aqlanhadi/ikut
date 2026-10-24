@@ -51,7 +51,7 @@ enum ConvoyHeader {
         return Text(from: from, joinLine: j.line, spokenJoin: j.spoken)
     }
 
-    /// Starts with "3 in Convoy" (UI tests read it).
+    /// Starts with "3 in convoy" (UI tests read it).
     static func label(title: String, text: Text, destination: String, arrive: String?) -> String {
         var parts = [title, "from \(text.from)"]
         if let spoken = text.spokenJoin { parts.append(spoken) }

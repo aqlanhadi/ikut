@@ -36,10 +36,10 @@ enum StopSkipAll {
 
     /// What everyone else reads where the button would be: "Aqlan can skip this stop for everyone." The organizer's
     /// name comes from their member document (`organizerName`); until that is loaded, the owner word of car number 1
-    /// (the organizer's car, kept on rejoin; the lead car can be another car); else "The organizer".
+    /// (the organizer's car, kept on rejoin; the lead car can be another car); else "The organiser".
     static func passengerLine(organizerName: String?, cars: [Car]) -> String {
         let named = organizerName.flatMap { $0.isEmpty ? nil : $0 }
-        let who = named ?? cars.first { $0.number == 1 }.map(StopLeave.ownerWord) ?? "The organizer"
+        let who = named ?? cars.first { $0.number == 1 }.map(StopLeave.ownerWord) ?? "The organiser"
         return "\(who) can skip this stop for everyone."
     }
 }
