@@ -215,7 +215,8 @@ final class StopPlanner {
         do {
             let built = try await Self.build(
                 items: edited, destination: destination, origin: origin,
-                fallbackStart: Polyline.decode(route).first, router: router, cache: cache)
+                fallbackStart: Polyline.decode(route).first, router: router, cache: cache,
+                ourSide: RouteLine(Polyline.decode(route)))
             try Task.checkCancellation()
             let removed = savedIds.filter { id in !edited.contains { $0.id == id } }
             do {
@@ -264,8 +265,12 @@ final class StopPlanner {
     static func build(
         items: [StopDraft], destination: CLLocationCoordinate2D,
         origin: @MainActor () async -> CLLocationCoordinate2D? = { try? await RouteBuilder.currentLocation() },
-        fallbackStart: CLLocationCoordinate2D?, router: LegRouting = MapKitLegRouter(), cache: LegCache? = nil
+        fallbackStart: CLLocationCoordinate2D?, router: LegRouting = MapKitLegRouter(), cache: LegCache? = nil,
+        ourSide: RouteLine? = nil, sites: [PlaceSite] = OurSide.bundledSites
     ) async throws -> (route: BuiltRoute, items: [StopDraft]) {
+        // A rest-area stop on the other carriageway moves to its twin on ours before any leg is asked for, so the
+        // route drives straight into it. `ourSide` is the road we are on: the trip's route as it is now.
+        let items = OurSide.snap(items, on: ourSide, sites: sites)
         let meet = items.first(where: \.isMeeting)
         let via = items.filter { !$0.isMeeting }
         // The meeting point when there is one; else where the organizer is now, or without a fix where

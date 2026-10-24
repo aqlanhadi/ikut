@@ -150,10 +150,12 @@
 		A657EDCF6D6DA9A73F846E55 /* TripAsks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7DC3EDEBB7871FAFC1771F /* TripAsks.swift */; };
 		A73AAE0FC74B7C166FC40A05 /* CreateTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */; };
 		A74B16DFEF7B5FB972954D3A /* kl-ipoh-north.json in Resources */ = {isa = PBXBuildFile; fileRef = AB235466F9BD996ABFB00B97 /* kl-ipoh-north.json */; };
+		A832D47DD7426CC3658296CC /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = CA192F79FB2F9166FBD454E4 /* README.md */; };
 		A889D2AE7ED65EDEDDACD020 /* OwnWayDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD4FAF0956DC812EFB12371 /* OwnWayDemo.swift */; };
 		AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
 		AE42D67433F25C45F00C1848 /* StopCardParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C456C99B4E7723AFF06FB58C /* StopCardParts.swift */; };
+		AE72CCADED8DA399C9756E21 /* OurSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E829D83EBFA088CE302217 /* OurSide.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
 		B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A209AB9671B47B22C20E451 /* ikut.icon */; };
 		B7DDF8AAF5AC85A86C6F39D6 /* StopPillLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */; };
@@ -179,6 +181,7 @@
 		D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D417D8CDD8A80CCF181936 /* TrackingTests.swift */; };
 		D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */; };
 		D80A984085D33024BE6B519E /* PausedBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236F0C8AD5686F34C2F35CD8 /* PausedBanner.swift */; };
+		D823810299EDCF93BD262452 /* StopOurSideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C199021086844F76B783FE /* StopOurSideTests.swift */; };
 		D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */; };
 		DDFB1D5C15A1D5FEC996A11C /* AlertSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6117F5F8B2493D250C4083B /* AlertSettings.swift */; };
 		DF3245BE5E06371D9D8F78DA /* AlertPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4E3792B5AD023C85CD5AA0 /* AlertPolicy.swift */; };
@@ -319,6 +322,7 @@
 		644401FB5F0CAB8C10EF3B3B /* StopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopTests.swift; sourceTree = "<group>"; };
 		650E26FDD008B015443CC328 /* AlertWording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertWording.swift; sourceTree = "<group>"; };
 		65A002CD84457A0B4A1CF7DC /* StopFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopFormat.swift; sourceTree = "<group>"; };
+		65E829D83EBFA088CE302217 /* OurSide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OurSide.swift; sourceTree = "<group>"; };
 		66FF5396649ED8B58EC123A7 /* TripAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAskTests.swift; sourceTree = "<group>"; };
 		67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarAheadTests.swift; sourceTree = "<group>"; };
 		698FEDDD6491F2113B929776 /* RecapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapService.swift; sourceTree = "<group>"; };
@@ -344,6 +348,7 @@
 		826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkBanner.swift; sourceTree = "<group>"; };
 		84CD4811E9FF9FE7940656C0 /* StopAnswer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswer.swift; sourceTree = "<group>"; };
 		85031A857FFEE9A7F7CEE986 /* StopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopService.swift; sourceTree = "<group>"; };
+		85C199021086844F76B783FE /* StopOurSideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopOurSideTests.swift; sourceTree = "<group>"; };
 		881F14A69E038A11FD750DD0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8910BC2D6402772067EC5AE7 /* SuggestStops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestStops.swift; sourceTree = "<group>"; };
 		89911FBE6E40CB98D46C337F /* Polyline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polyline.swift; sourceTree = "<group>"; };
@@ -395,6 +400,7 @@
 		C46CA4198406B579655640C1 /* FirestoreDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDecoding.swift; sourceTree = "<group>"; };
 		C46D1C04BC5842435C33213A /* TripSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSession.swift; sourceTree = "<group>"; };
 		C963869E69413A0E655BFED4 /* SpeechQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueue.swift; sourceTree = "<group>"; };
+		CA192F79FB2F9166FBD454E4 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportOption.swift; sourceTree = "<group>"; };
 		CBAB9007352FC219EF36852D /* README-places.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README-places.md"; sourceTree = "<group>"; };
 		CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripView.swift; sourceTree = "<group>"; };
@@ -689,6 +695,7 @@
 			children = (
 				AB235466F9BD996ABFB00B97 /* kl-ipoh-north.json */,
 				2244F4B55239022AF10B572D /* kl-ipoh-south.json */,
+				CA192F79FB2F9166FBD454E4 /* README.md */,
 				BEA9EED0F6538FAD356A6D9F /* sungai-buloh-north.json */,
 			);
 			path = Fixtures;
@@ -697,6 +704,7 @@
 		C9DC20C59EF24C89D55FB060 /* Places */ = {
 			isa = PBXGroup;
 			children = (
+				65E829D83EBFA088CE302217 /* OurSide.swift */,
 				643A99005C1667737C153F8B /* Place.swift */,
 				7FE148B8C110122AD858B9D2 /* PlaceRules.swift */,
 				091A73560C6A3A87AF053698 /* PlaceSide.swift */,
@@ -800,6 +808,7 @@
 				3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */,
 				01E0F9C4A3658B6AB1A4B07F /* StopDelayTests.swift */,
 				3077A797F64E10D19A3B4D36 /* StopLeaveTests.swift */,
+				85C199021086844F76B783FE /* StopOurSideTests.swift */,
 				13A17502ECF89C7385935BA5 /* StopRouteTests.swift */,
 				2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */,
 				644401FB5F0CAB8C10EF3B3B /* StopTests.swift */,
@@ -1006,6 +1015,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A832D47DD7426CC3658296CC /* README.md in Resources */,
 				A74B16DFEF7B5FB972954D3A /* kl-ipoh-north.json in Resources */,
 				2FA7B4DE64C9B6F7D8315DB5 /* kl-ipoh-south.json in Resources */,
 				A623E9E3325A54F7DE68E47B /* sungai-buloh-north.json in Resources */,
@@ -1091,6 +1101,7 @@
 				7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */,
 				7F0F1E9387E6DF47B36D0E2D /* NextStop.swift in Sources */,
 				A394C64ECF58676AB0A60731 /* NextStopDemo.swift in Sources */,
+				AE72CCADED8DA399C9756E21 /* OurSide.swift in Sources */,
 				FE481F15A33FCA102C4B35D7 /* OwnWay.swift in Sources */,
 				A889D2AE7ED65EDEDDACD020 /* OwnWayDemo.swift in Sources */,
 				F6B53E2E7B17959EE85F9245 /* PanelHeaderDemo.swift in Sources */,
@@ -1228,6 +1239,7 @@
 				8D67D8F00984536BF6345D04 /* StopArrivalTests.swift in Sources */,
 				4EDC16B825285A145AFE88C1 /* StopDelayTests.swift in Sources */,
 				9BB6E062ECEC7EDADF1CA6D7 /* StopLeaveTests.swift in Sources */,
+				D823810299EDCF93BD262452 /* StopOurSideTests.swift in Sources */,
 				7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */,
 				3AD9AEB8B316FD22E3E27B49 /* StopSkipAllTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
