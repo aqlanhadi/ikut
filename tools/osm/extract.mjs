@@ -28,6 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { publish } from './publish.mjs';
 import { readPbf, readPbfTimestamp } from './pbf.mjs';
 import { toPlaces, roadIndex, slipRoads, distanceToRing } from './places.mjs';
 import { haversine } from '../../qa/lib/route.mjs';
@@ -239,6 +240,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   fs.writeFileSync(out, serialize(file));
   // The licence readme travels with the file (the bundle, and the hosted copy).
   fs.copyFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'README-places.md'), path.join(path.dirname(out), 'README-places.md'));
+  // The hosted copy and its manifest, for `firebase deploy --only hosting` (only for the default output).
+  if (process.argv.length <= 3) publish(out);
   const bytes = fs.statSync(out).size;
   const by = (k) => file.sites.filter((s) => s.kind === k).length;
   console.log(`${out}: ${(bytes / 1024).toFixed(0)} KB, ${by('services')} services, ${by('rest_area')} rest areas, ${file.fuel.length} lone fuel stations, `

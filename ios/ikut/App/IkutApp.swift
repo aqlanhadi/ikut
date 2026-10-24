@@ -30,6 +30,7 @@ struct IkutApp: App {
             ContentView(pendingJoinCode: $pendingJoinCode)
                 .environment(auth)
                 .environment(location)
+                .task { await PlacesRefresher.shared.refreshIfDue() }
                 .onOpenURL { url in
                     if case .join(let code)? = DeepLink.parse(url) { pendingJoinCode = code }
                 }

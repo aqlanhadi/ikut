@@ -32,7 +32,7 @@ enum PlacesLoader {
     }
 }
 
-private extension JSONDecoder.DateDecodingStrategy {
+extension JSONDecoder.DateDecodingStrategy {
     /// `new Date().toISOString()`: `2026-10-24T03:14:15.926Z`.
     static var iso8601WithFractionalSeconds: Self {
         .custom { decoder in

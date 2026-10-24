@@ -18,6 +18,23 @@
       ]
     }
   ],
+  "hosting": {
+    "public": "hosting",
+    "ignore": [
+      "**/.*"
+    ],
+    "headers": [
+      {
+        "source": "places/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      }
+    ]
+  },
   "emulators": {
     "singleProjectMode": true,
     "auth": {
