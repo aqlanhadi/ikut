@@ -4,29 +4,29 @@ import Testing
 
 struct PanelSheetTests {
     private func heights(folded: CGFloat? = 300, unfolded: CGFloat? = 480, card: CGFloat? = 340,
-                         inset: CGFloat = 34, room: CGFloat? = 700) -> PanelSheet.Heights {
-        PanelSheet.heights(folded: folded, unfolded: unfolded, card: card, bottomInset: inset, room: room)
+                         room: CGFloat? = 700) -> PanelSheet.Heights {
+        PanelSheet.heights(folded: folded, unfolded: unfolded, card: card, room: room)
     }
 
     @Test func shortAndTallFollowTheMeasuredPanelPlusTheHomeIndicator() {
         let h = heights()
-        #expect(h.short == 334)
-        #expect(h.tall == 514)
-        #expect(h.card == 374)
+        #expect(h.short == 300)
+        #expect(h.tall == 480)
+        #expect(h.card == 340)
     }
 
     @Test func aLayoutNotSeenYetUsesTheEstimate() {
         let h = heights(folded: nil, unfolded: nil, card: nil)
-        #expect(h.short == PanelSheet.foldedEstimate + 34)
-        #expect(h.tall == PanelSheet.unfoldedEstimate + 34)
-        #expect(h.card == PanelSheet.cardEstimate + 34)
+        #expect(h.short == PanelSheet.foldedEstimate)
+        #expect(h.tall == PanelSheet.unfoldedEstimate)
+        #expect(h.card == PanelSheet.cardEstimate)
     }
 
     @Test func neitherHeightPassesTheRoomUnderThePills() {
         let h = heights(folded: 300, unfolded: 900, card: 900, room: 600)
         #expect(h.tall == 600)
         #expect(h.card == 600)
-        #expect(h.short == 334)
+        #expect(h.short == 300)
         // A big text size makes even the folded panel too tall: it gives way to the pills.
         #expect(heights(folded: 800, unfolded: 900, room: 600).short == 600)
     }
@@ -43,19 +43,19 @@ struct PanelSheetTests {
     }
 
     @Test func noRoomMeasuredYetCapsNothing() {
-        #expect(heights(folded: 300, unfolded: 900, room: nil).tall == 934)
+        #expect(heights(folded: 300, unfolded: 900, room: nil).tall == 900)
         #expect(PanelSheet.room(mapHeight: 0, reserved: 74) == nil)
         #expect(PanelSheet.room(mapHeight: 874, reserved: 74) == 800)
     }
 
     @Test func detentsAreTheShortAndTallOneOrTheCardsOwn() {
         let h = heights()
-        #expect(PanelSheet.detents(.folded, in: h) == [.height(334), .height(514)])
-        #expect(PanelSheet.detents(.unfolded, in: h) == [.height(334), .height(514)])
-        #expect(PanelSheet.detents(.card, in: h) == [.height(374)])
-        #expect(PanelSheet.detent(.folded, in: h) == .height(334))
-        #expect(PanelSheet.detent(.unfolded, in: h) == .height(514))
-        #expect(PanelSheet.detent(.card, in: h) == .height(374))
+        #expect(PanelSheet.detents(.folded, in: h) == [.height(300), .height(480)])
+        #expect(PanelSheet.detents(.unfolded, in: h) == [.height(300), .height(480)])
+        #expect(PanelSheet.detents(.card, in: h) == [.height(340)])
+        #expect(PanelSheet.detent(.folded, in: h) == .height(300))
+        #expect(PanelSheet.detent(.unfolded, in: h) == .height(480))
+        #expect(PanelSheet.detent(.card, in: h) == .height(340))
     }
 
     @Test func aCardOpenWinsOverTheFoldedState() {
@@ -67,18 +67,43 @@ struct PanelSheetTests {
 
     @Test func aDraggedSheetUnfoldsTheListOnlyAtTheTallDetent() {
         let h = heights()
-        #expect(PanelSheet.isTall(.height(514), in: h))
-        #expect(!PanelSheet.isTall(.height(334), in: h))
-        // Nothing to unfold when the two are one height.
+        #expect(PanelSheet.choice(.height(480), in: h) == true)
+        #expect(PanelSheet.choice(.height(300), in: h) == false)
+        // Nothing to unfold when the two are one height: that height is the folded one.
         let same = heights(folded: 300, unfolded: 300)
-        #expect(!PanelSheet.isTall(.height(334), in: same))
+        #expect(PanelSheet.choice(.height(300), in: same) == false)
+    }
+
+    @Test func aHeightThatChangesWhileTallIsNotTheDriverFoldingTheList() {
+        // Tall was 480; the measured height settles at 446 and the sheet reports its old detent once more.
+        let now = heights(unfolded: 446)
+        #expect(now.tall == 480)
+        #expect(PanelSheet.choice(.height(480), in: now) == nil)
+        #expect(PanelSheet.choice(.height(480), in: now) == true)
+        // Likewise a short that moved under a folded sheet.
+        #expect(PanelSheet.choice(.height(300), in: heights(folded: 280)) == nil)
+    }
+
+    @Test func nothingIsLeftUnderTheButtonsButTheMarginAndTheSystemsOwnSafeArea() {
+        // The panel's content ends with its bottom margin and the sheet adds nothing: the home indicator's strip is
+        // the sheet's own (adding it again left 34 pt of empty space under Report and Pit stop).
+        let h = PanelSheet.heights(folded: 400, unfolded: 480, card: 300, room: nil)
+        #expect(h.short == 400)
+        #expect(h.tall == 480)
+        #expect(h.card == 300)
+        #expect(PanelSheet.bottomMargin == Spacing.s)
+    }
+
+    @Test func anExitWaitsForTheSheetOnlyWhileItIsUp() {
+        #expect(PanelSheet.exit(sheetUp: true) == .afterDismissal)
+        #expect(PanelSheet.exit(sheetUp: false) == .now)
     }
 
     @Test func theMapInsetFollowsTheDetentOnShow() {
         let h = heights()
-        #expect(PanelSheet.height(.folded, in: h) == 334)
-        #expect(PanelSheet.height(.unfolded, in: h) == 514)
-        #expect(PanelSheet.height(.card, in: h) == 374)
+        #expect(PanelSheet.height(.folded, in: h) == 300)
+        #expect(PanelSheet.height(.unfolded, in: h) == 480)
+        #expect(PanelSheet.height(.card, in: h) == 340)
     }
 
     @Test func theSheetStepsAsideForEachThingThatTakesTheScreen() {

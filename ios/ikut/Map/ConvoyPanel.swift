@@ -24,6 +24,9 @@ struct ConvoyPanel: View {
     var onNextStop: (String) -> Void = { _ in }
     /// The panel's own height as laid out (folded or unfolded), for the sheet's detents.
     var onHeight: (CGFloat) -> Void = { _ in }
+    /// A hidden copy that only measures the other layout, so the sheet knows both heights before it is asked to
+    /// move: it does no lookups and is not on screen or in VoiceOver.
+    var probe = false
 
     @State private var listHeight: CGFloat = 0
     @State private var originName: String?
@@ -41,24 +44,26 @@ struct ConvoyPanel: View {
             handle
             header
             progress
+            // The summary and the list cross-fade, never slide; the header and the buttons stay in place.
             if !expanded {
-                summary
+                summary.transition(.opacity)
             }
             if expanded {
-                stats
-                list
+                stats.transition(.opacity)
+                list.transition(.opacity)
             }
             buttons
         }
         .padding(.horizontal, Spacing.l)
-        .padding(.bottom, Spacing.l)
+        .padding(.bottom, PanelSheet.bottomMargin)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { onHeight($0) }
-        .task(id: originKey) {
-            guard let start = model.mainRoute?.coordinates.first else { return }
+        .task(id: probe ? "" : originKey) {
+            guard !probe, let start = model.mainRoute?.coordinates.first else { return }
             originName = await RouteBuilder.placeName(at: start)
         }
-        .task(id: ownInputs) {
+        .task(id: probe ? "" : ownInputs) {
             // Once per change of my car's route, merge offset, state or the main route, not per refresh.
+            guard !probe else { return }
             let main = model.mainRoute
             ownStart = OwnWayLogic.start(car: model.myCar, phone: nil)
             if model.myCar?.state == .joining, let main {
@@ -69,12 +74,12 @@ struct ConvoyPanel: View {
                 joinCoordinate = nil
             }
         }
-        .task(id: coordinateKey(ownStart)) {
+        .task(id: probe ? "" : coordinateKey(ownStart)) {
             ownStartName = nil
             guard let start = ownStart else { return }
             ownStartName = await RouteBuilder.placeName(at: start)
         }
-        .task(id: coordinateKey(joinCoordinate)) {
+        .task(id: probe ? "" : coordinateKey(joinCoordinate)) {
             joinPlaceName = nil
             guard let at = joinCoordinate else { return }
             joinPlaceName = await RouteBuilder.placeName(at: at)
