@@ -121,10 +121,12 @@ final class PlacesRefresher: @unchecked Sendable {
         self.fileURL = fileURL
     }
 
-    /// Whether the check is due: never done, or the last successful one was a week ago or more.
+    /// Whether the check is due: never done, or the last successful one was a week ago or more (or is in the future).
     func isDue() -> Bool {
         guard let last = defaults.object(forKey: Self.lastCheckKey) as? Date else { return true }
-        return now().timeIntervalSince(last) >= Self.interval
+        // A last check in the future means the clock was set back: ask again rather than wait out the difference.
+        let since = now().timeIntervalSince(last)
+        return since < 0 || since >= Self.interval
     }
 
     /// Checks, and downloads when there is a newer file. Never throws and never reports: returns whether a new file

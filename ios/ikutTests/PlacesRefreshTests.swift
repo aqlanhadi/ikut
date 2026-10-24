@@ -184,6 +184,15 @@ struct PlacesRefreshTests {
         #expect(await rig.refresher.refreshIfDue())
     }
 
+    @Test func aClockSetBackMeansAskAgain() async {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let rig = Self.rig(now: now, lastCheck: now.addingTimeInterval(30 * 86_400))
+        let data = Self.file()
+        StubHosting.manifest = Self.manifest(for: data)
+        StubHosting.file = data
+        #expect(await rig.refresher.refreshIfDue())
+    }
+
     @Test func noRequestWhileATripIsRunning() async {
         let rig = Self.rig(tripRunning: true)
         let data = Self.file()
