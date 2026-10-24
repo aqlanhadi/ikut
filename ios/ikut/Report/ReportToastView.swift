@@ -45,6 +45,7 @@ struct ReportToastView: View {
             }
         }
         .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: model.state)
+        .sensoryFeedback(.impact(weight: .medium), trigger: model.submittedCount)
         .sensoryFeedback(.success, trigger: model.reportedCount)
         .sensoryFeedback(.error, trigger: model.failureCount)
     }

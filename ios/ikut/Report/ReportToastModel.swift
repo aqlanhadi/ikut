@@ -19,6 +19,8 @@ final class ReportToastModel {
     private(set) var state: State = .hidden
     /// Bumped on every success / failure, for haptics.
     private(set) var reportedCount = 0
+    /// Bumped on every submit, for the tap haptic (the toast outlives the sheet).
+    private(set) var submittedCount = 0
     private(set) var failureCount = 0
 
     @ObservationIgnored private let service: any ReportService
@@ -54,6 +56,7 @@ final class ReportToastModel {
     @discardableResult
     func submit(_ option: ReportOption, context: ReportContext, snapshot: ReportSnapshot) -> Task<Void, Never> {
         generation += 1
+        submittedCount += 1
         let mine = generation
         hideTask?.cancel()
         tripId = context.tripId

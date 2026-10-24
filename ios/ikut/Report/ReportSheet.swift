@@ -11,7 +11,6 @@ struct ReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// Where the car was when the sheet opened; that's where the pin goes.
     @State private var pinned: ReportSnapshot?
-    @State private var tapCount = 0
 
     init(context: ReportContext, toast: ReportToastModel, onReported: @escaping (EventType) -> Void) {
         self.context = context
@@ -41,7 +40,6 @@ struct ReportSheet: View {
             .padding(.top, Spacing.m)
             .padding(.bottom, Spacing.block)
         }
-        .sensoryFeedback(.success, trigger: tapCount)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
@@ -127,7 +125,6 @@ struct ReportSheet: View {
 
     private func send(_ option: ReportOption) {
         guard let pinned else { return }
-        tapCount += 1
         toast.submit(option, context: context, snapshot: pinned)
         onReported(option.type)
         dismiss()
