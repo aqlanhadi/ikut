@@ -19,7 +19,7 @@ enum RecapFilter: String, CaseIterable, Identifiable {
 /// a trip (`RecapView`) and the sheet over Home's map when a past trip is picked (`PickedTripSheet`).
 struct RecapContent: View {
     enum Layout: Equatable {
-        /// The screen after a trip: "Trip complete", name and subtitle on top, a route map card
+        /// The screen after a trip: "Trip complete" and subtitle on top (the name is the bar's large title), a route map card
         /// above the stats, and Share and Done at the bottom.
         case screen
         /// Inside Home's sheet: the name is already pinned above, the map is Home's own.
@@ -45,10 +45,6 @@ struct RecapContent: View {
             Text("Trip complete")
                 .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ikutAccent)
                 .padding(.horizontal, Spacing.xs).padding(.top, Spacing.cozy)
-            Text(recap.title)
-                .font(.largeTitle.bold())
-                .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)
-                .accessibilityAddTraits(.isHeader)
             Text(recap.subtitle)
                 .font(.subheadline).foregroundStyle(.secondary)
                 .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)

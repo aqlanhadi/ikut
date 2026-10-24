@@ -73,6 +73,7 @@ struct HomeView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle("Trips") // only the pushed pages' Back label; this page has no bar
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .create:
