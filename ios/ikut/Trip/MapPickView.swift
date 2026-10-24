@@ -45,6 +45,12 @@ struct MapPickView: View {
         [place.name, along?.pinLine(for: place.coordinate)].compactMap { $0 }.joined(separator: " · ")
     }
 
+    /// Whether a camera frame is away from the spot the map last settled on (under about 1 m counts as the same), so
+    /// the answer is right whichever of the continuous and the end callbacks comes last.
+    static func isMoving(_ frame: CLLocationCoordinate2D, settled: CLLocationCoordinate2D) -> Bool {
+        abs(frame.latitude - settled.latitude) > 1e-5 || abs(frame.longitude - settled.longitude) > 1e-5
+    }
+
     private var spot: DestinationResult { namer.place ?? PinName.place(nil, at: center) }
 
     var body: some View {
@@ -56,7 +62,9 @@ struct MapPickView: View {
                     }
                 }
                 .mapControls { MapCompass() }
-                .onMapCameraChange(frequency: .continuous) { _ in moving = true }
+                .onMapCameraChange(frequency: .continuous) { context in
+                    moving = Self.isMoving(context.region.center, settled: center)
+                }
                 .onMapCameraChange(frequency: .onEnd) { context in
                     moving = false
                     center = context.region.center

@@ -209,4 +209,15 @@ struct PlacePinTests {
         #expect(abs(MapPickView.startRegion(origin: here, route: route).center.latitude - 4) < 1e-9)
         #expect(MapPickView.startRegion(origin: nil, route: []).center.latitude == SearchRegion.malaysia.center.latitude)
     }
+
+    @Test func movingDependsOnTheFrameNotOnWhichCallbackRunsLast() {
+        let settled = c(3.139, 101.687)
+        #expect(MapPickView.isMoving(c(3.140, 101.688), settled: settled))
+        // The final frame after the settle: same spot, not moving.
+        #expect(!MapPickView.isMoving(c(3.139, 101.687), settled: settled))
+        #expect(!MapPickView.isMoving(c(3.139000004, 101.687000004), settled: settled))
+        // The final frame before the settle: still away until the settle updates the spot.
+        #expect(MapPickView.isMoving(c(3.2, 101.7), settled: settled))
+        #expect(!MapPickView.isMoving(c(3.2, 101.7), settled: c(3.2, 101.7)))
+    }
 }
