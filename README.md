@@ -54,6 +54,8 @@ cd firebase/functions && npm install && npm run build
 gcloud firestore fields ttls update expiresAt --collection-group=events --enable-ttl --project=ikut-b1083
 ```
 
+TTL deletes only the event, not its stop votes; `purgeTripDataJob` deletes those once the trip has been ended for 7 days.
+
 TTL does not cover positions, so the scheduled function remains the only thing that enforces the 7-day location promise.
 
 ## Tests

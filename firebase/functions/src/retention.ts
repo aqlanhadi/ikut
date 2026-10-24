@@ -44,6 +44,8 @@ export interface PurgeResult {
   stopsCleared: number;
   /** Skip answers (stops/{s}/answers/{carId}: user id and time) deleted from ended trips. */
   answers: number;
+  /** Stop votes (events/{e}/votes/{carId}: user id and time) deleted with their events. */
+  votes: number;
   /** Ended trips that failed part-way; the next run retries them. */
   failed: number;
   positions: number;
@@ -64,6 +66,45 @@ async function deleteInBatches(db: Firestore, base: Query): Promise<number> {
     await batch.commit();
     deleted += page.size;
     if (page.size < BATCH_SIZE) return deleted;
+  }
+}
+
+/** How many events have their votes deleted at once. */
+const VOTE_PARALLEL = 20;
+
+/**
+ * Deletes the given events, each one's votes first (Firestore leaves a subcollection behind when its parent goes).
+ * Votes go before the event, so a run that stops half way leaves the event to retry. Refs may name events that are
+ * already gone (their votes are still found and deleted); `events` counts only those that existed.
+ */
+async function deleteEventsWithVotes(db: Firestore, refs: FirebaseFirestore.DocumentReference[]): Promise<{ events: number; votes: number }> {
+  let events = 0;
+  let votes = 0;
+  for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+    const slice = refs.slice(i, i + BATCH_SIZE);
+    for (let j = 0; j < slice.length; j += VOTE_PARALLEL) {
+      const counts = await Promise.all(slice.slice(j, j + VOTE_PARALLEL).map((r) => deleteInBatches(db, r.collection("votes"))));
+      votes += counts.reduce((a, n) => a + n, 0);
+    }
+    const snaps = await db.getAll(...slice, { fieldMask: [] });
+    events += snaps.filter((d) => d.exists).length;
+    const batch = db.batch();
+    for (const r of slice) batch.delete(r);
+    await batch.commit();
+  }
+  return { events, votes };
+}
+
+/** Same, for every document of an events query (the expiry sweep); pages until none match. */
+async function deleteEventsWithVotesOf(db: Firestore, base: Query): Promise<{ events: number; votes: number }> {
+  const total = { events: 0, votes: 0 };
+  for (;;) {
+    const page = await base.limit(BATCH_SIZE).get();
+    if (page.empty) return total;
+    const r = await deleteEventsWithVotes(db, page.docs.map((d) => d.ref));
+    total.events += r.events;
+    total.votes += r.votes;
+    if (page.size < BATCH_SIZE) return total;
   }
 }
 
@@ -93,11 +134,11 @@ async function purgeStopTraces(db: Firestore, tripRef: FirebaseFirestore.Documen
 }
 
 /**
- * Retention sweep. Deletes positions and events of ended trips older than POSITION_RETENTION_MS,
+ * Retention sweep. Deletes positions and events (with their stop votes) of ended trips older than POSITION_RETENTION_MS,
  * clears arrivedAt/leftAt/leftBy on their stops and deletes the skip answers (the trip and stop docs stay), then every event past its expiresAt grace period, in any trip.
  */
 export async function purgeTripData(db: Firestore, now: Date = new Date()): Promise<PurgeResult> {
-  const result: PurgeResult = { trips: 0, failed: 0, stopsCleared: 0, answers: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
+  const result: PurgeResult = { trips: 0, failed: 0, stopsCleared: 0, answers: 0, votes: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
   const endedBefore = Timestamp.fromMillis(now.getTime() - POSITION_RETENTION_MS);
   let cursor: QueryDocumentSnapshot | undefined;
 
@@ -118,14 +159,15 @@ export async function purgeTripData(db: Firestore, now: Date = new Date()): Prom
       if (!shouldPurgeTripData(doc.data() as Trip, now)) continue;
       try {
         const positions = await deleteInBatches(db, doc.ref.collection("positions"));
-        const events = await deleteInBatches(db, doc.ref.collection("events"));
+        const events = await deleteEventsWithVotes(db, await doc.ref.collection("events").listDocuments());
         const traces = await purgeStopTraces(db, doc.ref);
         result.positions += positions;
-        result.endedTripEvents += events;
+        result.endedTripEvents += events.events;
+        result.votes += events.votes;
         result.stopsCleared += traces.stops;
         result.answers += traces.answers;
         // Purged trips stay in the query, so only count those that had something to delete.
-        if (positions + events + traces.stops + traces.answers > 0) result.trips++;
+        if (positions + events.events + events.votes + traces.stops + traces.answers > 0) result.trips++;
       } catch (err) {
         result.failed++;
         logger.error("purgeTripData: trip purge failed", { tripId: doc.id, err: String(err) });
@@ -135,10 +177,12 @@ export async function purgeTripData(db: Firestore, now: Date = new Date()): Prom
   }
 
   // Collection-group sweep: covers active trips too.
-  result.expiredEvents = await deleteInBatches(
+  const expired = await deleteEventsWithVotesOf(
     db,
     db.collectionGroup("events").where("expiresAt", "<", eventExpiryCutoff(now)),
   );
+  result.expiredEvents = expired.events;
+  result.votes += expired.votes;
 
   logger.info("purgeTripData: done", { ...result });
   return result;
