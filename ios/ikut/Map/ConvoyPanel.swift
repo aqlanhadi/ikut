@@ -3,8 +3,8 @@ import SwiftUI
 
 /// What Apple's own sheet at the bottom of the map holds (Map.dc.html): FROM and TO with the arrival
 /// time, a progress bar with every car and hazard on the route, spread / lead speed,
-/// one row per car (joining cars last, with dashed badges). Report and Pit stop are `ConvoyActionBar`, pinned under it. Folded (the
-/// short detent) it is FROM/TO, progress and a one-line summary; a tap on the header
+/// one row per car (joining cars last, with dashed badges). Report and Pit stop are `ConvoyActionBar`, pinned
+/// under it. Folded (the short detent) it is FROM/TO, progress and a one-line summary; a tap on the header
 /// or a drag of the sheet, unfolds it (the tall detent).
 ///
 /// The sheet (`TripMapView`, `PanelSheet`) is the surface and owns the sizes: this view only reports
@@ -405,8 +405,9 @@ struct ConvoyActionBar: View {
         }
         .padding(.horizontal, Spacing.l)
         .padding(.top, Spacing.m)
-        // The sheet's bottom safe area is more than the side gap: the buttons hang down into it (the bar's layout height stops above
-        // it, so the detents are still content + bar) until the gap under them equals the gap beside them.
+        // The sheet's bottom safe area is more than the side gap: the buttons hang down into it (the bar's layout
+        // height stops above it, so the detents are still content + bar) until the gap under them equals the gap
+        // beside them.
         .padding(.bottom, -lift)
     }
 }
