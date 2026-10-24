@@ -32,4 +32,16 @@ enum PlaceRules {
     static let halfwayFrom: Double = 5_400
     /// Two places within this many seconds of the mark tie, and the one with more for everyone wins.
     static let tie: Double = 300
+
+    // MARK: A stop request on the road
+
+    /// A lay-by counts this many seconds further than it is when ranking: an R&R 10 min beyond a lay-by stall
+    /// is the better stop.
+    static let laybyPenalty: Double = 15 * 60
+    /// A place less than this far ahead of the front car is too close to turn into.
+    static let minAhead: Double = 500
+    /// How many places a request lists.
+    static let requestMax = 3
+    /// The convoy's pace when nothing better is known: 90 km/h.
+    static let fallbackSpeed: Double = 25
 }

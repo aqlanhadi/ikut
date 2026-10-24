@@ -13,6 +13,9 @@ struct StopContext: Sendable {
     var snapshot: @MainActor @Sendable () -> ReportSnapshot?
     /// The trip's main route; nil until loaded. The event's offset is along this route.
     var mainRoute: RouteLine?
+    /// Where the convoy's front is on `mainRoute` and how fast it goes (the places a request lists are ahead of
+    /// it); nil while no car has a place on the route.
+    var front: @MainActor @Sendable () -> RequestFront? = { nil }
 }
 
 /// What the card's and the pill's buttons do. The host supplies these; `StopService.actions`

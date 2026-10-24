@@ -12,7 +12,8 @@ enum OurSide {
     static let twinRadius: Double = 1_000
 
     /// The places file inside the app, read once.
-    static let bundledSites: [PlaceSite] = (try? PlacesLoader.bundled())?.sites ?? []
+    static let bundledFile: PlacesFile? = try? PlacesLoader.bundled()
+    static var bundledSites: [PlaceSite] { bundledFile?.sites ?? [] }
 
     /// Reads the places file on a background thread so the first stop edit doesn't decode it on the main one.
     static func warm() { Task.detached(priority: .utility) { _ = bundledSites } }

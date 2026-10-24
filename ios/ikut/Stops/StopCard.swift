@@ -18,6 +18,8 @@ final class StopCardModel {
     /// The request being made: reason tiles, then the optional message.
     let ask: RequestStopModel
     var session = StopCardSession()
+    /// Places ahead that fit what is asked, under the open request(s).
+    let places = StopPlacesModel()
     /// Sent; waiting for the request to show up on the board.
     var sentWaiting = false
 
@@ -71,6 +73,7 @@ struct StopCard: View {
                 try? await Task.sleep(for: .seconds(8))
                 if !Task.isCancelled { model.sentWaiting = false }
             }
+            .task(id: needs) { await model.places.keepFresh(reasons: needs, context: context) }
             .onChange(of: board.requests.map(\.eventId)) { _, ids in
                 guard !ids.isEmpty else { return }
                 // A request is open, mine or someone's: whatever was being asked is over.
@@ -79,6 +82,9 @@ struct StopCard: View {
                 model.backHome()
             }
     }
+
+    /// What the open requests ask for, together: one list covers every reason.
+    private var needs: [RequestNeed] { board.requests.compactMap { RequestNeed($0.type) } }
 
     @ViewBuilder private var screen: some View {
         switch model.screen {
@@ -248,6 +254,7 @@ struct StopCard: View {
         StopCardFrame(title: state.title, subtitle: subtitle(state), onClose: onClose) {
             if let message = state.message { StopMessageTile(text: message) }
             ForEach(state.rows) { StopVoterRow(row: $0) }
+            StopPlaceRows(places: model.places.places)
         } actions: {
             requestButtons(state, suffix: "", height: big ? 72 : 50, secondaryHeight: big ? 56 : 50)
         }
@@ -288,6 +295,7 @@ struct StopCard: View {
             ForEach(Array(board.requests.enumerated()), id: \.element.eventId) { index, state in
                 miniRequest(state, suffix: ".\(index)")
             }
+            StopPlaceRows(places: model.places.places)
         } actions: {}
     }
 
