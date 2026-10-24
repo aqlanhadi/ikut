@@ -65,7 +65,7 @@ targets:
           if [ "$CONFIGURATION" != "Debug" ]; then
             PLIST="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
             /usr/libexec/PlistBuddy -c "Delete :NSLocalNetworkUsageDescription" "$PLIST" || true
-            /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$PLIST" || true
+            /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity:NSAllowsLocalNetworking" "$PLIST" || true
           fi
     dependencies:
       - package: Firebase
