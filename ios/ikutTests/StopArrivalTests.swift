@@ -189,4 +189,36 @@ struct StopArrivalTests {
         // Leave names it instead of saying everyone is here.
         #expect(StopLeave.waitingLine(tally.rows, leaving: "c1") == "No location from Car 2 yet")
     }
+
+    @Test func aCarNobodyShareLocationFromIsListedButNotCountedOrWaitedFor() {
+        func shared(_ id: String, _ n: Int, tracker: String?) -> Car {
+            var c = car(id, number: n); c.trackerUserId = tracker; return c
+        }
+        // c3 has no tracker; c2 has a tracker but no position yet.
+        let cars = [shared("c1", 1, tracker: "u1"), shared("c2", 2, tracker: "u2"), shared("c3", 3, tracker: nil)]
+        let positions = ["c1": position(offset: stopOffset)]
+        let snapshot = ConvoyOrdering.order(cars: cars, positions: positions, now: now)
+        func tally(_ cars: [Car]) -> StopArrival.Tally {
+            StopArrival.tally(target: target, convoy: snapshot.convoy, joining: snapshot.joining, pace: nil, now: now, cars: cars)
+        }
+        let t = tally(cars)
+        #expect(t.rows.count == 3)
+        // The tracker with no position counts and reads "Waiting for location"; the car with none does neither.
+        #expect(t.title == "1 of 2 here")
+        #expect(StopArrival.words(t.rows[1]) == "Waiting for location")
+        #expect(StopArrival.words(t.rows[2]) == "Not sharing location" && !t.counted.contains { $0.id == "c3" })
+        #expect(StopLeave.waitingLine(t.rows, leaving: "c1") == "No location from Car 2 yet")
+        // Everyone who can be here is here: all here, and Leave has nobody to name.
+        let done = ConvoyOrdering.order(
+            cars: cars, positions: ["c1": position(offset: stopOffset), "c2": position(offset: stopOffset - 50)], now: now)
+        let all = StopArrival.tally(target: target, convoy: done.convoy, joining: done.joining, pace: nil, now: now, cars: cars)
+        #expect(all.title == "2 of 2 here" && all.allHere)
+        #expect(StopLeave.waitingLine(all.rows, leaving: "c1") == nil)
+        // A tracker that left mid-trip moves the car to the same row, even with a position.
+        var left = cars; left[1].trackerUserId = nil
+        let after = ConvoyOrdering.order(
+            cars: left, positions: ["c1": position(offset: stopOffset), "c2": position(offset: stopOffset - 50)], now: now)
+        let gone = StopArrival.tally(target: target, convoy: after.convoy, joining: after.joining, pace: nil, now: now, cars: left)
+        #expect(gone.title == "1 of 1 here" && StopArrival.words(gone.rows[1]) == "Not sharing location")
+    }
 }

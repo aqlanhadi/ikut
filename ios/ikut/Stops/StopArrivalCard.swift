@@ -363,8 +363,8 @@ struct StopArrivalCard: View {
             CarBadge(number: row.car.number, colorHex: row.car.color, size: 26)
             Text(row.car.name).font(.body).lineLimit(1)
             Spacer(minLength: Spacing.s)
-            if row.skipping {
-                Text("Skipping").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+            if row.skipping || row.notSharing {
+                Text(StopArrival.words(row)).font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             } else if row.isHere {
                 Label("Here", systemImage: "checkmark")
                     .font(.subheadline.weight(.semibold))

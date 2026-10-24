@@ -50,15 +50,19 @@ enum StopArrival {
         var status: Status
         /// The car said it is skipping this stop (`SkipAnswers`): shown, but not counted and not waited for.
         var skipping = false
+        /// Nobody is sharing location from this car (`trackerUserId` nil, or the tracker left): shown, but not
+        /// counted and not waited for, since it can never turn Here (#231).
+        var notSharing: Bool { car.trackerUserId == nil }
         var isHere: Bool { status == .here }
     }
 
     struct Tally: Equatable, Sendable {
         var rows: [Row]
-        /// Skipping cars leave the count: "3 of 3 here" with a fourth car skipping. A car with no position yet still
+        /// Skipping cars and cars nobody shares location from leave the count: "3 of 3 here" with a fourth car
+        /// skipping. A car with no position yet still
         /// counts: it has a row of its own ("Waiting for location") because `tally` adds one for every trip car in
         /// neither list.
-        var counted: [Row] { rows.filter { !$0.skipping } }
+        var counted: [Row] { rows.filter { !$0.skipping && !$0.notSharing } }
         var here: Int { counted.filter(\.isHere).count }
         var total: Int { counted.count }
         var allHere: Bool { total > 0 && here == total }
@@ -127,8 +131,11 @@ enum StopArrival {
         return Tally(rows: rows)
     }
 
-    /// What a row says: "Skipping" for a skipping car, else `words(status)`.
-    static func words(_ row: Row) -> String { row.skipping ? "Skipping" : words(row.status) }
+    /// What a row says: "Skipping" for a skipping car, "Not sharing location" for a car with no tracker, else
+    /// `words(status)`.
+    static func words(_ row: Row) -> String {
+        row.skipping ? "Skipping" : row.notSharing ? "Not sharing location" : words(row.status)
+    }
 
     /// "Here", "3 min away", "9 km away" (no time to give), "Waiting for location".
     static func words(_ status: Status) -> String {

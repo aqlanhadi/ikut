@@ -205,6 +205,7 @@ enum DemoScreens {
         case "lobby-own-noroute": return nav(OwnWayDemo.lobby(.noRoute))
         case "road-arrival": return AnyView(StopArrivalDemo(.someHere))
         case "road-arrival-all": return AnyView(StopArrivalDemo(.allHere))
+        case "road-not-sharing": return AnyView(StopArrivalDemo(.notSharing))
         case "road-arrival-meet": return AnyView(StopArrivalDemo(.meeting))
         case "road-leave": return AnyView(StopArrivalDemo(.leave))
         case "road-leave-confirm": return AnyView(StopArrivalDemo(.leaveConfirm))

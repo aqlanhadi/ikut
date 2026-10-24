@@ -63,7 +63,7 @@ enum StopLeave {
     /// Who the convoy is waiting for, as one line: "Hafiz is 3 min away", "Hafiz and 2 more are still on the way".
     /// Nil when every car is here. `leaving` is the viewer's own car, which is not waited for.
     static func waitingLine(_ rows: [StopArrival.Row], leaving carId: String?) -> String? {
-        let away = rows.filter { !$0.isHere && !$0.skipping && $0.id != carId }
+        let away = rows.filter { !$0.isHere && !$0.skipping && !$0.notSharing && $0.id != carId }
         guard let first = away.first else { return nil }
         let name = ownerWord(first.car)
         if away.count > 1 { return "\(name) and \(away.count - 1) more are still on the way" }
