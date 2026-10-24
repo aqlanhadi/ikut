@@ -119,7 +119,7 @@ if (!o.skipBuild) {
 // ---------------------------------------------------------------- the two UI tests
 
 const startTest = (who, udid, only) => startUiTest(o, {
-  udid, only, id: who, label: who, say, onFail: (why) => sync.abort(why),
+  udid, only, id: who, label: who, say, onFail: (why) => sync.abort(why === `${who}'s test failed` ? `phone ${why}` : why), // the abort text names the phone
   logPath: path.join(o.logs, `convoy2-${who}.log`),
   bundle: path.join(o.logs, `convoy2-${who}.xcresult`),
   env: { TEST_RUNNER_IKUT_SYNC_DIR: sync.dir, TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
@@ -178,7 +178,7 @@ async function convoyOrderFromFirestore() {
 async function scenario() {
   // 1. A created the trip
   code = await sync.wait('a.code', 420);
-  const trips = await firestoreOwner({ structuredQuery: { from: [{ collectionId: 'trips' }], where: { fieldFilter: { field: { fieldPath: 'code' }, op: 'EQUAL', value: { stringValue: code } } } } });
+  const trips = await firestoreOwner({ from: [{ collectionId: 'trips' }], where: { fieldFilter: { field: { fieldPath: 'code' }, op: 'EQUAL', value: { stringValue: code } } } });
   check('trip created by phone A is in Firestore with a route', trips.length === 1 && (trips[0].fields.route?.stringValue ?? '').length > 0, `code ${code}`);
   tripId = trips[0].name.split('/').pop();
   route = new RouteLine(Polyline.decode(trips[0].fields.route.stringValue));
