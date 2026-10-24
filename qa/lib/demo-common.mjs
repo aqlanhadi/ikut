@@ -634,7 +634,7 @@ export const STOP_OPEN_S = 45;
 export const STOP_MESSAGE = 'Low on fuel, next R&R please';
 
 /**
- * The stop story: Faiz (phone 2) taps Pit stop > Fuel > Add a message > Inform the convoy (marker stop.b);
+ * The stop story: Faiz (phone 2) taps Pit stop > Fuel > Add a message > Tell the convoy (marker stop.b);
  * Hafiz and then Daniel tap OK; the organizer taps OK on her pill if her car was asked (marker agree) and the OKs
  * show on her card; the request stays STOP_OPEN_S; the organizer taps We've stopped (marker arrive) and the
  * request closes on every phone.

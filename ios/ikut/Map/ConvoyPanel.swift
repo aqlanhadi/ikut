@@ -204,7 +204,7 @@ struct ConvoyPanel: View {
             .padding(.horizontal, Spacing.xs)
             .padding(.top, Spacing.gap)
             .accessibilityElement()
-            .accessibilityLabel("Convoy progress: \(ConvoyFormat.distance(driven)) of \(ConvoyFormat.distance(length))")
+            .accessibilityLabel("Convoy progress, \(ConvoyFormat.distance(driven)) of \(ConvoyFormat.distance(length))")
 
             HStack {
                 Text("\(ConvoyFormat.distance(driven)) driven")

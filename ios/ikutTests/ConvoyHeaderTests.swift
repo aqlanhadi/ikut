@@ -119,10 +119,10 @@ struct ConvoyHeaderTests {
     @Test func rowSaysTimeWhileMovingAndDistanceUnderTheFloor() {
         let moving = model(speed: 25).joiningRows
         #expect(moving.first?.trailingPrimary.hasSuffix("min") == true || moving.first?.trailingPrimary.hasSuffix("h") == true)
-        #expect(moving.first?.trailingSecondary == "to merge")
+        #expect(moving.first?.trailingSecondary == "to join")
         let slow = model(speed: 0).joiningRows
         #expect(slow.first?.trailingPrimary.hasSuffix("km") == true)
-        #expect(slow.first?.trailingSecondary == "to merge")
+        #expect(slow.first?.trailingSecondary == "to join")
         let justUnder = model(speed: 5.55).joiningRows
         #expect(justUnder.first?.trailingPrimary.hasSuffix("km") == true)
         let justOver = model(speed: 5.56).joiningRows
@@ -145,16 +145,16 @@ struct ConvoyHeaderTests {
 
     @Test func labelForAJoiningCarAndAConvoyCar() {
         let joining = ConvoyHeader.Text(from: "Shah Alam", joinLine: "x", spokenJoin: "joining near Rawang, 14 km away")
-        #expect(ConvoyHeader.label(title: "3 in Convoy", text: joining, destination: "Ipoh", arrive: "3:40 PM")
-            == "3 in Convoy, from Shah Alam, joining near Rawang, 14 km away, to Ipoh, arrive 3:40 PM")
+        #expect(ConvoyHeader.label(title: "3 in convoy", text: joining, destination: "Ipoh", arrive: "3:40 PM")
+            == "3 in convoy, from Shah Alam, joining near Rawang, 14 km away, to Ipoh, arrive 3:40 PM")
         let inConvoy = ConvoyHeader.Text(from: "Shah Alam", joinLine: nil, spokenJoin: nil)
-        #expect(ConvoyHeader.label(title: "3 in Convoy", text: inConvoy, destination: "Ipoh", arrive: "3:40 PM")
-            == "3 in Convoy, from Shah Alam to Ipoh, arrive 3:40 PM")
-        #expect(ConvoyHeader.label(title: "3 in Convoy", text: inConvoy, destination: "Ipoh", arrive: nil)
-            == "3 in Convoy, from Shah Alam to Ipoh")
+        #expect(ConvoyHeader.label(title: "3 in convoy", text: inConvoy, destination: "Ipoh", arrive: "3:40 PM")
+            == "3 in convoy, from Shah Alam to Ipoh, arrive 3:40 PM")
+        #expect(ConvoyHeader.label(title: "3 in convoy", text: inConvoy, destination: "Ipoh", arrive: nil)
+            == "3 in convoy, from Shah Alam to Ipoh")
         let never = ConvoyHeader.Text(from: "George Town", joinLine: "x", spokenJoin: "meets the convoy in Ipoh, 160 km away")
-        #expect(ConvoyHeader.label(title: "3 in Convoy", text: never, destination: "Ipoh", arrive: "3:40 PM")
-            == "3 in Convoy, from George Town, meets the convoy in Ipoh, 160 km away, arrive 3:40 PM")
+        #expect(ConvoyHeader.label(title: "3 in convoy", text: never, destination: "Ipoh", arrive: "3:40 PM")
+            == "3 in convoy, from George Town, meets the convoy in Ipoh, 160 km away, arrive 3:40 PM")
     }
 
     // MARK: Never merges, by road

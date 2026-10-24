@@ -74,7 +74,7 @@ final class ReportToastModel {
                 if !voiceOverRunning() { scheduleHide(generation: mine, after: undoWindow) }
             } catch {
                 guard mine == generation else { return }
-                fail("Couldn't report \(option.toastName). \(Self.reason(error))", generation: mine)
+                fail("Couldn’t report \(option.toastName). \(Self.reason(error))", generation: mine)
             }
         }
     }
@@ -92,7 +92,7 @@ final class ReportToastModel {
             state = .hidden
         } catch {
             guard mine == generation else { return }
-            fail("Couldn't undo. \(Self.reason(error))", generation: mine)
+            fail("Couldn’t undo. \(Self.reason(error))", generation: mine)
         }
     }
 
@@ -124,8 +124,8 @@ final class ReportToastModel {
 
     private static func reason(_ error: Error) -> String {
         let ns = error as NSError
-        if ns.domain == "FIRFirestoreErrorDomain", ns.code == 7 { return "You can't report right now." }
-        if ns.domain == NSURLErrorDomain { return "Check your connection." }
+        if ns.domain == "FIRFirestoreErrorDomain", ns.code == 7 { return "You can’t report right now." }
+        if ns.domain == NSURLErrorDomain { return "Check your signal." }
         return "Try again."
     }
 }

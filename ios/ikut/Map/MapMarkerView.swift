@@ -158,7 +158,7 @@ struct MergePointView: View {
             .frame(width: 18, height: 18)
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { dotX = $0 }
             .overlay(alignment: side == .trailing ? .leading : .trailing) {
-                Text("Merge")
+                Text("Join point")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.primary)
                     .fixedSize()

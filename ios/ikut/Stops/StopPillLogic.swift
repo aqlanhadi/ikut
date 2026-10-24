@@ -8,7 +8,7 @@ enum StopPill: Equatable, Sendable {
     case question(eventId: String, symbol: String, title: String, detail: String)
     /// "You said OK · 3 of 4 OK", after a tap.
     case confirm(symbol: String, title: String, detail: String)
-    /// The asker's own phone: "Informed the convoy", never a question.
+    /// The asker's own phone: "Sent to the convoy", never a question.
     case asked(title: String, detail: String)
 
     var id: String {
@@ -62,7 +62,7 @@ enum StopPillPlanner {
     static let questionWindow: TimeInterval = 20
     /// Seconds a confirmation after a tap stays.
     static let confirmWindow: TimeInterval = 5
-    /// Seconds "Informed the convoy" stays on the asker's phone.
+    /// Seconds "Sent to the convoy" stays on the asker's phone.
     static let askedWindow: TimeInterval = 5
 
     /// The pill to show at `now`, or nil. Order: a confirmation of the tap, then the oldest request
@@ -86,7 +86,7 @@ enum StopPillPlanner {
         }
         for request in requests where StopLogic.viewerIsRequester(request) {
             guard let seen = memory.askedSeen[request.eventId], now.timeIntervalSince(seen) < askedWindow else { continue }
-            return .asked(title: "Informed the convoy", detail: StopLogic.waitingText(request))
+            return .asked(title: "Sent to the convoy", detail: StopLogic.waitingText(request))
         }
         return nil
     }

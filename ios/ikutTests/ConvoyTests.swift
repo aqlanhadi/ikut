@@ -442,7 +442,7 @@ struct ConvoyTests {
         await m.waitForETA()
         #expect(provider.calls == 1)
         // Destination is the main route's end.
-        #expect(m.title == "3 in Convoy")
+        #expect(m.title == "3 in convoy")
         #expect(m.subtitle.hasPrefix("Spread 3.0 km · ETA Ipoh "))
     }
 
@@ -534,7 +534,7 @@ struct ConvoyTests {
         let join = m.joiningRows
         #expect(join.count == 1)
         #expect(join[0].trailingPrimary == "--")
-        #expect(join[0].trailingSecondary == "to merge")
+        #expect(join[0].trailingSecondary == "to join")
     }
 
     @MainActor @Test func modelFrontThatIsNotLeadSaysFront() async {
@@ -564,7 +564,7 @@ struct ConvoyTests {
         await m.waitForETA()
         #expect(provider.calls == 0)
         #expect(m.subtitle == "")
-        #expect(m.convoyRows[0].trailingSecondary == "Calculating ETA")
+        #expect(m.convoyRows[0].trailingSecondary == "Working out ETA")
     }
 
     // MARK: Paused cars

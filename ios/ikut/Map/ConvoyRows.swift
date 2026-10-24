@@ -180,15 +180,15 @@ struct JoiningRowView: View {
         JoiningRowText(
             id: "c3", number: 3, name: "Hafiz’s Hilux", color: "#0F766E",
             subtitle: ConvoyFormat.speed(metersPerSecond: 84 / 3.6), subtitleIsWarning: false,
-            trailingPrimary: ConvoyFormat.duration(1_080), trailingSecondary: "to merge", isStale: false),
+            trailingPrimary: ConvoyFormat.duration(1_080), trailingSecondary: "to join", isStale: false),
         JoiningRowText(
             id: "c8", number: 8, name: "Rina’s Persona", color: "#65A30D",
             subtitle: ConvoyFormat.lastSeen(age: 300), subtitleIsWarning: true,
-            trailingPrimary: "--", trailingSecondary: "to merge", isStale: true),
+            trailingPrimary: "--", trailingSecondary: "to join", isStale: true),
         JoiningRowText(
             id: "c9", number: nil, name: "Aqlan’s car", color: "#2563EB",
-            subtitle: "Waiting for location", subtitleIsWarning: false,
-            trailingPrimary: "--", trailingSecondary: "to merge", isStale: false),
+            subtitle: "Waiting for its location", subtitleIsWarning: false,
+            trailingPrimary: "--", trailingSecondary: "to join", isStale: false),
     ]
     return ScrollView {
         VStack(spacing: 0) {

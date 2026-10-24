@@ -97,7 +97,7 @@ enum AlertWording {
         case .accident: "Accident"
         case .pothole: "Pothole"
         case .animal: "Animal on the road"
-        case .stoppedVehicle: "Stopped vehicle"
+        case .stoppedVehicle: "Stopped car"
         case .roadworks: "Roadworks"
         case .heavyRain: "Heavy rain"
         case .trafficJam: "Traffic jam"

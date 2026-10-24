@@ -173,7 +173,7 @@ enum MapDemo {
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
                 demoCard: env["IKUT_MAP_DEMO_CARD"], demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
                 demoExpanded: expanded || env["IKUT_MAP_DEMO_EXPANDED"] != nil,
-                demoError: env["IKUT_MAP_DEMO_ERROR"] == nil ? nil : "Could not reach the convoy. Try again in a moment.",
+                demoError: env["IKUT_MAP_DEMO_ERROR"] == nil ? nil : "Couldn’t reach the convoy. Try again in a moment.",
                 demoSelected: selected ?? env["IKUT_MAP_DEMO_SELECTED"],
                 stopService: DemoStopService())
                 .overlay(alignment: .top) {
@@ -277,7 +277,7 @@ private struct BannerGallery: View {
             ApproachPill(alert: MapDemo.debrisAlert, model: model) {}
             PassedBanner(text: "Passed the debris")
             ReportToastView(model: toast)
-            GlanceErrorBanner(message: "Could not reach the convoy. Try again in a moment.") {}
+            GlanceErrorBanner(message: "Couldn’t reach the convoy. Try again in a moment.") {}
         }
         .padding(.horizontal, 12)
     }

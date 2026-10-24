@@ -225,9 +225,9 @@ struct StopVoterRow: View {
 
 #Preview("Buttons and tiles") {
     VStack(spacing: Spacing.s) {
-        StopActionButton(title: "Inform the convoy", style: .primary, id: "p") {}
-        StopActionButton(title: "Inform the convoy", style: .primary, height: 72, id: "p-big") {}
-        StopActionButton(title: "Inform the convoy", style: .primary, disabled: true, id: "p-off") {}
+        StopActionButton(title: "Tell the convoy", style: .primary, id: "p") {}
+        StopActionButton(title: "Tell the convoy", style: .primary, height: 72, id: "p-big") {}
+        StopActionButton(title: "Tell the convoy", style: .primary, disabled: true, id: "p-off") {}
         StopActionButton(title: "Cancel request", id: "s") {}
         StopActionButton(title: "You said OK", style: .positive, id: "y") {}
         StopActionButton(title: "Back", style: .ghost, height: 44, id: "g") {}
@@ -259,7 +259,7 @@ struct StopVoterRow: View {
 
 #Preview("Frame") {
     VStack(spacing: Spacing.m) {
-        StopCardFrame(title: "Informed the convoy", subtitle: "Waiting for the other cars", onClose: {}) {
+        StopCardFrame(title: "Sent to the convoy", subtitle: "Waiting for the other cars", onClose: {}) {
             Text("The cars tap OK when they see it.").foregroundStyle(Color.surfaceSecondary)
         } actions: {}
         // Taller than the cap: the body scrolls and the actions stay put.

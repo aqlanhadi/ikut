@@ -1212,7 +1212,7 @@ async function finalChecks(ctx, appCarId) {
       const off = (t) => interpolate(truth[APP_KEY], t);
       let predicted = null;
       for (let t = ctx.hazardAt; t <= T; t++) { const d = H - off(t); if (d > 0 && d <= 500) { predicted = t; break; } }
-      log(`the phone (car5) should announce "Debris ahead in 500 meters" about T=${predicted} (assuming it follows car5-app.gpx without lag)`);
+      log(`the phone (car5) should announce "Debris ahead in 500 m" about T=${predicted} (assuming it follows car5-app.gpx without lag)`);
     }
   }
 

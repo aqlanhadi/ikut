@@ -352,7 +352,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             let fuel = app.buttons["stop.reason.stopFuel"]
             XCTAssertTrue(fuel.waitForExistence(timeout: 10), "the stop card didn't open")
             fuel.tap()
-            // Nothing is sent until the explicit "Inform the convoy". The phone drives at 90 km/h, so a
+            // Nothing is sent until the explicit "Tell the convoy". The phone drives at 90 km/h, so a
             // message asks "Are you a passenger?" first.
             let addMessage = app.buttons["stop.addMessage"]
             try waitFor("Add a message is ready", timeout: 30) { addMessage.exists && addMessage.isHittable }
@@ -369,7 +369,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             shot("08b-message-typed")
             app.buttons["stop.messageDone"].tap()
             let send = app.buttons["stop.send"]
-            try waitFor("Inform the convoy is ready", timeout: 30) { send.exists && send.isEnabled }
+            try waitFor("Tell the convoy is ready", timeout: 30) { send.exists && send.isEnabled }
             send.tap()
             // The card then shows the request with a row per car.
             try waitFor("request sent: the card shows the request", timeout: 90) { element("stop.message").exists || app.buttons["stop.cancel"].exists }

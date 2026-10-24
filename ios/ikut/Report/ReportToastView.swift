@@ -30,7 +30,7 @@ struct ReportToastView: View {
                         .accessibilityHint("Removes the report")
                 }
                 .modifier(Placement(edge: edge))
-                .announces("Reported \(label). Undo is available.")
+                .announces("Reported \(label). You can undo it.")
                 .accessibilityAction(named: "Close") { model.dismiss() }
             case .failed(let message):
                 DarkBanner(title: message, symbol: "exclamationmark.triangle.fill", circle: .orange) {
@@ -66,7 +66,7 @@ struct ReportToastView: View {
     let states: [ReportToastModel.State] = [
         .sending(label: "debris"),
         .reported(label: "debris", eventId: "demo-debris"),
-        .failed(message: "Couldn't report debris. Check your connection."),
+        .failed(message: "Couldn’t report debris. Check your signal."),
     ]
     let models = states.map { state in
         let model = ReportToastModel()

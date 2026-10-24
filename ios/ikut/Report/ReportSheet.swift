@@ -2,7 +2,7 @@ import CoreLocation
 import SwiftUI
 import UIKit
 
-/// "What's on the road?": 8 road reports in a grid, 3 car statuses below. Tapping one sends
+/// "What’s on the road?": 8 road reports in a grid, 3 car statuses below. Tapping one sends
 /// the report through `toast` (which shows "Reported … · Undo"), then dismisses at once.
 struct ReportSheet: View {
     let context: ReportContext
@@ -46,7 +46,7 @@ struct ReportSheet: View {
 
     private var header: some View {
         SheetHeader(
-            title: "What's on the road?",
+            title: "What’s on the road?",
             subtitle: "Pinned where you tapped Report, not where you send it. Cars behind you get an alert.",
             onClose: { dismiss() })
     }
@@ -67,7 +67,7 @@ struct ReportSheet: View {
                     }
                 } else {
                     Text("Waiting for your location").font(.subheadline.weight(.semibold))
-                    Text("You can report as soon as the GPS has a fix.")
+                    Text("You can report once your phone finds where you are.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

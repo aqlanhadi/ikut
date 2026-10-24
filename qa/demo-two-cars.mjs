@@ -51,7 +51,7 @@ const timeline = (d) => {
     { at: DROP.from, text: (t) => `Hafiz loses signal (${w.gap('hafiz', t)}); he keeps driving but cannot report`, run: async (x) => x.cars.hafiz.goOffline() },
     { at: DROP.from + 60, text: () => 'on both phones the Hafiz row goes stale: "Last seen ..."', note: true },
     { at: DROP.to, text: () => 'Hafiz gets signal back, his position jumps to where he is now', run: async (x) => x.cars.hafiz.goOnline() },
-    { at: STOP_AT, who: 'phone2', text: () => 'THE HIGHLIGHT. Faiz taps Pit stop > Fuel > Add a message ("Low on fuel, next R&R please") > Inform the convoy on phone 2; Hafiz and Daniel tap OK', run: (x) => stopStory(x) },
+    { at: STOP_AT, who: 'phone2', text: () => 'THE HIGHLIGHT. Faiz taps Pit stop > Fuel > Add a message ("Low on fuel, next R&R please") > Tell the convoy on phone 2; Hafiz and Daniel tap OK', run: (x) => stopStory(x) },
     { at: STOP_AT + 40, who: 'phone1', text: () => 'phone 1: the pill asks Aisha for an OK; she taps it, then the stop card shows the OKs', note: true },
     { at: STOP_AT + 40 + STOP_OPEN_S, who: 'phone1', text: () => "Aisha taps We've stopped on phone 1; the request closes on both phones", note: true },
     { at: END_AT - 60, text: () => 'the map stays open and the convoy keeps driving until the end', note: true },

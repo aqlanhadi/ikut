@@ -164,7 +164,7 @@ struct ReportToastModelTests {
             Issue.record("expected failed, got \(toast.state)")
             return
         }
-        #expect(message.contains("Couldn't report debris"))
+        #expect(message.contains("Couldn’t report debris"))
         #expect(toast.failureCount == 1)
         #expect(!toast.isUndoAvailable)
     }
@@ -206,7 +206,7 @@ struct ReportToastModelTests {
             Issue.record("expected failed, got \(toast.state)")
             return
         }
-        #expect(message.contains("Couldn't undo"))
+        #expect(message.contains("Couldn’t undo"))
     }
 
     @Test func dismissHides() async {

@@ -33,9 +33,9 @@ struct DrivingGlanceTests {
 
     @Test func anErrorStaysUntilItsCauseClearsOrItIsClosed() {
         var error = GlanceError()
-        error.show("Could not reach the convoy.", cause: .send)
+        error.show("Couldn’t reach the convoy.", cause: .send)
         error.resolve(.pause)
-        #expect(error.message == "Could not reach the convoy.")
+        #expect(error.message == "Couldn’t reach the convoy.")
         error.resolve(.send)
         #expect(error.message == nil)
 
@@ -49,7 +49,7 @@ struct DrivingGlanceTests {
 struct DrivingGlanceWiringTests {
     @Test func aLaterSuccessClearsASendError() {
         var error = GlanceError()
-        error.actionFinished(failure: "Could not reach the convoy.")
+        error.actionFinished(failure: "Couldn’t reach the convoy.")
         #expect(error.message != nil)
         error.actionFinished(failure: nil)
         #expect(error.message == nil)

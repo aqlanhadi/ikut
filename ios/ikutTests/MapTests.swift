@@ -449,7 +449,7 @@ struct TripMapModelTests {
         #expect(model.markers.map(\.id) == ["a", "j"])
         #expect(model.overlays.map(\.id) == ["j"])
         #expect(model.tripCode == "K7M 2QX")
-        #expect(model.convoy.title == "1 in Convoy")
+        #expect(model.convoy.title == "1 in convoy")
         #expect(model.mainRouteCoordinates.count == 2)
         guard case .follow(let center, _)? = model.cameraTarget else {
             Issue.record("expected follow target")

@@ -181,14 +181,14 @@ export class ApproachCore {
   }
 }
 
-/** AlertWording.distanceText: rounded to 50 m below a km. */
-export function distanceText(meters) {
+/** AlertWording.distanceText: rounded to 50 m below a km; spoken writes "500 metres", shown "500 m". */
+export function distanceText(meters, spoken = false) {
   if (meters >= 1000) {
     const km = Math.round(meters / 100) / 10;
     return km === Math.round(km) ? `${Math.round(km)} km` : `${km} km`;
   }
   const rounded = Math.max(50, Math.round(meters / 50) * 50);
-  return `${rounded} meters`;
+  return spoken ? `${rounded} metres` : `${rounded} m`;
 }
 
 export { RouteLine };
