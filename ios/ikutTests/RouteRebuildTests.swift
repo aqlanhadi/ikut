@@ -25,14 +25,10 @@ private func stop(
     _ id: String, _ c: CLLocationCoordinate2D, order: Int, kind: PlannedStopKind = .fuel, skipped: Bool = false,
     left: Bool = false, arrived: Bool = false
 ) -> PlannedStop {
-    var s = PlannedStop(
-        id: nil, name: id, coordinate: GeoPoint(latitude: c.latitude, longitude: c.longitude),
-        routeOffset: oldLine.project(c)?.offset ?? 0, kind: kind, minutes: nil, order: order,
-        skipped: skipped ? true : nil)
-    s.id = id
-    if left { s.leftAt = Date(timeIntervalSince1970: 1_000) }
-    if arrived { s.arrivedAt = Date(timeIntervalSince1970: 2_000) }
-    return s
+    PlannedStop.fixture(
+        id, name: id, offset: oldLine.project(c)?.offset ?? 0, coordinate: GeoPoint(latitude: c.latitude, longitude: c.longitude),
+        kind: kind, minutes: nil, order: order, skipped: skipped ? true : nil,
+        arrivedAt: arrived ? Date(timeIntervalSince1970: 2_000) : nil, leftAt: left ? Date(timeIntervalSince1970: 1_000) : nil)
 }
 
 /// The meeting point (left), a fuel stop the organizer drove past at 30 km, the town (skipped for everyone), Tapah.

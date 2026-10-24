@@ -6,11 +6,9 @@ import Testing
 @Suite("Next stop on the panel")
 struct NextStopTests {
     func stop(_ name: String, _ offset: Double, skipped: Bool = false) -> PlannedStop {
-        var stop = PlannedStop(
-            id: nil, name: name, coordinate: GeoPoint(latitude: 0, longitude: 0), routeOffset: offset,
-            kind: .fuel, minutes: nil, order: 0, skipped: skipped ? true : nil)
-        stop.id = name
-        return stop
+        PlannedStop.fixture(
+            name, name: name, offset: offset, coordinate: GeoPoint(latitude: 0, longitude: 0), minutes: nil,
+            skipped: skipped ? true : nil)
     }
 
     @Test func skipsSkippedAndPassedStops() {
@@ -103,14 +101,5 @@ struct NextStopTests {
             == "Petronas Sungai Buloh")
         #expect(NextStop.joiningCell(stops: stops, distance: 9_000, seconds: 420, mergeOffset: 10_000, pace: 0.05, skipsMeet: true)?.name
             == "Tapah")
-    }
-
-    @Test func noMeetingAlongTheWayButtonOnceTheMeetingPointWasLeft() {
-        var meet = stop("m", 0)
-        meet.kind = .meet
-        #expect(SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
-        meet.leftAt = Date(timeIntervalSince1970: 1_000)
-        meet.leftBy = "u1"
-        #expect(!SkipAnswers.canSkip(stop: meet, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
     }
 }

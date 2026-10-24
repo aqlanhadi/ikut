@@ -99,83 +99,78 @@ struct EventServiceEmulatorTests {
         try Auth.auth().signOut()
     }
 
-    private func makeTrip() async throws -> (uid: String, tripId: String, carId: String) {
-        let trip = try await EmulatorTrip.make(name: "Events")
-        return (trip.uid, trip.tripId, trip.carId)
-    }
-
     private func load(_ tripId: String, _ eventId: String) async throws -> TripEvent {
         try await Firestore.firestore().document(FirestorePaths.event(tripId: tripId, eventId: eventId))
             .getDocument(as: TripEvent.self)
     }
 
     @Test func reportClearUndo() async throws {
-        let (uid, tripId, carId) = try await makeTrip()
+        let t = try await EmulatorTrip.make(name: "Events")
         let coords = (0...10).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.01) }
         let route = RouteLine(coords)
 
         let id = try await EventService.report(
-            type: .debris, tripId: tripId, carId: carId, authorId: uid,
+            type: .debris, tripId: t.tripId, carId: t.carId, authorId: t.uid,
             location: CLLocationCoordinate2D(latitude: 3.0001, longitude: 101.05),
             heading: 90, route: route, previousOffset: nil)
-        let e = try await load(tripId, id)
+        let e = try await load(t.tripId, id)
         #expect(e.category == .hazard)
         #expect(e.severity == .high)
-        #expect(e.authorId == uid)
-        #expect(e.carId == carId)
+        #expect(e.authorId == t.uid)
+        #expect(e.carId == t.carId)
         #expect(abs(e.routeOffset - route.length / 2) < 5)
         let expiry = try #require(e.expiresAt)
         let created = try #require(e.createdAt)
         #expect(abs(expiry.timeIntervalSince(created) - 45 * 60) < 1)
 
-        var iterator = EventService.listen(tripId: tripId).makeAsyncIterator()
+        var iterator = EventService.listen(tripId: t.tripId).makeAsyncIterator()
         let first = await iterator.next()
         #expect(first?.map(\.id) == [id])
 
-        try await EventService.clear(tripId: tripId, eventId: id)
-        let cleared = try await load(tripId, id)
+        try await EventService.clear(tripId: t.tripId, eventId: id)
+        let cleared = try await load(t.tripId, id)
         #expect(try #require(cleared.expiresAt) <= Date().addingTimeInterval(1))
         let afterClear = await iterator.next()
         #expect(afterClear?.isEmpty == true)
 
-        try await EventService.undo(tripId: tripId, eventId: id)
+        try await EventService.undo(tripId: t.tripId, eventId: id)
         let gone = try await Firestore.firestore()
-            .document(FirestorePaths.event(tripId: tripId, eventId: id)).getDocument()
+            .document(FirestorePaths.event(tripId: t.tripId, eventId: id)).getDocument()
         #expect(!gone.exists)
     }
 
     @Test func ruleRejectionSurfacesAsError() async throws {
-        let (uid, tripId, _) = try await makeTrip()
+        let t = try await EmulatorTrip.make(name: "Events")
         let here = CLLocationCoordinate2D(latitude: 3, longitude: 101)
         await #expect(throws: (any Error).self) {
             try await EventService.report(
-                type: .debris, tripId: tripId, carId: "not-my-car", authorId: uid, location: here,
+                type: .debris, tripId: t.tripId, carId: "not-my-car", authorId: t.uid, location: here,
                 heading: 0, route: nil, previousOffset: nil)
         }
     }
 
     @Test func messageAndStopEventsPassRules() async throws {
-        let (uid, tripId, carId) = try await makeTrip()
+        let t = try await EmulatorTrip.make(name: "Events")
         let here = CLLocationCoordinate2D(latitude: 3, longitude: 101)
         let long = "  " + String(repeating: "🚗", count: 400) + "  "
         let msgId = try await EventService.report(
-            type: .message, tripId: tripId, carId: carId, authorId: uid, location: here,
+            type: .message, tripId: t.tripId, carId: t.carId, authorId: t.uid, location: here,
             heading: -1, route: nil, previousOffset: 42, message: long)
-        let msg = try await load(tripId, msgId)
+        let msg = try await load(t.tripId, msgId)
         #expect(msg.message?.utf16.count == 280)
         #expect(msg.routeOffset == 42)
         #expect(msg.severity == .low)
 
         let stopId = try await EventService.report(
-            type: .stopFuel, tripId: tripId, carId: carId, authorId: uid, location: here,
+            type: .stopFuel, tripId: t.tripId, carId: t.carId, authorId: t.uid, location: here,
             heading: 0, route: nil, previousOffset: nil)
-        let stop = try await load(tripId, stopId)
+        let stop = try await load(t.tripId, stopId)
         // A stop request closes itself 30 minutes after it was asked, and the rules accept that.
         let asked = try #require(stop.createdAt)
         #expect(stop.expiresAt == asked.addingTimeInterval(30 * 60))
         // Clearing an event expires it now.
-        try await EventService.clear(tripId: tripId, eventId: stopId)
-        let cleared = try #require(try await load(tripId, stopId).expiresAt)
+        try await EventService.clear(tripId: t.tripId, eventId: stopId)
+        let cleared = try #require(try await load(t.tripId, stopId).expiresAt)
         #expect(cleared < asked.addingTimeInterval(30 * 60))
     }
 }

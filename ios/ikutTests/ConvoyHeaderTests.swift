@@ -14,8 +14,7 @@ struct ConvoyHeaderTests {
     private static let floor = ConvoyOrdering.Config.default.parkedSpeed
 
     private func car(route: String? = nil, merge: Double? = nil, state: CarState = .joining) -> Car {
-        Car(id: "4", name: "Hafiz’s Hilux", color: "#0F766E", trackerUserId: nil, isLead: false,
-            route: route, mergeOffset: merge, state: state, number: 4)
+        Car.fixture("4", name: "Hafiz’s Hilux", number: 4, state: state, color: "#0F766E", route: route, mergeOffset: merge)
     }
 
     private func entry(speed: Double, time: Double? = 1800, distance: Double? = 14_000) -> JoiningEntry {
@@ -102,13 +101,14 @@ struct ConvoyHeaderTests {
     private func model(speed: Double) -> ConvoyModel {
         let m = ConvoyModel.fixture(route: Self.main)
         func pos(_ c: CLLocationCoordinate2D, speed: Double, offset: Double?) -> Position {
-            Position(location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, heading: 90,
-                     routeOffset: offset ?? 0, convoyOffset: offset, battery: nil, updatedAt: Self.now.addingTimeInterval(-1))
+            Position.fixture(
+                location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, routeOffset: offset ?? 0,
+                convoyOffset: offset, updatedAt: Self.now.addingTimeInterval(-1))
         }
         // Hafiz is 14 km due south of the main-route point at 20 km.
         let target = Self.main.coordinate(atOffset: 20_000)!
         let south = CLLocationCoordinate2D(latitude: target.latitude - 14_000 / metersPerDegree, longitude: target.longitude)
-        let lead = Car(id: "1", name: "Car 1", color: "#2563EB", trackerUserId: nil, isLead: true, route: nil, mergeOffset: nil, state: .convoy, number: 1)
+        let lead = Car.fixture("1", lead: true)
         m.update(cars: [lead, car(merge: 20_000)], positions: [
             "1": pos(Self.main.coordinate(atOffset: 8000)!, speed: 25, offset: 8000),
             "4": pos(south, speed: speed, offset: nil),
@@ -165,8 +165,9 @@ struct ConvoyHeaderTests {
         let own = RouteLine(MapDemo.densify([
             .init(latitude: 3.5, longitude: 100.5), .init(latitude: 3.5, longitude: 100.0), .init(latitude: 3.0, longitude: 100.0)]))
         let c = own.coordinates[0]
-        let p = Position(location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: 0, heading: 180,
-                         routeOffset: 10_000, convoyOffset: nil, battery: nil, updatedAt: Self.now.addingTimeInterval(-1))
+        let p = Position.fixture(
+            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: 0, heading: 180,
+            routeOffset: 10_000, updatedAt: Self.now.addingTimeInterval(-1))
         let hafiz = car(route: Polyline.encode(own.coordinates), merge: Self.main.length)
         m.update(cars: [hafiz], positions: ["4": p])
         let entry = try #require(m.joining.first)

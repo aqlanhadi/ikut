@@ -12,9 +12,8 @@ private func fix(_ lat: Double = 0, _ lon: Double = 0, speed: Double = 20, cours
 }
 
 private func position(_ lon: Double, speed: Double = 20) -> Position {
-    Position(
-        location: GeoPoint(latitude: 0, longitude: lon), speed: speed, heading: 90,
-        routeOffset: lon * 1000, convoyOffset: nil, battery: nil, updatedAt: nil)
+    Position.fixture(
+        location: GeoPoint(latitude: 0, longitude: lon), speed: speed, routeOffset: lon * 1000, updatedAt: nil)
 }
 
 /// Main route along the equator from lon 0 to 0.1 (about 11 km).
@@ -251,17 +250,13 @@ struct TrackingEmulatorTests {
         try Auth.auth().signOut()
     }
 
-    private func makeTrip() async throws -> EmulatorTrip {
-        try await EmulatorTrip.make(name: "Tracking")
-    }
-
     private func makePosition() -> Position {
         var b = PositionBuilder(mainRoute: mainRoute, carRoute: nil)
         return b.build(from: fix(0, 0.03, speed: -1, course: -1), battery: nil)
     }
 
     @Test func trackerWritesPositionAndReadsItBack() async throws {
-        let t = try await makeTrip()
+        let t = try await EmulatorTrip.make(name: "Tracking")
         let writer = FirestorePositionWriter()
         var b = PositionBuilder(mainRoute: mainRoute, carRoute: nil)
         let p = b.build(from: fix(0, 0.03, speed: 12, course: 270), battery: 0.4)
@@ -282,12 +277,12 @@ struct TrackingEmulatorTests {
     }
 
     @Test func invalidSpeedAndHeadingStillPassRules() async throws {
-        let t = try await makeTrip()
+        let t = try await EmulatorTrip.make(name: "Tracking")
         try await FirestorePositionWriter().write(makePosition(), tripId: t.tripId, carId: t.carId)
     }
 
     @Test func nonTrackerWriteIsRejected() async throws {
-        let t = try await makeTrip()
+        let t = try await EmulatorTrip.make(name: "Tracking")
         // A second signed-in user who is not the car's tracker (and not a member).
         try Auth.auth().signOut()
         try await AuthModel().signInAsGuest(name: "Other")

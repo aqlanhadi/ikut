@@ -12,14 +12,15 @@ struct StopArrivalTests {
 
     func position(offset: Double?, age: TimeInterval = 5, along: Double? = nil) -> Position {
         let meters = along ?? offset ?? 0
-        return Position(
-            id: nil, location: GeoPoint(latitude: 3 + meters / metersPerDegree, longitude: 101), speed: 25, heading: 0,
+        return Position.fixture(
+            location: GeoPoint(latitude: 3 + meters / metersPerDegree, longitude: 101), heading: 0,
             routeOffset: offset ?? 0, convoyOffset: offset, battery: 0.8, updatedAt: now.addingTimeInterval(-age))
     }
 
     func car(_ id: String, number: Int, joining: Bool = false) -> Car {
-        Car(id: id, name: "Car \(number)", color: "#2563EB", trackerUserId: "u-\(id)", isLead: number == 1, route: nil,
-            mergeOffset: nil, state: joining ? .joining : .convoy, number: number)
+        Car.fixture(
+            id, name: "Car \(number)", number: number, lead: number == 1, state: joining ? .joining : .convoy,
+            tracker: "u-\(id)")
     }
 
     func status(_ offset: Double?, age: TimeInterval = 5, pace: Double? = 0.04) -> StopArrival.Status {
@@ -133,11 +134,9 @@ struct StopArrivalTests {
 
     @Test func aSkippedStopHasNoCard() {
         func stop(_ id: String, _ offset: Double, skipped: Bool = false) -> PlannedStop {
-            var s = PlannedStop(
-                id: nil, name: id, coordinate: GeoPoint(latitude: 3, longitude: 101), routeOffset: offset, kind: .fuel,
-                minutes: nil, order: 0, skipped: skipped ? true : nil)
-            s.id = id
-            return s
+            PlannedStop.fixture(
+                id, name: id, offset: offset, coordinate: GeoPoint(latitude: 3, longitude: 101), minutes: nil,
+                skipped: skipped ? true : nil)
         }
         let stops = [stop("a", 10_000), stop("b", 20_000, skipped: true), stop("c", 30_000)]
         #expect(StopArrival.target(stopId: "a", in: stops)?.routeOffset == 10_000)

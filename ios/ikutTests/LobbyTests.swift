@@ -6,7 +6,7 @@ import Testing
 
 struct LobbyTests {
     private func car(_ id: String, _ name: String, lead: Bool = false, tracker: String? = nil) -> Car {
-        Car(id: id, name: name, color: "#2563EB", trackerUserId: tracker, isLead: lead, state: .joining)
+        Car.fixture(id, name: name, number: .some(nil), lead: lead, state: .joining, tracker: tracker)
     }
 
     private func member(_ id: String, _ name: String, car: String) -> Member {

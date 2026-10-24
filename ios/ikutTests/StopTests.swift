@@ -12,9 +12,7 @@ struct StopLogicTests {
     private let t0 = Fixtures.t0
 
     private func car(_ id: String, _ number: Int?, _ name: String, tracker: String? = nil, lead: Bool = false) -> Car {
-        Car(
-            id: id, name: name, color: "#2563EB", trackerUserId: tracker, isLead: lead, route: nil,
-            mergeOffset: nil, state: .convoy, number: number)
+        Car.fixture(id, name: name, number: number, lead: lead, tracker: tracker)
     }
 
     private func stop(
@@ -633,12 +631,7 @@ struct StopEmulatorTests {
     private let service = StopService()
     private let route = RouteLine((0...60).map { CLLocationCoordinate2D(latitude: 3, longitude: 101 + Double($0) * 0.009) })
 
-    private func makeTrip() async throws -> (tripId: String, carId: String, uid: String, code: String) {
-        let trip = try await EmulatorTrip.make(
-            name: "Stops",
-            destination: DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 3, longitude: 101.5)))
-        return (trip.tripId, trip.carId, trip.uid, try await trip.code())
-    }
+    private static let ipoh = DestinationResult(name: "Ipoh", subtitle: "", coordinate: .init(latitude: 3, longitude: 101.5))
 
     private func context(_ tripId: String, uid: String, carId: String, organizer: Bool) -> StopContext {
         StopContext(
@@ -667,7 +660,7 @@ struct StopEmulatorTests {
     /// Organizer (lead car) asks with a message, the request is written with a 30 minute expiry, then
     /// the organizer says We've stopped; the listener sees each step.
     @Test func leadAsksWithAMessageAndMarksItStopped() async throws {
-        let trip = try await makeTrip()
+        let trip = try await EmulatorTrip.make(name: "Stops", destination: Self.ipoh)
         let ctx = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: true)
         let stream = StopService.listen(context: ctx, refresh: .seconds(60))
 
@@ -697,17 +690,14 @@ struct StopEmulatorTests {
     /// A joined car says OK and is tallied; it cannot close someone else's request, nor say OK for
     /// another car, and a stop with no message has none.
     @Test func memberSaysOKButCannotCloseOrVoteForAnotherCar() async throws {
-        let trip = try await makeTrip()
+        let trip = try await EmulatorTrip.make(name: "Stops", destination: Self.ipoh)
         let orgContext = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: true)
         let eventId = try await service.request(
             type: .stopFood, message: nil, context: orgContext, snapshot: try #require(orgContext.snapshot()))
 
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        let joiner = try #require(Auth.auth().currentUser?.uid)
-        let joined = try await LiveJoinAPI().join(
-            code: trip.code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
-        let ctx = context(trip.tripId, uid: joiner, carId: joined.carId, organizer: false)
+        let (joiner, joinedCar) = try await EmulatorTrip.joinAsGuest(
+            code: try await trip.code(), name: "Wyna", carName: "Wyna's X70", tracker: true)
+        let ctx = context(trip.tripId, uid: joiner, carId: joinedCar, organizer: false)
         let stream = StopService.listen(context: ctx, refresh: .seconds(60))
 
         let before = try await state(stream) { $0.rows.count == 2 }
@@ -716,11 +706,11 @@ struct StopEmulatorTests {
         #expect(before.viewerCarIsOK == false)
         #expect(before.message == nil)
 
-        try await service.ok(tripId: trip.tripId, eventId: eventId, carId: joined.carId, userId: joiner)
+        try await service.ok(tripId: trip.tripId, eventId: eventId, carId: joinedCar, userId: joiner)
         let said = try await state(stream) { $0.viewerCarIsOK }
         #expect(said.okCount == 2)
         // A second phone in the car writes the same document: still one OK for the car.
-        try await service.ok(tripId: trip.tripId, eventId: eventId, carId: joined.carId, userId: joiner)
+        try await service.ok(tripId: trip.tripId, eventId: eventId, carId: joinedCar, userId: joiner)
 
         await #expect(throws: (any Error).self) {
             try await service.close(tripId: trip.tripId, eventId: eventId, reason: .stopped, userId: joiner)
@@ -739,7 +729,7 @@ struct StopEmulatorTests {
 
     /// The asker cancels their own request.
     @Test func askerCancelsOwnRequest() async throws {
-        let trip = try await makeTrip()
+        let trip = try await EmulatorTrip.make(name: "Stops", destination: Self.ipoh)
         let ctx = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: false)
         let eventId = try await service.request(
             type: .stopToilet, message: nil, context: ctx, snapshot: try #require(ctx.snapshot()))

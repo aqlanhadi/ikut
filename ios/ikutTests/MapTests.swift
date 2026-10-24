@@ -13,17 +13,16 @@ private func car(
     _ id: String, name: String = "Aqlan’s Myvi", number: Int? = 1, lead: Bool = false,
     state: CarState = .convoy, route: String? = nil, color: String = "#2563EB"
 ) -> Car {
-    Car(id: id, name: name, color: color, trackerUserId: nil, isLead: lead, route: route,
-        mergeOffset: nil, state: state, number: number)
+    Car.fixture(id, name: name, number: .some(number), lead: lead, state: state, color: color, route: route)
 }
 
 private func position(
     lat: Double = 4.2, lon: Double = 101.26, heading: Double = 45, offset: Double? = 1000,
     ownOffset: Double = 1000, age: TimeInterval = 5
 ) -> Position {
-    Position(
-        id: nil, location: GeoPoint(latitude: lat, longitude: lon), speed: 25, heading: heading,
-        routeOffset: ownOffset, convoyOffset: offset, battery: nil, updatedAt: t0.addingTimeInterval(-age))
+    Position.fixture(
+        location: GeoPoint(latitude: lat, longitude: lon), heading: heading, routeOffset: ownOffset,
+        convoyOffset: offset, updatedAt: t0.addingTimeInterval(-age))
 }
 
 private func snapshot(cars: [Car], positions: [String: Position], main: RouteLine? = nil,
@@ -540,7 +539,7 @@ struct TripMapEmulatorTests {
             session.stop()
         }
 
-        var builder = PositionBuilder(mainRoute: RouteLine(Polyline.decode("_p~iF~ps|U_ulLnnqC")), carRoute: nil)
+        var builder = PositionBuilder(mainRoute: RouteLine(Polyline.decode(Fixtures.longRoute.polyline)), carRoute: nil)
         let writer = FirestorePositionWriter()
         let first = builder.build(
             from: LocationFix(latitude: 38.5, longitude: -120.2, speed: 20, course: 90, timestamp: Date()), battery: nil)
@@ -612,25 +611,3 @@ struct MapStopContextTests {
         #expect(model.stopContext(tripId: "t", userId: "u", isOrganizer: false) == nil)
     }
 }
-
-#if DEBUG
-import SwiftUI
-import UIKit
-
-/// Hosts the demo map in a window and waits, so the simulator can be screenshotted from outside:
-/// `TEST_RUNNER_IKUT_MAP_DEMO_HOLD=40 xcodebuild ... test -only-testing:ikutTests/MapDemoScreenshot`
-/// then `xcrun simctl io <device> screenshot map.png`. Skipped unless the variable is set.
-@MainActor
-struct MapDemoScreenshot {
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["IKUT_MAP_DEMO_HOLD"] != nil))
-    func holdDemoMapOnScreen() async throws {
-        let seconds = Double(ProcessInfo.processInfo.environment["IKUT_MAP_DEMO_HOLD"] ?? "") ?? 30
-        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let window = UIWindow(windowScene: scene)
-        window.rootViewController = UIHostingController(rootView: MapDemo.view())
-        window.makeKeyAndVisible()
-        defer { window.isHidden = true }
-        try await Task.sleep(for: .seconds(seconds))
-    }
-}
-#endif

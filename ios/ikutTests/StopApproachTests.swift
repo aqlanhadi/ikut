@@ -9,12 +9,9 @@ import Testing
 struct StopApproachTests {
     private func stop(_ id: String, at offset: Double, kind: PlannedStopKind = .fuel, minutes: Int? = 20,
                       name: String = "R&R Tapah", skipped: Bool? = nil, order: Int = 1) -> PlannedStop {
-        // Set the id after init: passing a non-nil @DocumentID to the initializer logs a Firestore warning.
-        var stop = PlannedStop(
-            id: nil, name: name, coordinate: GeoPoint(latitude: 4, longitude: 101), routeOffset: offset,
-            kind: kind, minutes: minutes, order: order, skipped: skipped)
-        stop.id = id
-        return stop
+        PlannedStop.fixture(
+            id, name: name, offset: offset, coordinate: GeoPoint(latitude: 4, longitude: 101), kind: kind,
+            minutes: minutes, order: order, skipped: skipped)
     }
 
     @Test func firesOnceAtAboutTwoKilometresForAStopAhead() {

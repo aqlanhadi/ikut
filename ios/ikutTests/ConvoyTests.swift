@@ -14,17 +14,15 @@ struct ConvoyTests {
 
     private func car(_ id: String, number: Int? = nil, lead: Bool = false, state: CarState = .convoy,
                      route: String? = nil, merge: Double? = nil) -> Car {
-        Car(id: id, name: "Car \(id)", color: "#2563EB", trackerUserId: nil, isLead: lead,
-            route: route, mergeOffset: merge, state: state, number: number ?? Int(id))
+        Car.fixture(id, number: number.map { Optional($0) }, lead: lead, state: state, route: route, mergeOffset: merge)
     }
 
     private func pos(offset: Double?, speed: Double = 25, age: TimeInterval = 1, routeOffset: Double? = nil,
                      at: CLLocationCoordinate2D? = nil) -> Position {
         let c = at ?? move(origin, east: offset ?? 0)
-        return Position(
-            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, heading: 90,
-            routeOffset: routeOffset ?? offset ?? 0, convoyOffset: offset, battery: nil,
-            updatedAt: Self.now.addingTimeInterval(-age))
+        return Position.fixture(
+            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed,
+            routeOffset: routeOffset ?? offset ?? 0, convoyOffset: offset, updatedAt: Self.now.addingTimeInterval(-age))
     }
 
     private func order(_ cars: [Car], _ positions: [String: Position], speeds: [String: Double] = [:],

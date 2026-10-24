@@ -37,16 +37,14 @@ private enum Fixture {
     }
 
     static func car(_ id: String, joining: Bool = false, merge: Double? = nil, route: String? = nil) -> Car {
-        Car(id: id, name: "Car \(id)", color: "#2563EB", trackerUserId: nil, isLead: false, route: route,
-            mergeOffset: merge, state: joining ? .joining : .convoy, number: Int(id))
+        Car.fixture(id, state: joining ? .joining : .convoy, route: route, mergeOffset: merge)
     }
 
     static func position(convoy: Double?, own: Double? = nil, age: TimeInterval = 1) -> Position {
         let c = main(at: convoy ?? 0)
-        return Position(
-            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: 25, heading: 90,
-            routeOffset: own ?? convoy ?? 0, convoyOffset: convoy, battery: nil,
-            updatedAt: now.addingTimeInterval(-age))
+        return Position.fixture(
+            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), routeOffset: own ?? convoy ?? 0,
+            convoyOffset: convoy, updatedAt: now.addingTimeInterval(-age))
     }
 }
 

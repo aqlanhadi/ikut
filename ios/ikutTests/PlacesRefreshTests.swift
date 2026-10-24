@@ -52,7 +52,7 @@ struct PlacesRefreshTests {
         var defaults: UserDefaults
     }
 
-    static func rig(now: Date = Date(timeIntervalSince1970: 1_800_000_000), lastCheck: Date? = nil, bundled: PlacesFile = bundled, tripRunning: Bool = false) -> Rig {
+    static func rig(now: Date = Fixtures.t0, lastCheck: Date? = nil, bundled: PlacesFile = bundled, tripRunning: Bool = false) -> Rig {
         StubHosting.reset()
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubHosting.self]
@@ -178,7 +178,7 @@ struct PlacesRefreshTests {
                 let c = URLSessionConfiguration.ephemeral
                 c.protocolClasses = [StubHosting.self]
                 return URLSession(configuration: c)
-            }(), store: rig.store, defaults: rig.defaults, inApp: { Self.bundled }, now: { Date(timeIntervalSince1970: 1_800_000_000 + 8 * 86_400) })
+            }(), store: rig.store, defaults: rig.defaults, inApp: { Self.bundled }, now: { Fixtures.t0.addingTimeInterval(8 * 86_400) })
         let cut = good.prefix(good.count / 2)
         StubHosting.manifest = Self.manifest(for: Data(cut), stamp: "2026-12-22T20:21:33.000Z", bytes: good.count, sha: "abc")
         StubHosting.file = Data(cut)
@@ -195,7 +195,7 @@ struct PlacesRefreshTests {
     }
 
     @Test func checkedADayAgoMeansNoRequest() async {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let now = Fixtures.t0
         let rig = Self.rig(now: now, lastCheck: now.addingTimeInterval(-86_400))
         let data = Self.file()
         StubHosting.manifest = Self.manifest(for: data)
@@ -205,7 +205,7 @@ struct PlacesRefreshTests {
     }
 
     @Test func checkedEightDaysAgoAsksAgain() async {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let now = Fixtures.t0
         let rig = Self.rig(now: now, lastCheck: now.addingTimeInterval(-8 * 86_400))
         let data = Self.file()
         StubHosting.manifest = Self.manifest(for: data)
@@ -214,7 +214,7 @@ struct PlacesRefreshTests {
     }
 
     @Test func aClockSetBackMeansAskAgain() async {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let now = Fixtures.t0
         let rig = Self.rig(now: now, lastCheck: now.addingTimeInterval(30 * 86_400))
         let data = Self.file()
         StubHosting.manifest = Self.manifest(for: data)

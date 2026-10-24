@@ -12,13 +12,11 @@ struct StopAnswerTests {
     }
 
     private func stop(_ offset: Double = 62_000, skipped: Bool = false, kind: PlannedStopKind = .fuel) -> PlannedStop {
-        PlannedStop(
-            id: "s1", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: offset,
-            kind: kind, minutes: 20, order: 0, skipped: skipped ? true : nil)
+        PlannedStop.fixture(offset: offset, kind: kind, skipped: skipped ? true : nil)
     }
 
     @Test func theAnswerDecodesWithTheCarIdFromTheDocument() throws {
-        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        let at = Fixtures.t0
         let decoded = try firestoreDecode(StopAnswer.self, from: ["answer": "skip", "userId": "u2", "at": Timestamp(date: at)],
             path: "trips/t/stops/s1/answers/carB")
         #expect(decoded.id == "carB")
@@ -39,23 +37,27 @@ struct StopAnswerTests {
 
     @Test func aMeetingPointIsDecidedByTheCarsStateAlone() {
         func meet(_ offset: Double) -> PlannedStop {
-            PlannedStop(
-                id: "m", name: "Petronas", coordinate: GeoPoint(latitude: 3.2, longitude: 101.6), routeOffset: offset,
-                kind: .meet, minutes: nil, order: 0)
+            PlannedStop.fixture(
+                "m", name: "Petronas", offset: offset, coordinate: GeoPoint(latitude: 3.2, longitude: 101.6),
+                kind: .meet, minutes: nil)
         }
         // A car with no way in of its own sits at offset about 0, the meeting point's own offset: joining still skips.
         #expect(SkipAnswers.canSkip(stop: meet(0), isLeadCar: false, carOffset: 0, tripStarted: true, isJoining: true))
         #expect(!SkipAnswers.canSkip(stop: meet(0), isLeadCar: false, carOffset: 0, tripStarted: true, isJoining: false))
         #expect(SkipAnswers.canSkip(stop: meet(5_000), isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
         #expect(!SkipAnswers.canSkip(stop: meet(5_000), isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
+        // Once the meeting point was left there is nothing to meet at: no button, even for a joining car.
+        var left = meet(0)
+        left.leftAt = Date(timeIntervalSince1970: 1_000)
+        left.leftBy = "u1"
+        #expect(!SkipAnswers.canSkip(stop: left, isLeadCar: false, carOffset: nil, tripStarted: true, isJoining: true))
         // Any other stop goes by the offset, whatever the state.
         #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 100, tripStarted: true, isJoining: false))
     }
 
     @Test func skippingCarsAreNamedOneLineEachUpToTwo() {
         func car(_ id: String, _ name: String, _ n: Int) -> Car {
-            Car(id: id, name: name, color: "#2563EB", trackerUserId: nil, isLead: false, route: nil, mergeOffset: nil,
-                state: .convoy, number: n)
+            Car.fixture(id, name: name, number: n)
         }
         let a = car("a", "Daniel’s Myvi", 2), b = car("b", "Wyna’s X70", 3), c = car("c", "Hafiz’s Axia", 4)
         #expect(SkipAnswers.lines(skippingCars: [], stopName: "R&R Tapah").isEmpty)
@@ -120,35 +122,27 @@ struct StopAnswerEmulatorTests {
     /// A started trip with one stop; a second car joined. A car skips, undoes, skips again; the lead car, another
     /// car's answer and a skipped stop are refused.
     @Test func aCarSkipsAStopAndUndoesIt() async throws {
-        let trip = try await EmulatorTrip.make(name: "Skips", route: Fixtures.longRoute)
+        let trip = try await EmulatorTrip.make(name: "Skips", route: Fixtures.longRoute, stops: [Fixtures.tapah])
         let code = try await trip.code()
-        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
-        let tapah = PlannedStop(
-            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
-            kind: .fuel, minutes: 20, order: 0)
-        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
 
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        let joiner = try #require(Auth.auth().currentUser?.uid)
-        let joined = try await LiveJoinAPI().join(
-            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        let (joiner, joinedCar) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
 
         // Before the trip starts nobody can answer, the joiner's own car included.
         await #expect(throws: (any Error).self) {
-            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
         }
         await TripService.markStarted(tripId: trip.tripId)
         let stream = StopAnswerService.listen(tripId: trip.tripId, stopId: "tapah")
 
-        let sent = try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        let sent = try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
         #expect(sent)
         let said = try #require(await firstValue(of: stream, within: 15) { $0.count == 1 && $0[0].at != nil })
-        #expect(SkipAnswers.skipping(said) == [joined.carId])
+        #expect(SkipAnswers.skipping(said) == [joinedCar])
         #expect(said[0].userId == joiner)
         #expect(said[0].at != nil)
         // A second phone in the car says it again: still one answer.
-        try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
 
         // Nobody answers for another car.
         await #expect(throws: (any Error).self) {
@@ -158,23 +152,17 @@ struct StopAnswerEmulatorTests {
             try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: trip.carId)
         }
 
-        let undone = try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
+        let undone = try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joinedCar)
         #expect(undone)
         let gone = try #require(await firstValue(of: stream, within: 15) { $0.isEmpty })
         #expect(SkipAnswers.skipping(gone).isEmpty)
         // Undo with nothing there is harmless; and the car can change its mind again.
-        try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
-        try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+        try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joinedCar)
+        try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
     }
 
     private func tripWithStop(_ name: String) async throws -> EmulatorTrip {
-        let trip = try await EmulatorTrip.make(name: name, route: Fixtures.longRoute)
-        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
-        let tapah = PlannedStop(
-            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
-            kind: .fuel, minutes: 20, order: 0)
-        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
-        return trip
+        try await EmulatorTrip.make(name: name, route: Fixtures.longRoute, stops: [Fixtures.tapah])
     }
 
     /// The organizer's own (lead) car takes no skip answer, on a started trip.

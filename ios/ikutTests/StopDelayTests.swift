@@ -13,11 +13,10 @@ struct StopDelayTests {
         _ name: String, _ offset: Double, minutes: Int? = nil, kind: PlannedStopKind = .fuel, meetAt: Date? = nil,
         arrivedAt: Date? = nil, left: Bool = false, skipped: Bool = false
     ) -> PlannedStop {
-        var s = PlannedStop(
-            id: name, name: name, coordinate: GeoPoint(latitude: 0, longitude: 0), routeOffset: offset, kind: kind,
-            minutes: minutes, meetAt: meetAt, order: 0, skipped: skipped ? true : nil, arrivedAt: arrivedAt)
-        if left { s.leftAt = Self.now; s.leftBy = "u1" }
-        return s
+        PlannedStop.fixture(
+            name, name: name, offset: offset, coordinate: GeoPoint(latitude: 0, longitude: 0), kind: kind,
+            minutes: minutes, meetAt: meetAt, skipped: skipped ? true : nil, arrivedAt: arrivedAt,
+            leftAt: left ? Self.now : nil, leftBy: left ? "u1" : nil)
     }
 
     func extra(_ stops: [PlannedStop], from offset: Double = 0, pace: Double? = pace) -> TimeInterval {
@@ -93,18 +92,17 @@ struct StopETAModelTests {
             CLLocationCoordinate2D(latitude: origin.latitude, longitude: origin.longitude + Double(i) * 1000 / 111_320) })
         let m = ConvoyModel.fixture(route: route, locale: .current, timeZone: .current)
         let at = route.coordinate(atOffset: 10_000)!
-        let position = Position(
-            location: GeoPoint(latitude: at.latitude, longitude: at.longitude), speed: 25, heading: 90,
-            routeOffset: 10_000, convoyOffset: 10_000, battery: nil, updatedAt: Fixtures.t0)
-        let car = Car(id: "1", name: "Car 1", color: "#2563EB", trackerUserId: nil, isLead: true, route: nil,
-                      mergeOffset: nil, state: .convoy, number: 1)
+        let position = Position.fixture(
+            location: GeoPoint(latitude: at.latitude, longitude: at.longitude), routeOffset: 10_000,
+            convoyOffset: 10_000, updatedAt: Fixtures.t0)
+        let car = Car.fixture("1", lead: true)
         m.update(cars: [car], positions: ["1": position])
         return m
     }
 
     private func planned(_ id: String, _ offset: Double, _ minutes: Int) -> PlannedStop {
-        PlannedStop(id: id, name: id, coordinate: GeoPoint(latitude: 0, longitude: 0), routeOffset: offset,
-                    kind: .fuel, minutes: minutes, order: 0)
+        PlannedStop.fixture(
+            id, name: id, offset: offset, coordinate: GeoPoint(latitude: 0, longitude: 0), minutes: minutes)
     }
 
     @Test func destinationArrivalIncludesTheStopsAhead() async {

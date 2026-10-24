@@ -27,6 +27,9 @@ enum Fixtures {
     /// The same two points plus a third (a real, longer drive).
     static let longRoute = BuiltRoute(
         distance: 205_400, travelTime: 8_700, name: "E1", polyline: "_p~iF~ps|U_ulLnnqC")
+
+    /// R&R Tapah, a fuel stop of 20 minutes 62 km along `longRoute`, as the emulator tests save it.
+    static let tapah = PlannedStop.fixture("tapah")
 }
 
 // MARK: - Models
@@ -41,6 +44,51 @@ extension Trip {
         Trip(
             id: "t", name: name, code: code, organizerId: organizerId, route: route, destination: destination,
             status: status, startedAt: startedAt)
+    }
+}
+
+extension Car {
+    /// A car in the convoy named "Car <id>", not the lead, with no tracker, unless told otherwise.
+    /// `number` defaults to the id read as a number (nil when it isn't one); pass `.some(nil)`, or any `Int?`
+    /// variable, to say "no number".
+    static func fixture(
+        _ id: String, name: String? = nil, number: Int?? = nil, lead: Bool = false, state: CarState = .convoy,
+        color: String = "#2563EB", tracker: String? = nil, route: String? = nil, mergeOffset: Double? = nil,
+        pausedAt: Date? = nil
+    ) -> Car {
+        Car(
+            id: id, name: name ?? "Car \(id)", color: color, trackerUserId: tracker, isLead: lead, route: route,
+            mergeOffset: mergeOffset, state: state, number: number ?? Int(id), pausedAt: pausedAt)
+    }
+}
+
+extension Position {
+    /// A position at (0, 0) doing 25 m/s due east, reported a second before `Fixtures.t0`, unless told otherwise.
+    static func fixture(
+        location: GeoPoint = GeoPoint(latitude: 0, longitude: 0), speed: Double = 25, heading: Double = 90,
+        routeOffset: Double = 0, convoyOffset: Double? = nil, battery: Double? = nil,
+        updatedAt: Date? = Fixtures.t0.addingTimeInterval(-1)
+    ) -> Position {
+        Position(
+            location: location, speed: speed, heading: heading, routeOffset: routeOffset, convoyOffset: convoyOffset,
+            battery: battery, updatedAt: updatedAt)
+    }
+}
+
+extension PlannedStop {
+    /// R&R Tapah, a fuel stop of 20 minutes at 62 km, first in the list, unless told otherwise.
+    static func fixture(
+        _ id: String = "s1", name: String = "R&R Tapah", offset: Double = 62_000,
+        coordinate: GeoPoint = GeoPoint(latitude: 4.2, longitude: 101.2), kind: PlannedStopKind = .fuel,
+        minutes: Int? = 20, meetAt: Date? = nil, order: Int = 0, skipped: Bool? = nil, arrivedAt: Date? = nil,
+        leftAt: Date? = nil, leftBy: String? = nil
+    ) -> PlannedStop {
+        var s = PlannedStop(
+            id: nil, name: name, coordinate: coordinate, routeOffset: offset, kind: kind, minutes: minutes,
+            meetAt: meetAt, order: order, skipped: skipped, arrivedAt: arrivedAt, leftAt: leftAt, leftBy: leftBy)
+        // Set the id after init: passing a non-nil @DocumentID to the initializer logs a Firestore warning.
+        s.id = id
+        return s
     }
 }
 
@@ -141,14 +189,37 @@ struct EmulatorTrip {
     static func make(
         name: String = "Trip", destination: DestinationResult = Fixtures.kotaBharu,
         route: BuiltRoute = Fixtures.shortRoute, organizer: String = "Aqlan",
-        carName: String? = nil, carColor: String? = nil
+        carName: String? = nil, carColor: String? = nil, stops: [PlannedStop] = []
     ) async throws -> EmulatorTrip {
         try await AuthModel().signInAsGuest(name: organizer)
         let uid = try #require(Auth.auth().currentUser?.uid)
         let ids = try await TripService.createTrip(
             name: name, destination: destination, route: route,
             organizer: TripOrganizer(id: uid, displayName: organizer), carName: carName, carColor: carColor)
+        if !stops.isEmpty {
+            let saved = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: route.polyline)
+            try await TripService.saveStops(tripId: ids.tripId, plan: StopPlanSave(route: saved, stops: stops, removedIds: []))
+        }
         return EmulatorTrip(tripId: ids.tripId, carId: ids.carId, uid: uid)
+    }
+
+    /// Signs out the current user, signs in a new guest and joins the trip with `code` in a new car. The guest is
+    /// anonymous unless `viaAuthModel` (then `AuthModel.signInAsGuest`, as the app does).
+    @discardableResult
+    static func joinAsGuest(
+        code: String, name: String, carName: String, color: String = TripService.palette[1], tracker: Bool,
+        viaAuthModel: Bool = false
+    ) async throws -> (uid: String, carId: String) {
+        try Auth.auth().signOut()
+        if viaAuthModel {
+            try await AuthModel().signInAsGuest(name: name)
+        } else {
+            try await Auth.auth().signInAnonymously()
+        }
+        let uid = try #require(Auth.auth().currentUser?.uid)
+        let joined = try await LiveJoinAPI().join(
+            code: code, displayName: name, car: .new(name: carName, color: color), tracker: tracker)
+        return (uid, joined.carId)
     }
 
     /// The trip's join code.

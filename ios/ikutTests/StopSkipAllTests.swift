@@ -9,12 +9,10 @@ struct StopSkipAllTests {
     func stop(
         kind: PlannedStopKind = .fuel, arrivedAt: Date? = nil, leftAt: Date? = nil, skipped: Bool = false
     ) -> PlannedStop {
-        var s = PlannedStop(
-            id: "s1", name: "R&R Tapah", coordinate: GeoPoint(latitude: 3, longitude: 101), routeOffset: 60_000, kind: kind,
-            minutes: kind == .meet ? nil : 20, order: 0, skipped: skipped ? true : nil, arrivedAt: arrivedAt,
-            leftAt: leftAt, leftBy: leftAt == nil ? nil : "u1")
-        s.id = "s1"
-        return s
+        PlannedStop.fixture(
+            offset: 60_000, coordinate: GeoPoint(latitude: 3, longitude: 101), kind: kind,
+            minutes: kind == .meet ? nil : 20, skipped: skipped ? true : nil, arrivedAt: arrivedAt, leftAt: leftAt,
+            leftBy: leftAt == nil ? nil : "u1")
     }
 
     func can(_ s: PlannedStop, org: Bool = true, started: Bool = true, reached: Bool = false) -> Bool {
@@ -34,11 +32,11 @@ struct StopSkipAllTests {
 
     @Test func notOnceACarIsThereOrTheLeadCarMarkedItsArrival() {
         #expect(!can(stop(), reached: true))
-        #expect(!can(stop(arrivedAt: Date(timeIntervalSince1970: 1_800_000_000))))
+        #expect(!can(stop(arrivedAt: Fixtures.t0)))
     }
 
     @Test func notOnAStopAlreadyLeftOrSkipped() {
-        #expect(!can(stop(leftAt: Date(timeIntervalSince1970: 1_800_000_000))))
+        #expect(!can(stop(leftAt: Fixtures.t0)))
         #expect(!can(stop(skipped: true)))
     }
 
@@ -50,8 +48,7 @@ struct StopSkipAllTests {
 
     @Test func aCarSeenAtTheStopAMomentAgoCountsAsReached() {
         func row(_ status: StopArrival.Status) -> StopArrival.Row {
-            .init(id: "c", car: Car(id: "c", name: "Car", color: "#2563EB", trackerUserId: nil, isLead: false, route: nil,
-                                    mergeOffset: nil, state: .convoy, number: 2), status: status)
+            .init(id: "c", car: Car.fixture("c", name: "Car", number: 2), status: status)
         }
         #expect(StopSkipAll.carReached([row(.here)]))
         #expect(StopSkipAll.carReached([row(.away(distance: 5_000, seconds: 200)), row(.lastSeenHere)]))
@@ -68,8 +65,7 @@ struct StopSkipAllTests {
 
     @Test func theOrganizerIsNamedFromTheirMemberNotFromTheLeadCar() {
         func car(_ id: String, _ name: String, number: Int, lead: Bool) -> Car {
-            Car(id: id, name: name, color: "#2563EB", trackerUserId: nil, isLead: lead, route: nil, mergeOffset: nil,
-                state: .convoy, number: number)
+            Car.fixture(id, name: name, number: number, lead: lead)
         }
         // The lead car moved to Wyna; Aqlan's car (number 1) is not the lead.
         let cars = [car("c1", "Aqlan’s Myvi", number: 1, lead: false), car("c2", "Wyna’s X70", number: 2, lead: true)]
@@ -86,13 +82,11 @@ struct StopSkipAllTests {
     /// the highway project onto the far end of that detour: each car's offset jumps forward by the detour's length
     /// (a few hundred metres) as it passes the slip road, at slightly different moments.
     private func car(_ id: String, number: Int) -> Car {
-        Car(id: id, name: "Car \(id)", color: "#2563EB", trackerUserId: nil, isLead: number == 1, route: nil,
-            mergeOffset: nil, state: .convoy, number: number)
+        Car.fixture(id, number: number, lead: number == 1)
     }
     private func pos(_ offset: Double) -> Position {
-        Position(
-            location: GeoPoint(latitude: 3, longitude: 101), speed: 28, heading: 90, routeOffset: offset,
-            convoyOffset: offset, battery: nil, updatedAt: Fixtures.t0.addingTimeInterval(-1))
+        Position.fixture(
+            location: GeoPoint(latitude: 3, longitude: 101), speed: 28, routeOffset: offset, convoyOffset: offset)
     }
     private func order(_ lead: Double, _ behind: Double) -> ConvoySnapshot {
         ConvoyOrdering.order(

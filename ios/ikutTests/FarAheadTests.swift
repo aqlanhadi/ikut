@@ -14,15 +14,14 @@ struct FarAheadTests {
     private static let main = RouteLine(stride(from: 0.0, through: 120_000, by: 1000).map { move(origin, east: $0) })
 
     private func car(_ id: String, _ name: String, lead: Bool = false) -> Car {
-        Car(id: id, name: name, color: "#2563EB", trackerUserId: nil, isLead: lead,
-            route: nil, mergeOffset: nil, state: .convoy, number: Int(id))
+        Car.fixture(id, name: name, lead: lead)
     }
 
     private func pos(_ offset: Double, speed: Double = 25, age: TimeInterval = 1) -> Position {
         let c = move(origin, east: offset)
-        return Position(
-            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, heading: 90,
-            routeOffset: offset, convoyOffset: offset, battery: nil, updatedAt: Self.now.addingTimeInterval(-age))
+        return Position.fixture(
+            location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, routeOffset: offset,
+            convoyOffset: offset, updatedAt: Self.now.addingTimeInterval(-age))
     }
 
     private var aisha: Car { car("1", "Aisha’s Myvi", lead: true) }
