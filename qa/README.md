@@ -116,6 +116,7 @@ its suite finishes; the script takes the suite's result and kills it after 60 s.
 | `convoy-sim.mjs` | The scenario driver. |
 | `lib/route.mjs`, `lib/tracking.mjs` | JS ports of the Swift logic, each function annotated with its source file. |
 | `lib/scenario.mjs` | The script: cars, speeds, gap, timeline, and the parked and stop scenarios. |
+| `lib/rebuild.mjs` | The route rebuilt mid-trip (port of `RouteRebuild`, `StopRouting.join`) and the town-loop geometry of `--scenario rebuild`, with `lib/rebuild.test.mjs`. |
 | `lib/stoparrival.mjs` | Who is at a planned stop (port of `StopArrival`), with `lib/stoparrival.test.mjs`. |
 | `lib/shell.mjs`, `lib/firebase-config.mjs` | `run`/`simctl`/`sleep`/`makeSay`, `endsWithResult` (the `RESULT` line and `--deadline`) and `holdSimulators` (the simulator lock) for the scripts that drive simulators; the production client config read from the app's plist. |
 | `simlock.sh` | Holds one or more simulators while a command runs, see Waiting on a run. |
@@ -154,6 +155,15 @@ the trip's `startedAt` before the cars set off. No phone car, no timeline: it do
 `run-ui.mjs` does not run it. D25 4a: car 1's phone writes `arrivedAt` when it first counts itself here and taps
 Leave once all four are here (`lib/stopleave.mjs` ports Next stop and Leaving at).
 
+**A rebuilt route** (`--scenario rebuild`, D25 4d, 420 s, about 45 s at the default speed): the trip is planned with Lunch in
+Bidor, a town stop on a loop off the highway (leaves it at 15 km, 1.5 km out, back at 19 km), and R&R Tapah on the
+highway at 22 km. At T=120 car 1 (the organizer, 8.3 km along) skips Lunch for everyone and writes the rebuilt route and the
+new offset of R&R Tapah in one batch, as `RouteRebuild.build` and `TripService.rebuildRoute` do (the road behind the
+organizer kept, then the highway). Each car's phone follows the new route from the snapshot on. Car 3 is parked at R&R
+Tapah all along, car 4 keeps to the highway (1.9 km past the turn-off at T=120, so off the old route), cars 1 and 2
+follow; car 4 passes car 3 at about T=305. Tracks are made in memory (`syntheticTrack`), no GPX files; no phone, so not
+`--wait-app`.
+
 ## What is checked
 
 `convoy-sim.mjs` (PASS/FAIL lines, exit code 1 on any FAIL):
@@ -177,6 +187,17 @@ Leave once all four are here (`lib/stopleave.mjs` ports Next stop and Leaving at
   after the last car is here, Next stop moves on from R&R Tapah to Kopitiam Gopeng within 10 s, a skip answer, a
   skip for everyone and a second Leave on the left stop are refused, and before it car 2 could not Leave or mark
   the arrival and car 4, still short of the stop, could skip and undo
+
+- rebuild (`--scenario rebuild`; car 1's, car 2's and every phone's view): convoy order against the highway truth before,
+  just after and well after the rebuild and after car 4 passes the parked car; one batch, R&R Tapah's offset read
+  moving once on every phone (old route, then new, by what the loop added) and Lunch's never; the route read changing
+  once; the server holds the same; the new route is the highway, its cut at the organizer; no separation warning
+  within 60 s of it (car 2's phone, `lib/farahead.mjs`); the parked car had the new route within 5 s (real) and wrote at most one republish on the old one meanwhile, and never reads "Drove past" (car 1's phone, `lib/stoparrival.mjs`; a car at the stop is "here" by distance, so
+  only the offset count can show the transient); car 4 was more than 100 m off the old route and is on the new one with its
+  true `convoyOffset`. `OffRouteDetector` is not ported: car 4 turning back into the convoy stays covered by the unit test.
+  `IKUT_QA_BREAK=<name>` breaks the drive on purpose to show each check fails: `parked-stays-old` and `parked-late`
+  (the parked car keeps the old route, or takes the new one 8 s late), `nobody-swaps`, `batch-twice`, `moves-skipped`
+  (the skipped stop is moved too), `car2-prefix-lost` (a rebuild that does not keep the line behind the organizer).
 
 `ConvoyScenarioUITests` (the panel as a person sees it, ids `convoy.row.N`, `joining.row.N`, `convoy.header`,
 `convoy.joining.header`, `hazard.marker`):
