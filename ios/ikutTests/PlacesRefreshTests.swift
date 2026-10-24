@@ -110,6 +110,34 @@ struct PlacesRefreshTests {
         #expect(rig.defaults.object(forKey: PlacesRefresher.lastCheckKey) == nil)
     }
 
+    @Test func moreBytesThanTheManifestSaysAreRejected() async {
+        let rig = Self.rig()
+        let data = Self.file()
+        StubHosting.manifest = Self.manifest(for: data)
+        StubHosting.file = data + Data(repeating: 0x20, count: 5_000)
+        #expect(await rig.refresher.refreshIfDue() == false)
+        #expect(rig.store.load() == nil)
+        #expect(rig.defaults.object(forKey: PlacesRefresher.lastCheckKey) == nil)
+    }
+
+    @Test func aManifestOverTheCapIsRejected() async {
+        let rig = Self.rig()
+        let data = Self.file()
+        StubHosting.manifest = Self.manifest(for: data) + Data(repeating: 0x20, count: PlacesRefresher.manifestCap)
+        StubHosting.file = data
+        #expect(await rig.refresher.refreshIfDue() == false)
+        #expect(StubHosting.requests.map { $0.url?.lastPathComponent } == ["manifest.json"])
+    }
+
+    @Test func aFileDatedDifferentlyFromItsManifestIsRejected() async {
+        let rig = Self.rig()
+        let data = Self.file(stamp: "2026-11-22T20:21:33.000Z")
+        StubHosting.manifest = Self.manifest(for: data, stamp: "2026-12-22T20:21:33.000Z")
+        StubHosting.file = data
+        #expect(await rig.refresher.refreshIfDue() == false)
+        #expect(rig.store.load() == nil)
+    }
+
     @Test func hashMismatchIsRejected() async {
         let rig = Self.rig()
         let data = Self.file()

@@ -110,6 +110,7 @@ final class PlacesRefresher: @unchecked Sendable {
             config.httpCookieStorage = nil
             config.urlCredentialStorage = nil
             config.timeoutIntervalForRequest = 20
+            config.timeoutIntervalForResource = 60
             self.session = URLSession(configuration: config)
         }
         self.store = store
@@ -146,7 +147,7 @@ final class PlacesRefresher: @unchecked Sendable {
             defaults.set(now(), forKey: Self.lastCheckKey)
             return false
         }
-        guard let data = await fetch(fileURL), accept(data, for: manifest, bundledCount: bundled.sites.count) else { return false }
+        guard let data = await fetch(fileURL, cap: manifest.bytes), accept(data, for: manifest, bundledCount: bundled.sites.count) else { return false }
         do { try store.write(data) } catch { return false }
         defaults.set(now(), forKey: Self.lastCheckKey)
         return true
@@ -155,22 +156,36 @@ final class PlacesRefresher: @unchecked Sendable {
     /// The hosted file matches its manifest, reads, and has not lost most of its sites.
     func accept(_ data: Data, for manifest: PlacesManifest, bundledCount: Int) -> Bool {
         guard data.count == manifest.bytes else { return false }
+        // The file is the one the manifest describes, not another that happens to have the same size and hash.
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         guard hash == manifest.sha256.lowercased() else { return false }
-        guard let file = try? PlacesLoader.decode(data) else { return false }
+        guard let file = try? PlacesLoader.decode(data), file.generatedAt == manifest.generatedAt else { return false }
         return Double(file.sites.count) >= Double(bundledCount) * Self.floorShare
     }
 
+    /// The most a manifest may be: it is a few hundred bytes.
+    static let manifestCap = 4_096
+
     private func fetchManifest() async -> PlacesManifest? {
-        guard let data = await fetch(manifestURL) else { return nil }
+        guard let data = await fetch(manifestURL, cap: Self.manifestCap) else { return nil }
         return try? PlacesManifest.decode(data)
     }
 
-    private func fetch(_ url: URL) async -> Data? {
+    /// The body of a plain GET, or nil: not a 200, a length over `cap` announced up front, or more than `cap` bytes
+    /// arriving. Reading stops at the cap, so a wrong or hostile file never fills memory.
+    private func fetch(_ url: URL, cap: Int) async -> Data? {
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false
-        guard let (data, response) = try? await session.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        guard let (bytes, response) = try? await session.bytes(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              response.expectedContentLength <= Int64(cap) else { return nil }
+        var data = Data()
+        do {
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > cap { return nil }
+            }
+        } catch { return nil }
         return data
     }
 }
