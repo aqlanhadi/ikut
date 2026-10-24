@@ -92,6 +92,52 @@ enum TripSessionLogic {
         return CLLocationCoordinate2D(latitude: first.coordinate.latitude, longitude: first.coordinate.longitude)
     }
 
+    /// The meeting point a car's own route goes to (D25 4d-2). The same as `meetingPoint(in:)` until the lead car
+    /// has tapped Leave at it, or this car has said it will meet the convoy along the way (`skippingAlong`): after
+    /// either, the car's route goes to the destination and merges wherever its road meets the main route, as on a
+    /// trip with no meeting point.
+    static func joiningMeetingPoint(in stops: [PlannedStop], skippingAlong: Bool) -> CLLocationCoordinate2D? {
+        guard !skippingAlong,
+              let first = stops.min(by: { $0.order < $1.order }), first.kind == .meet, first.isOpen
+        else { return nil }
+        return meetingPoint(in: stops)
+    }
+
+    /// What a running tracking session was started with, for `sessionMeetingPoint`.
+    struct RunningSession { var meetingPoint: CLLocationCoordinate2D? }
+
+    /// A listener on the car's answer that ended in an error, and when.
+    struct AnswerFailure: Equatable { var target: [String]; var at: Date }
+
+    /// How long after an error the same answer listener waits before attaching again.
+    static let answerRetryDelay: TimeInterval = 10
+
+    /// Whether the listener on `target` may attach now: not within `answerRetryDelay` of its own last failure, so a
+    /// lasting error (permission denied) does not loop attach, error, attach.
+    static func mayAttachAnswer(target: [String], lastFailure: AnswerFailure?, now: Date) -> Bool {
+        guard let lastFailure, lastFailure.target == target else { return true }
+        return now.timeIntervalSince(lastFailure.at) >= answerRetryDelay
+    }
+
+    /// The meeting point that keys a tracking session. After the start, a car that is no longer joining keeps what
+    /// its running session was started with (`running`, when that session is this car's on this route), so neither
+    /// a Leave nor its own merge restarts it; with no running session it follows `joiningMeetingPoint`. A car still
+    /// joining, or any car before the start, follows `joiningMeetingPoint`.
+    static func sessionMeetingPoint(
+        in stops: [PlannedStop], skippingAlong: Bool, carState: CarState, tripStarted: Bool,
+        running: RunningSession? = nil
+    ) -> CLLocationCoordinate2D? {
+        if tripStarted, carState != .joining, let running { return running.meetingPoint }
+        return joiningMeetingPoint(in: stops, skippingAlong: skippingAlong)
+    }
+
+    /// A session for a joining car is not keyed until this car's answer on the meeting point has been read once:
+    /// after a relaunch the answer starts unknown, and a route started toward the meet could land after the right one.
+    static func waitsForAnswer(stops: [PlannedStop], carState: CarState, tripStarted: Bool, answerRead: Bool) -> Bool {
+        guard tripStarted, carState == .joining, !answerRead else { return false }
+        return stops.min(by: { $0.order < $1.order })?.kind == .meet
+    }
+
     /// What a tracking session starts from. While a trip with a meeting point has not started, the car doc's state and
     /// route can't be trusted: they may belong to an old route (the organizer's car says `convoy` from the day the trip
     /// was made), or be left from before a pause, a relaunch, or an add made while the phone had no fix. So every

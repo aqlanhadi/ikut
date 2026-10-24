@@ -233,9 +233,12 @@ struct ConvoyPanel: View {
 
     private var nextStopCell: NextStop.Cell? {
         if let mine = myEntry { return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: model.stopPace(), now: Date()) }
-        // Still joining: the meeting point, how far my own way in has to go.
+        // Still joining: the meeting point, how far my own way in has to go; after Leave, or my own "meet you along
+        // the way", the next open stop ahead of where my road meets the main route.
         guard let mine = convoy.joining.first(where: { $0.id == model.myCarId }) else { return nil }
-        return NextStop.joiningCell(stops: model.stops, distance: mine.distanceToMerge, seconds: mine.timeToMerge)
+        return NextStop.joiningCell(
+            stops: model.stops, distance: mine.distanceToMerge, seconds: mine.timeToMerge,
+            mergeOffset: mine.car.mergeOffset, pace: model.joiningStopPace(), skipsMeet: model.skipsMeetingPoint)
     }
 
     private var myEntry: ConvoyEntry? { convoy.convoy.first(where: { $0.id == model.myCarId }) }

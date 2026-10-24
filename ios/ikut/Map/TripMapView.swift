@@ -764,7 +764,8 @@ struct TripMapView: View {
     private var sessionSignature: SessionSignature {
         SessionSignature(
             trip: session.trip, car: session.car, positions: session.positions,
-            isTracking: session.isTracking, carId: session.member?.carId, stops: session.stops)
+            isTracking: session.isTracking, carId: session.member?.carId, stops: session.stops,
+            skipsMeetingPoint: session.skipsMeetingPoint)
     }
 
     private struct SessionSignature: Equatable {
@@ -774,6 +775,7 @@ struct TripMapView: View {
         var isTracking: Bool
         var carId: String?
         var stops: [PlannedStop]
+        var skipsMeetingPoint: Bool
     }
 
     private func appear() {

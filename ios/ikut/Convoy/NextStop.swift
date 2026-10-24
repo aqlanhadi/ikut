@@ -60,13 +60,31 @@ enum NextStop {
             isHere: here, stopId: stop.id)
     }
 
-    /// The cell for a car still on its own way in: the meeting point, if the trip has one that is not skipped,
-    /// with how far its own route has to go. Nil without a meeting point or a known distance, and for any other
-    /// stop: a car that has not joined has no place on the route to measure them from.
-    static func joiningCell(stops: [PlannedStop], distance: Double?, seconds: TimeInterval?) -> Cell? {
-        guard let distance, let meet = stops.first(where: { $0.isMeeting && $0.isOpen }) else { return nil }
-        let here = distance <= hereRadius
+    /// The cell for a car still on its own way in. While the meeting point is open and the car is going to it: the
+    /// meeting point, with how far its own route has to go. Once the lead car has left it, or this car said it will
+    /// meet the convoy along the way (`skipsMeet`), the car is no longer sent there: the next open stop ahead of
+    /// where its road meets the main route (`mergeOffset`, meters along the main route), at the distance left on its
+    /// own route to the merge plus the distance along the main route from the merge to the stop; with a `pace`
+    /// (seconds per meter on the main route) and a time to the merge, the time adds up the same way, else just the
+    /// distance. Nil without a meeting point on the trip, without a known distance, or, after the meet, with no
+    /// known merge place (a route that never meets the main one has no place to measure the stop from).
+    static func joiningCell(
+        stops: [PlannedStop], distance: Double?, seconds: TimeInterval?,
+        mergeOffset: Double? = nil, pace: Double? = nil, skipsMeet: Bool = false
+    ) -> Cell? {
+        guard let distance, stops.contains(where: \.isMeeting) else { return nil }
+        if !skipsMeet, let meet = stops.first(where: { $0.isMeeting && $0.isOpen }) {
+            let here = distance <= hereRadius
+            return Cell(
+                name: meet.name, distance: here ? 0 : distance, seconds: here ? nil : seconds, isHere: here,
+                stopId: meet.id)
+        }
+        guard let mergeOffset, let stop = next(in: stops.filter { !$0.isMeeting }, from: mergeOffset) else { return nil }
+        let alongMain = max(0, stop.routeOffset - mergeOffset)
+        let total = distance + alongMain
+        let time: TimeInterval? = if let seconds, let pace { seconds + pace * alongMain } else { nil }
+        let here = total <= hereRadius
         return Cell(
-            name: meet.name, distance: here ? 0 : distance, seconds: here ? nil : seconds, isHere: here, stopId: meet.id)
+            name: stop.name, distance: here ? 0 : total, seconds: here ? nil : time, isHere: here, stopId: stop.id)
     }
 }

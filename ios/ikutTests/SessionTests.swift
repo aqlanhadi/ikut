@@ -208,10 +208,12 @@ struct SessionCarRouteTests {
     }
 }
 
-private func meetStop(order: Int = 0, skipped: Bool? = nil) -> PlannedStop {
-    PlannedStop(
+private func meetStop(order: Int = 0, skipped: Bool? = nil, left: Bool = false) -> PlannedStop {
+    var stop = PlannedStop(
         id: "m", name: "Petronas Sungai Buloh", coordinate: GeoPoint(latitude: 38.55, longitude: -120.1), routeOffset: 0,
         kind: .meet, order: order, skipped: skipped)
+    if left { stop.leftAt = Date(timeIntervalSince1970: 1_000); stop.leftBy = "u1" }
+    return stop
 }
 
 private func fuelStop(order: Int) -> PlannedStop {
@@ -227,6 +229,54 @@ struct MeetingPointLogicTests {
         #expect(TripSessionLogic.meetingPoint(in: [fuelStop(order: 0)]) == nil)
         #expect(TripSessionLogic.meetingPoint(in: []) == nil)
         #expect(TripSessionLogic.meetingPoint(in: [meetStop(skipped: true)]) == nil)
+    }
+
+    @Test func aCarStillJoiningIsNotSentToAMeetingPointThatWasLeftOrThatItWillMeetAlongTheWay() {
+        let stops = [meetStop(), fuelStop(order: 1)]
+        #expect(TripSessionLogic.joiningMeetingPoint(in: stops, skippingAlong: false)?.latitude == 38.55)
+        // Left by the lead car, or this car's own "we'll meet you along the way": the destination, merging on the way.
+        #expect(TripSessionLogic.joiningMeetingPoint(in: [meetStop(left: true), fuelStop(order: 1)], skippingAlong: false) == nil)
+        #expect(TripSessionLogic.joiningMeetingPoint(in: stops, skippingAlong: true) == nil)
+    }
+
+    @Test func aLeaveOnlyRestartsTheSessionOfACarStillJoining() {
+        let left = [meetStop(left: true)]
+        let open = [meetStop()]
+        // Joining after the start: Leave takes the meet away, so the key changes and the route is rebuilt.
+        #expect(TripSessionLogic.sessionMeetingPoint(in: open, skippingAlong: false, carState: .joining, tripStarted: true) != nil)
+        #expect(TripSessionLogic.sessionMeetingPoint(in: left, skippingAlong: false, carState: .joining, tripStarted: true) == nil)
+        // A car in the convoy keeps the session it is running through the Leave and through its own merge.
+        let running = TripSessionLogic.RunningSession(meetingPoint: CLLocationCoordinate2D(latitude: 38.55, longitude: -120.1))
+        #expect(TripSessionLogic.sessionMeetingPoint(
+            in: left, skippingAlong: false, carState: .convoy, tripStarted: true, running: running) != nil)
+        // A joining car that has just merged after answering: its session had no meet, and keeps none.
+        #expect(TripSessionLogic.sessionMeetingPoint(
+            in: open, skippingAlong: false, carState: .convoy, tripStarted: true, running: .init(meetingPoint: nil)) == nil)
+        // With no running session it follows the joining rule.
+        #expect(TripSessionLogic.sessionMeetingPoint(in: left, skippingAlong: false, carState: .convoy, tripStarted: true) == nil)
+        // Before the start every car follows the meet (and an answer cannot exist yet).
+        #expect(TripSessionLogic.sessionMeetingPoint(in: open, skippingAlong: false, carState: .convoy, tripStarted: false) != nil)
+    }
+
+    @Test func aSessionWaitsForTheCarsAnswerOnlyWhileItIsJoiningAfterTheStartOnATripWithAMeet() {
+        let stops = [meetStop(), fuelStop(order: 1)]
+        #expect(TripSessionLogic.waitsForAnswer(stops: stops, carState: .joining, tripStarted: true, answerRead: false))
+        #expect(!TripSessionLogic.waitsForAnswer(stops: stops, carState: .joining, tripStarted: true, answerRead: true))
+        #expect(!TripSessionLogic.waitsForAnswer(stops: stops, carState: .convoy, tripStarted: true, answerRead: false))
+        #expect(!TripSessionLogic.waitsForAnswer(stops: stops, carState: .joining, tripStarted: false, answerRead: false))
+        #expect(!TripSessionLogic.waitsForAnswer(stops: [fuelStop(order: 0)], carState: .joining, tripStarted: true, answerRead: false))
+    }
+
+    @Test func aFailedAnswerListenerWaitsTenSecondsBeforeAttachingAgain() {
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        let target = ["m", "c1"]
+        let failure = TripSessionLogic.AnswerFailure(target: target, at: t0)
+        #expect(TripSessionLogic.mayAttachAnswer(target: target, lastFailure: nil, now: t0))
+        #expect(!TripSessionLogic.mayAttachAnswer(target: target, lastFailure: failure, now: t0))
+        #expect(!TripSessionLogic.mayAttachAnswer(target: target, lastFailure: failure, now: t0.addingTimeInterval(9.9)))
+        #expect(TripSessionLogic.mayAttachAnswer(target: target, lastFailure: failure, now: t0.addingTimeInterval(10)))
+        // Another stop or car is not held back by it.
+        #expect(TripSessionLogic.mayAttachAnswer(target: ["m", "c2"], lastFailure: failure, now: t0))
     }
 
     @Test func aCarDocIsNotTrustedWhileATripWithAMeetingPointHasNotStarted() {
@@ -272,6 +322,68 @@ struct SessionMeetingPointTests {
         #expect(seen.meetingPoints.count == 2)
         #expect(seen.meetingPoints[1]?.latitude == 38.55)
         #expect(seen.states == [.convoy, .joining])
+    }
+
+    @Test func aJoiningCarRoutesToTheDestinationOnceTheMeetingPointIsLeftOrItAnswersAlongTheWay() async throws {
+        let seen = Seen()
+        let tracker = FakeTrackingController()
+        let session = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker,
+            carRouteFactory: { _, _, _, car, meet in
+                seen.meetingPoints.append(meet)
+                seen.states.append(car.state)
+                return FakeCarRoute()
+            })
+        var joining = testCar(route: ownPolyline)
+        joining.state = .joining
+        let started = testTrip(startedAt: Date())
+        session.applyForTesting(trip: started, member: testMember, car: joining, stops: [meetStop()])
+        await waitUntil(.seconds(2)) { seen.meetingPoints.count == 1 }
+        #expect(seen.meetingPoints[0]?.latitude == 38.55)
+
+        // This car says it will meet the convoy along the way: the session starts again with no meeting point,
+        // and keeps the car doc's state and route (the start has passed).
+        session.applyForTesting(trip: started, member: testMember, car: joining, stops: [meetStop()], skipsMeetingPoint: true)
+        await waitUntil(.seconds(2)) { seen.meetingPoints.count == 2 }
+        #expect(seen.meetingPoints.count == 2 && seen.meetingPoints[1] == nil)
+        #expect(seen.states == [.joining, .joining])
+
+        // "We'll stop after all", before Leave: back to the meet. Then Leave: gone for good.
+        session.applyForTesting(trip: started, member: testMember, car: joining, stops: [meetStop()])
+        await waitUntil(.seconds(2)) { seen.meetingPoints.count == 3 }
+        #expect(seen.meetingPoints[2]?.latitude == 38.55)
+        session.applyForTesting(trip: started, member: testMember, car: joining, stops: [meetStop(left: true)])
+        await waitUntil(.seconds(2)) { seen.meetingPoints.count == 4 }
+        #expect(seen.meetingPoints[3] == nil)
+    }
+
+    @Test func aLateJoinerThatMergesKeepsItsRunningSession() async throws {
+        let seen = Seen()
+        let tracker = FakeTrackingController()
+        let session = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker,
+            carRouteFactory: { _, _, _, car, meet in
+                seen.meetingPoints.append(meet)
+                seen.states.append(car.state)
+                return FakeCarRoute()
+            })
+        var car = testCar(route: ownPolyline)
+        car.state = .joining
+        let started = testTrip(startedAt: Date())
+        let open = [meetStop()]
+        // Joining, and said it will meet the convoy along the way: the session has no meeting point.
+        session.applyForTesting(trip: started, member: testMember, car: car, stops: open, skipsMeetingPoint: true)
+        await waitUntil(.seconds(2)) { seen.meetingPoints.count == 1 && tracker.isTracking }
+        #expect(seen.meetingPoints[0] == nil)
+
+        // It merges (the doc says convoy), and the session goes on: the factory is not called again.
+        car.state = .convoy
+        session.applyForTesting(trip: started, member: testMember, car: car, stops: open, skipsMeetingPoint: true)
+        // Even if the answer is taken back after the merge, a car in the convoy is not sent to the meet.
+        session.applyForTesting(trip: started, member: testMember, car: car, stops: open, skipsMeetingPoint: false)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(seen.meetingPoints.count == 1)
+        #expect(tracker.isTracking)
     }
 
     @Test func aNewSessionStartsJoiningWhateverTheCarDocSaysWhileTheTripHasAMeetingPointAndHasNotStarted() async throws {
