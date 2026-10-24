@@ -27,26 +27,19 @@
 // build). Screenshots: qa/screens/convoy2/. Logs: $TMPDIR/ikut-qa/convoy2-*.log. It holds both simulators while it
 // runs (qa/simlock.sh), and the log always ends in one `RESULT: PASS|FAIL|ABORT` line.
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth';
-import {
-  GeoPoint, Timestamp, collection, connectFirestoreEmulator, doc, getDoc, getDocs, initializeFirestore, serverTimestamp,
-  onSnapshot, setDoc, setLogLevel, terminate, updateDoc,
-} from 'firebase/firestore';
-import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
-import { CarRouteLogic, Polyline, RouteLine, bearing } from './lib/route.mjs';
-import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
-import { endsWithResult, holdSimulators, makeSay, run, simctl, sleep } from './lib/shell.mjs';
+import { collection, doc, getDoc, getDocs, onSnapshot, setLogLevel } from 'firebase/firestore';
+import { Polyline, RouteLine, bearing } from './lib/route.mjs';
+import { Car, Sync, buildForTesting, feedLocation, prepareSimulator, startUiTest } from './lib/demo-common.mjs';
+import { ownerQuery } from './lib/playground.mjs';
+import { endsWithResult, holdSimulators, makeSay, simctl, sleep } from './lib/shell.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.dirname(here);
-const PROJECT_ID = 'ikut-b1083';
-const REGION = 'asia-southeast1';
 
 const o = {
   aUdid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', // iPhone 17 #1 (shared)
@@ -97,198 +90,50 @@ function check(name, pass, detail = '') {
 
 // ---------------------------------------------------------------- sync directory
 
-const syncDir = path.join(o.logs, 'convoy2-sync');
-fs.rmSync(syncDir, { recursive: true, force: true });
-fs.mkdirSync(syncDir, { recursive: true });
+const sync = new Sync(path.join(o.logs, 'convoy2-sync'), say);
 fs.mkdirSync(o.screens, { recursive: true });
 for (const f of fs.readdirSync(o.screens)) if (f.endsWith('.png')) fs.rmSync(path.join(o.screens, f));
 
-const markPath = (name) => path.join(syncDir, name);
-const mark = (name, content = '') => { fs.writeFileSync(markPath(name), content); say(`mark ${name}${content ? ` = ${content}` : ''}`); };
-let aborted = null;
-async function waitMark(name, timeoutS) {
-  const deadline = Date.now() + timeoutS * 1000;
-  while (Date.now() < deadline) {
-    if (fs.existsSync(markPath(name))) return fs.readFileSync(markPath(name), 'utf8').trim();
-    if (fs.existsSync(markPath('abort'))) throw new Error(`aborted: ${fs.readFileSync(markPath('abort'), 'utf8')}`);
-    if (aborted) throw new Error(`aborted: ${aborted}`);
-    await sleep(300);
-  }
-  throw new Error(`timed out after ${timeoutS} s waiting for ${name}`);
-}
-function abort(why) {
-  if (fs.existsSync(markPath('abort'))) return;
-  aborted = why;
-  fs.writeFileSync(markPath('abort'), why);
-  say(`ABORT: ${why}`);
-}
-
 // ---------------------------------------------------------------- simulators
 
-function deviceLine(pred) {
-  return simctl('list', 'devices').stdout.split('\n').find(pred);
-}
-// Never create or erase simulators here (CLAUDE.md): both phones must already exist (checked below).
+// Never create or erase simulators here (CLAUDE.md): both phones must already exist (prepareSimulator checks).
 say(`phone A ${o.aUdid}, phone B ${o.bUdid}`);
 
+// Known starting state for both phones (Q9): the app is uninstalled so no earlier session, trip or setting
+// survives (Backend.dropUserFromOtherBackend signs out the Keychain user once UserDefaults is gone), and the
+// text size is the default (a leftover accessibility size from a screenshot session breaks taps).
+// --ask-location: phone B answers the system location prompt in the UI instead (first-run path).
 for (const udid of [o.aUdid, o.bUdid]) {
-  const line = deviceLine((l) => l.includes(udid));
-  if (!line) { console.error(`simulator ${udid} not found`); process.exit(1); }
-  if (!line.includes('(Booted)')) { say(`booting ${udid}`); simctl('boot', udid); }
-  simctl('bootstatus', udid, '-b');
-  // --ask-location: phone B answers the system location prompt in the UI instead (first-run path).
-  // Known starting state for both phones (Q9): the app is uninstalled so no earlier session, trip or setting
-  // survives (Backend.dropUserFromOtherBackend signs out the Keychain user once UserDefaults is gone), and the
-  // text size is the default (a leftover accessibility size from a screenshot session breaks taps).
-  simctl('terminate', udid, 'dev.aqlan.ikut');
-  simctl('uninstall', udid, 'dev.aqlan.ikut');
-  simctl('ui', udid, 'content_size', 'large');
-  if (o.askLocation && udid === o.bUdid) simctl('privacy', udid, 'reset', 'location', 'dev.aqlan.ikut');
-  else simctl('privacy', udid, 'grant', 'location-always', 'dev.aqlan.ikut');
-  simctl('location', udid, 'set', `${START.latitude},${START.longitude}`);
+  prepareSimulator(udid, say, { start: START, textSize: 'large', askLocation: o.askLocation && udid === o.bUdid, bootText: `booting ${udid}` });
 }
 
 // ---------------------------------------------------------------- build
 
-const ios = path.join(repo, 'ios');
-const common = ['-project', path.join(ios, 'ikut.xcodeproj'), '-scheme', 'ikut', '-derivedDataPath', o.derivedData,
-  '-clonedSourcePackagesDirPath', path.join(o.derivedData, 'SourcePackages')];
 fs.mkdirSync(o.logs, { recursive: true });
 if (!o.skipBuild) {
   say('building for testing');
-  const r = run('xcodebuild', ['build-for-testing', ...common, '-destination', 'generic/platform=iOS Simulator'], { maxBuffer: 1 << 28 });
-  fs.writeFileSync(path.join(o.logs, 'convoy2-build.log'), `${r.stdout}\n${r.stderr}`);
-  if (r.status !== 0) { console.error(`build failed, see ${path.join(o.logs, 'convoy2-build.log')}`); process.exit(1); }
+  const build = buildForTesting(o, path.join(o.logs, 'convoy2-build.log'));
+  if (!build.ok) { console.error(`build failed, see ${build.logPath}`); process.exit(1); }
 }
 
 // ---------------------------------------------------------------- the two UI tests
 
-function startTest(who, udid, only) {
-  const logPath = path.join(o.logs, `convoy2-${who}.log`);
-  const log = fs.createWriteStream(logPath);
-  const bundle = path.join(o.logs, `convoy2-${who}.xcresult`);
-  fs.rmSync(bundle, { recursive: true, force: true });
-  const xc = end.track(spawn('xcodebuild', ['test-without-building', ...common, '-destination', `platform=iOS Simulator,id=${udid}`,
-    `-only-testing:ikutUITests/${only}`, '-resultBundlePath', bundle, '-collect-test-diagnostics', 'never'], {
-    env: { ...process.env, TEST_RUNNER_IKUT_SYNC_DIR: syncDir, TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
-  }));
-  const t = { who, logPath, checks: [], result: null };
-  let buf = '';
-  const onData = (d) => {
-    log.write(d);
-    buf += d.toString();
-    let nl;
-    while ((nl = buf.indexOf('\n')) >= 0) {
-      const l = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      const c = /QA CHECK: (PASS|FAIL) (.*)$/.exec(l);
-      if (c) t.checks.push({ pass: c[1] === 'PASS', name: c[2] });
-      if (/Test Case .* failed/.test(l) || /error: -\[ikutUITests/.test(l)) abort(`phone ${who}: ${l.replace(/^.*error: /, '').slice(0, 200)}`);
-      if (/QA (STEP|CHECK)|Test Case .*(passed|failed|skipped)|error:|\*\* TEST|XCTAssert|Timed out|Aborted/.test(l)) process.stdout.write(`  ${who} | ${l}\n`);
-      if (/\*\* TEST (SUCCEEDED|FAILED) \*\*/.test(l)) t.result ??= l.trim();
-      // xcodebuild on the second simulator sometimes never exits after the suite finishes; the suite line decides.
-      const suite = /Test Suite 'Selected tests' (passed|failed)/.exec(l);
-      if (suite && !t.suite) {
-        t.suite = suite[1];
-        setTimeout(() => { if (t.code === undefined) { say(`${who}'s xcodebuild still running 60 s after its suite ${t.suite}; killing it`); xc.kill('SIGKILL'); } }, 60_000);
-      }
-    }
-  };
-  xc.stdout.on('data', onData);
-  xc.stderr.on('data', onData);
-  t.exit = new Promise((r) => xc.on('exit', (code) => { t.code = code; t.ok = code === 0 || (code === null && t.suite === 'passed'); r(code); }));
-  t.proc = xc;
-  return t;
-}
+const startTest = (who, udid, only) => startUiTest(o, {
+  udid, only, id: who, label: who, say, onFail: (why) => sync.abort(why),
+  logPath: path.join(o.logs, `convoy2-${who}.log`),
+  bundle: path.join(o.logs, `convoy2-${who}.xcresult`),
+  env: { TEST_RUNNER_IKUT_SYNC_DIR: sync.dir, TEST_RUNNER_IKUT_QA_SCREENS: o.screens },
+  track: (c) => end.track(c),
+  echo: /QA (STEP|CHECK)|Test Case .*(passed|failed|skipped)|error:|\*\* TEST|XCTAssert|Timed out|Aborted/,
+  abortOn: (l) => (/Test Case .* failed/.test(l) || /error: -\[ikutUITests/.test(l) ? `phone ${who}: ${l.replace(/^.*error: /, '').slice(0, 200)}` : null),
+});
 
 const tests = [startTest('A', o.aUdid, 'ConvoyOrganizerUITests'), startTest('B', o.bUdid, 'ConvoyJoinerUITests')];
-for (const t of tests) {
-  t.exit.then((code) => {
-    say(`${t.who}'s test exited ${code} (${t.result ?? `suite ${t.suite ?? 'unfinished'}`})`);
-    if (!t.ok) abort(`phone ${t.who}'s test failed`);
-  });
-}
-
 // ---------------------------------------------------------------- scripted cars
 
-const firestoreOwner = async (body) => {
-  const res = await fetch(`http://${o.host}:8080/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`, {
-    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Firestore emulator: ${res.status} ${await res.text()}`);
-  return (await res.json()).filter((r) => r.document).map((r) => r.document);
-};
+const firestoreOwner = (structuredQuery) => ownerQuery(o.host, structuredQuery);
 
-let clockS = () => (Date.now() - t0) / 1000;
-
-class ScriptedCar {
-  constructor(spec) { Object.assign(this, spec); }
-
-  async connect() {
-    this.app = initializeApp({ apiKey: 'qa-fake-key', projectId: PROJECT_ID, appId: `qa2-${this.key}` }, `qa2-${this.key}`);
-    const auth = getAuth(this.app);
-    connectAuthEmulator(auth, `http://${o.host}:9099`, { disableWarnings: true });
-    this.db = initializeFirestore(this.app, {});
-    connectFirestoreEmulator(this.db, o.host, 8080);
-    this.fns = getFunctions(this.app, REGION);
-    connectFunctionsEmulator(this.fns, o.host, 5001);
-    this.uid = (await signInAnonymously(auth)).user.uid;
-  }
-
-  // JoinService.join: callable joinTrip, a new car, tracker
-  async join(code) {
-    const res = await httpsCallable(this.fns, 'joinTrip')({ code, displayName: this.displayName, car: { newCar: { name: this.name, color: this.color } }, tracker: true });
-    this.tripId = res.data.tripId;
-    this.carId = res.data.carId;
-  }
-
-  // CarRouteService.ensureRoute for a car that starts on the main route
-  async ensureRoute(route, fix) {
-    const plan = CarRouteLogic.planIfOnMain(fix, route);
-    if (!plan) throw new Error(`${this.key} start is off the route`);
-    await updateDoc(doc(this.db, `trips/${this.tripId}/cars/${this.carId}`), { mergeOffset: plan.mergeOffset, state: plan.state });
-    this.builder = new PositionBuilder(route, null);
-    this.publisher = new PositionPublisher({ write: (p) => this.writePosition(p), now: clockS });
-  }
-
-  writePosition(p) {
-    const data = { location: new GeoPoint(p.latitude, p.longitude), speed: p.speed, heading: p.heading, routeOffset: p.routeOffset, updatedAt: serverTimestamp() };
-    if (p.convoyOffset !== undefined) data.convoyOffset = p.convoyOffset;
-    if (p.battery !== null && p.battery !== undefined) data.battery = p.battery;
-    return setDoc(doc(this.db, `trips/${this.tripId}/positions/${this.carId}`), data);
-  }
-
-  onFix(fix) {
-    this.lastFix = fix;
-    this.lastPosition = this.builder.build(fix, 0.8);
-    this.publisher.submit(this.lastPosition);
-  }
-
-  // EventService.report: hazard, severity high, 45 minute expiry
-  async report(type) {
-    const createdAt = new Date();
-    const ref = doc(collection(this.db, `trips/${this.tripId}/events`));
-    await setDoc(ref, {
-      type, category: 'hazard', severity: 'high', location: new GeoPoint(this.lastFix.latitude, this.lastFix.longitude),
-      heading: Math.max(0, this.lastFix.course) % 360, routeOffset: this.lastPosition.routeOffset,
-      authorId: this.uid, carId: this.carId, createdAt: Timestamp.fromDate(createdAt),
-      expiresAt: Timestamp.fromMillis(createdAt.getTime() + 45 * 60 * 1000),
-    });
-    return ref.id;
-  }
-
-  // StopService.ok
-  async ok(eventId) {
-    await setDoc(doc(this.db, `trips/${this.tripId}/events/${eventId}/votes/${this.carId}`), { userId: this.uid, at: serverTimestamp() });
-  }
-
-  async close() {
-    this.publisher?.stop();
-    if (!this.app) return;
-    await terminate(this.db).catch(() => {});
-    await deleteApp(this.app).catch(() => {});
-  }
-}
+const clockS = () => (Date.now() - t0) / 1000;
 
 // ---------------------------------------------------------------- the drive
 
@@ -308,16 +153,11 @@ function feed(who, udid) {
   const m = offsetOf(who);
   const next = route.cumulative.findIndex((d) => d > m);
   if (next < 0) return;
-  const p = route.coordinateAtOffset(m);
-  const pts = [p, ...route.coordinates.slice(next)].map((c) => `${c.latitude.toFixed(6)},${c.longitude.toFixed(6)}`);
   players[who]?.kill();
-  const loc = spawn('xcrun', ['simctl', 'location', udid, 'start', `--speed=${mps.toFixed(2)}`, '--interval=1', '-']);
-  loc.stdin.end(`${pts.join('\n')}\n`);
-  loc.stderr.on('data', (d) => process.stdout.write(`  loc ${who}! ${d}`));
-  players[who] = loc;
+  players[who] = feedLocation({ udid, points: [route.coordinateAtOffset(m), ...route.coordinates.slice(next)], mps, label: who });
 }
 
-const cars = SCRIPTED.map((s) => new ScriptedCar(s));
+const cars = SCRIPTED.map((s) => new Car({ appPrefix: 'qa2', ...s }, { host: o.host, backend: 'emulators' }, say));
 let ticker = null;
 let feeder = null;
 let tripId = null;
@@ -337,7 +177,7 @@ async function convoyOrderFromFirestore() {
 
 async function scenario() {
   // 1. A created the trip
-  code = await waitMark('a.code', 420);
+  code = await sync.wait('a.code', 420);
   const trips = await firestoreOwner({ structuredQuery: { from: [{ collectionId: 'trips' }], where: { fieldFilter: { field: { fieldPath: 'code' }, op: 'EQUAL', value: { stringValue: code } } } } });
   check('trip created by phone A is in Firestore with a route', trips.length === 1 && (trips[0].fields.route?.stringValue ?? '').length > 0, `code ${code}`);
   tripId = trips[0].name.split('/').pop();
@@ -348,15 +188,15 @@ async function scenario() {
     simctl('location', udid, 'set', `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`);
   }
   say(`trip ${tripId}: ${(route.length / 1000).toFixed(1)} km; A parked ${OFFSETS.A} m along, B ${OFFSETS.B} m`);
-  mark('code', code);
+  sync.mark('code', code);
 
   // 2. B joined; then cars 3 and 4 join and hold their start positions
-  await waitMark('b.lobby', 300);
+  await sync.wait('b.lobby', 300);
   for (const c of cars) {
     await c.connect();
     await c.join(code);
     const fix = fixAt(OFFSETS[c.key], false);
-    await c.ensureRoute(route, fix);
+    await c.ensureRoute(route, fix, clockS);
     c.onFix(fix);
   }
   ticker = setInterval(() => {
@@ -366,25 +206,25 @@ async function scenario() {
   const numbers = [...carDocs.values()].map((c) => `${c.number} ${c.name}`).sort();
   check('car numbers: A 1, B 2, car 3, car 4', JSON.stringify([...carDocs.values()].map((c) => c.number).sort()) === '[1,2,3,4]', numbers.join(', '));
   await sleep(3000);
-  mark('cars.joined');
+  sync.mark('cars.joined');
 
   // 3. both on the map: go
-  await waitMark('a.map', 240);
-  await waitMark('b.map', 240);
+  await sync.wait('a.map', 240);
+  await sync.wait('b.map', 240);
   goAt = Date.now();
   feed('A', o.aUdid);
   feed('B', o.bUdid);
   feeder = setInterval(() => { feed('A', o.aUdid); feed('B', o.bUdid); }, 20_000);
   say(`go: everyone at ${o.kmh} km/h`);
-  mark('go');
+  sync.mark('go');
 
-  await waitMark('a.order', 240);
-  await waitMark('b.order', 240);
+  await sync.wait('a.order', 240);
+  await sync.wait('b.order', 240);
   const order = await convoyOrderFromFirestore();
   check('Firestore convoy order 1 > 3 > 2 > 4', order.map((r) => r.n).join(',') === '1,3,2,4', order.map((r) => `${r.n}@${(r.off / 1000).toFixed(2)}k`).join(' > '));
 
   // 4. A's hazard
-  await waitMark('a.reported', 240);
+  await sync.wait('a.reported', 240);
   await sleep(2000);
   const events = await getDocs(collection(reader(), `trips/${tripId}/events`));
   const carDocs2 = await carsByNumber();
@@ -393,14 +233,14 @@ async function scenario() {
   check('phone A\'s debris report stored (hazard, high, from car 1)', Boolean(debris) && debris.category === 'hazard' && debris.severity === 'high', debris ? `routeOffset ${debris.routeOffset?.toFixed(0)} m` : 'missing');
 
   // 5. car 3 reports an accident once B has been warned about the debris
-  await waitMark('b.alerted', 240);
+  await sync.wait('b.alerted', 240);
   const car3 = cars[0];
-  const accidentId = await car3.report('accident');
+  const { id: accidentId } = await car3.reportEvent('accident', 'hazard', 'high', 45 * 60);
   say(`car 3 reports an accident at ${car3.lastPosition.convoyOffset.toFixed(0)} m (event ${accidentId})`);
-  mark('cars.reported');
+  sync.mark('cars.reported');
 
   // 6. B's stop request (with a passenger message): the scripted cars say OK, A taps OK and We've stopped
-  await waitMark('b.stopRequested', 300);
+  await sync.wait('b.stopRequested', 300);
   const stop = (await getDocs(collection(reader(), `trips/${tripId}/events`))).docs
     .map((d) => ({ id: d.id, ...d.data() })).find((e) => e.category === 'stopRequest' && e.status !== 'closed' && e.expiresAt?.toMillis() > Date.now());
   if (!check('phone B\'s stop request is open in Firestore', Boolean(stop), stop ? `${stop.type}` : 'none')) throw new Error('no stop request');
@@ -409,13 +249,13 @@ async function scenario() {
   await car3.ok(stop.id);
   await cars[1].ok(stop.id);
   say('cars 3 and 4 say OK');
-  mark('cars.voted');
+  sync.mark('cars.voted');
 
-  await waitMark('a.ok', 300);
+  await sync.wait('a.ok', 300);
   const aCarId2 = [...carDocs2.entries()].find(([, c]) => c.number === 1)?.[0];
   const aVote = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}/votes/${aCarId2}`))).data();
   check('phone A said OK for its car', Boolean(aVote), JSON.stringify(aVote ? { userId: aVote.userId } : null));
-  await waitMark('a.stopped', 300);
+  await sync.wait('a.stopped', 300);
   const closed = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();
   check('stop closed as stopped by phone A (We\'ve stopped)', closed.status === 'closed' && closed.closedReason === 'stopped' && Boolean(closed.closedBy) && closed.expiresAt.toMillis() <= Date.now() + 1000, JSON.stringify({ status: closed.status, closedReason: closed.closedReason }));
 
@@ -425,31 +265,31 @@ async function scenario() {
   const stopListening = onSnapshot(doc(reader(), `trips/${tripId}/cars/${bCarId}`), (snap) => {
     if (snap.data()?.pausedAt) sawPausedAt = true;
   });
-  await waitMark('b.paused', 300);
+  await sync.wait('b.paused', 300);
   for (let i = 0; i < 20 && !sawPausedAt; i++) await sleep(500);
   check('B\'s car doc has pausedAt while paused', sawPausedAt);
-  await waitMark('b.resumed', 300);
+  await sync.wait('b.resumed', 300);
   stopListening();
   await sleep(1500);
   const resumed = (await getDoc(doc(reader(), `trips/${tripId}/cars/${bCarId}`))).data();
   check('pausedAt cleared after resume', resumed && !resumed.pausedAt);
 
   // 8. leave, rejoin, end
-  await waitMark('b.left', 300);
+  await sync.wait('b.left', 300);
   await sleep(5000);
   const afterLeave = await carsByNumber();
   check('B\'s car removed after B leaves (memberCleanup)', !afterLeave.has(bCarId), [...afterLeave.values()].map((c) => c.number).sort().join(','));
-  await waitMark('b.rejoined', 300);
-  await waitMark('a.ended', 300);
+  await sync.wait('b.rejoined', 300);
+  await sync.wait('a.ended', 300);
   const trip = (await getDoc(doc(reader(), `trips/${tripId}`))).data();
   check('trip status ended', trip.status === 'ended', trip.status);
-  await waitMark('b.done', 180);
+  await sync.wait('b.done', 180);
 }
 
 let scenarioError = null;
-await scenario().catch((e) => { scenarioError = e; abort(`script: ${e.message}`); });
+await scenario().catch((e) => { scenarioError = e; sync.abort(`script: ${e.message}`); });
 const codes = await Promise.race([Promise.all(tests.map((t) => t.exit)), sleep(180_000).then(() => null)]);
-if (!codes) for (const t of tests) if (t.code === undefined) { say(`killing ${t.who}'s test`); t.proc.kill('SIGKILL'); }
+if (!codes) for (const t of tests) if (t.code === undefined) { say(`killing ${t.id}'s test`); t.xc.kill('SIGKILL'); }
 await Promise.all(tests.map((t) => t.exit));
 
 clearInterval(ticker);
@@ -461,12 +301,12 @@ for (const c of cars) await c.close();
 
 // ---------------------------------------------------------------- summary
 console.log('\n---- checks');
-for (const t of tests) for (const c of t.checks) console.log(`${c.pass ? 'PASS' : 'FAIL'}  phone ${c.name}`);
+for (const t of tests) for (const c of t.checks.filter((c) => c.kind !== 'NOTE')) console.log(`${c.kind}  phone ${c.name}`);
 for (const r of results) console.log(`${r.pass ? 'PASS' : 'FAIL'}  script: ${r.name}${r.detail ? ` (${r.detail})` : ''}`);
 if (scenarioError) console.log(`script stopped: ${scenarioError.message}`);
-for (const t of tests) console.log(`phone ${t.who}: ${t.result ?? `suite ${t.suite ?? 'unfinished'}, exit ${t.code}`}, log ${t.logPath}`);
+for (const t of tests) console.log(`phone ${t.id}: ${t.result ?? `suite ${t.suite ?? 'unfinished'}, exit ${t.code}`}, log ${t.logPath}`);
 console.log(`screenshots ${o.screens}`);
 const ok = !scenarioError && results.every((r) => r.pass) && tests.every((t) => t.ok);
-fs.writeFileSync(path.join(o.logs, 'convoy2-results.json'), JSON.stringify({ code, tripId, results, phones: tests.map((t) => ({ who: t.who, ok: t.ok, suite: t.suite, checks: t.checks })) }, null, 2));
+fs.writeFileSync(path.join(o.logs, 'convoy2-results.json'), JSON.stringify({ code, tripId, results, phones: tests.map((t) => ({ who: t.id, ok: t.ok, suite: t.suite, checks: t.checks.filter((c) => c.kind !== 'NOTE').map((c) => ({ pass: c.kind === 'PASS', name: c.name })) })) }, null, 2));
 end.result(ok);
 process.exit(ok ? 0 : 1);

@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readGpx } from './lib/gpx.mjs';
 import { endsWithResult, holdSimulators, makeSay, simctl } from './lib/shell.mjs';
+import { feedLocation, prepareSimulator } from './lib/demo-common.mjs';
 import { haversine } from './lib/route.mjs';
 import { appKey } from './lib/scenario.mjs';
 
@@ -72,17 +73,9 @@ const t0 = Date.now();
 const say = makeSay('run-ui', t0);
 
 // ---- simulator
-const list = simctl('list', 'devices').stdout;
-const line = list.split('\n').find((l) => l.includes(o.udid));
-if (!line) { console.error(`simulator ${o.udid} not found`); process.exit(1); }
-if (!line.includes('(Booted)')) {
-  say('booting simulator');
-  simctl('boot', o.udid);
-  simctl('bootstatus', o.udid, '-b');
-}
 const track = readGpx(path.join(here, 'gpx', `${appKey(o.scenario)}.gpx`));
-simctl('privacy', o.udid, 'grant', 'location', 'dev.aqlan.ikut');
-simctl('location', o.udid, 'set', `${track[0].latitude},${track[0].longitude}`);
+// The app stays installed (the UI test starts from its own state); only the permission and the location are set.
+prepareSimulator(o.udid, say, { start: track[0], uninstall: false, privacy: 'location', bootText: 'booting simulator' });
 
 // ---- sim
 const simLog = fs.createWriteStream(path.join(o.logs, 'sim.log'));
@@ -167,11 +160,9 @@ const feed = () => {
   const T = ((Date.now() - goAt) / 1000) * o.speed;
   const from = Math.max(0, track.findIndex((p) => p.t >= T));
   if (parkedAt(from)) { simctl('location', o.udid, 'set', `${track[from].latitude},${track[from].longitude}`); return; }
-  const pts = track.filter((p, i) => i >= from && (i % 4 === 0 || i === track.length - 1)).map((p) => `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`);
+  const pts = track.filter((p, i) => i >= from && (i % 4 === 0 || i === track.length - 1));
   if (pts.length < 2) return;
-  const loc = spawn('xcrun', ['simctl', 'location', o.udid, 'start', `--speed=${mps.toFixed(2)}`, '--interval=1', '-']);
-  loc.stdin.end(`${pts.join('\n')}\n`);
-  loc.stderr.on('data', (d) => process.stdout.write(`  loc! ${d}`));
+  feedLocation({ udid: o.udid, points: pts, mps });
 };
 say(`simctl location start at ${mps.toFixed(1)} m/s, resynced every ${RESYNC} s`);
 feed();
