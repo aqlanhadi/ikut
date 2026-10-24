@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The timeline filter: All, Stops, Road Reports.
+/// The timeline filter: All, Stops, Road reports.
 enum RecapFilter: String, CaseIterable, Identifiable {
-    case all = "All", stops = "Stops", reports = "Road Reports"
+    case all = "All", stops = "Stops", reports = "Road reports"
     var id: String { rawValue }
 
     func matches(_ item: RecapTimelineItem) -> Bool {
