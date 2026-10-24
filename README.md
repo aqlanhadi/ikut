@@ -48,9 +48,10 @@ cd firebase/functions && npm install && npm run build
 - Ended trips: positions and events are deleted 7 days after `trip.endedAt`. The trip doc is kept.
 - Expired events: removed 1 hour after `expiresAt`, in active and ended trips.
 - `purgeTripDataJob` (`firebase/functions/src/purgeTripDataJob.ts`, every 6 hours) is the guaranteed path for both. It runs in code, so it works without any console setup.
-- Optional: Firestore TTL on `events.expiresAt` also removes expired events, on Firestore's own schedule (typically within 24 hours). Enable it once per project:
+- Firestore TTL on `events.expiresAt` is left off in production (owner, 2026-10-25): the purge job covers expired events, and TTL would leave each stop request's votes behind until the trip has been ended 7 days. It could remove expired events on Firestore's own schedule (typically within 24 hours); to check or turn it on:
 
 ```sh
+gcloud firestore fields ttls list --project=ikut-b1083
 gcloud firestore fields ttls update expiresAt --collection-group=events --enable-ttl --project=ikut-b1083
 ```
 
