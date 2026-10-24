@@ -82,6 +82,13 @@ enum LobbyStopsDemo {
     }
 }
 
+/// A reverse geocoder with one fixed answer, for the demo screens.
+struct DemoGeocoder: ReverseGeocoding {
+    var answer: GeocodedName?
+    init(_ answer: GeocodedName?) { self.answer = answer }
+    func lookup(_ coordinate: CLLocationCoordinate2D) async -> GeocodedName? { answer }
+}
+
 /// Screens for screenshots and UI tests, opened by launching with `IKUT_SCREEN=<name>` (debug builds only).
 @MainActor
 enum DemoScreens {
@@ -136,6 +143,18 @@ enum DemoScreens {
                     petrol("Petronas Genting Sempah R&R", "Karak Highway, Pahang", 3.37, 101.77),
                 ], origin: kl, originName: "Kuala Lumpur")
             return search(model)
+        case "search-dropped-pin":
+            let model = CreateTripModel()
+            model.showPinForDemo(
+                query: "3.139, 101.687", found: GeocodedName(name: nil, locality: "Tapah"), origin: kl, originName: "Kuala Lumpur")
+            return search(model)
+        case "map-pick":
+            return AnyView(MapPickView(origin: kl, namer: PinNamer(geocoder: DemoGeocoder(GeocodedName(name: nil, locality: "Kuala Lumpur")))) { _ in })
+        case "map-pick-stop":
+            let route = AlongRoute(coordinates: LobbyStopsDemo.route, seconds: 2 * 3600 + 40 * 60)
+            return AnyView(MapPickView(
+                origin: kl, along: route, start: .init(latitude: 4.2, longitude: 101.25),
+                namer: PinNamer(geocoder: DemoGeocoder(GeocodedName(name: nil, locality: "Tapah")))) { _ in })
         case "search-empty":
             let model = CreateTripModel()
             model.showForDemo(query: "zxqv", results: [], origin: kl, originName: "Kuala Lumpur")

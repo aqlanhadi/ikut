@@ -183,6 +183,12 @@ extension AlongRoute {
         return text(for: coordinate)
     }
 
+    /// "62 km along" for the label on the map, "Off the route" when the spot is far from the line; nil without a route.
+    func pinLine(for coordinate: CLLocationCoordinate2D) -> String? {
+        guard let row = rowText(for: coordinate) else { return nil }
+        return row.distance == "Off the route" ? row.distance : "\(row.distance) along"
+    }
+
     /// Along the route first, nearest the start first; the ones off the route after, nearest the line first.
     func sorted(_ results: [DestinationResult]) -> [DestinationResult] {
         guard line.segmentCount > 0 else { return results }
@@ -213,14 +219,34 @@ struct PlaceSearchResults: View {
     /// What a tap on a place does with it.
     var onPick: (DestinationResult) -> Void
 
+    @State private var choosingOnMap = false
+
     private var busy: Bool { model.isWorking || model.resolving != nil }
+    private var hasRows: Bool { model.pastedPin || model.showingResults || model.isSearching || !model.suggestions.isEmpty }
 
     var body: some View {
-        CardHeader(model.showingResults ? "Results" : "Suggestions")
+        if hasRows { CardHeader(model.pastedPin ? "Pin" : model.showingResults ? "Results" : "Suggestions") }
         VStack(spacing: 0) {
-            if model.showingResults { resultRows } else { suggestionRows }
+            if let pin = model.droppedPin {
+                resultRow(pin, isPin: true)
+            } else if model.showingResults {
+                resultRows
+            } else {
+                suggestionRows
+            }
+            if hasRows { RowDivider() }
+            PlaceResultRow(action: "Choose on map", symbol: "map.fill", color: .blue, disabled: busy, action: { choosingOnMap = true }) {
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            }
         }
         .ikutCard()
+        .padding(.top, hasRows ? 0 : Spacing.m)
+        .fullScreenCover(isPresented: $choosingOnMap) {
+            MapPickView(origin: model.origin, along: model.along, namer: PinNamer(geocoder: model.geocoder)) { place in
+                choosingOnMap = false
+                onPick(place)
+            }
+        }
         if distance == .alongRoute, model.along != nil, model.showingResults, !model.results.isEmpty {
             InlineNote("Distances are along your route.").padding(.top, Spacing.s)
         }
@@ -269,27 +295,32 @@ struct PlaceSearchResults: View {
         }
     }
 
-    private func resultRow(_ result: DestinationResult) -> some View {
+    private func resultRow(_ result: DestinationResult, isPin: Bool = false) -> some View {
         var shown = result
-        if showsKind {
+        if showsKind, !isPin {
             shown.subtitle = [PlaceKind.word(for: result), result.subtitle].filter { !$0.isEmpty }.joined(separator: " · ")
         }
-        return PlaceResultRow(result: shown, disabled: busy, action: { onPick(result) }) {
-            if model.working == result.id {
-                ProgressView().accessibilityLabel(workingLabel)
-            } else if distance == .alongRoute, let along = model.alongRowText(result) {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(along.distance)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                    if let time = along.time { Text(time).font(.caption).foregroundStyle(.secondary) }
-                }
-            } else if let text = model.distanceText(result) {
-                Text(text)
+        if isPin {
+            return AnyView(PlaceResultRow(pin: shown, disabled: busy, action: { onPick(result) }) { trailing(result) })
+        }
+        return AnyView(PlaceResultRow(result: shown, disabled: busy, action: { onPick(result) }) { trailing(result) })
+    }
+
+    @ViewBuilder private func trailing(_ result: DestinationResult) -> some View {
+        if model.working == result.id {
+            ProgressView().accessibilityLabel(workingLabel)
+        } else if distance == .alongRoute, let along = model.alongRowText(result) {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(along.distance)
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(.primary)
+                if let time = along.time { Text(time).font(.caption).foregroundStyle(.secondary) }
             }
+        } else if let text = model.distanceText(result) {
+            Text(text)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
         }
     }
 }
