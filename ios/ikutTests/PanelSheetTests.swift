@@ -77,9 +77,9 @@ struct PanelSheetTests {
     @Test func aHeightThatChangesWhileTallIsNotTheDriverFoldingTheList() {
         // Tall was 480; the measured height settles at 446 and the sheet reports its old detent once more.
         let now = heights(unfolded: 446)
-        #expect(now.tall == 480)
+        #expect(now.tall == 446)
         #expect(PanelSheet.choice(.height(480), in: now) == nil)
-        #expect(PanelSheet.choice(.height(480), in: now) == true)
+        #expect(PanelSheet.choice(.height(446), in: now) == true)
         // Likewise a short that moved under a folded sheet.
         #expect(PanelSheet.choice(.height(300), in: heights(folded: 280)) == nil)
     }
