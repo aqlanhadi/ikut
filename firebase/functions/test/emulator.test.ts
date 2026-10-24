@@ -566,6 +566,14 @@ describe("purgeTripData (emulator)", () => {
     assert.equal((await active.collection("events/stop3/votes").get()).size, 1);
   });
 
+  it("deletes votes whose event doc is already gone, on a trip ended 8 days ago", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    await ref.collection("events/gone/votes").doc("carA").set({ userId: "u1", at: at(200) });
+    const result = await purgeTripData(db, NOW);
+    assert.equal(result.failed, 0);
+    assert.equal((await ref.collection("events/gone/votes").get()).size, 0);
+  });
+
   it("keeps a non-expired event and an event without expiresAt", async () => {
     const ref = await seedRetentionTrip({ status: "active" });
     await addEvent(ref, "future", Timestamp.fromMillis(NOW.getTime() + 3_600_000));
