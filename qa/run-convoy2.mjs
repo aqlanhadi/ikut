@@ -36,7 +36,7 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth';
 import {
   GeoPoint, Timestamp, collection, connectFirestoreEmulator, doc, getDoc, getDocs, initializeFirestore, serverTimestamp,
-  setDoc, setLogLevel, terminate, updateDoc,
+  onSnapshot, setDoc, setLogLevel, terminate, updateDoc,
 } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './lib/route.mjs';
@@ -419,12 +419,17 @@ async function scenario() {
   const closed = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();
   check('stop closed as stopped by phone A (We\'ve stopped)', closed.status === 'closed' && closed.closedReason === 'stopped' && Boolean(closed.closedBy) && closed.expiresAt.toMillis() <= Date.now() + 1000, JSON.stringify({ status: closed.status, closedReason: closed.closedReason }));
 
-  // 7. pause / resume
+  // 7. pause / resume. B resumes as soon as phone A has seen the pause, which can be before one read here
+  // lands, so listen from before B pauses and keep whether pausedAt ever showed.
+  let sawPausedAt = false;
+  const stopListening = onSnapshot(doc(reader(), `trips/${tripId}/cars/${bCarId}`), (snap) => {
+    if (snap.data()?.pausedAt) sawPausedAt = true;
+  });
   await waitMark('b.paused', 300);
-  await sleep(1500);
-  const paused = (await getDoc(doc(reader(), `trips/${tripId}/cars/${bCarId}`))).data();
-  check('B\'s car doc has pausedAt while paused', Boolean(paused?.pausedAt));
+  for (let i = 0; i < 20 && !sawPausedAt; i++) await sleep(500);
+  check('B\'s car doc has pausedAt while paused', sawPausedAt);
   await waitMark('b.resumed', 300);
+  stopListening();
   await sleep(1500);
   const resumed = (await getDoc(doc(reader(), `trips/${tripId}/cars/${bCarId}`))).data();
   check('pausedAt cleared after resume', resumed && !resumed.pausedAt);
