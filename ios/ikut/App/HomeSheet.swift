@@ -18,6 +18,13 @@ enum HomeSheet {
         return max(pickedCompactMinimum, pinnedHeight + indicatorRoom + bottomInset + margin)
     }
 
+    /// The Apple logo and Legal sit this far above the short sheet, as on the driving map.
+    static let legalMargin: CGFloat = 10
+
+    /// The map's bottom safe-area padding: from the screen's bottom edge to just above the short sheet.
+    /// MapKit fits regions inside it, so the camera keeps no bottom room of its own (`TripsHomeView.obscured`).
+    static func legalInset(compact: CGFloat) -> CGFloat { compact + legalMargin }
+
     static func short(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
     static let tall = PresentationDetent.large
 

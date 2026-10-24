@@ -62,6 +62,9 @@ struct StopNote: View {
                         .padding(.horizontal, Spacing.cozy)
                         .frame(minHeight: 36)
                         .background(Color.ikutCard, in: Capsule())
+                        // Drawn 36 pt tall, taps over 44.
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.ikutAccent)

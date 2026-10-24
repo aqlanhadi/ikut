@@ -468,6 +468,9 @@ struct LobbyView: View {
             .padding(.horizontal, 11)
             .frame(minHeight: 30)
             .background(.regularMaterial, in: Capsule())
+            // Drawn 30 pt tall, taps over 44 (HIG: a hit region of at least 44 x 44 pt).
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -590,6 +593,9 @@ struct LobbyView: View {
                         .padding(.horizontal, Spacing.cozy)
                         .frame(minHeight: 36)
                         .background(Color.ikutAccent, in: Capsule())
+                        // Drawn 36 pt tall, taps over 44.
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .padding(.top, Spacing.tight)
             }

@@ -28,8 +28,9 @@ struct PausedBanner: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.ikutAccent)
                         .padding(.horizontal, Spacing.cozy)
-                        .frame(minHeight: 36)
+                        .frame(minHeight: 44)
                         .background(Color.ikutAccent.opacity(0.10), in: Capsule())
+                        .contentShape(Capsule())
                 }
                 .disabled(isResuming)
             }

@@ -53,7 +53,7 @@ struct PastTripsMapTests {
         // Every height the map can report, including 0 before its first layout.
         for height: CGFloat in [0, 1, 300, 672, 778, 874] {
             let insets = TripsHomeView.obscured(mapHeight: height)
-            #expect(insets.bottom > 0 && insets.bottom < 0.5, "height \(height)")
+            #expect(insets.bottom == 0, "height \(height)")
             #expect(insets.top > 0 && insets.top < 0.2, "height \(height)")
             let r = try #require(PastTripsMapLogic.region(fitting: [a, b], bottomObscured: insets.bottom,
                                                           topObscured: insets.top))
@@ -108,6 +108,11 @@ struct PastTripsMapTests {
 }
 
 struct HomeSheetTests {
+    @Test func legalInsetKeepsTheLogoTenPointsAboveTheShortSheet() {
+        #expect(HomeSheet.legalInset(compact: HomeSheet.compactHeight) == 310)
+        #expect(HomeSheet.legalInset(compact: 180) == 190)
+    }
+
     @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {
         func covered(path: Int = 0, name: Bool = false, denied: Bool = false, after: Bool = false, opening: Bool = false) -> Bool {
             HomeSheet.isCovered(pathCount: path, showName: name, showDenied: denied, afterName: after, opening: opening)

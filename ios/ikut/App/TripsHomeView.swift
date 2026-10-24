@@ -140,6 +140,8 @@ struct TripsHomeView: View {
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
+        // The logo and Legal ride 10 pt above the folded sheet instead of under it.
+        .safeAreaPadding(.bottom, HomeSheet.legalInset(compact: compact))
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
             guard height != mapHeight else { return }
             mapHeight = height
@@ -362,7 +364,10 @@ struct TripsHomeView: View {
     /// fit far south).
     nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = HomeSheet.compactHeight) -> (top: Double, bottom: Double) {
         let height = mapHeight > sheet + Self.topObscured ? mapHeight : 874
-        return (Double(Self.topObscured / height), Double(sheet / height))
+        // The sheet is the map's bottom safe-area padding (`HomeSheet.legalInset`), and MapKit fits inside
+        // it, so nothing more is kept clear at the bottom.
+        _ = sheet
+        return (Double(Self.topObscured / height), 0)
     }
 
     /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
