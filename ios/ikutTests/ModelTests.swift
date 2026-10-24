@@ -8,19 +8,8 @@ struct ModelTests {
     private let point = GeoPoint(latitude: 3.139, longitude: 101.687)
     private let date = Fixtures.t0
 
-    /// `@DocumentID` can only be decoded with a document reference, which needs a (never contacted) Firestore instance.
-    private func decode<T: Decodable>(_ type: T.Type, from data: [String: Any]) throws -> T {
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure(options: FirebaseOptions(googleAppID: "1:1:ios:1", gcmSenderID: "1"))
-        }
-        let ref = Firestore.firestore().document("trips/doc")
-        let decoder = Firestore.Decoder()
-        decoder.userInfo[CodingUserInfoKey(rawValue: "DocumentRefUserInfoKey")!] = ref
-        return try decoder.decode(type, from: data)
-    }
-
     private func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
-        try decode(T.self, from: try encoder.encode(value))
+        try firestoreDecode(T.self, from: try encoder.encode(value))
     }
 
     @Test func tripRoundTrips() throws {
@@ -76,7 +65,7 @@ struct ModelTests {
             "location": point, "heading": 0.0, "routeOffset": 0.0,
             "authorId": "u1", "carId": "c1", "createdAt": Timestamp(date: date),
         ]
-        let event = try decode(TripEvent.self, from: data)
+        let event = try firestoreDecode(TripEvent.self, from: data)
         #expect(event.type == .other("meteorShower"))
         #expect(event.id == "doc")
         #expect(try roundTrip(event) == event)

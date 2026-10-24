@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import MapKit
 @testable import ikut
 
 // Test doubles shared by more than one test file.
@@ -146,4 +147,123 @@ final class FakeSource: LocationSource {
     private(set) var stopped = 0
     func start(onFix: @escaping @Sendable (LocationFix) -> Void) { started += 1; self.onFix = onFix }
     func stop() { stopped += 1; onFix = nil }
+}
+
+// MARK: - Convoy
+
+/// An ETA that always answers 30 minutes.
+struct StubETA: ETAProviding {
+    func travelTime(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> TimeInterval { 1800 }
+}
+
+/// Records every alert and spoken event; `eventResult` is what a spoken event answers.
+@MainActor
+final class FakeAnnouncer: AlertAnnouncing {
+    var eventResult = true
+    var calls: [(id: String?, distance: Double?)] = []
+    func announce(event: TripEvent, distance: Double?) async -> Bool {
+        calls.append((event.id, distance))
+        return eventResult
+    }
+    var alerts: [TripAlert] = []
+    func announce(alert: TripAlert) -> Bool {
+        alerts.append(alert)
+        return true
+    }
+}
+
+// MARK: - Routes
+
+/// Hands out the car's own route from a queue (the last one repeats); an empty queue drives straight there.
+struct CarRouteFakeDirections: CarRouteDirections {
+    var routes: Box
+    final class Box: @unchecked Sendable {
+        var queue: [[CLLocationCoordinate2D]]
+        var calls: [(CLLocationCoordinate2D, CLLocationCoordinate2D)] = []
+        var fail = false
+        init(_ q: [[CLLocationCoordinate2D]] = []) { queue = q }
+    }
+    func route(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> [CLLocationCoordinate2D] {
+        routes.calls.append((from, to))
+        if routes.fail { throw RouteError.noRoute }
+        if routes.queue.isEmpty { return line(from, to) }
+        return routes.queue.count > 1 ? routes.queue.removeFirst() : routes.queue[0]
+    }
+}
+
+final class CarRouteFakeWriter: CarRouteWriting, @unchecked Sendable {
+    var writes: [CarRoutePlan] = []
+    func write(_ plan: CarRoutePlan, tripId: String, carId: String) async throws { writes.append(plan) }
+}
+
+/// A leg along `points` at 25 m/s unless told otherwise.
+func leg(_ points: [CLLocationCoordinate2D], seconds: Double? = nil, name: String = "E1") -> RouteLeg {
+    let length = RouteLine(points).length
+    return RouteLeg(coordinates: points, distance: length, travelTime: seconds ?? length / 25, name: name)
+}
+
+/// Straight roads between any two points, 25 m/s, counting the requests it gets. The first `failures` requests throw
+/// `error` before it answers (they are not in `starts`), and a destination in `noRoadTo` (latitude) never has a road.
+final class StraightRoads: LegRouting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _requests: [(CLLocationCoordinate2D, CLLocationCoordinate2D)] = []
+    private var _starts: [CLLocationCoordinate2D] = []
+    private var _failures: Int
+    private let error: Error
+    var noRoadTo: Set<Double> = []
+
+    init(failures: Int = 0, error: Error = RouteError.noRoute) {
+        _failures = failures
+        self.error = error
+    }
+
+    var requests: Int { lock.withLock { _requests.count } }
+    /// Where each answered leg starts.
+    var starts: [CLLocationCoordinate2D] { lock.withLock { _starts } }
+
+    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
+        let fail = lock.withLock {
+            _requests.append((from, to))
+            if _failures > 0 { _failures -= 1; return true }
+            _starts.append(from)
+            return false
+        }
+        if fail { throw error }
+        if lock.withLock({ noRoadTo.contains(to.latitude) }) { throw RouteError.noRoute }
+        return ikutTests.leg(line(from, to))
+    }
+}
+
+/// A sleep that records how long it was asked for; asked for `hangFor`, it stays asleep until the test is over.
+final class Waits: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _items: [Duration] = []
+    private let hangFor: Duration?
+    init(hangFor: Duration? = nil) { self.hangFor = hangFor }
+    var items: [Duration] { lock.withLock { _items } }
+    func add(_ d: Duration) { lock.withLock { _items.append(d) } }
+    func sleep(_ d: Duration) async throws {
+        add(d)
+        if d == hangFor { try await Task.sleep(for: .seconds(3_600)) }
+    }
+}
+
+// MARK: - Joining and searching
+
+struct FakeJoinAPI: JoinAPI {
+    var preview: TripPreview
+    var joinResult = JoinResult(tripId: "t1", carId: "c9", trackerTaken: false)
+    func preview(code: String) async throws -> TripPreview { preview }
+    func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
+        joinResult
+    }
+}
+
+/// Never answers; records what was typed.
+@MainActor
+final class FakeSuggestions: SuggestionSource {
+    var onUpdate: ((String, Result<[SearchSuggestion], Error>) -> Void)?
+    var asked: [(String, MKCoordinateRegion)] = []
+    func update(query: String, region: MKCoordinateRegion) { asked.append((query, region)) }
+    func stop() {}
 }

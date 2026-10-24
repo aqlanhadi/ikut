@@ -19,7 +19,7 @@ struct PickedTripTests {
     // MARK: Words
 
     @Test func subtitleIsDestinationAndDay() {
-        let en = Locale(identifier: "en_GB")
+        let en = Fixtures.gb
         #expect(PickedTripLogic.subtitle(entry(), locale: en) == "To Ipoh · 31 Mar 2026")
         #expect(PickedTripLogic.subtitle(entry(ended: nil), locale: en) == "To Ipoh")
     }

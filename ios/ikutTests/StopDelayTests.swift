@@ -87,16 +87,11 @@ private extension PlannedStop {
 @Suite("The panel's arrival with stops")
 @MainActor
 struct StopETAModelTests {
-    private struct Fixed: ETAProviding {
-        func travelTime(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> TimeInterval { 1800 }
-    }
-
     private func model() -> ConvoyModel {
         let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
         let route = RouteLine((0...20).map { i in
             CLLocationCoordinate2D(latitude: origin.latitude, longitude: origin.longitude + Double(i) * 1000 / 111_320) })
-        let m = ConvoyModel(provider: Fixed(), clock: { Fixtures.t0 })
-        m.setMainRoute(route)
+        let m = ConvoyModel.fixture(route: route, locale: .current, timeZone: .current)
         let at = route.coordinate(atOffset: 10_000)!
         let position = Position(
             location: GeoPoint(latitude: at.latitude, longitude: at.longitude), speed: 25, heading: 90,

@@ -5,15 +5,6 @@ import Foundation
 import Testing
 @testable import ikut
 
-private let r = RouteLine.earthRadius
-private let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
-
-private func move(_ c: CLLocationCoordinate2D, north: Double = 0, east: Double = 0) -> CLLocationCoordinate2D {
-    CLLocationCoordinate2D(
-        latitude: c.latitude + north / r * 180 / .pi,
-        longitude: c.longitude + east / (r * cos(c.latitude * .pi / 180)) * 180 / .pi)
-}
-
 /// Main route: due east from `origin`, `km` long, a vertex every 500 m.
 private func makeMainCoords(km: Int = 100) -> [CLLocationCoordinate2D] {
     stride(from: 0.0, through: Double(km) * 1000, by: 500).map { move(origin, east: $0) }
@@ -32,7 +23,6 @@ private func joiningRoute(startEast: Double = 20_000, south: Double = 10_000, me
     return pts
 }
 
-private func close(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) <= tol }
 
 struct CarRouteLogicTests {
     private let main = RouteLine(makeMainCoords())
@@ -216,26 +206,6 @@ struct OffRouteDetectorTests {
         #expect(fire(&d, distanceFromRoute: 300, at: t(64)))
         #expect(fire(&d, distanceFromRoute: 300, at: t(65)))
     }
-}
-
-private struct CarRouteFakeDirections: CarRouteDirections {
-    var routes: Box
-    final class Box: @unchecked Sendable {
-        var queue: [[CLLocationCoordinate2D]]
-        var calls: [(CLLocationCoordinate2D, CLLocationCoordinate2D)] = []
-        var fail = false
-        init(_ q: [[CLLocationCoordinate2D]]) { queue = q }
-    }
-    func route(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> [CLLocationCoordinate2D] {
-        routes.calls.append((from, to))
-        if routes.fail { throw RouteError.noRoute }
-        return routes.queue.count > 1 ? routes.queue.removeFirst() : routes.queue[0]
-    }
-}
-
-private final class CarRouteFakeWriter: CarRouteWriting, @unchecked Sendable {
-    var writes: [CarRoutePlan] = []
-    func write(_ plan: CarRoutePlan, tripId: String, carId: String) async throws { writes.append(plan) }
 }
 
 @MainActor

@@ -17,19 +17,10 @@ struct StopAnswerTests {
             kind: kind, minutes: 20, order: 0, skipped: skipped ? true : nil)
     }
 
-    private func firestoreDecode<T: Decodable>(_ type: T.Type, from data: [String: Any]) throws -> T {
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure(options: FirebaseOptions(googleAppID: "1:1:ios:1", gcmSenderID: "1"))
-        }
-        let decoder = Firestore.Decoder()
-        decoder.userInfo[CodingUserInfoKey(rawValue: "DocumentRefUserInfoKey")!] = Firestore.firestore()
-            .document("trips/t/stops/s1/answers/carB")
-        return try decoder.decode(type, from: data)
-    }
-
     @Test func theAnswerDecodesWithTheCarIdFromTheDocument() throws {
         let at = Date(timeIntervalSince1970: 1_800_000_000)
-        let decoded = try firestoreDecode(StopAnswer.self, from: ["answer": "skip", "userId": "u2", "at": Timestamp(date: at)])
+        let decoded = try firestoreDecode(StopAnswer.self, from: ["answer": "skip", "userId": "u2", "at": Timestamp(date: at)],
+            path: "trips/t/stops/s1/answers/carB")
         #expect(decoded.id == "carB")
         #expect(decoded.answer == .skip)
         #expect(decoded.userId == "u2")
@@ -126,22 +117,6 @@ struct StopAnswerEmulatorTests {
         try Auth.auth().signOut()
     }
 
-    private func firstValue(_ stream: AsyncStream<[StopAnswer]>, where match: @escaping @Sendable ([StopAnswer]) -> Bool) async throws -> [StopAnswer] {
-        try await withThrowingTaskGroup(of: [StopAnswer]?.self) { group in
-            group.addTask {
-                for await value in stream where match(value) { return value }
-                return nil
-            }
-            group.addTask {
-                try await Task.sleep(for: .seconds(15))
-                return nil
-            }
-            let first = try await group.next() ?? nil
-            group.cancelAll()
-            return try #require(first)
-        }
-    }
-
     /// A started trip with one stop; a second car joined. A car skips, undoes, skips again; the lead car, another
     /// car's answer and a skipped stop are refused.
     @Test func aCarSkipsAStopAndUndoesIt() async throws {
@@ -168,7 +143,7 @@ struct StopAnswerEmulatorTests {
 
         let sent = try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
         #expect(sent)
-        let said = try await firstValue(stream) { $0.count == 1 && $0[0].at != nil }
+        let said = try #require(await firstValue(of: stream, within: 15) { $0.count == 1 && $0[0].at != nil })
         #expect(SkipAnswers.skipping(said) == [joined.carId])
         #expect(said[0].userId == joiner)
         #expect(said[0].at != nil)
@@ -185,7 +160,7 @@ struct StopAnswerEmulatorTests {
 
         let undone = try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
         #expect(undone)
-        let gone = try await firstValue(stream) { $0.isEmpty }
+        let gone = try #require(await firstValue(of: stream, within: 15) { $0.isEmpty })
         #expect(SkipAnswers.skipping(gone).isEmpty)
         // Undo with nothing there is harmless; and the car can change its mind again.
         try await StopAnswerService.undo(tripId: trip.tripId, stopId: "tapah", carId: joined.carId)
@@ -217,19 +192,6 @@ struct StopAnswerEmulatorTests {
         try Auth.auth().signOut()
         try await Auth.auth().signInAnonymously()
         let stream = StopAnswerService.listen(tripId: trip.tripId, stopId: "tapah")
-        let finished = await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                for await _ in stream {}
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(15))
-                return false
-            }
-            let first = await group.next() ?? false
-            group.cancelAll()
-            return first
-        }
-        #expect(finished)
+        #expect(await finishes(stream, within: 15))
     }
 }

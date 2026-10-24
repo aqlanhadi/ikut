@@ -5,17 +5,7 @@ import Testing
 @testable import ikut
 
 struct ConvoyTests {
-    private static let r = RouteLine.earthRadius
-    private static let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
     private static let now = Fixtures.t0
-    private static let gb = Locale(identifier: "en_GB")
-    private static let utc = TimeZone(identifier: "UTC")!
-
-    private static func move(_ c: CLLocationCoordinate2D, north: Double = 0, east: Double = 0) -> CLLocationCoordinate2D {
-        CLLocationCoordinate2D(
-            latitude: c.latitude + north / r * 180 / .pi,
-            longitude: c.longitude + east / (r * cos(c.latitude * .pi / 180)) * 180 / .pi)
-    }
 
     /// 20 km due east.
     private static var main: RouteLine {
@@ -30,7 +20,7 @@ struct ConvoyTests {
 
     private func pos(offset: Double?, speed: Double = 25, age: TimeInterval = 1, routeOffset: Double? = nil,
                      at: CLLocationCoordinate2D? = nil) -> Position {
-        let c = at ?? Self.move(Self.origin, east: offset ?? 0)
+        let c = at ?? move(origin, east: offset ?? 0)
         return Position(
             location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, heading: 90,
             routeOffset: routeOffset ?? offset ?? 0, convoyOffset: offset, battery: nil,
@@ -236,9 +226,9 @@ struct ConvoyTests {
 
     private func joiningFixture() -> (cars: [Car], merges: [String: Double], main: RouteLine) {
         // Own route: 3 km north-to-south approach joining the main route at x = 6 km, then along it.
-        let start = Self.move(Self.origin, north: -3000, east: 6000)
-        var pts = stride(from: 0.0, through: 3000, by: 500).map { Self.move(start, north: $0) }
-        pts += stride(from: 7000.0, through: 20_000, by: 1000).map { Self.move(Self.origin, east: $0) }
+        let start = move(origin, north: -3000, east: 6000)
+        var pts = stride(from: 0.0, through: 3000, by: 500).map { move(start, north: $0) }
+        pts += stride(from: 7000.0, through: 20_000, by: 1000).map { move(origin, east: $0) }
         let encoded = Polyline.encode(pts)
         let cars = [car("1"), car("4", state: .joining, route: encoded, merge: 6000)]
         let main = Self.main
@@ -254,7 +244,7 @@ struct ConvoyTests {
 
     @Test func joiningDistanceIsRemainingOwnRoute() throws {
         let f = joiningFixture()
-        let p = pos(offset: nil, speed: 20, routeOffset: 1000, at: Self.move(Self.origin, north: -2000, east: 6000))
+        let p = pos(offset: nil, speed: 20, routeOffset: 1000, at: move(origin, north: -2000, east: 6000))
         let s = order(f.cars, ["1": pos(offset: 8000), "4": p], main: f.main, merges: f.merges)
         #expect(s.convoy.map(\.id) == ["1"])
         let j = try #require(s.joining.first)
@@ -271,7 +261,7 @@ struct ConvoyTests {
     @Test func joiningFallsBackToStraightLine() throws {
         // No own route offset: 4 km due west of the main-route point at 6 km.
         let c = car("4", state: .joining, merge: 6000)
-        let p = pos(offset: nil, at: Self.move(Self.origin, east: 2000))
+        let p = pos(offset: nil, at: move(origin, east: 2000))
         let s = order([c], ["4": p], main: Self.main)
         #expect(abs(try #require(s.joining[0].distanceToMerge) - 4000) < 5)
     }
@@ -361,9 +351,9 @@ struct ConvoyTests {
 
     @Test func clockText() {
         let d = Fixtures.t0 // 2027-01-15 08:00 UTC
-        #expect(ConvoyFormat.clock(d.addingTimeInterval(52 * 60 + 6 * 3600), locale: Self.gb, timeZone: Self.utc) == "14:52")
-        #expect(ConvoyFormat.eta(d, destination: "Ipoh", locale: Self.gb, timeZone: Self.utc) == "ETA Ipoh 08:00")
-        #expect(ConvoyFormat.eta(d, locale: Self.gb, timeZone: Self.utc) == "ETA 08:00")
+        #expect(ConvoyFormat.clock(d.addingTimeInterval(52 * 60 + 6 * 3600), locale: Fixtures.gb, timeZone: Fixtures.utc) == "14:52")
+        #expect(ConvoyFormat.eta(d, destination: "Ipoh", locale: Fixtures.gb, timeZone: Fixtures.utc) == "ETA Ipoh 08:00")
+        #expect(ConvoyFormat.eta(d, locale: Fixtures.gb, timeZone: Fixtures.utc) == "ETA 08:00")
     }
 
     // MARK: ETA schedule
@@ -421,9 +411,7 @@ struct ConvoyTests {
 
     @MainActor
     private func makeModel(_ provider: MockETA, _ clock: Clock) -> ConvoyModel {
-        let m = ConvoyModel(provider: provider, locale: Self.gb, timeZone: Self.utc, clock: { clock.now })
-        m.setMainRoute(Self.main)
-        return m
+        ConvoyModel.fixture(provider: provider, route: Self.main, clock: { clock.now })
     }
 
     @MainActor @Test func modelOneRequestForWholeConvoyAndGapsGiveOtherETAs() async throws {
@@ -554,7 +542,7 @@ struct ConvoyTests {
         let m = makeModel(MockETA(), clock)
         m.update(cars: f.cars, positions: [
             "1": pos(offset: 8000),
-            "4": pos(offset: nil, speed: 20, routeOffset: 1000, at: Self.move(Self.origin, north: -2000, east: 6000)),
+            "4": pos(offset: nil, speed: 20, routeOffset: 1000, at: move(origin, north: -2000, east: 6000)),
         ])
         let joiner = try #require(m.joining.first)
         #expect(abs((joiner.timeToMerge ?? 0) - 100) < 5)

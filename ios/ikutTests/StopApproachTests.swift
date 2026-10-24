@@ -109,16 +109,11 @@ struct StopApproachTests {
 
     // MARK: On the map model
 
-    private final class Recorder: AlertAnnouncing {
-        var alerts: [TripAlert] = []
-        func announce(event: TripEvent, distance: Double?) async -> Bool { false }
-        func announce(alert: TripAlert) -> Bool { alerts.append(alert); return true }
-    }
-
     /// The demo convoy's lead (my car) is 30 km short of nothing in particular; stops are placed from it.
-    private func demo(_ stops: [PlannedStop], tripId: String = "demo") -> (TripMapModel, Recorder, Double) {
+    private func demo(_ stops: [PlannedStop], tripId: String = "demo") -> (TripMapModel, FakeAnnouncer, Double) {
         let model = MapDemo.model()
-        let recorder = Recorder()
+        let recorder = FakeAnnouncer()
+        recorder.eventResult = false
         model.startHazardAlerts(announcer: recorder, userId: "u-c1", tripId: tripId)
         model.setStops(stops)
         return (model, recorder, model.convoy.convoy.first?.convoyOffset ?? 0)

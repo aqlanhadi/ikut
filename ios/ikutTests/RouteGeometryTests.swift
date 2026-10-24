@@ -3,22 +3,9 @@ import Testing
 @testable import ikut
 
 struct RouteGeometryTests {
-    private static let r = RouteLine.earthRadius
-    private static let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
-
-    /// Moves `north`/`east` meters from `c` (local planar, fine at these scales).
-    private func move(_ c: CLLocationCoordinate2D, north: Double = 0, east: Double = 0) -> CLLocationCoordinate2D {
-        CLLocationCoordinate2D(
-            latitude: c.latitude + north / Self.r * 180 / .pi,
-            longitude: c.longitude + east / (Self.r * cos(c.latitude * .pi / 180)) * 180 / .pi
-        )
-    }
-
     private func eastLine(from start: CLLocationCoordinate2D = origin, km: Int, step: Double = 1000) -> [CLLocationCoordinate2D] {
         stride(from: 0.0, through: Double(km) * 1000, by: step).map { move(start, east: $0) }
     }
-
-    private func close(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) <= tol }
 
     @Test func lengthMatchesHaversineAlongMeridian() {
         let pts = (0...10).map { CLLocationCoordinate2D(latitude: 1.0 + Double($0) * 0.1, longitude: 103.0) }
@@ -37,7 +24,7 @@ struct RouteGeometryTests {
 
     @Test func pointOnRoute() throws {
         let line = RouteLine(eastLine(km: 10))
-        let p = try #require(line.project(move(Self.origin, east: 3500)))
+        let p = try #require(line.project(move(origin, east: 3500)))
         #expect(close(p.offset, 3500, 1))
         #expect(p.distance < 1)
         #expect(p.segmentIndex == 3)
@@ -46,19 +33,19 @@ struct RouteGeometryTests {
 
     @Test func pointOffRoute() throws {
         let line = RouteLine(eastLine(km: 10))
-        let p = try #require(line.project(move(Self.origin, north: 100, east: 4200)))
+        let p = try #require(line.project(move(origin, north: 100, east: 4200)))
         #expect(close(p.distance, 100, 1))
         #expect(close(p.offset, 4200, 1))
-        #expect(close(p.coordinate.latitude, Self.origin.latitude, 1e-6))
+        #expect(close(p.coordinate.latitude, origin.latitude, 1e-6))
     }
 
     @Test func clampsBeforeStartAndAfterEnd() throws {
         let line = RouteLine(eastLine(km: 5))
-        let before = try #require(line.project(move(Self.origin, east: -300)))
+        let before = try #require(line.project(move(origin, east: -300)))
         #expect(before.clamp == .beforeStart)
         #expect(before.offset == 0)
         #expect(close(before.distance, 300, 1))
-        let after = try #require(line.project(move(Self.origin, north: 40, east: 5400)))
+        let after = try #require(line.project(move(origin, north: 40, east: 5400)))
         #expect(after.clamp == .afterEnd)
         #expect(close(after.offset, line.length, 0.001))
         #expect(close(after.distance, hypot(400, 40), 1))
@@ -70,7 +57,7 @@ struct RouteGeometryTests {
         pts.insert(pts[0], at: 0)
         let line = RouteLine(pts)
         #expect(close(line.length, 4000, 5))
-        let p = try #require(line.project(move(Self.origin, east: 2500)))
+        let p = try #require(line.project(move(origin, east: 2500)))
         #expect(close(p.offset, 2500, 1))
         #expect(p.distance < 1)
     }
@@ -79,7 +66,7 @@ struct RouteGeometryTests {
         let out = eastLine(km: 5)
         let route = out + out.reversed().dropFirst()
         let line = RouteLine(route)
-        let spot = move(Self.origin, east: 2000)
+        let spot = move(origin, east: 2000)
         let noHint = try #require(line.project(spot))
         #expect(close(noHint.offset, 2000, 1))
         let hinted = try #require(line.project(spot, hint: 7))
@@ -91,7 +78,7 @@ struct RouteGeometryTests {
 
     @Test func hintFallsBackToFullScanWhenFarOff() throws {
         let line = RouteLine(eastLine(km: 200, step: 500))
-        let p = try #require(line.project(move(Self.origin, north: 20, east: 150_000), hint: 3))
+        let p = try #require(line.project(move(origin, north: 20, east: 150_000), hint: 3))
         #expect(close(p.offset, 150_000, 2))
         #expect((299...300).contains(p.segmentIndex))
     }
@@ -115,17 +102,17 @@ struct RouteGeometryTests {
 
     @Test func emptyAndSinglePointRoutes() throws {
         let empty = RouteLine([])
-        #expect(empty.project(Self.origin) == nil)
+        #expect(empty.project(origin) == nil)
         #expect(empty.coordinate(atOffset: 10) == nil)
         #expect(empty.length == 0)
         #expect(empty.mergeOffset(of: RouteLine(eastLine(km: 2))) == nil)
 
-        let single = RouteLine([Self.origin])
-        let p = try #require(single.project(move(Self.origin, north: 70)))
+        let single = RouteLine([origin])
+        let p = try #require(single.project(move(origin, north: 70)))
         #expect(p.offset == 0)
         #expect(close(p.distance, 70, 1))
         #expect(p.segmentIndex == 0)
-        #expect(single.coordinate(atOffset: 5)?.latitude == Self.origin.latitude)
+        #expect(single.coordinate(atOffset: 5)?.latitude == origin.latitude)
     }
 
     // MARK: Merge
@@ -133,7 +120,7 @@ struct RouteGeometryTests {
     private var main: RouteLine { RouteLine(eastLine(km: 20)) }
 
     @Test func sideRoadJoiningMainRoad() throws {
-        let junction = move(Self.origin, east: 10_000)
+        let junction = move(origin, east: 10_000)
         let start = move(junction, north: 5000)
         let side = RouteLine([start, junction] + eastLine(from: junction, km: 5).dropFirst())
         let m = try #require(main.mergeOffset(of: side))
@@ -142,18 +129,18 @@ struct RouteGeometryTests {
     }
 
     @Test func routeThatNeverJoins() {
-        let parallel = RouteLine(eastLine(from: move(Self.origin, north: 500), km: 15))
+        let parallel = RouteLine(eastLine(from: move(origin, north: 500), km: 15))
         #expect(main.mergeOffset(of: parallel) == nil)
     }
 
     @Test func routeThatTouchesThenLeaves() {
-        let cross = move(Self.origin, east: 5000)
+        let cross = move(origin, east: 5000)
         let wander = RouteLine([move(cross, north: -3000), cross, move(cross, north: 3000)])
         #expect(main.mergeOffset(of: wander) == nil)
     }
 
     @Test func routeEntirelyOnMainMergesAtStart() throws {
-        let sub = RouteLine(eastLine(from: move(Self.origin, east: 2000), km: 6))
+        let sub = RouteLine(eastLine(from: move(origin, east: 2000), km: 6))
         let m = try #require(main.mergeOffset(of: sub))
         #expect(m.otherOffset == 0)
         #expect(close(m.mainOffset, 2000, 1))

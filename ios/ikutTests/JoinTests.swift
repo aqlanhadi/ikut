@@ -79,15 +79,6 @@ struct JoinServiceTests {
     }
 }
 
-private struct FakeJoinAPI: JoinAPI {
-    var preview: TripPreview
-    var joinResult = JoinResult(tripId: "t1", carId: "c9", trackerTaken: false)
-    func preview(code: String) async throws -> TripPreview { preview }
-    func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
-        joinResult
-    }
-}
-
 struct JoinStopsTests {
     private let base: [String: Any] = [
         "tripId": "t1", "name": "Raya", "destinationName": "Ipoh",

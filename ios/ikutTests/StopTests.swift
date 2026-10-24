@@ -233,16 +233,6 @@ struct StopLogicTests {
         #expect(StopLogic.isOpen(old, now: t0.addingTimeInterval(5 * 3600)))
     }
 
-    /// `@DocumentID` can only be decoded with a document reference, which needs a (never contacted) Firestore instance.
-    private func firestoreDecode<T: Decodable>(_ type: T.Type, from data: [String: Any]) throws -> T {
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure(options: FirebaseOptions(googleAppID: "1:1:ios:1", gcmSenderID: "1"))
-        }
-        let decoder = Firestore.Decoder()
-        decoder.userInfo[CodingUserInfoKey(rawValue: "DocumentRefUserInfoKey")!] = Firestore.firestore().document("trips/doc")
-        return try decoder.decode(type, from: data)
-    }
-
     @Test func anOldStopRequestWithAPlaceAndPinnedStatusDecodesAsOpenAndIgnoresThePlace() throws {
         let event = try firestoreDecode(TripEvent.self, from: [
             "type": "stopFuel", "category": "stopRequest", "severity": "medium",
@@ -666,30 +656,11 @@ struct StopEmulatorTests {
             .getDocument(as: TripEvent.self)
     }
 
-    /// First board from `stream` that satisfies `predicate`, or nil after `seconds`.
-    private func next(
-        _ stream: AsyncStream<StopBoard>, seconds: Double = 10, where predicate: @escaping @Sendable (StopBoard) -> Bool
-    ) async -> StopBoard? {
-        await withTaskGroup(of: StopBoard?.self) { group in
-            group.addTask {
-                for await board in stream where predicate(board) { return board }
-                return nil
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(seconds))
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
-    }
-
     /// The first open request from `stream` that satisfies `predicate`.
     private func state(
         _ stream: AsyncStream<StopBoard>, where predicate: @escaping @Sendable (StopRequestState) -> Bool
     ) async throws -> StopRequestState {
-        let found = await next(stream) { $0.requests.contains(where: predicate) }
+        let found = await firstValue(of: stream) { $0.requests.contains(where: predicate) }
         return try #require(found?.requests.first(where: predicate), "no matching state arrived")
     }
 
@@ -714,7 +685,7 @@ struct StopEmulatorTests {
         #expect(written.expiresAt == createdAt.addingTimeInterval(30 * 60))
 
         try await service.close(tripId: trip.tripId, eventId: eventId, reason: .stopped, userId: trip.uid, now: Date().addingTimeInterval(-1))
-        let closed = await next(stream) { $0.requests.isEmpty }
+        let closed = await firstValue(of: stream) { $0.requests.isEmpty }
         #expect(closed != nil, "expected the listener to report no open stop")
         let closedDoc = try await eventDoc(trip.tripId, eventId)
         #expect(closedDoc.status == .closed)

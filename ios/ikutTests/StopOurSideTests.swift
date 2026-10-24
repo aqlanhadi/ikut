@@ -204,7 +204,7 @@ struct StopOurSideTests {
             destination: Destination(name: "Ipoh", coordinate: GeoPoint(latitude: end.latitude, longitude: end.longitude)))
         planner.sync(trip: trip, stops: [])
         planner.add(Self.stop(other.coordinate))
-        for _ in 0..<500 where planner.status != .saved { try await Task.sleep(for: .milliseconds(10)) }
+        await waitUntil(.seconds(5)) { planner.status == .saved }
         #expect(planner.status == .saved)
         let first = try #require(saved.plans.last)
         #expect(first.stops[0].coordinate.latitude == ours.coordinate.latitude)
@@ -212,8 +212,8 @@ struct StopOurSideTests {
         // A second edit builds again with the stop already on our side: it stays, and the leg still ends there.
         let before = roads.ends.count
         planner.add(Self.stop(Self.north.coordinate(atOffset: Self.north.length * 0.3)!, kind: .food, name: "Lunch"))
-        for _ in 0..<500 where planner.status != .saved { try await Task.sleep(for: .milliseconds(10)) }
-        for _ in 0..<500 where saved.plans.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        await waitUntil(.seconds(5)) { planner.status == .saved }
+        await waitUntil(.seconds(5)) { saved.plans.count >= 2 }
         let second = try #require(saved.plans.last)
         #expect(second.stops.count == 2)
         let tapah = try #require(second.stops.first { $0.name == "R&R Tapah" })
