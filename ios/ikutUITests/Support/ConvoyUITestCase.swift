@@ -79,17 +79,21 @@ class ConvoyUITestCase: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label IN %@", ["Start Trip", "Back to Map"])).firstMatch
     }
 
-    /// Badge numbers of the convoy rows, front of the convoy first (top of the list).
+    /// Badge numbers of the convoy rows, front of the convoy first (top of the list). Read from one snapshot of
+    /// the app: rows bound by index and read one by one failed the test when the panel redrew a row in between.
     func convoyOrder() -> [Int] {
-        guard app != nil else { return [] }
+        guard app != nil, let root = try? app.snapshot() else { return [] }
         let prefix = "convoy.row."
-        let rows = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).allElementsBoundByIndex
-        var seen = Set<Int>()
-        return rows.sorted { $0.frame.minY < $1.frame.minY }.compactMap { row -> Int? in
-            guard let n = Int(row.identifier.dropFirst(prefix.count)), seen.insert(n).inserted else { return nil }
-            return n
+        var rows: [(y: CGFloat, n: Int)] = []
+        func collect(_ element: XCUIElementSnapshot) {
+            if element.identifier.hasPrefix(prefix), let n = Int(element.identifier.dropFirst(prefix.count)) {
+                rows.append((element.frame.minY, n))
+            }
+            element.children.forEach(collect)
         }
+        collect(root)
+        var seen = Set<Int>()
+        return rows.sorted { $0.y < $1.y }.compactMap { seen.insert($0.n).inserted ? $0.n : nil }
     }
 
     // MARK: Shared flows
