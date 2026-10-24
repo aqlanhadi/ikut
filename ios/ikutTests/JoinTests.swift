@@ -36,19 +36,19 @@ struct JoinServiceTests {
     }
 
     @Test func errorMessagesAreFriendly() {
-        #expect(JoinService.message(code: .notFound, serverMessage: "").contains("No active trip"))
+        #expect(JoinService.message(code: .notFound, serverMessage: "").contains("No trip has that code"))
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip is full (20 people).") == "This trip is full.")
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip already has 10 cars.").contains("cars"))
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "That car is not part of this trip.").contains("no longer part"))
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "x").contains("6 letters"))
         #expect(JoinService.message(code: .unavailable, serverMessage: "").contains("connection"))
         #expect(JoinService.message(code: .unauthenticated, serverMessage: "").contains("signed out"))
-        #expect(JoinService.message(code: nil, serverMessage: "").contains("Something went wrong"))
+        #expect(JoinService.message(code: nil, serverMessage: "").contains("That didn’t go through"))
     }
 
     @Test func mapsFunctionsAndUrlErrors() {
         let notFound = NSError(domain: FunctionsErrorDomain, code: FunctionsErrorCode.notFound.rawValue)
-        #expect(JoinService.map(notFound).message.contains("No active trip"))
+        #expect(JoinService.map(notFound).message.contains("No trip has that code"))
         let offline = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
         #expect(JoinService.map(offline).message.contains("connection"))
         #expect(JoinService.map(JoinError(message: "hi")).message == "hi")
@@ -237,7 +237,7 @@ struct JoinEmulatorTests {
             _ = try await LiveJoinAPI().preview(code: "ZZZZZZ")
             Issue.record("expected failure")
         } catch let error as JoinError {
-            #expect(error.message.contains("No active trip"))
+            #expect(error.message.contains("No trip has that code"))
         }
     }
 }

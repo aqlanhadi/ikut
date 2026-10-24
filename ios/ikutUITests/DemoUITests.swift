@@ -120,7 +120,7 @@ class DemoBase: TwoPhoneConvoyBase {
             let carField = app.textFields["Car name"]
             if carField.waitForExistence(timeout: 5), let carName { replaceText(in: carField, with: carName) }
             shot("join-as-new-car")
-            app.buttons["Join Trip"].tap()
+            app.buttons["Join trip"].tap()
         }
         XCTAssertTrue(waitForLobby(timeout: 60), "Didn't reach the lobby")
     }
@@ -189,7 +189,7 @@ final class DemoOrganizerUITests: DemoBase {
     func testOrganizer() throws {
         try startDemo(as: "A")
 
-        try step("1. creates the trip (name, New Trip, Where to? Ipoh, lobby)") {
+        try step("1. creates the trip (name, New trip, Where to? Ipoh, lobby)") {
             startNewTrip(as: demoName)
             let search = app.textFields["Destination"]
             // A first-run sign-in can fail once ("Network error ..." under the name field); Continue tries again.
@@ -206,7 +206,7 @@ final class DemoOrganizerUITests: DemoBase {
             result.tap()
             if !waitForLobby(timeout: 120) {
                 shot("FAILED-no-lobby")
-                let error = labelled("label BEGINSWITH %@", "Error: ")
+                let error = labelled("identifier == %@", "createTripError")
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
                 throw WaitFailure()
             }

@@ -11,7 +11,7 @@ enum ServerWrite {
 
     /// Raised by callers that can't proceed on a queued write.
     struct Offline: LocalizedError {
-        var errorDescription: String? { "No connection to the server. Check your signal and try again." }
+        var errorDescription: String? { "Can’t reach the server. Check your signal and try again." }
     }
 
     /// Returns true once the server accepts the write, false if `timeout` passes first (still

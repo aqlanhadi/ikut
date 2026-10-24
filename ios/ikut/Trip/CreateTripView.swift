@@ -48,7 +48,7 @@ struct CreateTripView: View {
                 if let message = model.errorMessage {
                     InlineNote(message, tone: .alert)
                         .padding(.top, Spacing.m)
-                        .accessibilityLabel("Error: \(message)")
+                        .accessibilityIdentifier("createTripError")
                 }
 
                 if model.showsList || searchFocused {

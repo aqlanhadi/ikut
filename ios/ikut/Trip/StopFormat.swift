@@ -85,7 +85,7 @@ enum StopNoteText {
     static func failureDetail(_ failure: StopPlanner.Failure) -> String {
         switch (failure.place, failure.reason) {
         case (.start, _): return "Check that location is on, then try again."
-        case (.saving, _): return "The change wasn’t accepted. Try again in a moment."
+        case (.saving, _): return "Couldn’t save that change. Try again in a moment."
         case (.stop, .noRoute): return "There’s no road to this stop from the one before. Pick another place."
         case (.destination, .noRoute): return "There’s no road to the destination from the stop before. Pick another place."
         default: return "Maps didn’t answer. Try again, or pick another place."

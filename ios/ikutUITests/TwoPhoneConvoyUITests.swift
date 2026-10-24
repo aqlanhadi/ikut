@@ -143,7 +143,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
         try launch(as: "A")
         let long: TimeInterval = 300
 
-        try step("1. creates the trip (name, New Trip, Where to?, lobby)") {
+        try step("1. creates the trip (name, New trip, Where to?, lobby)") {
             startNewTrip(as: "Aisha")
             let search = app.textFields["Destination"]
             XCTAssertTrue(search.waitForExistence(timeout: 20), "Didn't reach Where to?")
@@ -153,7 +153,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
             result.tap()
             if !app.buttons["Start Trip"].waitForExistence(timeout: 45) {
-                let error = labelled("label BEGINSWITH %@", "Error: ")
+                let error = labelled("identifier == %@", "createTripError")
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
                 throw WaitFailure()
             }
@@ -414,7 +414,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             try waitMark("a.sawResumed", timeout: 150)
             openTripMenuItem("Trip options", "Leave trip")
             confirm("Leave trip")
-            let joinTrip = app.buttons["Join Trip"]
+            let joinTrip = app.buttons["Join trip"]
             XCTAssertTrue(joinTrip.waitForExistence(timeout: 30), "B didn't return Home after leaving")
             shot("14-left-home")
             mark("b.left")

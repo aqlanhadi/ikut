@@ -44,7 +44,7 @@ extension PlaceKind {
         case .gasStation?: "Petrol station"
         case .evCharger?: "Charging point"
         case .restaurant?: "Restaurant"
-        case .cafe?: "Cafe"
+        case .cafe?: "Café"
         case .bakery?: "Bakery"
         case .foodMarket?: "Market"
         case .hotel?: "Hotel"

@@ -262,7 +262,7 @@ struct StopNoteTextTests {
 
     @Test func aRefusedSaveAndAQueuedOneAreTold() {
         #expect(StopNoteText.failureTitle(failure(.saving, .failed("x")), stopName: nil, destinationName: "") == "Couldn’t save the stops")
-        #expect(StopNoteText.failureDetail(failure(.saving, .failed("x"))) == "The change wasn’t accepted. Try again in a moment.")
+        #expect(StopNoteText.failureDetail(failure(.saving, .failed("x"))) == "Couldn’t save that change. Try again in a moment.")
         #expect(StopNoteText.queuedTitle == "Not saved yet")
         #expect(StopNoteText.queuedDetail == "It saves when you’re back online.")
     }

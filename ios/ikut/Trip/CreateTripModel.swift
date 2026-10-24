@@ -28,7 +28,7 @@ final class CreateTripModel {
     /// The route a stop would be added to: results then read how far along it they are ("62 km", "40 min along").
     var along: AlongRoute?
 
-    static let searchMessage = "Couldn't search. Check your signal and try again."
+    static let searchMessage = "Couldn’t search. Check your signal and try again."
     static let spinnerDelay: Duration = .milliseconds(300)
 
     @ObservationIgnored private var searchTask: Task<Void, Never>?
@@ -166,7 +166,7 @@ final class CreateTripModel {
         defer { resolving = nil }
         do {
             if let place = try await places.resolve(suggestion) { return place }
-            errorMessage = "Couldn't find that place. Try another."
+            errorMessage = "Couldn’t find that place. Try another."
         } catch {
             errorMessage = Self.searchMessage
         }
@@ -267,7 +267,7 @@ final class CreateTripModel {
         }
     }
 
-    static let rebuildFallback = "Couldn't change the route. Check your signal and try again."
+    static let rebuildFallback = "Couldn’t change the route. Check your signal and try again."
 
     /// What the search says when a mid-trip rebuild did not work: Maps' own reasons in plain words, anything else
     /// (MapKit's or Firestore's text, a refusal) one plain line.

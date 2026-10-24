@@ -45,7 +45,7 @@ struct NameEntryView: View {
                 if let errorMessage {
                     InlineNote(errorMessage, tone: .alert)
                         .padding(.top, Spacing.s)
-                        .accessibilityLabel("Error: \(errorMessage)")
+                        .accessibilityIdentifier("nameError")
                 }
 
                 Spacer(minLength: 16)

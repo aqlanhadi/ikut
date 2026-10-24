@@ -72,7 +72,7 @@ struct PlaceSearchTests {
 
     @Test func completionsBecomeRowsWithBoldMatchesAndAQueryRow() {
         let place = SearchSuggestion(title: "Petronas KLCC", subtitle: "Kuala Lumpur", highlights: [NSRange(location: 0, length: 4)])
-        let query = SearchSuggestion(title: "petrol station", subtitle: "Search Nearby", highlights: [NSRange(location: 0, length: 4)])
+        let query = SearchSuggestion(title: "petrol station", subtitle: "Search nearby", highlights: [NSRange(location: 0, length: 4)])
         #expect(!place.isQuery && query.isQuery)
         #expect(query.shownTitle == "Search petrol station")
         #expect(query.shownHighlights == [NSRange(location: 7, length: 4)])
@@ -179,7 +179,7 @@ struct PlaceSearchTests {
         let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: places)
         let row = SearchSuggestion(title: "Petronas", subtitle: "Ipoh", highlights: [])
         #expect(await model.resolve(row) == nil)
-        #expect(model.errorMessage == "Couldn't find that place. Try another.")
+        #expect(model.errorMessage == "Couldn’t find that place. Try another.")
         #expect(model.resolving == nil)
         places.resolveFails = true
         #expect(await model.resolve(row) == nil)

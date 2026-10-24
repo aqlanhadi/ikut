@@ -32,7 +32,7 @@ enum SearchRegion {
 /// One line of "as you type": a place (name, area) or a query ("Search petrol station").
 struct SearchSuggestion: Identifiable, Equatable {
     /// Apple's own subtitle on a query completion.
-    static let queryMarker = "Search Nearby"
+    static let queryMarker = "Search nearby"
     static let queryPrefix = "Search "
 
     var title: String
@@ -261,7 +261,7 @@ struct PlaceSearchResults: View {
                     Color.clear.frame(height: 58)
                 }
             } else if model.errorMessage == nil {
-                Text("No places match “\(model.trimmedQuery)”.")
+                Text("No places match “\(model.trimmedQuery)”. Try a town name.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.section)
