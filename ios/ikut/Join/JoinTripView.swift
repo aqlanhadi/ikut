@@ -52,7 +52,7 @@ struct JoinTripView: View {
                         Text(message)
                             .font(.footnote)
                             .foregroundStyle(.red)
-                            .accessibilityLabel("Error: \(message)")
+                            .accessibilityIdentifier("joinError")
                         if model.preview == nil, !model.isLoadingPreview, JoinService.isCompleteCode(model.code) {
                             Button("Try again") { model.retryPreview() }
                         }
@@ -72,7 +72,7 @@ struct JoinTripView: View {
 
                     if model.trackerTakenResult != nil {
                         InlineNote(
-                            "You're in. Someone else is already tracking that car, so your phone won't share its location.",
+                            "You’re in. Someone else is already sharing that car’s location, so your phone won’t.",
                             systemImage: "info.circle")
                             .padding(.top, Spacing.m)
                     }
@@ -101,7 +101,7 @@ struct JoinTripView: View {
                 .ikutBottomBar()
             }
         }
-        .navigationTitle("Join Trip")
+        .navigationTitle("Join trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if QRScannerView.isAvailable {
@@ -185,7 +185,7 @@ struct JoinTripView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
         } else {
-            Text("The 6-character code from the organizer.")
+            Text("The 6-letter code from the organiser.")
                 .font(.footnote).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -270,7 +270,7 @@ struct JoinTripView: View {
         @Bindable var model = model
         return VStack(spacing: Spacing.tight) {
             HStack(spacing: Spacing.m) {
-                Text("Name")
+                Text("Your name")
                 TextField("Your name", text: $model.displayName)
                     .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
@@ -303,7 +303,7 @@ struct JoinTripView: View {
                     carTile(
                         name: car.name,
                         badge: CarBadge(number: car.number ?? index + 1, colorHex: car.color, size: 26),
-                        detail: car.hasTracker ? "Being tracked" : "No tracker yet",
+                        detail: car.hasTracker ? "Location shared" : "No one sharing yet",
                         selected: model.selectedCar?.id == car.id
                     ) { model.select(car) }
                 }
@@ -365,8 +365,8 @@ struct JoinTripView: View {
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text("Share this car’s location")
                     Text(model.selectedCarHasTracker
-                         ? "Someone is already tracking this car."
-                         : "Set it and forget it. Works with the screen off.")
+                         ? "Someone is already sharing this car’s location."
+                         : "Keeps sharing with the screen off.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -383,7 +383,7 @@ struct JoinTripView: View {
                     size: 30, font: .system(size: 15, weight: .semibold))
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text(model.selectedCarHasTracker
-                         ? "\(selectedCarName) is already tracked"
+                         ? "Someone already shares \(selectedCarName)’s location"
                          : "No one is sharing \(selectedCarName)’s location yet")
                     Text("You’re the co-pilot: call stops and report hazards for the driver.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -401,7 +401,7 @@ struct JoinTripView: View {
 
     private var joinLabel: String {
         if let car = model.selectedCar { return "Join in \(car.name)" }
-        return "Join Trip"
+        return "Join trip"
     }
 
     private func join() {

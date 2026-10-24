@@ -179,7 +179,7 @@ struct PlaceSearchTests {
         let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: places)
         let row = SearchSuggestion(title: "Petronas", subtitle: "Ipoh", highlights: [])
         #expect(await model.resolve(row) == nil)
-        #expect(model.errorMessage == "Couldn't find that place. Try another.")
+        #expect(model.errorMessage == "Couldn’t find that place. Try another.")
         #expect(model.resolving == nil)
         places.resolveFails = true
         #expect(await model.resolve(row) == nil)

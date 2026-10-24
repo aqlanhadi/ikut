@@ -3,7 +3,7 @@ import MapKit
 import SwiftUI
 
 /// Home after the welcome screen, as in Home.dc.html: a map of where you are and the routes of
-/// your past trips, under Apple's own sheet with New Trip, Join Trip and past trips.
+/// your past trips, under Apple's own sheet with New trip, Join trip and past trips.
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     var onNewTrip: () -> Void
@@ -436,7 +436,7 @@ struct TripsHomeView: View {
         } message: {
             Text("What the convoy sees in new trips.")
         }
-        .alert("Couldn't change your name", isPresented: .constant(renameError != nil)) {
+        .alert("Couldn’t change your name", isPresented: .constant(renameError != nil)) {
             Button("OK") { renameError = nil }
         } message: {
             Text(renameError ?? "")
@@ -458,11 +458,11 @@ struct TripsHomeView: View {
 
             HStack(spacing: Spacing.gap) {
                 Button(action: onNewTrip) {
-                    Label("New Trip", systemImage: "plus").frame(maxWidth: .infinity)
+                    Label("New trip", systemImage: "plus").frame(maxWidth: .infinity)
                 }
                 .actionButton(.primary, onGlass: true)
                 Button(action: onJoin) {
-                    Label("Join Trip", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
+                    Label("Join trip", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
                 }
                 .actionButton(.secondary, onGlass: true)
             }
@@ -522,7 +522,7 @@ struct TripsHomeView: View {
         if let name = profileName {
             Menu {
                 Section(name) {
-                    Button("Change Name", systemImage: "pencil") {
+                    Button("Change name", systemImage: "pencil") {
                         newName = name
                         renaming = true
                     }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// First screen until "Get Started": what ikut does, then on to Home (or straight to Join).
+/// First screen until "Get started": what ikut does, then on to Home (or straight to Join).
 struct WelcomeView: View {
     var onGetStarted: () -> Void
     var onJoin: () -> Void
@@ -74,7 +74,7 @@ struct WelcomeView: View {
         .background(Color(.systemBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: Spacing.tight) {
-                Text("Joining needs no account, just a name.")
+                Text("Joining needs only a name, no account.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -82,7 +82,7 @@ struct WelcomeView: View {
                 Button(action: onGetStarted) { Text("Get Started").frame(maxWidth: .infinity) }
                     .actionButton(.primary)
                 Button(action: onJoin) {
-                    Label("Join with Code or QR", systemImage: "qrcode").frame(maxWidth: .infinity)
+                    Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity)
                 }
                 .actionButton(.link)
             }

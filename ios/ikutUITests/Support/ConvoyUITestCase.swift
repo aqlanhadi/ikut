@@ -1,7 +1,7 @@
 import XCTest
 
 /// One place for what every driven-by-a-script UI test needs: finding elements, polling, screenshots,
-/// the permission prompt, and the first-run steps (name sheet, New Trip, joining with a code).
+/// the permission prompt, and the first-run steps (name sheet, New trip, joining with a code).
 /// `TwoPhoneConvoyBase` (and through it the demos) and `ConvoyScenarioUITests` build on it.
 @MainActor
 class ConvoyUITestCase: XCTestCase {
@@ -139,12 +139,12 @@ class ConvoyUITestCase: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
     }
 
-    /// Welcome (first run) or Home to the name sheet and on: taps New Trip.
+    /// Welcome (first run) or Home to the name sheet and on: taps New trip.
     func startNewTrip(as name: String, homeTimeout: TimeInterval = 20) {
-        let getStarted = app.buttons["Get Started"]
+        let getStarted = app.buttons["Get started"]
         if getStarted.waitForExistence(timeout: 5) { getStarted.tap() }
-        let newTrip = app.buttons["New Trip"]
-        XCTAssertTrue(newTrip.waitForExistence(timeout: homeTimeout), "Home didn't show New Trip")
+        let newTrip = app.buttons["New trip"]
+        XCTAssertTrue(newTrip.waitForExistence(timeout: homeTimeout), "Home didn’t show New trip")
         newTrip.tap()
         enterNameIfAsked(name)
     }
@@ -170,8 +170,8 @@ class ConvoyUITestCase: XCTestCase {
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
         failIfAlreadyInATrip()
         let joinButton = app.buttons
-            .matching(NSPredicate(format: "label IN %@", ["Join with Code or QR", "Join Trip"])).firstMatch
-        XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn't show Join Trip")
+            .matching(NSPredicate(format: "label IN %@", ["Join with a code", "Join trip"])).firstMatch
+        XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn’t show Join trip")
         joinButton.tap()
         enterNameIfAsked(name)
         let codeField = app.textFields["Trip code"]
@@ -191,7 +191,7 @@ class ConvoyUITestCase: XCTestCase {
         let carName = app.textFields["Car name"]
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
-        app.buttons["Join Trip"].tap()
+        app.buttons["Join trip"].tap()
         XCTAssertTrue(lobbyActionButton.waitForExistence(timeout: 30), "Didn't reach the lobby")
         let notNow = app.buttons["Not now"]
         if notNow.waitForExistence(timeout: 4) { notNow.tap() }

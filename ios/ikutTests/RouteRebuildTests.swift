@@ -210,7 +210,7 @@ struct RouteRebuilderTests {
              "The route will change once you have signal again"),
             (NSError(domain: "FIRFirestoreErrorDomain", code: 14), "The route will change once you have signal again"),
             (RouteError.locationUnavailable, "The route will change once your phone finds where you are"),
-            (LegFailure(index: 0, reason: .noRoute), "Maps can't find a road for the new route yet. Trying again soon"),
+            (LegFailure(index: 0, reason: .noRoute), "Maps can’t find a road for the new route yet. Trying again soon."),
         ]
         for (error, line) in cases { #expect(RouteRebuilder.waitingLine(for: error) == line) }
 
@@ -296,12 +296,12 @@ struct RouteRebuilderTests {
         let model = CreateTripModel()
         let kampar = DestinationResult(name: "Kampar", subtitle: "", coordinate: at(north: 160_000))
         let cases: [(Error, String)] = [
-            (LegFailure(index: 0, reason: .noRoute), "No driving route found to that destination."),
+            (LegFailure(index: 0, reason: .noRoute), "There’s no road to that place. Pick another."),
             (LegFailure(index: 1, reason: .failed("The operation couldn’t be completed.")),
-             "Couldn't change the route. Check your signal and try again."),
-            (RouteError.locationUnavailable, "Can't find your location. Check that location is on, then try again."),
+             "Couldn’t change the route. Check your signal and try again."),
+            (RouteError.locationUnavailable, "Can’t find where you are. Check that location is on, then try again."),
             (NSError(domain: "FIRFirestoreErrorDomain", code: 7, userInfo: [NSLocalizedDescriptionKey: "Missing or insufficient permissions."]),
-             "Couldn't change the route. Check your signal and try again."),
+             "Couldn’t change the route. Check your signal and try again."),
         ]
         for (error, message) in cases {
             #expect(await model.use(kampar, rebuild: { _ in throw error }) == false)
@@ -314,7 +314,7 @@ struct RouteRebuilderTests {
         ) { _, _ in }
         rebuilder.input = { input() }
         #expect(await model.use(kampar, rebuild: { try await rebuilder.changeDestination(to: $0) }) == false)
-        #expect(model.errorMessage == "Couldn't change the route. Check your signal and try again.")
+        #expect(model.errorMessage == "Couldn’t change the route. Check your signal and try again.")
     }
 }
 

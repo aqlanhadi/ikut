@@ -89,7 +89,7 @@ final class RouteRebuilder {
 
     nonisolated static let waitingLine = "The route will change once you have signal again"
     nonisolated static let noFixLine = "The route will change once your phone finds where you are"
-    nonisolated static let noRoadLine = "Maps can't find a road for the new route yet. Trying again soon"
+    nonisolated static let noRoadLine = "Maps can’t find a road for the new route yet. Trying again soon."
 
     /// What the organizer reads while the rebuild waits, by what went wrong.
     nonisolated static func waitingLine(for error: Error) -> String {

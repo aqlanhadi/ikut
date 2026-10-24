@@ -38,9 +38,9 @@ enum RouteError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .locationUnavailable: "Can't find your location. Check that location is on, then try again."
-        case .noRoute: "No driving route found to that destination."
-        case .timedOut: "Getting the route took too long. Check your connection and try again."
+        case .locationUnavailable: "Can’t find where you are. Check that location is on, then try again."
+        case .noRoute: "There’s no road to that place. Pick another."
+        case .timedOut: "Maps took too long to answer. Check your signal and try again."
         case .failed(let message): message
         }
     }

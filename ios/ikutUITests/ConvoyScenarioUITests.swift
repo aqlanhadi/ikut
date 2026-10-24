@@ -213,7 +213,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
         let carName = app.textFields["Car name"]
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
-        app.buttons["Join Trip"].tap()
+        app.buttons["Join trip"].tap()
         let startTrip = lobbyActionButton
         XCTAssertTrue(startTrip.waitForExistence(timeout: 20), "Didn't reach the lobby")
 
