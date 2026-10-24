@@ -1,7 +1,7 @@
 // node tools/osm/publish.mjs [places.json] [outDir]
-// Copies the places file and its readme to firebase/hosting/places/ and writes manifest.json beside them: the few
-// hundred bytes the app checks once a week (version, generatedAt, byte size, SHA-256). extract.mjs runs this after
-// every extract; run it by itself to republish the bundled file. Deploying is `firebase deploy --only hosting`.
+// Copies the places file and its readme to firebase/hosting/places/ (not in git) and writes manifest.json beside them: the few
+// hundred bytes the app checks once a week (version, generatedAt, byte size, SHA-256). `firebase deploy` runs this
+// first (hosting predeploy in firebase.json), so the hosted copy is always the bundled file.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';

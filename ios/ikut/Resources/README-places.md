@@ -35,10 +35,10 @@ slip road is `[junctionLat, junctionLon, bearing, gateLat, gateLon, meters]`.
 The app checks `https://ikut-b1083.web.app/places/manifest.json` once a week when it opens (`ios/ikut/Places/PlacesRefresher.swift`)
 and downloads the file only when its `generatedAt` is newer than the one in use. To publish:
 
-1. Run `extract.mjs` as above. With its default output it also copies the file and this readme to `firebase/hosting/places/` and
-   writes `manifest.json` (version, generatedAt, bytes, SHA-256) there; `node tools/osm/publish.mjs` does just that step.
-2. Commit the new bundled and hosted files together (the next app build then carries the same file).
-3. `cd firebase && firebase deploy --only hosting`.
+1. Run `extract.mjs` as above and commit the new bundled file (the next app build then carries the same file).
+2. From `main`: `cd firebase && firebase deploy --only hosting`. Its predeploy step runs `tools/osm/publish.mjs`, which copies the
+   bundled file and this readme to `firebase/hosting/places/` (not in git) and writes `manifest.json` there (version, generatedAt,
+   bytes, SHA-256). A plain `firebase deploy` publishes it too, so deploy from `main`.
 
 A phone ignores a hosted file whose size or hash does not match the manifest, that does not read, whose `version` is newer than
 the app knows, or that has fewer than half the sites of the bundled file. Never publish a file with a higher `version` without an

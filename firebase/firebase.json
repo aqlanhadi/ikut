@@ -20,6 +20,9 @@
   ],
   "hosting": {
     "public": "hosting",
+    "predeploy": [
+      "node \"$PROJECT_DIR/../tools/osm/publish.mjs\""
+    ],
     "ignore": [
       "**/.*"
     ],
