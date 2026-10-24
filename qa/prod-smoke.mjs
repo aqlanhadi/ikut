@@ -14,10 +14,10 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { endsWithResult } from './lib/shell.mjs';
+import { generateCode } from './lib/scenario.mjs';
 
 const config = productionFirebaseConfig();
 const REGION = 'asia-southeast1';
-const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // TripService.codeAlphabet
 
 let failures = 0;
 const check = (ok, label, detail = '') => {
@@ -36,7 +36,7 @@ async function client(name) {
   return c;
 }
 
-const code = Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
+const code = generateCode();
 console.log(`project ${config.projectId}, trip code ${code}`);
 
 let org;

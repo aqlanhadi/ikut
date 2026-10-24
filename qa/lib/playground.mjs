@@ -3,7 +3,7 @@
 // reading Firestore's REST format. Pure functions, tested in playground.test.mjs.
 
 import { PROJECT_ID } from './firebase-config.mjs';
-import { CarRouteLogic, EARTH_RADIUS, Polyline, RouteLine, bearing, haversine, simplifyToFit, truncate } from './route.mjs';
+import { CarRouteLogic, Polyline, RouteLine, bearing, destinationPoint, haversine, simplifyToFit, truncate } from './route.mjs';
 
 export const MAX_KMH = 200;
 
@@ -62,18 +62,6 @@ export function autoPick(candidates, nearMeters = 300) {
 /** One step of driving: meters along the route after `dt` seconds at `kmh`. Stops at the end. */
 export function advanceOffset(offset, kmh, dt, length) {
   return Math.min(length, Math.max(0, offset + (kmh / 3.6) * dt));
-}
-
-/** The point `meters` away from `p` in direction `bearingDeg` (great circle). */
-export function destinationPoint(p, bearingDeg, meters) {
-  const rad = Math.PI / 180;
-  const d = meters / EARTH_RADIUS;
-  const b = bearingDeg * rad;
-  const lat1 = p.latitude * rad;
-  const lon1 = p.longitude * rad;
-  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
-  const lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
-  return { latitude: lat2 / rad, longitude: ((lon2 / rad + 540) % 360) - 180 };
 }
 
 /**

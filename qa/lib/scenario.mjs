@@ -3,6 +3,28 @@
 // Staleness is judged on the server clock (ConvoyOrdering.Config.staleAfter = 60 s), so checks that depend
 // on it (the signal drop) only hold at speed <= 2x. See qa/README.md.
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+
+/** An OSRM `[lng, lat]` list as {latitude, longitude} coordinates. */
+export const toLine = (coords) => coords.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
+
+/** The two fetched OSRM routes (qa/data), as coordinates: the trip's main route and car 4's way on. */
+export function loadRoutes() {
+  const main = JSON.parse(fs.readFileSync(path.join(dataDir, 'osrm-main.json'), 'utf8'));
+  const car4 = JSON.parse(fs.readFileSync(path.join(dataDir, 'osrm-car4.json'), 'utf8'));
+  return { mainCoords: toLine(main.coordinates), car4Coords: toLine(car4.coordinates) };
+}
+
+/** A trip code: 6 characters from TripService.codeAlphabet (no 0, 1, I, L, O). */
+export function generateCode() {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+}
+
 export const GPX_EPOCH = '2026-10-18T09:00:00Z';
 export const DURATION = 900; // seconds of drive
 export const FIX_HZ = 1;

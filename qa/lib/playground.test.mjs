@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RouteLine, CarRouteLogic, haversine } from './route.mjs';
-import { loadRoutes } from '../generate-gpx.mjs';
+import { RouteLine, CarRouteLogic, destinationPoint, haversine } from './route.mjs';
+import { loadRoutes } from './scenario.mjs';
 import {
-  advanceOffset, clampKmh, decodeDoc, destinationPoint, feedPoints, nudged, offRouteCoords, parseStart,
+  advanceOffset, clampKmh, decodeDoc, feedPoints, nudged, offRouteCoords, parseStart,
   ageSeconds, UserError, numberIn, startFrom, validDerivedData, shouldPark, autoPick,
   MAX_POINTS, PALETTE, FIRST_NAMES, EVENT_KINDS, STOP_TYPES, REPORT_TYPES, LEAVE_SLACK, oksByCar, messageIn, MAX_MESSAGE, STOP_LIFETIME_SECONDS, buildTrack, carNameFor, carryState, composeTrack, coordIn, coordsIn,
   divergeOffset, eventKindIn, eventStatus, fallbackStartRoad, locate, mainDistance, mainLeg, nameIn, newCarState, nextCar, nextWait, openStopSnapshot,

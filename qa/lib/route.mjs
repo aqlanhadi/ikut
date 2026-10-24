@@ -93,6 +93,17 @@ export function haversine(a, b) {
   return 2 * EARTH_RADIUS * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/** The point `meters` away from `p` in direction `bearingDeg` (great circle); the longitude wraps into -180..<180. */
+export function destinationPoint(p, bearingDeg, meters) {
+  const d = meters / EARTH_RADIUS;
+  const b = bearingDeg * RAD;
+  const lat1 = p.latitude * RAD;
+  const lon1 = p.longitude * RAD;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
+  const lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return { latitude: lat2 / RAD, longitude: ((lon2 / RAD + 540) % 360) - 180 };
+}
+
 /** Initial bearing a -> b, degrees clockwise from north, 0..<360. */
 export function bearing(a, b) {
   const lat1 = a.latitude * RAD;

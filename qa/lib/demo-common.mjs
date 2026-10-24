@@ -18,8 +18,8 @@
 // convoy), agree (the organizer taps OK if her car is asked and opens the card), arrive (the organizer taps
 // We've stopped), end (leave the map and finish), abort.
 //
-// Reuse: lib/route.mjs, lib/tracking.mjs, the 20 s simctl location resync of run-ui.mjs, the REST read and
-// marker handshake of run-convoy2.mjs.
+// Reuse: lib/route.mjs, lib/tracking.mjs, and the 20 s simctl location resync of run-ui.mjs. The marker handshake
+// below is the one run-convoy2.mjs uses too.
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -37,7 +37,7 @@ import { CarRouteLogic, Polyline, RouteLine, bearing } from './route.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher } from './tracking.mjs';
 import { PROJECT_ID, REGION, productionFirebaseConfig } from './firebase-config.mjs';
 import { endsWithResult, run, simctl, sleep } from './shell.mjs';
-import { loadRoutes } from '../generate-gpx.mjs';
+import { loadRoutes } from './scenario.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repo = path.dirname(path.dirname(here));
@@ -242,12 +242,14 @@ export class Sync {
 
 // ---------------------------------------------------------------- the route
 
+const { mainCoords } = loadRoutes();
+
 /** Stand-in for the trip's route in a dry run: the E1 snapshot (the real route comes from the phone's trip). */
 export function standInRoute() {
-  return new RouteLine(loadRoutes().mainCoords);
+  return new RouteLine(mainCoords);
 }
 /** Where the phones are when the organizer picks the destination: the start of that snapshot (E1 just south of Bidor). */
-export const START = loadRoutes().mainCoords[0];
+export const START = mainCoords[0];
 
 // ---------------------------------------------------------------- the world: who is where, when
 

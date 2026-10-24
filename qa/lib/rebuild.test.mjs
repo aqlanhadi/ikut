@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RouteLine, Polyline } from './route.mjs';
-import { loadRoutes } from '../generate-gpx.mjs';
+import { loadRoutes } from './scenario.mjs';
 import { driftedGaps, entries, togetherPairs } from './farahead.mjs';
 import { ahead, distinctValues, rebuildRoute, staleReads, syntheticTrack, townDetour, ON_ROUTE_TOLERANCE } from './rebuild.mjs';
 
