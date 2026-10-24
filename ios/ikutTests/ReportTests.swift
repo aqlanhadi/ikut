@@ -148,6 +148,13 @@ struct ReportToastModelTests {
         #expect(service.undone == ["event-2"])
     }
 
+    @Test func submitBumpsSubmittedCountOnce() async {
+        let toast = model(FakeReportService())
+        #expect(toast.submittedCount == 0)
+        await toast.submit(debris(), context: context, snapshot: snapshot).value
+        #expect(toast.submittedCount == 1)
+    }
+
     @Test func reportFailureIsSurfaced() async {
         let service = FakeReportService()
         service.failReport = URLError(.notConnectedToInternet)

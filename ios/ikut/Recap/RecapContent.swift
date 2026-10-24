@@ -36,6 +36,8 @@ struct RecapContent: View {
     var onSelect: ((RecapTimelineItem) -> Void)?
     var onDone: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .title) private var statValueSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .headline) private var statUnitSize: CGFloat = 17
 
     /// At the largest text sizes the sheet's tiles and awards go one to a row (the screen keeps two).
     private var columns: Int { layout == .sheet && typeSize.isAccessibilitySize ? 1 : 2 }
@@ -127,10 +129,10 @@ struct RecapContent: View {
     private func statTile(_ s: RecapStat) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xxs) {
             Text(s.label).font(.footnote).foregroundStyle(.secondary)
-            (Text(s.value).font(.system(size: 28, weight: .bold, design: .rounded))
-                + Text(s.unit.isEmpty ? "" : " \(s.unit)").font(.system(size: 17, weight: .semibold)).foregroundStyle(.secondary))
+            (Text(s.value).font(.system(size: ScaledSize.capped(statValueSize, base: 28, cap: 1.6), weight: .bold, design: .rounded))
+                + Text(s.unit.isEmpty ? "" : " \(s.unit)").font(.system(size: ScaledSize.capped(statUnitSize, base: 17, cap: 1.6), weight: .semibold)).foregroundStyle(.secondary))
                 .monospacedDigit()
-            Text(s.note.isEmpty ? " " : s.note).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+            Text(s.note.isEmpty ? " " : s.note).font(.footnote).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.cozy)

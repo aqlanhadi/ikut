@@ -96,8 +96,7 @@ struct ReportSheet: View {
                     .background(option.tint, in: Circle())
                 Text(option.label)
                     .font(.headline)
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
+                    .wrapsAtAccessibilitySizes(lines: 2)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, Spacing.m)
@@ -114,8 +113,7 @@ struct ReportSheet: View {
         Button { send(option) } label: {
             Text(option.label)
                 .font(.subheadline.weight(.semibold))
-                .minimumScaleFactor(0.8)
-                .lineLimit(1)
+                .wrapsAtAccessibilitySizes(lines: 2)
                 .frame(maxWidth: .infinity, minHeight: 60)
                 .ikutSurface(.quaternary, radius: Radius.tile)
                 .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
@@ -127,7 +125,6 @@ struct ReportSheet: View {
 
     private func send(_ option: ReportOption) {
         guard let pinned else { return }
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         toast.submit(option, context: context, snapshot: pinned)
         onReported(option.type)
         dismiss()
