@@ -59,3 +59,24 @@ enum ConvoyEndName {
 
     static func lineLimit(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 2 }
 }
+
+// MARK: - Palette
+
+enum MapPalette {
+    /// Fills under white labels (Report, the progress bar): the same blue in both modes on purpose, since the
+    /// lighter dark-mode blue would put a white label under 4.5:1.
+    static let accent = Color(red: 0, green: 113 / 255, blue: 227 / 255)
+    /// The route line and its edge read against map imagery in both modes, so they stay one value.
+    static let route = Color(red: 10 / 255, green: 132 / 255, blue: 1)
+    static let routeCasing = Color(red: 0, green: 96 / 255, blue: 223 / 255)
+    /// The system green (the same 34C759 in light, a lighter one in dark).
+    static let live = Color.green
+    /// The warning orange-red, with the lighter orange in dark that the rest of the app uses.
+    static let warning = Color.ikutWarning
+    /// Stale-car chip text: the warning red on light, a lighter orange on dark so it stays legible.
+    static let staleChipText = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1, green: 159 / 255, blue: 10 / 255, alpha: 1)
+            : UIColor(red: 176 / 255, green: 40 / 255, blue: 0, alpha: 1)
+    })
+}

@@ -1,33 +1,5 @@
 import SwiftUI
 
-extension TripMapModel {
-    /// Meters from my car to a hazard along the main route, carried forward from my last fix at my
-    /// speed so it counts down between fixes. Nil when the hazard isn't on the main route or my car
-    /// isn't in the convoy yet. Negative once passed.
-    func approachDistance(eventId: String, now: Date = Date()) -> Double? {
-        guard let hazard = hazards.markers.first(where: { $0.id == eventId })?.mainOffset,
-              let mine = myOffsetNow(now: now) else { return nil }
-        return hazard - mine
-    }
-
-    /// My car's offset on the main route, carried forward from my last fix at my speed (at most 30 s), and
-    /// only while that fix is fresh: a fix older than `HazardLogic.Config.staleAfter` is returned as it was.
-    func myOffsetNow(now: Date = Date()) -> Double? {
-        guard let me = convoy.myEntry else { return nil }
-        var mine = me.convoyOffset
-        if let at = me.position.updatedAt, !me.isPaused, now.timeIntervalSince(at) <= HazardLogic.Config.default.staleAfter {
-            mine += me.speed * min(max(now.timeIntervalSince(at), 0), 30)
-        }
-        return mine
-    }
-
-    /// Seconds to cover `distance` at my current speed; nil when unknown or barely moving.
-    func secondsToCover(_ distance: Double) -> Double? {
-        guard let me = convoy.myEntry, me.speed > 1 else { return nil }
-        return distance / me.speed
-    }
-}
-
 /// The hazard ahead while its approach alert is up (MapHazard.dc.html), with a live distance; the
 /// map frames my car and the hazard meanwhile. Tap to frame them again after moving the map.
 struct ApproachPill: View {
