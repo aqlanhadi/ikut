@@ -5,13 +5,15 @@
 //   (out defaults to ios/ikut/Resources/places.json)
 //
 // Rebuild monthly:
-//   mkdir -p /tmp/osm-dl && curl -L -o /tmp/osm-dl/malaysia.osm.pbf \
+//   mkdir -p /tmp/osm-dl && curl -L -R -o /tmp/osm-dl/malaysia.osm.pbf \
 //     https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf
 //   node tools/osm/extract.mjs /tmp/osm-dl/malaysia.osm.pbf && rm -r /tmp/osm-dl
 //
+// generatedAt is the data's own time (the header's replication timestamp, else the file's date), so the same
+// download built twice gives the same file; the hosted refresh compares it.
 // Pure node: pbf.mjs reads the file, places.mjs (the tested reference of the app's place logic) turns elements into
 // places and works out each place's slip roads, and this file writes only what the app reads. Three passes over
-// the download (relations, ways, nodes); about two minutes and under 1 GB of memory.
+// the download (relations, ways, nodes); about 25 to 40 seconds and under 2 GB of memory.
 //
 // File shape (all coordinates [latitude, longitude], 5 decimals, about 1 m):
 //   {version, generatedAt, source, license,
@@ -26,7 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readPbf } from './pbf.mjs';
+import { readPbf, readPbfTimestamp } from './pbf.mjs';
 import { toPlaces, roadIndex, slipRoads, distanceToRing } from './places.mjs';
 import { haversine } from '../../qa/lib/route.mjs';
 
@@ -196,6 +198,7 @@ export function buildFile(elements, { generatedAt = new Date().toISOString(), so
   const sites = [], fuel = [];
   for (const p of all) {
     if (p.kind === 'fuel') {
+      // Ids: sites keep OSM's `way/123`, `relation/123`, `node/123`; a lone pump is `n123`, `w123` or `r123`.
       fuel.push([p.id.replace('node/', 'n').replace('way/', 'w').replace('relation/', 'r'), ...rc(p.coordinate), p.name]);
       continue;
     }
@@ -232,7 +235,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!pbf) { console.error('usage: extract.mjs <malaysia.osm.pbf> [out.json]'); process.exit(64); }
   const started = Date.now();
   const elements = readElements(pbf, (m) => console.log(`${((Date.now() - started) / 1000).toFixed(0)}s ${m}`));
-  const file = buildFile(elements, { generatedAt: new Date(fs.statSync(pbf).mtime).toISOString() });
+  const file = buildFile(elements, { generatedAt: readPbfTimestamp(pbf) ?? new Date(fs.statSync(pbf).mtime).toISOString() });
   fs.writeFileSync(out, serialize(file));
   // The licence readme travels with the file (the bundle, and the hosted copy).
   fs.copyFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'README-places.md'), path.join(path.dirname(out), 'README-places.md'));

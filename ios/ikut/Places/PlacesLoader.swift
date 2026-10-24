@@ -10,6 +10,8 @@ enum PlacesLoader {
         case unsupportedVersion(Int)
     }
 
+    private struct Versioned: Decodable { var version: Int }
+
     /// The file inside the app bundle: works with no signal.
     static func bundled(_ bundle: Bundle = .main) throws -> PlacesFile {
         guard let url = bundle.url(forResource: "places", withExtension: "json") else { throw LoadError.missing }
@@ -23,9 +25,10 @@ enum PlacesLoader {
     static func decode(_ data: Data) throws -> PlacesFile {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601WithFractionalSeconds
-        let file = try decoder.decode(PlacesFile.self, from: data)
-        guard file.version <= PlacesFile.supportedVersion else { throw LoadError.unsupportedVersion(file.version) }
-        return file
+        // The version first: a newer file may have a different shape, and must be refused for that, not misread.
+        let version = try decoder.decode(Versioned.self, from: data).version
+        guard version <= PlacesFile.supportedVersion else { throw LoadError.unsupportedVersion(version) }
+        return try decoder.decode(PlacesFile.self, from: data)
     }
 }
 

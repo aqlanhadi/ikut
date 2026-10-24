@@ -15,6 +15,21 @@ struct PlacesFile: Decodable, Sendable {
     /// Fuel stations that are not part of a services area (a town pump, or one mapped on its own), by latitude.
     var fuel: [FuelStation]
 
+    private enum CodingKeys: String, CodingKey { case version, generatedAt, source, license, sites, fuel }
+
+    /// A hosted file may be newer than the app in what it lists (a new kind of place, a new facility), never in its
+    /// shape (that is a `version` bump). A site of a kind this build does not know is skipped, as is an unknown
+    /// facility on a site, instead of the whole file being refused.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(Int.self, forKey: .version)
+        generatedAt = try c.decode(Date.self, forKey: .generatedAt)
+        source = try c.decode(String.self, forKey: .source)
+        license = try c.decode(String.self, forKey: .license)
+        sites = try c.decode([MaybeSite].self, forKey: .sites).compactMap(\.site)
+        fuel = try c.decode([FuelStation].self, forKey: .fuel)
+    }
+
     /// The newest file format this build reads. A hosted file with a higher `version` is ignored.
     static let supportedVersion = 1
 }
@@ -24,6 +39,14 @@ enum PlaceSiteKind: String, Decodable, Sendable {
     case services
     /// `highway=rest_area`: parking and maybe toilets, no fuel.
     case restArea = "rest_area"
+}
+
+/// One entry of `sites`: nil for a kind this build does not know.
+private struct MaybeSite: Decodable {
+    var site: PlaceSite?
+    init(from decoder: any Decoder) throws {
+        do { site = try PlaceSite(from: decoder) } catch is PlaceSite.UnknownKind { site = nil }
+    }
 }
 
 enum PlaceFacility: String, Decodable, Sendable {
@@ -47,16 +70,19 @@ struct PlaceSite: Decodable, Sendable, Identifiable {
     var entries: [PlaceSlipRoad]
     var exits: [PlaceSlipRoad]
 
+    struct UnknownKind: Error {}
+
     private enum CodingKeys: String, CodingKey { case id, kind, name, at, ring, facilities, brands, entries, exits }
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
-        kind = try c.decode(PlaceSiteKind.self, forKey: .kind)
+        guard let kind = PlaceSiteKind(rawValue: try c.decode(String.self, forKey: .kind)) else { throw UnknownKind() }
+        self.kind = kind
         name = try c.decodeIfPresent(String.self, forKey: .name)
         coordinate = try c.decode(CoordinatePair.self, forKey: .at).coordinate
         ring = try c.decodeIfPresent([CoordinatePair].self, forKey: .ring)?.map(\.coordinate)
-        facilities = Set(try c.decode([PlaceFacility].self, forKey: .facilities))
+        facilities = Set(try c.decode([String].self, forKey: .facilities).compactMap(PlaceFacility.init(rawValue:)))
         brands = try c.decodeIfPresent([String].self, forKey: .brands) ?? []
         entries = try c.decodeIfPresent([PlaceSlipRoad].self, forKey: .entries) ?? []
         exits = try c.decodeIfPresent([PlaceSlipRoad].self, forKey: .exits) ?? []

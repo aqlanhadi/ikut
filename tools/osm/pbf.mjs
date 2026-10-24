@@ -164,6 +164,20 @@ function decodeBlock(buf, want) {
   }
 }
 
+/**
+ * When the data was current: the header's `osmosis_replication_timestamp` (seconds, same for every download of the
+ * same Geofabrik file), as an ISO string, or null when the header has none.
+ */
+export function readPbfTimestamp(file) {
+  for (const [type, data] of blobs(file)) {
+    if (type !== 'OSMHeader') continue;
+    let seconds = null;
+    new Reader(data).fields((f, w, r) => { if (f === 32) seconds = r.varint(); else return false; });
+    return seconds === null ? null : new Date(seconds * 1000).toISOString();
+  }
+  return null;
+}
+
 /** Reads the whole file once, calling `want.nodes`, `want.ways` and `want.relations` for the kinds given. */
 export function readPbf(file, want) {
   for (const [type, data] of blobs(file)) {

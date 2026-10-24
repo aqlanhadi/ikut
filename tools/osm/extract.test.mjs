@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { readPbf } from './pbf.mjs';
+import { readPbf, readPbfTimestamp } from './pbf.mjs';
 import { joinRing, simplifyRing, buildFile, serialize, readElements } from './extract.mjs';
 
 // ---------------------------------------------------------------- a tiny protobuf writer
@@ -26,34 +26,56 @@ const len = (num, buf) => field(num, 2, Buffer.concat([varint(buf.length), buf])
 const packed = (num, values, signed) => len(num, Buffer.concat(values.map((v) => varint(signed ? zigzag(v) : v))));
 const delta = (xs) => xs.map((x, i) => x - (i ? xs[i - 1] : 0));
 
-function pbfFile(strings, group) {
+function pbfFile(strings, group, { raw = false } = {}) {
   const block = Buffer.concat([
     len(1, Buffer.concat(strings.map((s) => len(1, Buffer.from(s))))),
     len(2, group),
   ]);
-  const blob = Buffer.concat([field(2, 0, varint(block.length)), len(3, zlib.deflateSync(block))]);
+  const blob = raw ? Buffer.concat([len(1, block), field(2, 0, varint(block.length))])
+    : Buffer.concat([field(2, 0, varint(block.length)), len(3, zlib.deflateSync(block))]);
   const header = Buffer.concat([len(1, Buffer.from('OSMData')), field(3, 0, varint(blob.length))]);
   const size = Buffer.alloc(4);
   size.writeUInt32BE(header.length);
   return Buffer.concat([size, header, blob]);
 }
 
-// Strings: 0 is the empty one. Two nodes (ids 100, 105) the second tagged amenity=fuel, then a way and a relation.
-const STRINGS = ['', 'amenity', 'fuel', 'highway', 'services', 'type', 'multipolygon', 'outer'];
+/** An OSMHeader block carrying only the replication timestamp (field 32). */
+function headerFile(seconds) {
+  const block = field(32, 0, varint(seconds));
+  const blob = Buffer.concat([field(2, 0, varint(block.length)), len(3, zlib.deflateSync(block))]);
+  const header = Buffer.concat([len(1, Buffer.from('OSMHeader')), field(3, 0, varint(blob.length))]);
+  const size = Buffer.alloc(4);
+  size.writeUInt32BE(header.length);
+  return Buffer.concat([size, header, blob]);
+}
+
+// Block 1 (compressed): dense nodes going DOWN in id, latitude and longitude, so every delta is negative after
+// the first: node 105 (tagged amenity=fuel) then node 100.
+const STRINGS = ['', 'amenity', 'fuel'];
 const LAT = (d) => Math.round(d * 1e7); // granularity 100 nano-degrees: units of 1e-7 degrees
+// Block 2 (raw, uncompressed): a plain, non-dense node south of the equator (negative latitude) tagged
+// amenity=toilets; a way whose refs go back and forth; a relation whose member ids go down.
+const STRINGS2 = ['', 'amenity', 'toilets', 'type', 'multipolygon', 'highway', 'services', 'outer'];
 function sample() {
   const dense = Buffer.concat([
-    packed(1, delta([100, 105]), true),
-    packed(8, delta([LAT(3.5), LAT(3.6)]), true),
-    packed(9, delta([LAT(101.5), LAT(101.6)]), true),
-    packed(10, [0, 1, 2, 0], false), // node 100 has no tags; node 105 has amenity=fuel
+    packed(1, delta([105, 100]), true),
+    packed(8, delta([LAT(3.6), LAT(3.5)]), true),
+    packed(9, delta([LAT(101.6), LAT(101.5)]), true),
+    packed(10, [1, 2, 0, 0], false), // node 105 has amenity=fuel; node 100 has no tags
   ]);
-  const way = Buffer.concat([field(1, 0, varint(7)), packed(8, delta([100, 105, 105, 100]), true)]);
+  const plain = Buffer.concat([
+    field(1, 0, varint(zigzag(90))), packed(2, [1], false), packed(3, [2], false),
+    field(8, 0, varint(zigzag(LAT(-1.25)))), field(9, 0, varint(zigzag(LAT(100.5)))),
+  ]);
+  const way = Buffer.concat([field(1, 0, varint(7)), packed(8, delta([105, 100, 100, 105]), true)]);
   const relation = Buffer.concat([
-    field(1, 0, varint(9)), packed(2, [5, 3], false), packed(3, [6, 4], false),
-    packed(8, [7], false), packed(9, delta([7]), true), packed(10, [1], false),
+    field(1, 0, varint(9)), packed(2, [3, 5], false), packed(3, [4, 6], false),
+    packed(8, [7, 7], false), packed(9, delta([7, 3]), true), packed(10, [1, 1], false),
   ]);
-  return pbfFile(STRINGS, Buffer.concat([len(2, dense), len(3, way), len(4, relation)]));
+  return Buffer.concat([
+    pbfFile(STRINGS, len(2, dense)),
+    pbfFile(STRINGS2, Buffer.concat([len(1, plain), len(3, way), len(4, relation)]), { raw: true }),
+  ]);
 }
 
 function tmp(name, data) {
@@ -67,23 +89,32 @@ test('the pbf reader decodes dense nodes, ways and relations, and skips the kind
   const file = tmp('s.pbf', sample());
   const nodes = [], ways = [], relations = [];
   readPbf(file, { nodes: (n) => nodes.push(n), ways: (w) => ways.push(w), relations: (r) => relations.push(r) });
-  assert.equal(nodes.length, 2);
-  assert.deepEqual(nodes.map((n) => n.id), [100, 105]);
-  assert.ok(Math.abs(nodes[1].lat - 3.6) < 1e-7 && Math.abs(nodes[1].lon - 101.6) < 1e-7);
-  assert.deepEqual(nodes[0].tags, {});
-  assert.deepEqual(nodes[1].tags, { amenity: 'fuel' });
-  assert.deepEqual(ways, [{ id: 7, refs: [100, 105, 105, 100], tags: {} }]);
-  assert.deepEqual(relations, [{ id: 9, tags: { type: 'multipolygon', highway: 'services' }, members: [{ type: 'way', ref: 7, role: 'outer' }] }]);
+  assert.deepEqual(nodes.map((n) => n.id), [105, 100, 90]);
+  assert.ok(Math.abs(nodes[0].lat - 3.6) < 1e-7 && Math.abs(nodes[0].lon - 101.6) < 1e-7);
+  assert.ok(Math.abs(nodes[1].lat - 3.5) < 1e-7 && Math.abs(nodes[1].lon - 101.5) < 1e-7);
+  assert.ok(Math.abs(nodes[2].lat + 1.25) < 1e-7 && Math.abs(nodes[2].lon - 100.5) < 1e-7);
+  assert.deepEqual(nodes.map((n) => n.tags), [{ amenity: 'fuel' }, {}, { amenity: 'toilets' }]);
+  assert.deepEqual(ways, [{ id: 7, refs: [105, 100, 100, 105], tags: {} }]);
+  assert.deepEqual(relations, [{
+    id: 9, tags: { type: 'multipolygon', highway: 'services' },
+    members: [{ type: 'way', ref: 7, role: 'outer' }, { type: 'way', ref: 3, role: 'outer' }],
+  }]);
   const only = [];
   readPbf(file, { relations: (r) => only.push(r.id) });
   assert.deepEqual(only, [9]);
   fs.rmSync(path.dirname(file), { recursive: true });
 });
 
+test('the header timestamp is the data time, not the file time', () => {
+  const file = tmp('h.pbf', Buffer.concat([headerFile(1_761_264_000), sample()]));
+  assert.equal(readPbfTimestamp(file), '2025-10-24T00:00:00.000Z');
+  assert.equal(readPbfTimestamp(tmp('s.pbf', sample())), null);
+});
+
 test('readElements turns a download into elements: a multipolygon area and a pump node, not its bare outline way', () => {
   const file = tmp('s.pbf', sample());
   const elements = readElements(file);
-  assert.deepEqual(elements.map((e) => `${e.type}/${e.id}`).sort(), ['node/105', 'relation/9']);
+  assert.deepEqual(elements.map((e) => `${e.type}/${e.id}`).sort(), ['node/105', 'node/90', 'relation/9']);
   const rel = elements.find((e) => e.type === 'relation');
   assert.equal(rel.geometry.length, 4);
   fs.rmSync(path.dirname(file), { recursive: true });

@@ -71,9 +71,53 @@ struct PlacesTests {
         #expect(file.generatedAt.timeIntervalSince1970 > 1_700_000_000)
     }
 
+    /// The error's case, whatever it carries.
+    func loadError(_ body: () throws -> Void) -> PlacesLoader.LoadError? {
+        do { try body() } catch let error as PlacesLoader.LoadError { return error } catch {}
+        return nil
+    }
+
     @Test func aNewerFormatIsRefusedNotMisread() {
         let json = #"{"version":2,"generatedAt":"2026-10-24T03:14:15Z","source":"x","license":"x","sites":[],"fuel":[]}"#
         #expect(throws: PlacesLoader.LoadError.self) { try PlacesLoader.decode(Data(json.utf8)) }
+        // A different shape is still "unsupported", not a missing key.
+        let reshaped = #"{"version":2,"places":[{"id":1}],"stamp":5}"#
+        guard case .unsupportedVersion(let v) = loadError({ _ = try PlacesLoader.decode(Data(reshaped.utf8)) }) else {
+            Issue.record("expected unsupportedVersion"); return
+        }
+        #expect(v == 2)
+    }
+
+    @Test func unknownValuesAreSkippedNotFatal() throws {
+        let json = """
+        {"version":1,"generatedAt":"2026-10-24T03:14:15Z","source":"x","license":"x",
+         "sites":[{"id":"way/1","kind":"services","name":"A","at":[3.5,101.5],"facilities":["fuel","hot-tub","ev"]},
+                  {"id":"way/2","kind":"ferry_terminal","name":"B","at":[3.6,101.5],"facilities":["fuel"]},
+                  {"id":"way/3","kind":"rest_area","name":"C","at":[3.7,101.5],"facilities":[]}],"fuel":[]}
+        """
+        let file = try PlacesLoader.decode(Data(json.utf8))
+        #expect(file.sites.map(\.id) == ["way/1", "way/3"])
+        #expect(file.sites[0].facilities == [.fuel, .ev])
+    }
+
+    @Test func aMissingBundleFileIsMissing() {
+        let empty = FileManager.default.temporaryDirectory.appendingPathComponent("empty-\(UUID().uuidString).bundle")
+        try? FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: empty) }
+        guard let bundle = Bundle(url: empty) else { Issue.record("no bundle"); return }
+        guard case .missing = loadError({ _ = try PlacesLoader.bundled(bundle) }) else {
+            Issue.record("expected missing"); return
+        }
+    }
+
+    @Test func aFileThatIsNotThereOrIsCutShortThrows() throws {
+        let dir = FileManager.default.temporaryDirectory
+        #expect(throws: (any Error).self) { try PlacesLoader.load(from: dir.appendingPathComponent("nope-\(UUID().uuidString).json")) }
+        let whole = try Data(contentsOf: #require(Bundle.main.url(forResource: "places", withExtension: "json")))
+        let cut = dir.appendingPathComponent("cut-\(UUID().uuidString).json")
+        try whole.prefix(whole.count / 2).write(to: cut)
+        defer { try? FileManager.default.removeItem(at: cut) }
+        #expect(throws: (any Error).self) { try PlacesLoader.load(from: cut) }
     }
 
     @Test func aBrokenFileThrows() {

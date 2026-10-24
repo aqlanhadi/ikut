@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-10-24T02:14:21.079Z","source":"Geofabrik","license":"Contains data from OpenStreetMap, ODbL 1.0, https://www.openstreetmap.org/copyright",
+{"version":1,"generatedAt":"2026-10-22T20:21:33.000Z","source":"Geofabrik","license":"Contains data from OpenStreetMap, ODbL 1.0, https://www.openstreetmap.org/copyright",
 "sites":[
 {"id":"way/1253780531","kind":"services","name":null,"at":[1.1703,111.65856],"facilities":["food"],"ring":[[1.17177,111.65878],[1.1717,111.65926],[1.16863,111.65875],[1.16851,111.65847],[1.16974,111.65786],[1.17143,111.65824],[1.17177,111.65878]]},
 {"id":"node/5624708622","kind":"rest_area","name":null,"at":[1.28628,103.78862],"facilities":[]},

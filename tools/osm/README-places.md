@@ -15,8 +15,9 @@ PLUS, Apple or any other source.
 
 From the Geofabrik download `malaysia-singapore-brunei-latest.osm.pbf`
 (<https://download.geofabrik.de/asia/malaysia-singapore-brunei.html>, itself ODbL), by `tools/osm/extract.mjs` in
-the ikut repository, about once a month, in one command (node only, no other install):
+the ikut repository, about once a month (node only, no other install; about 25 to 40 seconds and under 2 GB of memory):
 
+    curl -L -R -o malaysia-singapore-brunei-latest.osm.pbf https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf
     node tools/osm/extract.mjs <malaysia-singapore-brunei-latest.osm.pbf>
 
 It keeps `highway=services`, `highway=rest_area` and `amenity=fuel`, and the `toilets` and `charging_station`
@@ -25,6 +26,6 @@ points inside them; the slip roads are the one-way `service` and `motorway_link`
 
 ## Format
 
-`version`, `generatedAt`, `source`, `license`, then `sites` (objects: `id`, `kind`, `name`, `at` `[lat, lon]`,
+`version`, `generatedAt` (the data's own time, so the same download gives the same file), `source`, `license`, then `sites` (objects: `id`, `kind`, `name`, `at` `[lat, lon]`,
 `ring`, `facilities`, `brands`, `entries`, `exits`) and `fuel` (`[id, lat, lon, name]` per lone fuel station). A
 slip road is `[junctionLat, junctionLon, bearing, gateLat, gateLon, meters]`.
