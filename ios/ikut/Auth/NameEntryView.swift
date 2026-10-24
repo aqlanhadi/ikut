@@ -69,6 +69,8 @@ struct NameEntryView: View {
                 }
             }
         }
+        // Like Cancel: a swipe or a tap outside mid sign-in would drop the Create or Join that follows.
+        .interactiveDismissDisabled(isWorking)
         .onAppear { focused = true }
     }
 
