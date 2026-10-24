@@ -43,14 +43,16 @@ struct MapMarker: Identifiable, Equatable, Sendable {
     /// Still on its own route, not merged into the convoy yet.
     var isJoining: Bool
     var isMine: Bool
+    /// For my own marker: my phone is online, so the "You" tag is green (yellow when not).
+    var youOnline = true
     /// The tracker paused sharing (and the pause has not expired). Shown instead of the age.
     var isPaused = false
     /// Reached the destination: the badge shows a small check.
     var hasArrived = false
 
-    /// "Me" for my car; "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
+    /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
     var label: String {
-        var parts = [isMine ? ConvoyFormat.me : MapMarkerBuilder.shortName(name)]
+        var parts = [MapMarkerBuilder.shortName(name)]
         if isJoining { parts.append("joining") }
         if isPaused {
             parts.append("Paused")

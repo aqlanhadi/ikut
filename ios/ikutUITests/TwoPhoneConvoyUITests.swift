@@ -313,7 +313,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             mark("b.map")
             try waitMark("go", timeout: 120)
             try waitFor("convoy order 1, 3, 2, 4", timeout: 120) { convoyOrder() == [1, 3, 2, 4] }
-            XCTAssertTrue(element("convoy.row.2").label.hasPrefix("Me"), "row 2 should be this phone's car: \(element("convoy.row.2").label)")
+            XCTAssertTrue(element("convoy.row.2").label.contains("Wyna"), "row 2 should be this phone's car: \(element("convoy.row.2").label)")
             shot("03-map-order")
             mark("b.order")
         }

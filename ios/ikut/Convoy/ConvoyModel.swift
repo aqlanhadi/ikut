@@ -19,7 +19,7 @@ struct ConvoyRowText: Equatable, Identifiable, Sendable {
     var trailingSecondary: String
     var isStale: Bool
     var isSeparated: Bool
-    /// The row is the viewer's own car: its name reads "Me".
+    /// The row is the viewer's own car: it gets the "You" tag after its name.
     var isMine = false
     /// Reached the destination: the trailing column shows an "Arrived" pill.
     var hasArrived = false
@@ -271,7 +271,7 @@ final class ConvoyModel {
 
     var convoyRows: [ConvoyRowText] { convoyRows(myCarId: myCarId) }
 
-    /// The rows, with the viewer's own car named "Me". A car more than 2 km from the viewer's along the
+    /// The rows, with the viewer's own car marked `isMine`. A car more than 2 km from the viewer's along the
     /// route says how far instead of its speed: "38 km ahead · parked near Rawang", "12 km behind".
     func convoyRows(myCarId: String?) -> [ConvoyRowText] {
         convoy.map { e in
@@ -299,7 +299,7 @@ final class ConvoyModel {
                 } ?? (aheadOfReference ? "" : "Calculating ETA")
             }
             return ConvoyRowText(
-                id: e.id, number: e.car.number, name: mine ? ConvoyFormat.me : e.car.name, color: e.car.color,
+                id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
                 subtitle: subtitle, subtitleIsWarning: e.isStale,
                 trailingPrimary: primary, trailingSecondary: secondary,
                 isStale: e.isStale, isSeparated: !e.hasArrived && (e.gap?.hasDrifted ?? false),
@@ -339,7 +339,7 @@ final class ConvoyModel {
     func joiningRows(myCarId: String?) -> [JoiningRowText] {
         joining.map { e in
             JoiningRowText(
-                id: e.id, number: e.car.number, name: e.id == myCarId ? ConvoyFormat.me : e.car.name, color: e.car.color,
+                id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
                 subtitle: e.isPaused
                     ? ConvoyFormat.paused
                     : e.isStale

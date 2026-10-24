@@ -156,12 +156,13 @@ enum MapDemo {
         return model
     }
 
-    static func view(expanded: Bool = false) -> some View {
+    static func view(expanded: Bool = false, online: Bool = true) -> some View {
         Backend.configure()
         let env = ProcessInfo.processInfo.environment
         let five = env["IKUT_MAP_DEMO_CARS"] == "5"
         let gallery = env["IKUT_MAP_DEMO_BANNERS"] != nil
         let model = model(fiveCars: five, parked: env["IKUT_MAP_DEMO_PARKED"])
+        model.networkUp = online
         // IKUT_MAP_DEMO_STOP picks what the stop screens show (see `stopBoard`); IKUT_MAP_DEMO_NO_STOP
         // shows none. IKUT_MAP_DEMO_CARD opens the stop card (or one of its screens), and
         // IKUT_MAP_DEMO_EXPANDED=1 unfolds the panel, IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.

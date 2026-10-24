@@ -657,12 +657,12 @@ extension ConvoyTests {
         #expect(ConvoyFormat.toGo(remaining: 850, travelTime: nil, arrived: false) == "850 m to go")
     }
 
-    @MainActor @Test func rowsNameMyCarMeAndShowArrived() {
+    @MainActor @Test func rowsKeepMyCarsNameAndShowArrived() {
         let m = makeModel(MockETA(), Clock())
         m.setMainRoute(Self.main)
         m.update(cars: [car("1"), car("2")], positions: ["1": pos(offset: 19_950), "2": pos(offset: 15_000)])
         let rows = m.convoyRows(myCarId: "2")
-        #expect(rows.map(\.name) == ["Car 1", "Me"])
+        #expect(rows.map(\.name) == ["Car 1", "Car 2"])
         #expect(rows.map(\.isMine) == [false, true])
         #expect(rows[0].hasArrived)
         #expect(rows[0].trailingPrimary == "Arrived")
@@ -670,10 +670,10 @@ extension ConvoyTests {
         #expect(m.convoyRows.map(\.name) == ["Car 1", "Car 2"])
     }
 
-    @Test func myMarkerReadsMeAndArrivedMarkerIsFlagged() {
+    @Test func myMarkerKeepsItsNameAndArrivedMarkerIsFlagged() {
         let s = order([car("1"), car("2")], ["1": pos(offset: 19_950), "2": pos(offset: 15_000)], main: Self.main)
         let markers = MapMarkerBuilder.markers(from: s, myCarId: "1", now: Self.now)
-        #expect(markers[0].label == "Me")
+        #expect(markers[0].label == "Car 1")
         #expect(markers[0].hasArrived)
         #expect(markers[1].label == "Car 2")
         #expect(!markers[1].hasArrived)

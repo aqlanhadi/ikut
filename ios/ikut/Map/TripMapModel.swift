@@ -38,6 +38,8 @@ final class TripMapModel {
     /// The phone's own fix, while it is being streamed (not the tracker).
     var device: DeviceFix?  // set by the location stream; tests set it directly
     private(set) var isEnded = false
+    /// This phone has a network path (`NetworkStatus`, after its hold); with my car's freshness it makes the "You" tag.
+    var networkUp = true
     /// The trip has started (`startedAt`): stops can then be left, and the lead car marks when it arrived.
     var tripStarted = false
     /// The trip's organizer (user id), for naming who can skip a stop for everyone.
@@ -315,7 +317,19 @@ final class TripMapModel {
     // MARK: Outputs
 
     var markers: [MapMarker] {
-        MapMarkerBuilder.markers(from: convoy.snapshot, myCarId: myCarId)
+        let online = youOnline
+        return MapMarkerBuilder.markers(from: convoy.snapshot, myCarId: myCarId).map {
+            var marker = $0
+            if marker.isMine { marker.youOnline = online }
+            return marker
+        }
+    }
+
+    /// Whether my phone counts as online: a network path and, as the tracker, a car that is not stale.
+    var youOnline: Bool {
+        let mine = convoy.convoy.first { $0.id == myCarId }?.isStale
+            ?? convoy.joining.first { $0.id == myCarId }?.isStale ?? false
+        return YouOnline.isOnline(pathUp: networkUp, isTracker: isTracker, carStale: mine)
     }
 
     var overlays: [RouteOverlay] {

@@ -338,12 +338,12 @@ struct ConvoyPanel: View {
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 { Divider().padding(.leading, 44) }
-                ConvoyRowView(row: row)
+                ConvoyRowView(row: row, youOnline: model.youOnline)
             }
             // Joining cars follow in the same list; their dashed badges set them apart.
             ForEach(Array(convoy.joiningRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 || !convoy.convoyRows.isEmpty { Divider().padding(.leading, 44) }
-                JoiningRowView(row: row)
+                JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline)
             }
         }
     }
@@ -481,16 +481,13 @@ private struct RowBadge: View {
 
 struct ConvoyRowView: View {
     var row: ConvoyRowText
+    var youOnline = true
 
     var body: some View {
         HStack(spacing: Spacing.m) {
             RowBadge(number: row.number, colorHex: row.color)
             VStack(alignment: .leading, spacing: 0) {
-                if row.isMine {
-                    MeCapsule()
-                } else {
-                    Text(row.name).font(.body).lineLimit(1)
-                }
+                NameLine(name: row.name, mine: row.isMine, online: youOnline)
                 Text(row.subtitle)
                     .font(.footnote)
                     .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
@@ -524,26 +521,30 @@ struct ConvoyRowView: View {
     }
 }
 
-/// "Me" in a subtle blue capsule, for my own row.
-private struct MeCapsule: View {
+/// A car's name on one line; my own car gets the "You" tag after it. The name gives way, the tag never wraps.
+private struct NameLine: View {
+    var name: String
+    var mine: Bool
+    var online: Bool
+
     var body: some View {
-        Text(ConvoyFormat.me)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(MapPalette.accent)
-            .padding(.horizontal, Spacing.chipX)
-            .padding(.vertical, Spacing.xxs)
-            .background(MapPalette.accent.opacity(0.14), in: Capsule())
+        HStack(spacing: Spacing.xs) {
+            Text(name).font(.body).lineLimit(1)
+            if mine { YouTag(online: online).layoutPriority(1) }
+        }
     }
 }
 
 struct JoiningRowView: View {
     var row: JoiningRowText
+    var mine = false
+    var youOnline = true
 
     var body: some View {
         HStack(spacing: Spacing.m) {
             RowBadge(number: row.number, colorHex: row.color, dashed: true)
             VStack(alignment: .leading, spacing: 0) {
-                if row.name == ConvoyFormat.me { MeCapsule() } else { Text(row.name).font(.body).lineLimit(1) }
+                NameLine(name: row.name, mine: mine, online: youOnline)
                 Text(row.subtitle)
                     .font(.footnote)
                     .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
@@ -596,7 +597,7 @@ extension View {
             isMine: mine, hasArrived: arrived)
     }
     let rows = [
-        row("c1", 1, "#2563EB", ConvoyFormat.me, subtitle: "Lead · " + ConvoyFormat.speed(metersPerSecond: 96 / 3.6),
+        row("c1", 1, "#2563EB", "Aqlan’s car", subtitle: "Lead · " + ConvoyFormat.speed(metersPerSecond: 96 / 3.6),
             "Lead", ConvoyFormat.eta(Date().addingTimeInterval(3_000)), mine: true),
         row("c2", 2, "#D9480F", "Wyna’s X70", subtitle: ConvoyFormat.speed(metersPerSecond: 92 / 3.6),
             ConvoyFormat.distance(1_800), ConvoyFormat.behind(70)),
@@ -619,7 +620,7 @@ extension View {
             subtitle: ConvoyFormat.lastSeen(age: 300), subtitleIsWarning: true,
             trailingPrimary: "--", trailingSecondary: "to merge", isStale: true),
         JoiningRowText(
-            id: "c9", number: nil, name: ConvoyFormat.me, color: "#2563EB",
+            id: "c9", number: nil, name: "Aqlan’s car", color: "#2563EB",
             subtitle: "Waiting for location", subtitleIsWarning: false,
             trailingPrimary: "--", trailingSecondary: "to merge", isStale: false),
     ]
@@ -627,7 +628,7 @@ extension View {
         VStack(spacing: 0) {
             ForEach(rows) { ConvoyRowView(row: $0) }
             Divider().padding(.vertical, Spacing.s)
-            ForEach(joining) { JoiningRowView(row: $0) }
+            ForEach(joining) { JoiningRowView(row: $0, mine: $0.id == "c9", youOnline: false) }
         }
         .padding(Spacing.l)
     }
