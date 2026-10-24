@@ -269,7 +269,7 @@ struct RouteRebuilderTests {
     /// A retry still building with the old destination when the organizer picks a new one is stopped and waited
     /// for: the last write carries the new destination and a route to it.
     @Test func aNewDestinationIsNeverOverwrittenByARetryInFlight() async throws {
-        let roads = SlowStraightRoads()
+        let roads = SlowRoads()
         var writes: [(RouteRebuild.Result, DestinationResult?)] = []
         let rebuilder = RouteRebuilder(tripId: "t7", router: roads, defaults: defaults(), sleep: { _ in }) {
             writes.append(($0, $1))

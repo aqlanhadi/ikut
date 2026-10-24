@@ -27,3 +27,6 @@ func line(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D, step: Double
 
 /// `a` and `b` are within `tol` of each other.
 func close(_ a: Double, _ b: Double, _ tol: Double) -> Bool { abs(a - b) <= tol }
+
+/// Meters in one degree of latitude, for tests that place a car "n meters north" of a point.
+let metersPerDegree = 111_195.0
