@@ -121,6 +121,7 @@ final class TripSession {
         tracker.onFix = nil
         tracker.stop()
         removeListeners()
+        PlacesRefresher.tripRunning = false
     }
 
     /// Attaches the listeners; calling it again while running does nothing.

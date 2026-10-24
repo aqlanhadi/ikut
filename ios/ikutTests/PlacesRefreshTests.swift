@@ -52,7 +52,7 @@ struct PlacesRefreshTests {
         var defaults: UserDefaults
     }
 
-    static func rig(now: Date = Date(timeIntervalSince1970: 1_800_000_000), lastCheck: Date? = nil, bundled: PlacesFile = bundled) -> Rig {
+    static func rig(now: Date = Date(timeIntervalSince1970: 1_800_000_000), lastCheck: Date? = nil, bundled: PlacesFile = bundled, tripRunning: Bool = false) -> Rig {
         StubHosting.reset()
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubHosting.self]
@@ -60,9 +60,8 @@ struct PlacesRefreshTests {
         let store = PlacesStore(directory: dir)
         let defaults = UserDefaults(suiteName: "places-test-\(UUID().uuidString)")!
         if let lastCheck { defaults.set(lastCheck, forKey: PlacesRefresher.lastCheckKey) }
-        PlacesRefresher.tripRunning = false
         let refresher = PlacesRefresher(
-            session: URLSession(configuration: config), store: store, defaults: defaults, inApp: { bundled }, now: { now })
+            session: URLSession(configuration: config), store: store, defaults: defaults, inApp: { bundled }, now: { now }, tripRunning: { tripRunning })
         return Rig(refresher: refresher, store: store, defaults: defaults)
     }
 
@@ -186,12 +185,10 @@ struct PlacesRefreshTests {
     }
 
     @Test func noRequestWhileATripIsRunning() async {
-        let rig = Self.rig()
+        let rig = Self.rig(tripRunning: true)
         let data = Self.file()
         StubHosting.manifest = Self.manifest(for: data)
         StubHosting.file = data
-        PlacesRefresher.tripRunning = true
-        defer { PlacesRefresher.tripRunning = false }
         #expect(await rig.refresher.refreshIfDue() == false)
         #expect(StubHosting.requests.isEmpty)
     }

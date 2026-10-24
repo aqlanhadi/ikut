@@ -11,7 +11,7 @@ enum OurSide {
     /// Sites this close, of the same kind and name, are the two ways of one R&R.
     static let twinRadius: Double = 1_000
 
-    /// The places file in use, read once at launch: the newest valid of the one inside the app and the one the weekly
+    /// The places file in use, read once, at first use: the newest valid of the one inside the app and the one the weekly
     /// refresh downloaded (`PlacesSource`). Named for the bundle, which it is without a download.
     static let bundledFile: PlacesFile? = PlacesSource.current()
     static var bundledSites: [PlaceSite] { bundledFile?.sites ?? [] }

@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 
 /// Where the weekly refresh looks (Firebase Hosting, `firebase/hosting/places/`). The one place the address lives.
 enum PlacesHosting {
@@ -71,8 +72,13 @@ enum PlacesSource {
 final class PlacesRefresher: @unchecked Sendable {
     static let shared = PlacesRefresher()
 
-    /// True while a car is sharing its position: no refresh then. Set by `TripSession`.
-    nonisolated(unsafe) static var tripRunning = false
+    private static let tripFlag = OSAllocatedUnfairLock(initialState: false)
+    /// True while a car is sharing its position: no refresh then. Set by `TripSession`. The check runs once per
+    /// process, at app open, so this is read once; a trip that starts later is never interrupted by it.
+    static var tripRunning: Bool {
+        get { tripFlag.withLock { $0 } }
+        set { tripFlag.withLock { $0 = newValue } }
+    }
 
     static let interval: TimeInterval = 7 * 24 * 3600
     static let lastCheckKey = "placesLastCheck"
@@ -84,6 +90,7 @@ final class PlacesRefresher: @unchecked Sendable {
     private let defaults: UserDefaults
     private let inApp: @Sendable () -> PlacesFile?
     private let now: @Sendable () -> Date
+    private let tripRunning: @Sendable () -> Bool
     private let manifestURL: URL
     private let fileURL: URL
 
@@ -91,6 +98,7 @@ final class PlacesRefresher: @unchecked Sendable {
         session: URLSession? = nil, store: PlacesStore = .standard, defaults: UserDefaults = .standard,
         inApp: @escaping @Sendable () -> PlacesFile? = { try? PlacesLoader.bundled() },
         now: @escaping @Sendable () -> Date = { Date() },
+        tripRunning: @escaping @Sendable () -> Bool = { PlacesRefresher.tripRunning },
         manifestURL: URL = PlacesHosting.manifestURL, fileURL: URL = PlacesHosting.fileURL
     ) {
         if let session {
@@ -108,6 +116,7 @@ final class PlacesRefresher: @unchecked Sendable {
         self.defaults = defaults
         self.inApp = inApp
         self.now = now
+        self.tripRunning = tripRunning
         self.manifestURL = manifestURL
         self.fileURL = fileURL
     }
@@ -122,7 +131,7 @@ final class PlacesRefresher: @unchecked Sendable {
     /// was stored (for the tests).
     @discardableResult
     func refreshIfDue() async -> Bool {
-        guard !Self.tripRunning, isDue() else { return false }
+        guard !tripRunning(), isDue() else { return false }
         guard let bundled = inApp() else { return false }
         let inUse = PlacesSource.current(bundled: { bundled }, store: store) ?? bundled
         guard let manifest = await fetchManifest() else { return false }
