@@ -1,13 +1,15 @@
 import CoreLocation
 import SwiftUI
 
-/// The floating glass panel at the bottom of the map (Map.dc.html): FROM and TO with the arrival
+/// What Apple's own sheet at the bottom of the map holds (Map.dc.html): FROM and TO with the arrival
 /// time, a progress bar with every car and hazard on the route, spread / lead speed,
-/// one row per car (joining cars last, with dashed badges), then Report and Pit stop. Tap or drag
-/// the grabber to collapse it to FROM/TO, progress, a one-line summary and the buttons.
+/// one row per car (joining cars last, with dashed badges), then Report and Pit stop. Folded (the
+/// short detent) it is FROM/TO, progress, a one-line summary and the buttons; a tap on the header
+/// or the handle, or a drag of the sheet, unfolds it (the tall detent).
 ///
-/// A custom overlay rather than a `.sheet`: a sheet that is always up would stop the map from
-/// presenting the report sheet, and the mock's inset glass card is what this matches.
+/// The sheet (`TripMapView`, `PanelSheet`) is the surface and owns the sizes: this view only reports
+/// its own height (`onHeight`) so the detents follow it. The alerts the panel's buttons lead to are
+/// presented from the sheet, since a presented sheet blocks a presentation from the map under it.
 struct ConvoyPanel: View {
     var model: TripMapModel
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -20,6 +22,8 @@ struct ConvoyPanel: View {
     var onStop: () -> Void
     /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
     var onNextStop: (String) -> Void = { _ in }
+    /// The panel's own height as laid out (folded or unfolded), for the sheet's detents.
+    var onHeight: (CGFloat) -> Void = { _ in }
 
     @State private var listHeight: CGFloat = 0
     @State private var originName: String?
@@ -34,7 +38,7 @@ struct ConvoyPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            grabber
+            handle
             header
             progress
             if !expanded {
@@ -47,12 +51,8 @@ struct ConvoyPanel: View {
             buttons
         }
         .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.tight)
-        .padding(.bottom, Spacing.section)
-        .glassSurface()
-        .padding(.horizontal, Spacing.s)
-        .padding(.bottom, Spacing.s)
-        .animation(.snappy, value: expanded)
+        .padding(.bottom, Spacing.l)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { onHeight($0) }
         .task(id: originKey) {
             guard let start = model.mainRoute?.coordinates.first else { return }
             originName = await RouteBuilder.placeName(at: start)
@@ -128,18 +128,14 @@ struct ConvoyPanel: View {
 
     // MARK: Pieces
 
-    private var grabber: some View {
-        Capsule()
-            .fill(Color(.systemGray3))
-            .frame(width: 36, height: 5)
-            .frame(maxWidth: .infinity, minHeight: 20)
+    /// The strip under the sheet's own drag indicator: a tap on it folds or unfolds the list, and it is the
+    /// button VoiceOver and the UI tests find ("Expand convoy list").
+    private var handle: some View {
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: BottomSheet.indicatorRoom)
             .contentShape(Rectangle())
             .onTapGesture { expanded.toggle() }
-            .gesture(
-                DragGesture(minimumDistance: 12).onEnded { drag in
-                    if drag.translation.height > 20 { expanded = false }
-                    if drag.translation.height < -20 { expanded = true }
-                })
             .accessibilityElement()
             .accessibilityLabel(expanded ? "Collapse convoy list" : "Expand convoy list")
             .accessibilityAddTraits(.isButton)
@@ -188,6 +184,8 @@ struct ConvoyPanel: View {
         }
         .padding(.horizontal, Spacing.xs)
         .padding(.top, Spacing.xs)
+        .contentShape(Rectangle())
+        .onTapGesture { expanded.toggle() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ConvoyHeader.label(title: convoy.title, text: text, destination: destination, arrive: arrive))
         .accessibilityAddTraits(.isHeader)
@@ -564,14 +562,21 @@ struct JoiningRowView: View {
     @Previewable @State var expanded = true
     ZStack(alignment: .bottom) {
         Color(.systemGray4).ignoresSafeArea()
-        ConvoyPanel(model: MapDemo.model(), expanded: $expanded, canReport: true, onReport: {}, onStop: {})
+        ConvoyPanel(model: MapDemo.model(), expanded: $expanded, canReport: true, onReport: {}, onStop: {}).previewCard()
     }
 }
 
 #Preview("Panel collapsed") {
     ZStack(alignment: .bottom) {
         Color(.systemGray4).ignoresSafeArea()
-        ConvoyPanel(model: MapDemo.model(), expanded: .constant(false), canReport: false, onReport: {}, onStop: {})
+        ConvoyPanel(model: MapDemo.model(), expanded: .constant(false), canReport: false, onReport: {}, onStop: {}).previewCard()
+    }
+}
+
+extension View {
+    /// The panel as a card on a plain background, for previews and the small demos that show only its words.
+    func previewCard() -> some View {
+        glassSurface().padding(.horizontal, Spacing.s).padding(.bottom, Spacing.s)
     }
 }
 #endif

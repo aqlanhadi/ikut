@@ -122,9 +122,9 @@ struct HomeSheetTests {
     }
 
     @Test func aRootSheetWaitsForHomeSheetToGo() {
-        #expect(!HomeSheet.presents(wanted: true, homeSheetUp: true))
-        #expect(HomeSheet.presents(wanted: true, homeSheetUp: false))
-        #expect(!HomeSheet.presents(wanted: false, homeSheetUp: false))
+        #expect(!BottomSheet.presents(wanted: true, sheetUp: true))
+        #expect(BottomSheet.presents(wanted: true, sheetUp: false))
+        #expect(!BottomSheet.presents(wanted: false, sheetUp: false))
     }
 
     @Test func listSheetIsShortUntilPulledUp() {

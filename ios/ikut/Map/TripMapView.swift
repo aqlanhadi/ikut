@@ -50,11 +50,18 @@ struct TripMapView: View {
     @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
-    /// The banner stack's height, and the top of the bottom panel (with any card) against the
-    /// map's bottom edge, for `mapInsets`. The panel sits above the home indicator, so its own
-    /// height would leave that strip out.
+    /// The banner stack's height, for `mapInsets`; the sheet's own height comes from `sheetHeights`.
     @State private var topHeight: CGFloat = 0
-    @State private var panelMinY: CGFloat = 0
+    /// Apple's convoy sheet: on screen (it reports its own appear and dismiss), stepping aside for an exit,
+    /// the action that waits for it to go, and the panel's measured heights (nil until each layout is seen).
+    @State private var panelUp = false
+    @State private var visible = false
+    @State private var leaving = false
+    @State private var afterPanel: (() -> Void)?
+    @State private var foldedContent: CGFloat?
+    @State private var unfoldedContent: CGFloat?
+    @State private var cardContent: CGFloat?
+    @State private var bottomInset: CGFloat = 0
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
     @State private var mapWidth: CGFloat = 0
@@ -120,6 +127,7 @@ struct TripMapView: View {
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY + $0.safeAreaInsets.bottom } action: {
                 mapMaxY = $0
             }
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
             .overlay(alignment: .topTrailing) {
                 // Below whatever is at the top (the trip pill, a banner, the stop pill), with the same gap
                 // the stack keeps between its own items. Before the stack is measured: its top
@@ -129,61 +137,14 @@ struct TripMapView: View {
                     .padding(.trailing, Spacing.m)
                     .animation(.snappy, value: viewButtonsTop)
             }
-            .overlay(alignment: .bottom) {
-                // The stop card is one more layer in the same stack: on top of the panel, same inset
-                // and radius, opened only by a tap on the Pit stop button.
-                bottomStack
-                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { panelMinY = $0 }
-                .frame(maxHeight: maxBottomHeight, alignment: .bottom)
-            }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showReport) {
-                if let reportContext {
-                    ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
-                }
+            .sheet(isPresented: Binding(get: { visible && !panelCovered }, set: { _ in }), onDismiss: panelDismissed) {
+                panelSheet
             }
-            .confirmationDialog("Leave this trip?", isPresented: $confirmLeave, titleVisibility: .visible) {
-                Button("Leave trip", role: .destructive) { run { try await session.leave(); onExit() } }
-            } message: {
-                Text("Your phone stops sharing its location.")
-            }
-            .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
-                // Ending flips session.isEnded, which opens the recap (onEnded).
-                Button("End trip", role: .destructive) { run { try await session.endTrip() } }
-            } message: {
-                Text("Everyone stops sharing their location. This can't be undone.")
-            }
-            .alert("Get road alerts?", isPresented: asking(.roadAlerts)) {
-                Button("Turn on") { answer(.roadAlerts) { _ = await alerts.requestPermission() } }
-                Button("Not now", role: .cancel) { answer(.roadAlerts) }
-            } message: {
-                Text("ikut can warn you about debris, breakdowns and stops ahead, even while the app is in the background.")
-            }
-            .alert("Road alerts are off", isPresented: asking(.roadAlertsOff)) {
-                Button("Open Settings") {
-                    answer(.roadAlertsOff) {
-                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                            await UIApplication.shared.open(url)
-                        }
-                    }
-                }
-                Button("Not now", role: .cancel) { answer(.roadAlertsOff) }
-            } message: {
-                Text("Turn them on in Settings to hear about debris, breakdowns and stops ahead.")
-            }
-            .alert("Keep the screen on?", isPresented: asking(.keepScreenOn)) {
-                Button("Keep it on") {
-                    keepAwake = true
-                    keepAwakeAnswered = true
-                    answer(.keepScreenOn)
-                }
-                Button("Not now", role: .cancel) {
-                    keepAwake = false
-                    keepAwakeAnswered = true
-                    answer(.keepScreenOn)
-                }
-            } message: {
-                Text("So the map stays up while you drive. Uses more battery.")
+            .onChange(of: typeSize) { _, _ in
+                foldedContent = nil
+                unfoldedContent = nil
+                cardContent = nil
             }
             .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk() }
             .onChange(of: ask) { _, now in session.askShowing = now != nil }
@@ -212,7 +173,7 @@ struct TripMapView: View {
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
             // The panel folding or a banner coming and going moves the visible middle; recenter on it.
             .onChange(of: mapInsets) { _, insets in
-                if !panelExpanded, !stopCardOpen { legalInset = insets.bottom }
+                if shownNow == .folded { legalInset = insets.bottom }
                 move(to: model.cameraTarget, animated: true)
             }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
@@ -279,7 +240,7 @@ struct TripMapView: View {
     /// What the banner stack and the panel cover, as the map's extra safe area.
     private var mapInsets: EdgeInsets {
         let insets = MapObscuredInsets.insets(
-            mapHeight: mapHeight, top: topHeight, bottom: panelMinY > 0 ? mapMaxY - panelMinY : 0)
+            mapHeight: mapHeight, top: topHeight, bottom: panelUp ? PanelSheet.height(shownNow, in: sheetHeights) : 0)
         return EdgeInsets(top: insets.top, leading: 0, bottom: insets.bottom, trailing: 0)
     }
 
@@ -455,7 +416,7 @@ struct TripMapView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
-                Button("Back to lobby", systemImage: "chevron.backward") { dismiss() }
+                Button("Back to lobby", systemImage: "chevron.backward") { exit { dismiss() } }
                 if liveServices {
                     Toggle("Keep screen on", systemImage: "sun.max", isOn: $keepAwake)
                         .onChange(of: keepAwake) { _, _ in keepAwakeAnswered = true }
@@ -531,15 +492,6 @@ struct TripMapView: View {
         var routeLength: Double?
     }
 
-    /// The most the card and panel may take together: the map (already below the status bar) minus
-    /// what is on top, as measured (the trip pill, the stop pill when it is up, a banner), so the
-    /// stop pill never sits under the expanded panel, at any text size. Never less room than the
-    /// usual estimate for a pill alone or with a banner.
-    private var maxBottomHeight: CGFloat? {
-        guard mapHeight > 0 else { return nil }
-        return mapHeight - max(bannerShowing ? 158 : 74, topHeight + Spacing.m)
-    }
-
     private func openStopCard() {
         withAnimation(.snappy) { stopCardOpen = true }
     }
@@ -548,30 +500,139 @@ struct TripMapView: View {
         withAnimation(.snappy) { stopCardOpen = false }
     }
 
-    /// The panel and the stop card. The card slides up over the panel, and the panel, with everything
-    /// on it, sinks and fades out in the same moment, so no button stays put under the moving card
-    /// (a glass or frosted card is see-through). Closing runs the same way backwards.
-    /// At accessibility text sizes the stop pill alone is taller than the room above even a folded panel,
-    /// so the panel steps aside while the pill is up (at most 20 seconds) instead of covering its OK.
-    private var panelAside: Bool {
-        stopCardOpen || arrivalOpen || (typeSize.isAccessibilitySize && stopPill != nil)
-    }
+    // MARK: The sheet
 
     /// The arrival card is up: its stop is still on (a stop skipped while it is open closes it).
     private var arrivalOpen: Bool {
         arrivalStopId.map { StopArrival.target(stopId: $0, in: model.stops) != nil } ?? false
     }
 
-    private var bottomStack: some View {
-        ZStack(alignment: .bottom) {
-            panel
-                .offset(y: panelAside ? 40 : 0)
-                .opacity(panelAside ? 0 : 1)
-                // Gone in a blink, so it never shows through the card on its way up.
-                .animation(.easeOut(duration: 0.12), value: panelAside)
-                .allowsHitTesting(!panelAside)
-                .accessibilityHidden(panelAside)
-            if arrivalOpen, !stopCardOpen, let id = arrivalStopId {
+    /// A stop card takes the sheet's place: the Pit stop request (opened only by a tap on the button) or the
+    /// who-is-here card (the Next stop cell).
+    private var cardShowing: Bool { (stopCardOpen && stopContext != nil) || (arrivalOpen && !stopCardOpen) }
+
+    private var shownNow: PanelSheet.Shown { PanelSheet.shown(expanded: panelExpanded, cardOpen: cardShowing) }
+
+    /// The map's height under the pills and banners, where the sheet may reach to at most (the stop pill, a
+    /// banner and the trip pill always stay visible above it, at any text size).
+    private var sheetRoom: CGFloat? {
+        PanelSheet.room(mapHeight: mapMaxY > 0 ? mapMaxY - mapMinY : 0,
+                        reserved: max(bannerShowing ? 158 : 74, topHeight + Spacing.m))
+    }
+
+    private var sheetHeights: PanelSheet.Heights {
+        PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, card: cardContent,
+                           bottomInset: bottomInset, room: sheetRoom)
+    }
+
+    /// Steps aside for the trip ending (the recap), an exit in progress and the lobby's Always sheet.
+    private var panelCovered: Bool {
+        PanelSheet.isCovered(
+            ended: session.isEnded, leaving: leaving,
+            explainerWants: TripSessionLogic.explainerWants(
+                wanted: session.alwaysExplainerShowing, askShowing: session.askShowing))
+    }
+
+    /// The sheet's own dismissal is the signal: whatever waited for it (Back to lobby, Leave) runs now, no timer.
+    private func panelDismissed() {
+        panelUp = false
+        session.mapSheetUp = false
+        if let action = afterPanel {
+            afterPanel = nil
+            action()
+        }
+    }
+
+    /// Runs `action` once the sheet is gone: it would otherwise stay up over the screen that comes next.
+    private func exit(_ action: @escaping () -> Void) {
+        guard panelUp else { action(); return }
+        afterPanel = action
+        leaving = true
+    }
+
+    /// Apple's own sheet over the map, as on Home: drag it between short (the folded panel) and tall (the
+    /// unfolded one), always up, the map above it touchable. A stop card replaces the panel in it. The
+    /// report sheet, the confirmations and the asks are presented from here, since a presented sheet
+    /// blocks a presentation from the map under it.
+    private var panelSheet: some View {
+        let shown = shownNow
+        let heights = sheetHeights
+        return Group {
+            if shown == .card {
+                ScrollView { cardView }.scrollBounceBehavior(.basedOnSize)
+            } else {
+                ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+            }
+        }
+        .environment(\.inPanelSheet, true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onAppear {
+            panelUp = true
+            session.mapSheetUp = true
+        }
+        .presentationDetents(PanelSheet.detents(shown, in: heights), selection: Binding(
+            get: { PanelSheet.detent(shown, in: heights) },
+            set: { if shown != .card { panelExpanded = PanelSheet.isTall($0, in: heights) } }))
+        .presentationDragIndicator(shown == .card ? .hidden : .visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: .height(shown == .card ? heights.card : heights.tall)))
+        .interactiveDismissDisabled()
+        .sheet(isPresented: $showReport) {
+            if let reportContext {
+                ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
+            }
+        }
+        .confirmationDialog("Leave this trip?", isPresented: $confirmLeave, titleVisibility: .visible) {
+            Button("Leave trip", role: .destructive) { run { try await session.leave(); exit(onExit) } }
+        } message: {
+            Text("Your phone stops sharing its location.")
+        }
+        .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
+            // Ending flips session.isEnded, which opens the recap (onEnded).
+            Button("End trip", role: .destructive) { run { try await session.endTrip() } }
+        } message: {
+            Text("Everyone stops sharing their location. This can't be undone.")
+        }
+        .alert("Get road alerts?", isPresented: asking(.roadAlerts)) {
+            Button("Turn on") { answer(.roadAlerts) { _ = await alerts.requestPermission() } }
+            Button("Not now", role: .cancel) { answer(.roadAlerts) }
+        } message: {
+            Text("ikut can warn you about debris, breakdowns and stops ahead, even while the app is in the background.")
+        }
+        .alert("Road alerts are off", isPresented: asking(.roadAlertsOff)) {
+            Button("Open Settings") {
+                answer(.roadAlertsOff) {
+                    if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                        await UIApplication.shared.open(url)
+                    }
+                }
+            }
+            Button("Not now", role: .cancel) { answer(.roadAlertsOff) }
+        } message: {
+            Text("Turn them on in Settings to hear about debris, breakdowns and stops ahead.")
+        }
+        .alert("Keep the screen on?", isPresented: asking(.keepScreenOn)) {
+            Button("Keep it on") {
+                keepAwake = true
+                keepAwakeAnswered = true
+                answer(.keepScreenOn)
+            }
+            Button("Not now", role: .cancel) {
+                keepAwake = false
+                keepAwakeAnswered = true
+                answer(.keepScreenOn)
+            }
+        } message: {
+            Text("So the map stays up while you drive. Uses more battery.")
+        }
+
+    }
+
+    @ViewBuilder private var cardView: some View {
+        Group {
+            if stopCardOpen, let context = stopContext {
+                stopCard(context)
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
+            } else if let id = arrivalStopId {
                 StopArrivalCard(
                     model: model, stopId: id, tripId: session.tripId, frozenNow: nil, isOrganizer: session.isOrganizer,
                     leave: leaveHandler,
@@ -581,16 +642,7 @@ struct TripMapView: View {
                 ) {
                     withAnimation(.snappy) { arrivalStopId = nil }
                 }
-                .padding(.horizontal, Spacing.s)
-                .padding(.bottom, Spacing.s)
-                .zIndex(1)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            if stopCardOpen, let context = stopContext {
-                stopCard(context)
-                    // Above the panel for the whole of its exit too, or it would slide away behind it.
-                    .zIndex(1)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
             }
         }
     }
@@ -600,7 +652,8 @@ struct TripMapView: View {
             model: model, expanded: $panelExpanded, canReport: model.myCarId != nil,
             stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: openReport, onStop: openStopCard,
-            onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } })
+            onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } },
+            onHeight: { if panelExpanded { unfoldedContent = $0 } else { foldedContent = $0 } })
     }
 
     private var leaveHandler: (@MainActor @Sendable (String) async -> StopLeave.Result)? {
@@ -654,8 +707,6 @@ struct TripMapView: View {
             service: stopService, demoScreen: demoScreen,
             onClose: closeStopCard
         )
-        .padding(.horizontal, Spacing.s)
-        .padding(.bottom, Spacing.s)
     }
 
     /// Live actions that also tell the pill what happened (a tap on OK is confirmed there for a few seconds).
@@ -779,6 +830,7 @@ struct TripMapView: View {
     }
 
     private func appear() {
+        visible = true
         followApproachIfNeeded()
         move(to: model.cameraTarget, animated: false)
         guard liveServices else { return }
@@ -837,6 +889,7 @@ struct TripMapView: View {
     }
 
     private func disappear() {
+        visible = false
         onScreen = false
         ask = nil
         session.askShowing = false

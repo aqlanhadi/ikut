@@ -270,7 +270,7 @@ struct LobbyView: View {
             if session.consumeAlwaysExplainer(action: action) { session.alwaysExplainerShowing = true }
         }
         .sheet(isPresented: Binding(
-            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing) },
+            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing, mapSheetUp: session.mapSheetUp) },
             set: { if !$0 { session.alwaysExplainerShowing = false } }
         )) {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.

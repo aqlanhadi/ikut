@@ -17,6 +17,7 @@ struct StopCardFrame<Content: View, Actions: View>: View {
 
     @State private var contentHeight: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.inPanelSheet) private var inSheet
 
     /// A little taller at accessibility sizes, where a row is tall: the last row is not left half cut.
     private var cap: CGFloat { typeSize.isAccessibilitySize ? bodyCap + 40 : bodyCap }
@@ -67,7 +68,7 @@ struct StopCardFrame<Content: View, Actions: View>: View {
         .padding(.horizontal, Spacing.block)
         .padding(.top, Spacing.block)
         .padding(.bottom, Spacing.block)
-        .glassSurface()
+        .glassSurface(if: !inSheet)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.card")
     }

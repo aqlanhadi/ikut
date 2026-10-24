@@ -68,7 +68,7 @@ struct StopCardPreview: View {
             if !cardOpen {
                 ConvoyPanel(
                     model: map, expanded: .constant(false), canReport: true,
-                    stopButton: StopLogic.buttonContent(for: board), onReport: {}, onStop: {})
+                    stopButton: StopLogic.buttonContent(for: board), onReport: {}, onStop: {}).previewCard()
             } else if let context = map.stopContext(tripId: "demo", userId: "u-c1", isOrganizer: false) {
                 StopCard(
                     board: board, context: context, driving: driving, actions: .none, service: DemoStopService(),

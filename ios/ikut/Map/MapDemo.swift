@@ -156,7 +156,7 @@ enum MapDemo {
         return model
     }
 
-    static func view() -> some View {
+    static func view(expanded: Bool = false) -> some View {
         Backend.configure()
         let env = ProcessInfo.processInfo.environment
         let five = env["IKUT_MAP_DEMO_CARS"] == "5"
@@ -172,7 +172,7 @@ enum MapDemo {
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
                 demoCard: env["IKUT_MAP_DEMO_CARD"], demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
-                demoExpanded: env["IKUT_MAP_DEMO_EXPANDED"] != nil,
+                demoExpanded: expanded || env["IKUT_MAP_DEMO_EXPANDED"] != nil,
                 stopService: DemoStopService())
                 .overlay(alignment: .top) {
                     if gallery { BannerGallery(model: model).padding(.top, 72) }

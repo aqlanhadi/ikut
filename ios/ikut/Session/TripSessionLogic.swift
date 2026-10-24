@@ -73,8 +73,13 @@ enum TripSessionLogic {
         action == .showAlwaysExplainer && !alreadyShown
     }
 
-    /// The Always sheet is on screen only while wanted and no map ask is up, so the two never stack.
-    static func explainerVisible(wanted: Bool, askShowing: Bool) -> Bool { wanted && !askShowing }
+    /// The Always sheet wants the screen while wanted and no map ask is up, so the two never stack.
+    static func explainerWants(wanted: Bool, askShowing: Bool) -> Bool { wanted && !askShowing }
+
+    /// It comes up only once the map's convoy sheet has gone (the sheet steps aside for it first).
+    static func explainerVisible(wanted: Bool, askShowing: Bool, mapSheetUp: Bool = false) -> Bool {
+        BottomSheet.presents(wanted: explainerWants(wanted: wanted, askShowing: askShowing), sheetUp: mapSheetUp)
+    }
 
     @MainActor static func makeCarRouteService(
         tripId: String, carId: String, trip: Trip, car: Car, meetingPoint: CLLocationCoordinate2D? = nil
