@@ -97,6 +97,7 @@ struct PlacesRefreshTests {
         #expect(await rig.refresher.refreshIfDue() == false)
         #expect(StubHosting.requests.map { $0.url?.lastPathComponent } == ["manifest.json"])
         #expect(rig.store.load() == nil)
+        #expect(rig.defaults.object(forKey: PlacesRefresher.lastCheckKey) != nil)
     }
 
     @Test func sizeMismatchIsRejected() async {

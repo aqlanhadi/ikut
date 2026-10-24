@@ -137,7 +137,11 @@ final class PlacesRefresher: @unchecked Sendable {
         guard let bundled = inApp() else { return false }
         let inUse = PlacesSource.current(bundled: { bundled }, store: store) ?? bundled
         guard let manifest = await fetchManifest() else { return false }
-        guard manifest.version <= PlacesFile.supportedVersion else { return false }
+        guard manifest.version <= PlacesFile.supportedVersion else {
+            // Waiting for an app that reads it: not asked about again at every launch.
+            defaults.set(now(), forKey: Self.lastCheckKey)
+            return false
+        }
         guard manifest.generatedAt > inUse.generatedAt else {
             defaults.set(now(), forKey: Self.lastCheckKey)
             return false
