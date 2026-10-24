@@ -141,6 +141,7 @@ final class StopPlanner {
         waitForPending: @escaping @MainActor () async -> Void = { try? await Firestore.firestore().waitForPendingWrites() },
         save: @escaping @MainActor (StopPlanSave) async throws -> Void
     ) {
+        OurSide.warm()
         self.waitForPending = waitForPending
         self.router = router
         self.origin = origin
@@ -215,7 +216,8 @@ final class StopPlanner {
         do {
             let built = try await Self.build(
                 items: edited, destination: destination, origin: origin,
-                fallbackStart: Polyline.decode(route).first, router: router, cache: cache)
+                fallbackStart: Polyline.decode(route).first, router: router, cache: cache,
+                ourSide: RouteLine(Polyline.decode(route)))
             try Task.checkCancellation()
             let removed = savedIds.filter { id in !edited.contains { $0.id == id } }
             do {
@@ -264,16 +266,27 @@ final class StopPlanner {
     static func build(
         items: [StopDraft], destination: CLLocationCoordinate2D,
         origin: @MainActor () async -> CLLocationCoordinate2D? = { try? await RouteBuilder.currentLocation() },
-        fallbackStart: CLLocationCoordinate2D?, router: LegRouting = MapKitLegRouter(), cache: LegCache? = nil
+        fallbackStart: CLLocationCoordinate2D?, router: LegRouting = MapKitLegRouter(), cache: LegCache? = nil,
+        ourSide: RouteLine? = nil, snapOnDirectRoute: Bool = false, sites: [PlaceSite] = OurSide.bundledSites
     ) async throws -> (route: BuiltRoute, items: [StopDraft]) {
         let meet = items.first(where: \.isMeeting)
-        let via = items.filter { !$0.isMeeting }
         // The meeting point when there is one; else where the organizer is now, or without a fix where
         // the route started before.
         var start = meet?.coordinate
         if start == nil { start = await origin() }
         if start == nil { start = fallbackStart }
         guard let start else { throw RouteError.locationUnavailable }
+        var line = ourSide
+        // A new destination: the road we are on is the direct route to it. Asked for only when a stop is at a site,
+        // so a plain stop list costs no extra request.
+        if line == nil, snapOnDirectRoute, OurSide.hasRestAreaStop(items, sites: sites),
+           let direct = try? await router.leg(from: start, to: destination), direct.coordinates.count >= 2 {
+            line = RouteLine(direct.coordinates)
+        }
+        // A rest-area stop on the other carriageway moves to its twin on ours before any leg is asked for, so the
+        // route drives straight into it.
+        let items = OurSide.snap(items, on: line, sites: sites)
+        let via = items.filter { !$0.isMeeting }
         let built = try await StopRouting.build(
             from: start, via: via.map(\.coordinate), to: destination, router: router, cache: cache)
         var offsets = built.stopOffsets.makeIterator()

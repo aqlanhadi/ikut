@@ -239,7 +239,8 @@ final class CreateTripModel {
         errorMessage = nil
         defer { working = nil }
         do {
-            let built = try await StopPlanner.build(items: stops, destination: result.coordinate, fallbackStart: nil)
+            let built = try await StopPlanner.build(items: stops, destination: result.coordinate, fallbackStart: nil,
+                snapOnDirectRoute: true)
             try await finish(built.route, built.items)
             return true
         } catch let failure as LegFailure {
