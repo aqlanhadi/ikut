@@ -20,14 +20,6 @@ private final class FakeGeocoder: ReverseGeocoding {
     }
 }
 
-@MainActor
-private final class QuietSuggestions: SuggestionSource {
-    var onUpdate: ((String, Result<[SearchSuggestion], Error>) -> Void)?
-    var asked: [String] = []
-    func update(query: String, region: MKCoordinateRegion) { asked.append(query) }
-    func stop() {}
-}
-
 private struct QuietPlaces: PlaceSearching {
     func search(query: String, region: MKCoordinateRegion) async throws -> [DestinationResult] { [] }
     func resolve(_ suggestion: SearchSuggestion) async throws -> DestinationResult? { nil }
@@ -124,7 +116,7 @@ struct PlacePinTests {
         let geocoder = FakeGeocoder()
         geocoder.answers[PinName.coordinates(c(3.139, 101.687))] = GeocodedName(name: nil, locality: "Tapah")
         geocoder.held = [PinName.coordinates(c(3.139, 101.687))]
-        let source = QuietSuggestions()
+        let source = FakeSuggestions()
         let model = CreateTripModel(suggestions: { source }, places: QuietPlaces(), geocoder: geocoder)
         model.query = "3.139, 101.687"
         model.pinDelay = .milliseconds(10)
@@ -133,19 +125,19 @@ struct PlacePinTests {
         // Before the geocode answers the pin is named by its coordinates, never blank.
         #expect(model.droppedPin?.name == "3.139, 101.687" && model.droppedPin?.subtitle == "3.139, 101.687")
         geocoder.release("3.139, 101.687")
-        for _ in 0..<100 where model.pinNamer.isNaming { try await Task.sleep(for: .milliseconds(10)) }
+        await waitUntil(.seconds(1)) { !model.pinNamer.isNaming }
         #expect(model.droppedPin?.name == "Near Tapah" && model.droppedPin?.subtitle == "3.139, 101.687")
         // Late MapKit suggestions do not bring the list back; text brings suggestions back.
         source.onUpdate?("3.139, 101.687", .success([SearchSuggestion(title: "X", subtitle: "Y", highlights: [])]))
         #expect(model.suggestions.isEmpty)
         model.query = "Tapah"
         model.queryChanged()
-        #expect(model.droppedPin == nil && source.asked == ["Tapah"])
+        #expect(model.droppedPin == nil && source.asked.map(\.0) == ["Tapah"])
     }
 
     @Test func aBurstOfKeystrokesAsksTheGeocoderOnce() async throws {
         let geocoder = FakeGeocoder()
-        let model = CreateTripModel(suggestions: { QuietSuggestions() }, places: QuietPlaces(), geocoder: geocoder)
+        let model = CreateTripModel(suggestions: { FakeSuggestions() }, places: QuietPlaces(), geocoder: geocoder)
         model.pinDelay = .milliseconds(80)
         for text in ["3.139, 101.6", "3.139, 101.68", "3.139, 101.687"] {
             model.query = text

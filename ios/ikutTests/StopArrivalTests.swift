@@ -8,12 +8,12 @@ struct StopArrivalTests {
     let now = Date(timeIntervalSince1970: 1_000_000)
     // A stop 20 km along a line running due north from (3, 101): 1 degree of latitude is about 111 km.
     let stopOffset = 20_000.0
-    var target: StopArrival.Target { .init(latitude: 3 + stopOffset / 111_195, longitude: 101, routeOffset: stopOffset) }
+    var target: StopArrival.Target { .init(latitude: 3 + stopOffset / metersPerDegree, longitude: 101, routeOffset: stopOffset) }
 
     func position(offset: Double?, age: TimeInterval = 5, along: Double? = nil) -> Position {
         let meters = along ?? offset ?? 0
         return Position(
-            id: nil, location: GeoPoint(latitude: 3 + meters / 111_195, longitude: 101), speed: 25, heading: 0,
+            id: nil, location: GeoPoint(latitude: 3 + meters / metersPerDegree, longitude: 101), speed: 25, heading: 0,
             routeOffset: offset ?? 0, convoyOffset: offset, battery: 0.8, updatedAt: now.addingTimeInterval(-age))
     }
 

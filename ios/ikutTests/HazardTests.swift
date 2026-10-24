@@ -19,7 +19,7 @@ private enum Fixture {
 
     static func main(at offset: Double, north: Double = 0) -> CLLocationCoordinate2D {
         let c = main.coordinate(atOffset: offset)!
-        return CLLocationCoordinate2D(latitude: c.latitude + north / 111_195, longitude: c.longitude)
+        return CLLocationCoordinate2D(latitude: c.latitude + north / metersPerDegree, longitude: c.longitude)
     }
 
     static func event(
@@ -268,20 +268,6 @@ struct HazardLogicTests {
 }
 
 // MARK: Approach
-
-@MainActor
-private final class FakeAnnouncer: AlertAnnouncing {
-    var calls: [(id: String?, distance: Double?)] = []
-    func announce(event: TripEvent, distance: Double?) async -> Bool {
-        calls.append((event.id, distance))
-        return true
-    }
-    var alerts: [TripAlert] = []
-    func announce(alert: TripAlert) -> Bool {
-        alerts.append(alert)
-        return true
-    }
-}
 
 @MainActor
 struct ApproachTests {

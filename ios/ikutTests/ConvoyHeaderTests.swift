@@ -7,7 +7,6 @@ import Testing
 /// D26: the convoy panel's header and joining rows show the viewer's own trip; a slow car says how far, not how long.
 @MainActor
 struct ConvoyHeaderTests {
-    private static let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
     private static let now = Fixtures.t0
     private static var main: RouteLine {
         RouteLine(MapDemo.densify([origin, .init(latitude: 3.0, longitude: 101.2)]))
@@ -100,21 +99,15 @@ struct ConvoyHeaderTests {
 
     // MARK: Rows and summary
 
-    private struct StubETA: ETAProviding {
-        func travelTime(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> TimeInterval { 1800 }
-    }
-
     private func model(speed: Double) -> ConvoyModel {
-        let m = ConvoyModel(provider: StubETA(), locale: Locale(identifier: "en_GB"),
-                            timeZone: TimeZone(identifier: "UTC")!, clock: { Self.now })
-        m.setMainRoute(Self.main)
+        let m = ConvoyModel.fixture(route: Self.main)
         func pos(_ c: CLLocationCoordinate2D, speed: Double, offset: Double?) -> Position {
             Position(location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, heading: 90,
                      routeOffset: offset ?? 0, convoyOffset: offset, battery: nil, updatedAt: Self.now.addingTimeInterval(-1))
         }
         // Hafiz is 14 km due south of the main-route point at 20 km.
         let target = Self.main.coordinate(atOffset: 20_000)!
-        let south = CLLocationCoordinate2D(latitude: target.latitude - 14_000 / 111_195, longitude: target.longitude)
+        let south = CLLocationCoordinate2D(latitude: target.latitude - 14_000 / metersPerDegree, longitude: target.longitude)
         let lead = Car(id: "1", name: "Car 1", color: "#2563EB", trackerUserId: nil, isLead: true, route: nil, mergeOffset: nil, state: .convoy, number: 1)
         m.update(cars: [lead, car(merge: 20_000)], positions: [
             "1": pos(Self.main.coordinate(atOffset: 8000)!, speed: 25, offset: 8000),
@@ -167,9 +160,7 @@ struct ConvoyHeaderTests {
     // MARK: Never merges, by road
 
     @Test func neverMergingCarDistanceIsTheRestOfItsOwnRoute() throws {
-        let m = ConvoyModel(provider: StubETA(), locale: Locale(identifier: "en_GB"),
-                            timeZone: TimeZone(identifier: "UTC")!, clock: { Self.now })
-        m.setMainRoute(Self.main)
+        let m = ConvoyModel.fixture(route: Self.main)
         // A dog-leg west of the main route: about 110 km by road, about 95 km straight to the main route's end.
         let own = RouteLine(MapDemo.densify([
             .init(latitude: 3.5, longitude: 100.5), .init(latitude: 3.5, longitude: 100.0), .init(latitude: 3.0, longitude: 100.0)]))

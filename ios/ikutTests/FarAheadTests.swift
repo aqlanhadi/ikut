@@ -8,17 +8,7 @@ import Testing
 /// Aisha (lead) leaves Cyberjaya at km 0 with Wyna, Daniel is parked at R&R Rawang (km 38), Hafiz is
 /// already in Ipoh, the end of the route (km 120).
 struct FarAheadTests {
-    private static let r = RouteLine.earthRadius
-    private static let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
     private static let now = Fixtures.t0
-    private static let gb = Locale(identifier: "en_GB")
-    private static let utc = TimeZone(identifier: "UTC")!
-
-    private static func move(_ c: CLLocationCoordinate2D, east: Double) -> CLLocationCoordinate2D {
-        CLLocationCoordinate2D(
-            latitude: c.latitude,
-            longitude: c.longitude + east / (r * cos(c.latitude * .pi / 180)) * 180 / .pi)
-    }
 
     /// 120 km due east.
     private static let main = RouteLine(stride(from: 0.0, through: 120_000, by: 1000).map { move(origin, east: $0) })
@@ -29,7 +19,7 @@ struct FarAheadTests {
     }
 
     private func pos(_ offset: Double, speed: Double = 25, age: TimeInterval = 1) -> Position {
-        let c = Self.move(Self.origin, east: offset)
+        let c = move(origin, east: offset)
         return Position(
             location: GeoPoint(latitude: c.latitude, longitude: c.longitude), speed: speed, heading: 90,
             routeOffset: offset, convoyOffset: offset, battery: nil, updatedAt: Self.now.addingTimeInterval(-age))
@@ -179,9 +169,7 @@ struct FarAheadTests {
     @MainActor
     private func model(_ cars: [Car], _ positions: [String: Position], me: String?,
                        eta: FixedETA = FixedETA(), place: String? = "Rawang") async -> ConvoyModel {
-        let m = ConvoyModel(
-            provider: eta, locale: Self.gb, timeZone: Self.utc, clock: { Self.now }, placeNamer: { _ in place })
-        m.setMainRoute(Self.main)
+        let m = ConvoyModel.fixture(provider: eta, route: Self.main, placeNamer: { _ in place })
         m.destinationName = "Ipoh"
         m.myCarId = me
         m.update(cars: cars, positions: positions)
@@ -205,7 +193,7 @@ struct FarAheadTests {
         // The arrival time comes from Aisha, one request.
         #expect(m.arrival(forCar: "1") != nil)
         #expect(eta.calls.from.count == 1)
-        #expect(abs((eta.calls.from.first?.longitude ?? 0) - Self.origin.longitude) < 0.001)
+        #expect(abs((eta.calls.from.first?.longitude ?? 0) - origin.longitude) < 0.001)
     }
 
     /// The town lookup for a parked far car: once over many refreshes, again after a move of more than
@@ -222,9 +210,7 @@ struct FarAheadTests {
         }
         var clock = Self.now
         let namer = Namer([nil, "Rawang", "Rasa"])
-        let m = ConvoyModel(
-            provider: FixedETA(), locale: Self.gb, timeZone: Self.utc, clock: { clock }, placeNamer: { namer.name($0) })
-        m.setMainRoute(Self.main)
+        let m = ConvoyModel.fixture(provider: FixedETA(), route: Self.main, clock: { clock }, placeNamer: { namer.name($0) })
         m.myCarId = "1"
         let cars = [aisha, daniel]
         func at(_ danielAt: Double, after seconds: TimeInterval) async {

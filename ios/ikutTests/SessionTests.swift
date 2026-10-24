@@ -619,10 +619,10 @@ struct SessionEmulatorTests {
         // Far east of the main route's start; the fake route drives to it, then follows it.
         tracker.firstFixResult = LocationFix(
             latitude: 38.5, longitude: -119.0, speed: 10, course: 270, timestamp: Date())
-        let directions = SessionFakeDirections(coordinates: [
+        let directions = CarRouteFakeDirections(routes: .init([[
             .init(latitude: 38.5, longitude: -119.0), .init(latitude: 38.5, longitude: -120.2),
             .init(latitude: 40.7, longitude: -120.95),
-        ])
+        ]]))
         let session = TripSession(
             tripId: s.tripId, userId: s.uid, tracker: tracker,
             carRouteFactory: { tripId, carId, trip, car, _ in
@@ -818,12 +818,5 @@ struct SessionEmulatorTests {
         #expect(tracker.isTracking)
         let resumed = try await carRef(s).getDocument(as: Car.self)
         #expect(resumed.pausedAt == nil)
-    }
-}
-
-private struct SessionFakeDirections: CarRouteDirections {
-    var coordinates: [CLLocationCoordinate2D]
-    func route(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> [CLLocationCoordinate2D] {
-        coordinates
     }
 }

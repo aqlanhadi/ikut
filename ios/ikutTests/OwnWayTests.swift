@@ -242,17 +242,9 @@ struct OwnWayTests {
         #expect(try JoinService.parsePreview(data).destinationCoordinate == nil)
     }
 
-    private struct FakeAPI: JoinAPI {
-        var preview: TripPreview
-        func preview(code: String) async throws -> TripPreview { preview }
-        func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
-            JoinResult(tripId: "t1", carId: "c", trackerTaken: false)
-        }
-    }
-
     private func ticketModel(coordinate: PreviewCoordinate?, drive: TicketDrive?) -> JoinModel {
         let preview = TripPreview(tripId: "t1", name: "Raya", destinationName: "Ipoh", destinationCoordinate: coordinate, cars: [])
-        return JoinModel(displayName: "Sam", initialCode: "ABC234", api: FakeAPI(preview: preview), driveFromHere: { _ in drive })
+        return JoinModel(displayName: "Sam", initialCode: "ABC234", api: FakeJoinAPI(preview: preview), driveFromHere: { _ in drive })
     }
 
     @Test func ticketGetsItsDriveOnceTheTripIsFound() async {

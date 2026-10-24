@@ -27,7 +27,7 @@ struct StopLeaveTests {
         let s = stop(arrivedAt: t0)
         #expect(StopLeave.leavingAt(s) == t0.addingTimeInterval(20 * 60))
         // Every phone reads the same stored arrival, so every phone gets the same line.
-        let utc = TimeZone(identifier: "UTC")!, en = Locale(identifier: "en_GB")
+        let utc = Fixtures.utc, en = Fixtures.gb
         let arrived = Date(timeIntervalSince1970: 1_799_996_400)   // on the hour, UTC
         let line = StopLeave.leavingLine(stop(arrivedAt: arrived), locale: en, timeZone: utc)
         let expected = ConvoyFormat.clock(arrived.addingTimeInterval(1200), locale: en, timeZone: utc)
@@ -111,7 +111,7 @@ struct StopLeaveTests {
 
     func position(at meters: Double, age: TimeInterval = 5, now: Date) -> Position {
         Position(
-            id: nil, location: GeoPoint(latitude: 3 + meters / 111_195, longitude: 101), speed: 20, heading: 0,
+            id: nil, location: GeoPoint(latitude: 3 + meters / metersPerDegree, longitude: 101), speed: 20, heading: 0,
             routeOffset: meters, convoyOffset: meters, battery: 0.8, updatedAt: now.addingTimeInterval(-age))
     }
 
@@ -134,11 +134,6 @@ struct StopLeaveTests {
         #expect(!marks(stop(leftAt: now)))
     }
 
-    private final class Quiet: AlertAnnouncing {
-        func announce(event: TripEvent, distance: Double?) async -> Bool { false }
-        func announce(alert: TripAlert) -> Bool { true }
-    }
-
     @Test func theMapModelWritesArrivedAtOnceForTheLeadCar() async {
         let model = MapDemo.model()
         model.tripStarted = true
@@ -148,7 +143,9 @@ struct StopLeaveTests {
         final class Writes: @unchecked Sendable { var list: [String] = [] }
         let writes = Writes()
         model.arrivalWriter = { tripId, stopId in writes.list.append("\(tripId)/\(stopId)") }
-        model.startHazardAlerts(announcer: Quiet(), userId: "u-c1", tripId: "demo")
+        let quiet = FakeAnnouncer()
+        quiet.eventResult = false
+        model.startHazardAlerts(announcer: quiet, userId: "u-c1", tripId: "demo")
         model.setStops([s])
         model.setCars(model.cars)
         model.setCars(model.cars)

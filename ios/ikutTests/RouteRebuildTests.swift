@@ -6,49 +6,9 @@ import Testing
 
 // D25 4d: the main route rebuilt mid-trip from where the organizer is, through the stops still ahead.
 
-private let earth = RouteLine.earthRadius
-private let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
-
 /// `north` and `east` meters from the origin.
 private func at(north: Double, east: Double = 0) -> CLLocationCoordinate2D {
-    CLLocationCoordinate2D(
-        latitude: origin.latitude + north / earth * 180 / .pi,
-        longitude: origin.longitude + east / (earth * cos(origin.latitude * .pi / 180)) * 180 / .pi)
-}
-
-/// Points every `step` meters from `a` to `b`, both included.
-private func line(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D, step: Double = 500) -> [CLLocationCoordinate2D] {
-    let count = max(1, Int((RouteLine.haversine(a, b) / step).rounded(.up)))
-    return (0...count).map { i in
-        let t = Double(i) / Double(count)
-        return CLLocationCoordinate2D(
-            latitude: a.latitude + (b.latitude - a.latitude) * t, longitude: a.longitude + (b.longitude - a.longitude) * t)
-    }
-}
-
-/// Straight roads at 25 m/s; records where each leg starts. `failures` legs throw `error` before the roads answer.
-private final class Roads: LegRouting, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _starts: [CLLocationCoordinate2D] = []
-    private var _failures: Int
-    private let error: Error
-    init(failures: Int = 0, error: Error = RouteError.noRoute) {
-        _failures = failures
-        self.error = error
-    }
-    var starts: [CLLocationCoordinate2D] { lock.withLock { _starts } }
-
-    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
-        let fail = lock.withLock {
-            if _failures > 0 { _failures -= 1; return true }
-            _starts.append(from)
-            return false
-        }
-        if fail { throw error }
-        let points = line(from, to)
-        let length = RouteLine(points).length
-        return RouteLeg(coordinates: points, distance: length, travelTime: length / 25, name: "E1")
-    }
+    move(origin, north: north, east: east)
 }
 
 /// The trip as planned: north from the meeting point, out east to a town at 70 km and back to the highway at 80 km,
@@ -89,12 +49,11 @@ private func input(organizer: CLLocationCoordinate2D = at(north: 50_000), stops:
         organizer: organizer, organizerOffset: oldLine.project(organizer)?.offset)
 }
 
-private func close(_ a: Double, _ b: Double, _ tolerance: Double) -> Bool { abs(a - b) <= tolerance }
 
 @MainActor
 struct RouteRebuildTests {
     @Test func theRouteGoesFromTheOrganizerThroughTheStopsAheadToTheDestination() async throws {
-        let result = try await RouteRebuild.build(input(), router: Roads())
+        let result = try await RouteRebuild.build(input(), router: StraightRoads())
         let new = RouteLine(Polyline.decode(result.route.polyline))
         // Straight north now: 200 km instead of the detour through the town.
         #expect(close(new.length, 200_000, 50))
@@ -110,7 +69,7 @@ struct RouteRebuildTests {
     /// Answer 1: a car behind the organizer reads the same offset on both lines, so the convoy order holds while
     /// cars still project on the old one.
     @Test func behindTheOrganizerOffsetsAreTheSameOnBothLines() async throws {
-        let result = try await RouteRebuild.build(input(), router: Roads())
+        let result = try await RouteRebuild.build(input(), router: StraightRoads())
         let new = RouteLine(Polyline.decode(result.route.polyline))
         for north in [0.0, 10_000, 30_000, 49_000] {
             let car = at(north: north, east: 20)
@@ -126,14 +85,14 @@ struct RouteRebuildTests {
 
     /// The driving time keeps the old route's share for the stretch behind and adds the new legs'.
     @Test func theDrivingTimeIsTheKeptShareAndTheNewLegs() async throws {
-        let result = try await RouteRebuild.build(input(), router: Roads())
+        let result = try await RouteRebuild.build(input(), router: StraightRoads())
         let kept = 9_000 * 50_000 / oldLine.length
         #expect(close(result.route.travelTime, kept + 150_000 / 25, 5))
     }
 
     /// Answer 2: a hazard on the direct road, off the old detour, is on the new route by its coordinate.
     @Test func aHazardOnTheDirectRoadIsOnTheNewRoute() async throws {
-        let result = try await RouteRebuild.build(input(), router: Roads())
+        let result = try await RouteRebuild.build(input(), router: StraightRoads())
         let new = RouteLine(Polyline.decode(result.route.polyline))
         let spot = at(north: 70_000)
         let event = TripEvent(
@@ -146,10 +105,10 @@ struct RouteRebuildTests {
     /// Answer 3 (#235): a car that kept to the direct road past the skipped town went joining; on the rebuilt
     /// route its next start reads it as a convoy car, without asking for a route of its own.
     @Test func aCarOnTheDirectRoadIsConvoyAgain() async throws {
-        let result = try await RouteRebuild.build(input(), router: Roads())
+        let result = try await RouteRebuild.build(input(), router: StraightRoads())
         let car = at(north: 72_000, east: 30)
-        let directions = Directions()
-        let writer = Writer()
+        let directions = CarRouteFakeDirections(routes: .init())
+        let writer = CarRouteFakeWriter()
         let before = try CarRouteService(
             tripId: "t", carId: "c", mainRoute: oldRoute, destination: ipoh, state: .joining,
             directions: directions, writer: writer)
@@ -162,19 +121,19 @@ struct RouteRebuildTests {
         #expect(plan.kind == .onMainRoute)
         #expect(plan.route == nil)
         #expect(after.state == .convoy)
-        #expect(directions.calls == 0)
+        #expect(directions.routes.calls.isEmpty)
     }
 
     @Test func aStopTheLeadCarIsAtStaysOnTheRouteWithItsOffset() async throws {
         var withArrival = stops
         withArrival[3] = stop("R&R Tapah", tapah, order: 3, kind: .rest, arrived: true)
-        let result = try await RouteRebuild.build(input(organizer: at(north: 119_900), stops: withArrival), router: Roads())
+        let result = try await RouteRebuild.build(input(organizer: at(north: 119_900), stops: withArrival), router: StraightRoads())
         #expect(result.offsets.isEmpty)
         #expect(result.sentence == "The route now goes through R&R Tapah and Ipoh")
     }
 
     @Test func withNoStopsAheadItGoesStraightToTheDestination() async throws {
-        let result = try await RouteRebuild.build(input(organizer: at(north: 150_000)), router: Roads())
+        let result = try await RouteRebuild.build(input(organizer: at(north: 150_000)), router: StraightRoads())
         #expect(result.offsets.isEmpty)
         #expect(result.sentence == "The route now goes straight to Ipoh")
     }
@@ -184,7 +143,7 @@ struct RouteRebuildTests {
     /// shared route (their sharing may be paused).
     @Test func theNewLegsStartOnTheRouteNeverAtTheOrganizer() async throws {
         for east in [1_000.0, 100, 20] {
-            let roads = Roads()
+            let roads = StraightRoads()
             let organizer = at(north: 50_000, east: east)
             let result = try await RouteRebuild.build(input(organizer: organizer), router: roads)
             #expect(RouteLine.haversine(try #require(roads.starts.first), at(north: 50_000)) < 5)
@@ -201,32 +160,9 @@ struct RouteRebuildTests {
     }
 }
 
-private final class Directions: CarRouteDirections, @unchecked Sendable {
-    var calls = 0
-    func route(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> [CLLocationCoordinate2D] {
-        calls += 1
-        return line(from, to)
-    }
-}
-
-private final class Writer: CarRouteWriting, @unchecked Sendable {
-    func write(_ plan: CarRoutePlan, tripId: String, carId: String) async throws {}
-}
-
 /// Answer 4: the skip lands on its own; the rebuild after it keeps trying until Maps answers.
 @MainActor
 struct RouteRebuilderTests {
-    private final class Sleeps: @unchecked Sendable {
-        private let lock = NSLock()
-        private var _waits: [Duration] = []
-        var waits: [Duration] { lock.withLock { _waits } }
-        func sleep(_ d: Duration) async throws {
-            lock.withLock { _waits.append(d) }
-            // The notice stays up until the test is over.
-            if d == RouteRebuilder.noticeTime { try await Task.sleep(for: .seconds(3_600)) }
-        }
-    }
-
     private func defaults() -> UserDefaults {
         let name = "RouteRebuilderTests.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: name)!
@@ -239,18 +175,18 @@ struct RouteRebuilderTests {
     }
 
     @Test func theRebuildKeepsTryingUntilMapsAnswers() async throws {
-        let sleeps = Sleeps()
+        let sleeps = Waits(hangFor: RouteRebuilder.noticeTime)
         let store = defaults()
         var writes: [RouteRebuild.Result] = []
         let rebuilder = RouteRebuilder(
-            tripId: "t1", router: Roads(failures: 2), defaults: store, sleep: { try await sleeps.sleep($0) }
+            tripId: "t1", router: StraightRoads(failures: 2), defaults: store, sleep: { try await sleeps.sleep($0) }
         ) { result, _ in writes.append(result) }
         rebuilder.input = { input() }
         rebuilder.request()
         #expect(store.bool(forKey: "routeRebuild.pending.t1"))
         await settle(rebuilder)
         #expect(!rebuilder.isPending)
-        #expect(Array(sleeps.waits.prefix(2)) == [.seconds(15), .seconds(30)])
+        #expect(Array(sleeps.items.prefix(2)) == [.seconds(15), .seconds(30)])
         #expect(writes.count == 1)
         #expect(rebuilder.notice == RouteRebuilder.Notice(text: "The route now goes through R&R Tapah and Ipoh", waiting: false))
         #expect(!store.bool(forKey: "routeRebuild.pending.t1"))
@@ -260,7 +196,7 @@ struct RouteRebuilderTests {
     @Test func whileItWaitsTheOrganizerReadsOneLine() async throws {
         let store = defaults()
         let rebuilder = RouteRebuilder(
-            tripId: "t2", router: Roads(failures: 100, error: RouteError.timedOut), defaults: store, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+            tripId: "t2", router: StraightRoads(failures: 100, error: RouteError.timedOut), defaults: store, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
         ) { _, _ in }
         rebuilder.input = { input() }
         rebuilder.request()
@@ -284,7 +220,7 @@ struct RouteRebuilderTests {
 
         // No fix yet: the input throws, and the organizer reads the location line.
         let rebuilder = RouteRebuilder(
-            tripId: "t6", router: Roads(), defaults: defaults(), sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+            tripId: "t6", router: StraightRoads(), defaults: defaults(), sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
         ) { _, _ in }
         rebuilder.input = { throw RouteError.locationUnavailable }
         rebuilder.request()
@@ -297,7 +233,7 @@ struct RouteRebuilderTests {
         let store = defaults()
         store.set(true, forKey: "routeRebuild.pending.t3")
         var writes = 0
-        let rebuilder = RouteRebuilder(tripId: "t3", router: Roads(), defaults: store, sleep: { _ in }) { _, _ in writes += 1 }
+        let rebuilder = RouteRebuilder(tripId: "t3", router: StraightRoads(), defaults: store, sleep: { _ in }) { _, _ in writes += 1 }
         rebuilder.input = { input() }
         rebuilder.resumeIfPending()
         await settle(rebuilder)
@@ -310,7 +246,7 @@ struct RouteRebuilderTests {
     @Test func withNothingToRebuildTheWishIsDropped() async throws {
         let store = defaults()
         var writes = 0
-        let rebuilder = RouteRebuilder(tripId: "t4", router: Roads(), defaults: store, sleep: { _ in }) { _, _ in writes += 1 }
+        let rebuilder = RouteRebuilder(tripId: "t4", router: StraightRoads(), defaults: store, sleep: { _ in }) { _, _ in writes += 1 }
         rebuilder.request()
         await settle(rebuilder)
         #expect(writes == 0)
@@ -320,7 +256,7 @@ struct RouteRebuilderTests {
 
     @Test func aNewDestinationIsWrittenWithTheRoute() async throws {
         var written: (RouteRebuild.Result, DestinationResult?)?
-        let rebuilder = RouteRebuilder(tripId: "t5", router: Roads(), defaults: defaults(), sleep: { _ in }) { written = ($0, $1) }
+        let rebuilder = RouteRebuilder(tripId: "t5", router: StraightRoads(), defaults: defaults(), sleep: { _ in }) { written = ($0, $1) }
         rebuilder.input = { input() }
         let kampar = DestinationResult(name: "Kampar", subtitle: "", coordinate: at(north: 160_000))
         try await rebuilder.changeDestination(to: kampar)
@@ -377,7 +313,7 @@ struct RouteRebuilderTests {
         }
         // Through the rebuilder with a router that fails: no LegFailure text on screen.
         let rebuilder = RouteRebuilder(
-            tripId: "t8", router: Roads(failures: 1, error: NSError(domain: "MKErrorDomain", code: 1)),
+            tripId: "t8", router: StraightRoads(failures: 1, error: NSError(domain: "MKErrorDomain", code: 1)),
             defaults: defaults(), sleep: { _ in }
         ) { _, _ in }
         rebuilder.input = { input() }

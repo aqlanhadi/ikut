@@ -5,46 +5,7 @@ import Foundation
 import Testing
 @testable import ikut
 
-private let earth = RouteLine.earthRadius
-private let start = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
-
-private func move(_ c: CLLocationCoordinate2D, north: Double = 0, east: Double = 0) -> CLLocationCoordinate2D {
-    CLLocationCoordinate2D(
-        latitude: c.latitude + north / earth * 180 / .pi,
-        longitude: c.longitude + east / (earth * cos(c.latitude * .pi / 180)) * 180 / .pi)
-}
-
-/// Points every `step` meters from `a` to `b`, both included.
-private func line(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D, step: Double = 500) -> [CLLocationCoordinate2D] {
-    let length = RouteLine.haversine(a, b)
-    let count = max(1, Int((length / step).rounded(.up)))
-    return (0...count).map { i in
-        let t = Double(i) / Double(count)
-        return CLLocationCoordinate2D(
-            latitude: a.latitude + (b.latitude - a.latitude) * t, longitude: a.longitude + (b.longitude - a.longitude) * t)
-    }
-}
-
-private func leg(_ points: [CLLocationCoordinate2D], seconds: Double? = nil, name: String = "E1") -> RouteLeg {
-    let length = RouteLine(points).length
-    return RouteLeg(coordinates: points, distance: length, travelTime: seconds ?? length / 25, name: name)
-}
-
-/// Straight roads between any two points, 25 m/s, counting the requests it gets.
-private final class StraightRoads: LegRouting, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _requests: [(CLLocationCoordinate2D, CLLocationCoordinate2D)] = []
-    /// Destinations (latitude) that have no road.
-    var noRoadTo: Set<Double> = []
-
-    var requests: Int { lock.withLock { _requests.count } }
-
-    func leg(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteLeg {
-        lock.withLock { _requests.append((from, to)) }
-        if lock.withLock({ noRoadTo.contains(to.latitude) }) { throw RouteError.noRoute }
-        return ikutTests.leg(line(from, to))
-    }
-}
+private let start = origin
 
 /// Answers "throttled" the first `throttles` times, then like StraightRoads.
 private final class ThrottledRoads: LegRouting, @unchecked Sendable {
@@ -62,13 +23,6 @@ private final class ThrottledRoads: LegRouting, @unchecked Sendable {
         if throttled { throw MKError(.loadingThrottled) }
         return ikutTests.leg(line(from, to))
     }
-}
-
-private final class Waits: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _items: [Duration] = []
-    var items: [Duration] { lock.withLock { _items } }
-    func add(_ d: Duration) { lock.withLock { _items.append(d) } }
 }
 
 struct ThrottleRetryTests {

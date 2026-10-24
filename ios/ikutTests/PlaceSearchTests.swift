@@ -5,14 +5,6 @@ import Testing
 @testable import ikut
 
 @MainActor
-private final class FakeSuggestions: SuggestionSource {
-    var onUpdate: ((String, Result<[SearchSuggestion], Error>) -> Void)?
-    var asked: [(String, MKCoordinateRegion)] = []
-    func update(query: String, region: MKCoordinateRegion) { asked.append((query, region)) }
-    func stop() {}
-}
-
-@MainActor
 private final class FakePlaceSearch: PlaceSearching {
     var searches: [(String, MKCoordinateRegion)] = []
     var found: [DestinationResult] = []
@@ -101,7 +93,7 @@ struct PlaceSearchTests {
         model.query = "petrol station"
         model.queryChanged()
         model.submit()
-        for _ in 0..<100 where model.isSearching { try await Task.sleep(for: .milliseconds(10)) }
+        await waitUntil(.seconds(1)) { !model.isSearching }
         #expect(places.searches.count == 1 && places.searches[0].0 == "petrol station")
         #expect(places.searches[0].1.center.latitude == SearchRegion.malaysia.center.latitude)
         #expect(model.showingResults && model.results.map(\.name) == ["A", "B", "C"])
@@ -142,7 +134,7 @@ struct PlaceSearchTests {
         model.along = AlongRoute(coordinates: route, seconds: 3600)
         model.query = "petrol"
         model.runSearch("petrol")
-        for _ in 0..<100 where model.isSearching { try await Task.sleep(for: .milliseconds(10)) }
+        await waitUntil(.seconds(1)) { !model.isSearching }
         #expect(model.results.map(\.name) == ["Early", "Mid", "Late", "Far east"])
         // The region for a search with no fix is the route's.
         #expect(abs(places.searches[0].1.center.latitude - 3.589) < 0.01)
@@ -172,7 +164,7 @@ struct PlaceSearchTests {
         places.resolved = place("Petronas Ipoh", 4.6, 101.1)
         places.held = ["resolve"]
         let task = Task { await model.resolve(row) }
-        for _ in 0..<100 where model.resolving == nil { try await Task.sleep(for: .milliseconds(5)) }
+        await waitUntil(.milliseconds(500)) { model.resolving != nil }
         #expect(model.resolving == row.id)
         // A second tap while one is resolving does nothing.
         #expect(await model.resolve(row) == nil)
@@ -203,7 +195,7 @@ struct PlaceSearchTests {
         model.runSearch("a")
         model.runSearch("b")
         places.release("b")
-        for _ in 0..<100 where model.isSearching { try await Task.sleep(for: .milliseconds(5)) }
+        await waitUntil(.milliseconds(500)) { !model.isSearching }
         #expect(model.results.map(\.name) == ["From b"])
         places.release("a")
         try await Task.sleep(for: .milliseconds(150))

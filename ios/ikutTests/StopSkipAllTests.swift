@@ -85,7 +85,6 @@ struct StopSkipAllTests {
     /// The route is not rebuilt, so on a highway R&R it still turns off at the slip road and back. Cars that stay on
     /// the highway project onto the far end of that detour: each car's offset jumps forward by the detour's length
     /// (a few hundred metres) as it passes the slip road, at slightly different moments.
-    private static let origin = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
     private func car(_ id: String, number: Int) -> Car {
         Car(id: id, name: "Car \(id)", color: "#2563EB", trackerUserId: nil, isLead: number == 1, route: nil,
             mergeOffset: nil, state: .convoy, number: number)
