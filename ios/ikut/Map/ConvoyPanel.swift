@@ -22,6 +22,8 @@ struct ConvoyPanel: View {
     var onStop: () -> Void
     /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
     var onNextStop: (String) -> Void = { _ in }
+    /// The car tapped on the map (D34 7b): its row is highlighted and scrolled into view.
+    var selectedCar: String?
     /// The panel's own height as laid out (folded or unfolded), for the sheet's detents.
     var onHeight: (CGFloat) -> Void = { _ in }
     /// A hidden copy that only measures the other layout, so the sheet knows both heights before it is asked to
@@ -322,12 +324,14 @@ struct ConvoyPanel: View {
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 { Divider().padding(.leading, 44) }
-                ConvoyRowView(row: row, youOnline: model.youOnline)
+                ConvoyRowView(row: row, youOnline: model.youOnline, selected: row.id == selectedCar)
+                    .id(CarSelection.rowId(row.id))
             }
             // Joining cars follow in the same list; their dashed badges set them apart.
             ForEach(Array(convoy.joiningRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 || !convoy.convoyRows.isEmpty { Divider().padding(.leading, 44) }
-                JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline)
+                JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline, selected: row.id == selectedCar)
+                    .id(CarSelection.rowId(row.id))
             }
         }
         .padding(.top, Spacing.tight)
@@ -464,6 +468,7 @@ private struct RowBadge: View {
 struct ConvoyRowView: View {
     var row: ConvoyRowText
     var youOnline = true
+    var selected = false
 
     var body: some View {
         HStack(spacing: Spacing.m) {
@@ -497,8 +502,10 @@ struct ConvoyRowView: View {
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
+        .background(selected ? MapPalette.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
@@ -521,6 +528,7 @@ struct JoiningRowView: View {
     var row: JoiningRowText
     var mine = false
     var youOnline = true
+    var selected = false
 
     var body: some View {
         HStack(spacing: Spacing.m) {
@@ -539,8 +547,10 @@ struct JoiningRowView: View {
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
+        .background(selected ? MapPalette.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
