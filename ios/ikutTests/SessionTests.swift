@@ -55,11 +55,11 @@ struct SessionLogicTests {
     @Test func routeLineDecoding() {
         #expect(TripSessionLogic.routeLine(from: nil) == nil)
         #expect(TripSessionLogic.routeLine(from: "") == nil)
-        #expect(TripSessionLogic.routeLine(from: "_p~iF~ps|U_ulLnnqC")?.coordinates.count == 2)
+        #expect(TripSessionLogic.routeLine(from: Fixtures.longRoute.polyline)?.coordinates.count == 2)
     }
 }
 
-private let mainPolyline = "_p~iF~ps|U_ulLnnqC"
+private let mainPolyline = Fixtures.longRoute.polyline
 private let ownPolyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
 
 private func testTrip(route: String = mainPolyline, status: TripStatus = .active, startedAt: Date? = nil) -> Trip {
@@ -70,9 +70,7 @@ private func testTrip(route: String = mainPolyline, status: TripStatus = .active
 }
 
 private func testCar(route: String? = nil, tracker: String? = "u1") -> Car {
-    Car(
-        id: "c1", name: "Car", color: "#000000", trackerUserId: tracker, isLead: true,
-        route: route, mergeOffset: nil, state: .joining, number: 1)
+    Car.fixture("c1", name: "Car", number: 1, lead: true, state: .joining, color: "#000000", tracker: tracker, route: route)
 }
 
 private let testMember = Member(id: "u1", displayName: "A", carId: "c1", role: .organizer)
@@ -209,17 +207,15 @@ struct SessionCarRouteTests {
 }
 
 private func meetStop(order: Int = 0, skipped: Bool? = nil, left: Bool = false) -> PlannedStop {
-    var stop = PlannedStop(
-        id: "m", name: "Petronas Sungai Buloh", coordinate: GeoPoint(latitude: 38.55, longitude: -120.1), routeOffset: 0,
-        kind: .meet, order: order, skipped: skipped)
-    if left { stop.leftAt = Date(timeIntervalSince1970: 1_000); stop.leftBy = "u1" }
-    return stop
+    PlannedStop.fixture(
+        "m", name: "Petronas Sungai Buloh", offset: 0, coordinate: GeoPoint(latitude: 38.55, longitude: -120.1),
+        kind: .meet, minutes: nil, order: order, skipped: skipped,
+        leftAt: left ? Date(timeIntervalSince1970: 1_000) : nil, leftBy: left ? "u1" : nil)
 }
 
 private func fuelStop(order: Int) -> PlannedStop {
-    PlannedStop(
-        id: "f\(order)", name: "R&R", coordinate: GeoPoint(latitude: 38.6, longitude: -120.3), routeOffset: 1_000,
-        kind: .fuel, minutes: 20, order: order)
+    PlannedStop.fixture(
+        "f\(order)", name: "R&R", offset: 1_000, coordinate: GeoPoint(latitude: 38.6, longitude: -120.3), order: order)
 }
 
 struct MeetingPointLogicTests {
@@ -582,16 +578,12 @@ struct SessionEmulatorTests {
         try Auth.auth().signOut()
     }
 
-    private func makeTrip() async throws -> EmulatorTrip {
-        try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
-    }
-
     private func carRef(_ s: EmulatorTrip) -> DocumentReference {
         Firestore.firestore().document(FirestorePaths.car(tripId: s.tripId, carId: s.carId))
     }
 
     @Test func trackerStartsAndNonTrackerDoesNot() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         let tracker = FakeTrackingController()
         let session = TripSession(tripId: s.tripId, userId: s.uid, tracker: tracker)
         session.start()
@@ -614,7 +606,7 @@ struct SessionEmulatorTests {
 
 
     @Test func farTrackerGetsOwnRouteMergeOffsetAndJoiningState() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         let tracker = FakeTrackingController()
         // Far east of the main route's start; the fake route drives to it, then follows it.
         tracker.firstFixResult = LocationFix(
@@ -648,7 +640,7 @@ struct SessionEmulatorTests {
     }
 
     @Test func releasingTrackerDutyStopsTracking() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         let tracker = FakeTrackingController()
         let session = TripSession(tripId: s.tripId, userId: s.uid, tracker: tracker)
         session.start()
@@ -663,11 +655,11 @@ struct SessionEmulatorTests {
     }
 
     @Test func positionsAreExposedByCarId() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         let session = TripSession(tripId: s.tripId, userId: s.uid, tracker: FakeTrackingController())
         session.start()
         defer { session.stop() }
-        var b = PositionBuilder(mainRoute: RouteLine(Polyline.decode("_p~iF~ps|U_ulLnnqC")), carRoute: nil)
+        var b = PositionBuilder(mainRoute: RouteLine(Polyline.decode(Fixtures.longRoute.polyline)), carRoute: nil)
         let p = b.build(
             from: LocationFix(latitude: 38.5, longitude: -120.2, speed: 5, course: 90, timestamp: Date()),
             battery: 0.5)
@@ -677,7 +669,7 @@ struct SessionEmulatorTests {
     }
 
     @Test func leaveStopsTrackingFirstReleasesDutyAndDeletesMember() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         let tracker = FakeTrackingController()
         let session = TripSession(tripId: s.tripId, userId: s.uid, tracker: tracker)
         session.start()
@@ -716,7 +708,7 @@ struct SessionEmulatorTests {
     }
 
     @Test func endTripSetsStatusAndStopsTracking() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         let tracker = FakeTrackingController()
         let session = TripSession(tripId: s.tripId, userId: s.uid, tracker: tracker)
         session.start()
@@ -738,24 +730,21 @@ struct SessionEmulatorTests {
     }
 
     @Test func otherMembersSeeEndedAndStopTracking() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         nonisolated(unsafe) let organizerUser = try #require(Auth.auth().currentUser)
         let code = try await Firestore.firestore().document(FirestorePaths.trip(s.tripId))
             .getDocument(as: Trip.self).code
 
         // A second user joins as the tracker of a new car.
-        try Auth.auth().signOut()
-        try await AuthModel().signInAsGuest(name: "Siti")
-        let uid2 = try #require(Auth.auth().currentUser?.uid)
-        let joined = try await LiveJoinAPI().join(
-            code: code, displayName: "Siti", car: .new(name: "Siti's car", color: "#D9480F"), tracker: true)
+        let (uid2, joinedCar) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Siti", carName: "Siti's car", color: "#D9480F", tracker: true, viaAuthModel: true)
         let tracker2 = FakeTrackingController()
         let session2 = TripSession(tripId: s.tripId, userId: uid2, tracker: tracker2)
         session2.start()
         defer { session2.stop() }
         await waitUntil(.seconds(10)) { tracker2.isTracking }
         #expect(tracker2.isTracking)
-        #expect(tracker2.lastCarId == joined.carId)
+        #expect(tracker2.lastCarId == joinedCar)
 
         // The organizer ends the trip.
         try await Auth.auth().updateCurrentUser(organizerUser)
@@ -773,16 +762,14 @@ struct SessionEmulatorTests {
     }
 
     @Test func pausedAtIsWrittenAndSeenByAnotherMember() async throws {
-        let s = try await makeTrip()
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
         nonisolated(unsafe) let trackerUser = try #require(Auth.auth().currentUser)
         let code = try await Firestore.firestore().document(FirestorePaths.trip(s.tripId))
             .getDocument(as: Trip.self).code
 
         // A second member joins another car and listens to the trip.
-        try Auth.auth().signOut()
-        try await AuthModel().signInAsGuest(name: "Siti")
-        _ = try await LiveJoinAPI().join(
-            code: code, displayName: "Siti", car: .new(name: "Siti's car", color: "#D9480F"), tracker: false)
+        try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Siti", carName: "Siti's car", color: "#D9480F", tracker: false, viaAuthModel: true)
         nonisolated(unsafe) let otherUser = try #require(Auth.auth().currentUser)
         // The tracker pauses.
         try await Auth.auth().updateCurrentUser(trackerUser)

@@ -534,10 +534,7 @@ struct CarRouteEmulatorTests {
 
         // A member who is not this car's tracker is rejected.
         let code = try await Firestore.firestore().document(FirestorePaths.trip(ids.tripId)).getDocument(as: Trip.self).code
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        _ = try await LiveJoinAPI().join(
-            code: code, displayName: "Daniel", car: .new(name: "Daniel's City", color: TripService.palette[1]), tracker: true)
+        try await EmulatorTrip.joinAsGuest(code: code, name: "Daniel", carName: "Daniel's City", tracker: true)
         await #expect(throws: Error.self) {
             try await FirestoreCarRouteWriter().write(plan, tripId: ids.tripId, carId: ids.carId)
         }

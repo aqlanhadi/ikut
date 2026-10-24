@@ -7,18 +7,16 @@ import Testing
 @Suite("Leaving a planned stop")
 @MainActor
 struct StopLeaveTests {
-    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    let t0 = Fixtures.t0
 
     func stop(
         _ id: String = "s1", at offset: Double = 20_000, kind: PlannedStopKind = .fuel, minutes: Int? = 20,
         meetAt: Date? = nil, arrivedAt: Date? = nil, leftAt: Date? = nil, skipped: Bool = false
     ) -> PlannedStop {
-        var s = PlannedStop(
-            id: nil, name: "R&R Tapah", coordinate: GeoPoint(latitude: 3, longitude: 101), routeOffset: offset, kind: kind,
-            minutes: kind == .meet ? nil : minutes, meetAt: meetAt, order: 0, skipped: skipped ? true : nil,
+        PlannedStop.fixture(
+            id, offset: offset, coordinate: GeoPoint(latitude: 3, longitude: 101), kind: kind,
+            minutes: kind == .meet ? nil : minutes, meetAt: meetAt, skipped: skipped ? true : nil,
             arrivedAt: arrivedAt, leftAt: leftAt, leftBy: leftAt == nil ? nil : "u1")
-        s.id = id
-        return s
     }
 
     // MARK: Leaving at
@@ -110,8 +108,8 @@ struct StopLeaveTests {
     // MARK: arrivedAt
 
     func position(at meters: Double, age: TimeInterval = 5, now: Date) -> Position {
-        Position(
-            id: nil, location: GeoPoint(latitude: 3 + meters / metersPerDegree, longitude: 101), speed: 20, heading: 0,
+        Position.fixture(
+            location: GeoPoint(latitude: 3 + meters / metersPerDegree, longitude: 101), speed: 20, heading: 0,
             routeOffset: meters, convoyOffset: meters, battery: 0.8, updatedAt: now.addingTimeInterval(-age))
     }
 
@@ -162,8 +160,7 @@ struct StopLeaveTests {
     // MARK: Words
 
     func car(_ id: String, _ name: String, number: Int) -> Car {
-        Car(id: id, name: name, color: "#2563EB", trackerUserId: "u-\(id)", isLead: number == 1, route: nil,
-            mergeOffset: nil, state: .convoy, number: number)
+        Car.fixture(id, name: name, number: number, lead: number == 1, tracker: "u-\(id)")
     }
 
     func row(_ id: String, _ name: String, _ status: StopArrival.Status, number: Int = 2) -> StopArrival.Row {
@@ -217,13 +214,8 @@ struct StopLeaveEmulatorTests {
     /// The organizer (and lead car) marks its arrival once, then taps Leave once; a car that is neither cannot, and
     /// the left stop takes no more skip answers.
     @Test func theOrganizerLeavesAStopOnce() async throws {
-        let trip = try await EmulatorTrip.make(name: "Leave", route: Fixtures.longRoute)
+        let trip = try await EmulatorTrip.make(name: "Leave", route: Fixtures.longRoute, stops: [Fixtures.tapah])
         let code = try await trip.code()
-        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
-        let tapah = PlannedStop(
-            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
-            kind: .fuel, minutes: 20, order: 0)
-        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
         let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
 
         // Before the start there is nothing to mark or leave.
@@ -251,28 +243,20 @@ struct StopLeaveEmulatorTests {
         }
 
         // A car that is neither the lead car nor the organizer cannot leave; a left stop takes no skip answer.
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        let joiner = try #require(Auth.auth().currentUser?.uid)
-        let joined = try await LiveJoinAPI().join(
-            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        let (joiner, joinedCar) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
         await #expect(throws: (any Error).self) {
             try await StopLeaveService.leave(tripId: trip.tripId, stopId: "tapah", userId: joiner)
         }
         await #expect(throws: (any Error).self) {
-            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joined.carId, userId: joiner)
+            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
         }
     }
 
     /// The organizer skips a stop nobody has reached, once; before the start and for a joined car it is refused.
     @Test func theOrganizerSkipsAStopForEveryoneOnce() async throws {
-        let trip = try await EmulatorTrip.make(name: "SkipAll", route: Fixtures.longRoute)
+        let trip = try await EmulatorTrip.make(name: "SkipAll", route: Fixtures.longRoute, stops: [Fixtures.tapah])
         let code = try await trip.code()
-        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
-        let tapah = PlannedStop(
-            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
-            kind: .fuel, minutes: 20, order: 0)
-        try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [tapah], removedIds: []))
         let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
 
         await #expect(throws: (any Error).self) {
@@ -291,11 +275,8 @@ struct StopLeaveEmulatorTests {
         }
 
         // A joined car that is not the organizer cannot skip for everyone.
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        let joiner = try #require(Auth.auth().currentUser?.uid)
-        _ = try await LiveJoinAPI().join(
-            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        let (joiner, _) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
         await #expect(throws: (any Error).self) {
             try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "tapah", userId: joiner)
         }
@@ -304,17 +285,13 @@ struct StopLeaveEmulatorTests {
     /// D25 4d: after a skip for everyone the organizer writes the rebuilt route with the new offset of the stop still
     /// ahead in one batch; the skipped stop keeps its offset, and a car that is not the organizer cannot rebuild.
     @Test func theOrganizerRebuildsTheRouteAfterASkip() async throws {
-        let trip = try await EmulatorTrip.make(name: "Rebuild", route: Fixtures.longRoute)
+        let bidor = PlannedStop.fixture(
+            "bidor", name: "Bidor", offset: 40_000, coordinate: GeoPoint(latitude: 4.1, longitude: 101.25), kind: .food,
+            minutes: 30)
+        var tapah = Fixtures.tapah
+        tapah.order = 1
+        let trip = try await EmulatorTrip.make(name: "Rebuild", route: Fixtures.longRoute, stops: [bidor, tapah])
         let code = try await trip.code()
-        let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
-        let bidor = PlannedStop(
-            id: "bidor", name: "Bidor", coordinate: GeoPoint(latitude: 4.1, longitude: 101.25), routeOffset: 40_000,
-            kind: .food, minutes: 30, order: 0)
-        let tapah = PlannedStop(
-            id: "tapah", name: "R&R Tapah", coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: 62_000,
-            kind: .fuel, minutes: 20, order: 1)
-        try await TripService.saveStops(
-            tripId: trip.tripId, plan: StopPlanSave(route: route, stops: [bidor, tapah], removedIds: []))
         await TripService.markStarted(tripId: trip.tripId)
         try await StopLeaveService.skipForEveryone(tripId: trip.tripId, stopId: "bidor", userId: trip.uid)
 
@@ -343,10 +320,7 @@ struct StopLeaveEmulatorTests {
         #expect(try await offset("bidor") == 40_000)
 
         // A joined car that is not the organizer cannot rebuild the route.
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        _ = try await LiveJoinAPI().join(
-            code: code, displayName: "Wyna", car: .new(name: "Wyna's X70", color: TripService.palette[1]), tracker: true)
+        try await EmulatorTrip.joinAsGuest(code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
         await #expect(throws: (any Error).self) {
             try await TripService.rebuildRoute(tripId: trip.tripId, result: result, destination: nil)
         }

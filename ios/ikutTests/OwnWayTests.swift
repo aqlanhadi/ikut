@@ -13,8 +13,9 @@ struct OwnWayTests {
     private let shahAlam = CLLocationCoordinate2D(latitude: 3.1, longitude: 100.8)
 
     private func car(route: [CLLocationCoordinate2D]?, mergeOffset: Double?, state: CarState = .joining) -> Car {
-        Car(id: "c", name: "Wyna’s X70", color: "#D9480F", trackerUserId: "u", isLead: false,
-            route: route.map(Polyline.encode), mergeOffset: mergeOffset, state: state)
+        Car.fixture(
+            "c", name: "Wyna’s X70", number: .some(nil), state: state, color: "#D9480F", tracker: "u",
+            route: route.map(Polyline.encode), mergeOffset: mergeOffset)
     }
 
     /// The route a car from the west would store: its start, then the main route 20 km along and 500 m past.

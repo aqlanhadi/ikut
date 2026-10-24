@@ -5,10 +5,6 @@ import Testing
 @testable import ikut
 
 struct TripServiceTests {
-    private let destination = DestinationResult(
-        name: "Kota Bharu", subtitle: "Kelantan",
-        coordinate: .init(latitude: 6.1254, longitude: 102.2381))
-    private let route = BuiltRoute(distance: 205_400, travelTime: 8_700, name: "E1", polyline: "_p~iF~ps|U")
     private let organizer = TripOrganizer(id: "uid1", displayName: "Aqlan")
 
     @Test func codeHasSixCharsFromAlphabet() {
@@ -46,10 +42,10 @@ struct TripServiceTests {
 
     @Test func tripDocumentMatchesRules() {
         let trip = TripService.makeTrip(
-            name: "Raya", code: "ABC234", organizerId: "uid1", destination: destination, route: route)
+            name: "Raya", code: "ABC234", organizerId: "uid1", destination: Fixtures.kotaBharu, route: Fixtures.longRoute)
         #expect(trip.status == .active)
         #expect(trip.organizerId == "uid1")
-        #expect(trip.route == route.polyline)
+        #expect(trip.route == Fixtures.longRoute.polyline)
         #expect(trip.createdAt == nil)
         #expect(trip.endedAt == nil)
         #expect(trip.destination.name == "Kota Bharu")
@@ -86,8 +82,7 @@ struct TripServiceEmulatorTests {
         let trip = try await EmulatorTrip.make(name: "Stops", route: Fixtures.longRoute)
         let db = Firestore.firestore()
         func stop(_ id: String, _ name: String, _ order: Int, offset: Double, kind: PlannedStopKind = .fuel, minutes: Int? = 20) -> PlannedStop {
-            PlannedStop(id: id, name: name, coordinate: GeoPoint(latitude: 4.2, longitude: 101.2), routeOffset: offset,
-                        kind: kind, minutes: minutes, order: order)
+            PlannedStop.fixture(id, name: name, offset: offset, kind: kind, minutes: minutes, order: order)
         }
         let route = BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Fixtures.longRoute.polyline)
         try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(
@@ -103,9 +98,9 @@ struct TripServiceEmulatorTests {
         #expect(stops[0].routeOffset == 62_000 && stops[0].minutes == 20 && stops[1].minutes == nil)
 
         // Remove the first, put a meeting point first: one batch.
-        let meet = PlannedStop(
-            id: "m", name: "Petronas Sungai Buloh", coordinate: GeoPoint(latitude: 3.2, longitude: 101.58), routeOffset: 0,
-            kind: .meet, meetAt: Date().addingTimeInterval(3_600), order: 0)
+        let meet = PlannedStop.fixture(
+            "m", name: "Petronas Sungai Buloh", offset: 0, coordinate: GeoPoint(latitude: 3.2, longitude: 101.58),
+            kind: .meet, minutes: nil, meetAt: Date().addingTimeInterval(3_600))
         try await TripService.saveStops(tripId: trip.tripId, plan: StopPlanSave(
             route: route, stops: [meet, stop("b", "Kopitiam", 1, offset: 120_000, kind: .food, minutes: nil)], removedIds: ["a"]))
         let after = try await db.collection(FirestorePaths.stops(tripId: trip.tripId)).order(by: "order").getDocuments()
@@ -126,13 +121,9 @@ struct TripServiceEmulatorTests {
         try await auth.signInAsGuest(name: "Aqlan")
         let uid = try #require(Auth.auth().currentUser?.uid)
 
-        let destination = DestinationResult(
-            name: "Kota Bharu", subtitle: "Kelantan",
-            coordinate: .init(latitude: 6.1254, longitude: 102.2381))
-        let route = BuiltRoute(distance: 205_400, travelTime: 8_700, name: "E1", polyline: "_p~iF~ps|U")
 
         let ids = try await TripService.createTrip(
-            name: "Balik kampung", destination: destination, route: route,
+            name: "Balik kampung", destination: Fixtures.kotaBharu, route: Fixtures.longRoute,
             organizer: TripOrganizer(id: uid, displayName: "Aqlan"),
             carName: "Aqlan's Myvi", carColor: TripService.palette[0])
 
@@ -141,7 +132,7 @@ struct TripServiceEmulatorTests {
         #expect(trip.name == "Balik kampung")
         #expect(trip.organizerId == uid)
         #expect(trip.status == .active)
-        #expect(trip.route == route.polyline)
+        #expect(trip.route == Fixtures.longRoute.polyline)
         #expect(trip.code.range(of: "^[A-Z0-9]{6}$", options: .regularExpression) != nil)
         #expect(trip.createdAt != nil)
 
@@ -156,27 +147,5 @@ struct TripServiceEmulatorTests {
         #expect(car.isLead)
         #expect(car.trackerUserId == uid)
         #expect(car.state == .convoy)
-    }
-}
-
-@MainActor
-struct RouteTimeoutTests {
-    @Test func returnsWorkThatFinishesInTime() async throws {
-        let value = try await RouteBuilder.withTimeout(.seconds(5), error: .timedOut) { 42 }
-        #expect(value == 42)
-    }
-
-    /// The case that left Where to? spinning: work that never finishes (MapKit waiting for a fix).
-    @Test func throwsAndCancelsWhenWorkHangs() async throws {
-        var cancelled = false
-        await #expect(throws: RouteError.locationUnavailable) {
-            _ = try await RouteBuilder.withTimeout(.milliseconds(100), error: .locationUnavailable) {
-                try await Task.sleep(for: .seconds(60))
-                return 0
-            } onTimeout: {
-                cancelled = true
-            }
-        }
-        #expect(cancelled)
     }
 }

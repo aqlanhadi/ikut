@@ -175,11 +175,10 @@ struct RequestPlacesTests {
     }
 
     private func entry(_ id: String, offset: Double, lead: Bool = false, stale: Bool = false, speed: Double = 25) -> ConvoyEntry {
-        let car = Car(id: id, name: id, color: "#2563EB", trackerUserId: nil, isLead: lead, route: nil, mergeOffset: nil,
-                      state: .convoy, number: nil)
-        let position = Position(
+        let car = Car.fixture(id, name: id, number: .some(nil), lead: lead)
+        let position = Position.fixture(
             location: .init(latitude: 3, longitude: 101), speed: speed, heading: 0, routeOffset: offset,
-            convoyOffset: offset, battery: nil, updatedAt: nil)
+            convoyOffset: offset, updatedAt: nil)
         return ConvoyEntry(
             id: id, car: car, position: position, convoyOffset: offset, speed: speed, movingSpeed: speed,
             isFront: false, isLead: lead, isStale: stale)

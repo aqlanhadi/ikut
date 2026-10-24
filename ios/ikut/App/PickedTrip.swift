@@ -116,8 +116,8 @@ final class PickedTrip {
 }
 
 #if DEBUG
-/// States of Home for the screenshot test (`IKUT_HOME_DEMO`): the list, and a trip picked while its recap
-/// is loaded, loading or couldn't load.
+/// States of Home for the launch screens (`IKUT_SCREEN`, see `DemoScreens`): the list, and a trip picked while its
+/// recap is loaded, loading or couldn't load.
 @MainActor
 enum HomePickedDemo {
     static func view(_ name: String) -> TripsHomeView {

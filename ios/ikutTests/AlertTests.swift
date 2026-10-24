@@ -548,12 +548,8 @@ struct AlertEmulatorTests {
             type: .debris, tripId: trip.tripId, carId: trip.carId, authorId: trip.uid,
             location: .init(latitude: 3, longitude: 101), heading: 0, route: nil, previousOffset: nil)
 
-        try Auth.auth().signOut()
-        try await Auth.auth().signInAnonymously()
-        let daniel = try #require(Auth.auth().currentUser?.uid)
-        _ = try await LiveJoinAPI().join(
-            code: code, displayName: "Daniel", car: .new(name: "Daniel's City", color: TripService.palette[1]),
-            tracker: false)
+        let (daniel, _) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Daniel", carName: "Daniel's City", tracker: false)
 
         let speaker = AlertFakeSpeaker()
         let center = AlertCenter(

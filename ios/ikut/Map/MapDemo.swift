@@ -7,9 +7,8 @@ import SwiftUI
 /// three cars in the convoy near Tapah and Bidor (the last one stale), and Hafiz from Teluk Intan
 /// joining at Bidor on his own route.
 ///
-/// To see it in the simulator, run the `MapDemoScreenshot` test with
-/// `TEST_RUNNER_IKUT_MAP_DEMO_HOLD=<seconds>`: it hosts `MapDemo.view()` in a window and waits, so
-/// `xcrun simctl io <device> screenshot` can capture it. Nothing in the app launches it.
+/// To see it in the simulator, launch a debug build with `IKUT_SCREEN=road-panel-short` (or another `road-panel-*`
+/// state, see `DemoScreens`); `MapDemo.view()` hosts it. Nothing else in the app launches it.
 @MainActor
 enum MapDemo {
     private struct FixedETA: ETAProviding {
