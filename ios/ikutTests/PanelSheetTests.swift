@@ -3,22 +3,48 @@ import Testing
 @testable import ikut
 
 struct PanelSheetTests {
-    private func heights(folded: CGFloat? = 300, unfolded: CGFloat? = 480, card: CGFloat? = 340,
+    private func heights(folded: CGFloat? = 300, unfolded: CGFloat? = 480, card: CGFloat? = 340, bar: CGFloat? = 0,
                          room: CGFloat? = 700) -> PanelSheet.Heights {
-        PanelSheet.heights(folded: folded, unfolded: unfolded, card: card, room: room)
+        PanelSheet.heights(folded: folded, unfolded: unfolded, card: card, bar: bar, room: room)
     }
 
-    @Test func shortAndTallFollowTheMeasuredPanelPlusTheHomeIndicator() {
-        let h = heights()
-        #expect(h.short == 300)
-        #expect(h.tall == 480)
+    @Test func shortAndTallAreTheMeasuredPanelPlusTheMeasuredBar() {
+        let h = heights(bar: 62)
+        #expect(h.short == 362)
+        #expect(h.tall == 542)
+        // The stop card has no bar.
         #expect(h.card == 340)
     }
 
+    @Test func theBarIsKeptWhenTheContentIsCapped() {
+        // The panel is taller than the room: the sheet stops at the room, and the list scrolls under the bar.
+        let h = heights(folded: 300, unfolded: 900, bar: 62, room: 600)
+        #expect(h.tall == 600)
+        #expect(h.short == 362)
+        // Content that fits only without the bar is capped too, never past the room.
+        #expect(heights(folded: 580, unfolded: 580, bar: 62, room: 600).short == 600)
+    }
+
+    @Test func aBarNotMeasuredYetUsesItsEstimate() {
+        let h = heights(bar: nil)
+        #expect(h.short == 300 + PanelSheet.barEstimate)
+        #expect(h.tall == 480 + PanelSheet.barEstimate)
+    }
+
+    @Test func theBarHangsIntoTheSafeAreaSoTheGapUnderItEqualsTheSideGap() {
+        // iPhone with a home indicator (34 pt): lifted 34 - 16 = 18, so 16 pt is left under the buttons.
+        #expect(PanelSheet.barLift(safeBottom: 34) == 18)
+        // No safe area (home button): nothing to hang into.
+        #expect(PanelSheet.barLift(safeBottom: 0) == 0)
+        #expect(PanelSheet.barLift(safeBottom: 10) == 0)
+        // Never into the indicator's own strip.
+        #expect(PanelSheet.barLift(safeBottom: 20) <= 20 - PanelSheet.indicatorClearance)
+    }
+
     @Test func aLayoutNotSeenYetUsesTheEstimate() {
-        let h = heights(folded: nil, unfolded: nil, card: nil)
-        #expect(h.short == PanelSheet.foldedEstimate)
-        #expect(h.tall == PanelSheet.unfoldedEstimate)
+        let h = heights(folded: nil, unfolded: nil, card: nil, bar: nil)
+        #expect(h.short == PanelSheet.foldedEstimate + PanelSheet.barEstimate)
+        #expect(h.tall == PanelSheet.unfoldedEstimate + PanelSheet.barEstimate)
         #expect(h.card == PanelSheet.cardEstimate)
     }
 
@@ -84,14 +110,13 @@ struct PanelSheetTests {
         #expect(PanelSheet.choice(.height(300), in: heights(folded: 280)) == nil)
     }
 
-    @Test func nothingIsLeftUnderTheButtonsButTheMarginAndTheSystemsOwnSafeArea() {
-        // The panel's content ends with its bottom margin and the sheet adds nothing: the home indicator's strip is
-        // the sheet's own (adding it again left 34 pt of empty space under Report and Pit stop).
-        let h = PanelSheet.heights(folded: 400, unfolded: 480, card: 300, room: nil)
-        #expect(h.short == 400)
-        #expect(h.tall == 480)
+    @Test func theSheetAddsNothingButTheBarToTheContent() {
+        // The home indicator's strip is the sheet's own (adding it again left 34 pt of empty space under the buttons).
+        let h = PanelSheet.heights(folded: 400, unfolded: 480, card: 300, bar: 60, room: nil)
+        #expect(h.short == 460)
+        #expect(h.tall == 540)
         #expect(h.card == 300)
-        #expect(PanelSheet.bottomMargin == Spacing.s)
+        #expect(PanelSheet.sideGap == Spacing.l)
     }
 
     @Test func anExitWaitsForTheSheetOnlyWhileItIsUp() {

@@ -47,7 +47,7 @@ struct NextStopDemo: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
-            ConvoyPanel(model: map, expanded: $expanded, canReport: true, onReport: {}, onStop: {}).previewCard()
+            ConvoyPanel(model: map, expanded: $expanded).previewCard()
         }
     }
 }

@@ -66,9 +66,12 @@ struct StopCardPreview: View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
             if !cardOpen {
-                ConvoyPanel(
-                    model: map, expanded: .constant(false), canReport: true,
-                    stopButton: StopLogic.buttonContent(for: board), onReport: {}, onStop: {}).previewCard()
+                VStack(spacing: 0) {
+                    ConvoyPanel(model: map, expanded: .constant(false))
+                    ConvoyActionBar(
+                        canReport: true, stopButton: StopLogic.buttonContent(for: board), onReport: {}, onStop: {})
+                        .padding(.bottom, Spacing.s)
+                }.previewCard()
             } else if let context = map.stopContext(tripId: "demo", userId: "u-c1", isOrganizer: false) {
                 StopCard(
                     board: board, context: context, driving: driving, actions: .none, service: DemoStopService(),
