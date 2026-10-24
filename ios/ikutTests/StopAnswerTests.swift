@@ -25,11 +25,6 @@ struct StopAnswerTests {
         #expect(decoded.at == at)
     }
 
-    @Test func pathsPutTheAnswerUnderTheStopByCarId() {
-        #expect(FirestorePaths.answers(tripId: "t", stopId: "s1") == "trips/t/stops/s1/answers")
-        #expect(FirestorePaths.answer(tripId: "t", stopId: "s1", carId: "carB") == "trips/t/stops/s1/answers/carB")
-    }
-
     @Test func exactly150MetersShortIsAlreadyThere() {
         #expect(!SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_850, tripStarted: true, isJoining: false))
         #expect(SkipAnswers.canSkip(stop: stop(), isLeadCar: false, carOffset: 61_849.5, tripStarted: true, isJoining: false))

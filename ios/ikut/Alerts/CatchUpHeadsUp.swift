@@ -65,7 +65,7 @@ struct CatchUpHeadsUp: Sendable {
         let mine = "\(tripId)/\(myCarId)"
         if let at = firedAt[mine] {
             // Re-arm once my car has driven on; it then has to see a car far behind again.
-            guard let me = snapshot.convoy.first(where: { $0.id == myCarId }),
+            guard let me = snapshot.entry(myCarId),
                   me.convoyOffset - at > Self.rearmDistance else { return nil }
             firedAt[mine] = nil
             seenFar = seenFar.filter { !$0.hasPrefix("\(mine)/") }
@@ -77,7 +77,7 @@ struct CatchUpHeadsUp: Sendable {
             return nil
         }
         guard seenFar.contains(pair),
-              let me = snapshot.convoy.first(where: { $0.id == myCarId }) else { return nil }
+              let me = snapshot.entry(myCarId) else { return nil }
         firedAt[mine] = me.convoyOffset
         due.stop = (stops[mine] ?? 0) + 1
         stops[mine] = due.stop
@@ -86,7 +86,7 @@ struct CatchUpHeadsUp: Sendable {
 
     /// "Aisha’s car" for "Aisha’s X70"; a name that isn't anyone's stays as it is.
     static func phrase(_ carName: String) -> String {
-        let short = MapMarkerBuilder.shortName(carName)
+        let short = StopLogic.ownerName(fromCarName: carName)
         return short == carName ? carName : "\(short)’s car"
     }
 }

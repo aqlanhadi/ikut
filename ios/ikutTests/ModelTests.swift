@@ -113,12 +113,6 @@ struct ModelTests {
         #expect(stop.expiresAt == date.addingTimeInterval(30 * 60))
     }
 
-    @Test func pathsAreBuilt() {
-        #expect(FirestorePaths.cars(tripId: "t") == "trips/t/cars")
-        #expect(FirestorePaths.position(tripId: "t", carId: "c") == "trips/t/positions/c")
-        #expect(FirestorePaths.event(tripId: "t", eventId: "e") == "trips/t/events/e")
-    }
-
     /// Every path the app reads or writes, byte for byte (a wrong one writes to the wrong place).
     @Test func everyPathIsPinned() {
         #expect(FirestorePaths.trips == "trips")

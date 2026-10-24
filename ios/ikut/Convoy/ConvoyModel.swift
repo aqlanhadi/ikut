@@ -70,6 +70,9 @@ final class ConvoyModel {
     private(set) var frontETA: FrontETA?
     var convoy: [ConvoyEntry] { snapshot.convoy }
     var joining: [JoiningEntry] { snapshot.joining }
+    /// My car's entry in the convoy, or in the joining list; nil when it is in neither.
+    var myEntry: ConvoyEntry? { snapshot.entry(myCarId) }
+    var myJoining: JoiningEntry? { snapshot.joiningEntry(myCarId) }
     /// Set by the owner for "ETA Ipoh 14:52"; optional.
     var destinationName: String?
     /// Town names of cars parked far from the viewer ("Rawang"), by car id, as the reverse geocoder answers.
@@ -315,7 +318,7 @@ final class ConvoyModel {
 
     /// The collapsed summary: my own joining car first ("You join in 14 km"), else the first with a merge time.
     func summaryParts(myCarId: String?) -> (driving: String, joining: String?, spread: String?) {
-        let joiner = joining.first(where: { $0.id == myCarId })
+        let joiner = snapshot.joiningEntry(myCarId)
             ?? joining.first(where: { $0.timeToMerge != nil }) ?? joining.first
         return ConvoyFormat.convoySummary(
             driving: convoy.count, joinerName: joiner?.car.name, joinIn: joiner?.timeToMerge,
@@ -328,7 +331,7 @@ final class ConvoyModel {
     func headerText(
         car: Car?, join: OwnWayJoin?, ownStartTown: String?, mainStartTown: String?, joinPlace: String?, destination: String
     ) -> ConvoyHeader.Text {
-        let mine = joining.first(where: { $0.id == myCarId })
+        let mine = snapshot.joiningEntry(myCarId)
         return ConvoyHeader.text(
             car: car, joinEntry: mine, join: join, ownStartTown: ownStartTown, mainStartTown: mainStartTown,
             joinPlace: joinPlace, destination: destination, amount: mine.flatMap { joinAmount($0) })

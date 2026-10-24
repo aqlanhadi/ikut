@@ -59,7 +59,7 @@ struct MapMarkerTests {
         #expect(!markers[1].isLead)
         // My own car reads its name; the "You" tag is drawn after it.
         #expect(markers[1].label != "Me")
-        #expect(markers[1].label == MapMarkerBuilder.shortName(markers[1].name))
+        #expect(markers[1].label == StopLogic.ownerName(fromCarName: markers[1].name))
     }
 
     @Test func staleCarIsFlaggedWithAge() {
@@ -126,10 +126,11 @@ struct MapMarkerTests {
     }
 
     @Test func shortNames() {
-        #expect(MapMarkerBuilder.shortName("Wyna’s X70") == "Wyna")
-        #expect(MapMarkerBuilder.shortName("Aqlan's car") == "Aqlan")
-        #expect(MapMarkerBuilder.shortName("Red Myvi") == "Red Myvi")
-        #expect(MapMarkerBuilder.shortName("’s odd") == "’s odd")
+        #expect(StopLogic.ownerName(fromCarName: "Wyna’s X70") == "Wyna")
+        #expect(StopLogic.ownerName(fromCarName: "Aqlan's car") == "Aqlan")
+        #expect(StopLogic.ownerName(fromCarName: "Red Myvi") == "Red Myvi")
+        #expect(StopLogic.ownerName(fromCarName: "’s odd") == "’s odd")
+        #expect(StopLogic.ownerName(fromCarName: " Wyna ’s X70") == "Wyna")
     }
 
     @Test func separationWarningText() {

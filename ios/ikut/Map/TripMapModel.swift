@@ -207,7 +207,7 @@ final class TripMapModel {
     private func checkLeadArrival() {
         guard !isEnded, isTracker, myCar?.isLead == true, let write = arrivalWriter,
               let tripId = alertTripId ?? session?.tripId, let myCarId else { return }
-        let offset = convoy.convoy.first { $0.id == myCarId }?.convoyOffset
+        let offset = convoy.myEntry?.convoyOffset
         guard let stop = StopLeave.stopToMarkArrived(
                   stops: stops, isLeadTracker: true, tripStarted: tripStarted, position: positions[myCarId],
                   offset: offset, now: Date()),
@@ -246,7 +246,7 @@ final class TripMapModel {
     /// Seconds per meter along the main route for my car (`NextStop.pace`): my ETA over what is left of the route,
     /// else my speed; nil while I'm not in the convoy or with neither.
     func stopPace() -> Double? {
-        guard let length = mainRoute?.length, length > 0, let mine = convoy.convoy.first(where: { $0.id == myCarId })
+        guard let length = mainRoute?.length, length > 0, let mine = convoy.myEntry
         else { return nil }
         return NextStop.pace(
             travelTimeToGo: convoy.driveArrival(forCar: mine.id)?.timeIntervalSinceNow,
@@ -327,8 +327,8 @@ final class TripMapModel {
 
     /// Whether my phone counts as online: a network path and, as the tracker, a car that is not stale.
     var youOnline: Bool {
-        let mine = convoy.convoy.first { $0.id == myCarId }?.isStale
-            ?? convoy.joining.first { $0.id == myCarId }?.isStale ?? false
+        let mine = convoy.myEntry?.isStale
+            ?? convoy.myJoining?.isStale ?? false
         return YouOnline.isOnline(pathUp: networkUp, isTracker: isTracker, carStale: mine)
     }
 
@@ -511,5 +511,33 @@ final class TripMapModel {
     static func formatCode(_ code: String) -> String {
         guard code.count == 6 else { return code }
         return "\(code.prefix(3)) \(code.suffix(3))"
+    }
+}
+
+extension TripMapModel {
+    /// Meters from my car to a hazard along the main route, carried forward from my last fix at my
+    /// speed so it counts down between fixes. Nil when the hazard isn't on the main route or my car
+    /// isn't in the convoy yet. Negative once passed.
+    func approachDistance(eventId: String, now: Date = Date()) -> Double? {
+        guard let hazard = hazards.markers.first(where: { $0.id == eventId })?.mainOffset,
+              let mine = myOffsetNow(now: now) else { return nil }
+        return hazard - mine
+    }
+
+    /// My car's offset on the main route, carried forward from my last fix at my speed (at most 30 s), and
+    /// only while that fix is fresh: a fix older than `HazardLogic.Config.staleAfter` is returned as it was.
+    func myOffsetNow(now: Date = Date()) -> Double? {
+        guard let me = convoy.myEntry else { return nil }
+        var mine = me.convoyOffset
+        if let at = me.position.updatedAt, !me.isPaused, now.timeIntervalSince(at) <= HazardLogic.Config.default.staleAfter {
+            mine += me.speed * min(max(now.timeIntervalSince(at), 0), 30)
+        }
+        return mine
+    }
+
+    /// Seconds to cover `distance` at my current speed; nil when unknown or barely moving.
+    func secondsToCover(_ distance: Double) -> Double? {
+        guard let me = convoy.myEntry, me.speed > 1 else { return nil }
+        return distance / me.speed
     }
 }
