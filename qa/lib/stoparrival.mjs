@@ -32,15 +32,16 @@ export function status(car, target, { pace = null } = {}) {
   return { kind: 'away', distance: straight, seconds: perMeter === null ? null : perMeter * straight };
 }
 
-/** Every car once, by badge number then id: {rows: [{id, status, skipping}], here, total, title: "3 of 4 here"}.
- *  `options.skipping` is the set of car ids that said they are skipping the stop: they stay as rows but are not
- *  counted in `here` or `total`. (A car with no position yet is a row with status unknown and counts; the caller passes every trip car.) */
+/** Every car once, by badge number then id: {rows: [{id, status, skipping, notSharing}], here, total, title: "3 of 4 here"}.
+ *  `options.skipping` is the set of car ids that said they are skipping the stop, `options.notSharing` the cars nobody
+ *  shares location from (no trackerUserId, #231): both stay as rows but are not counted in `here` or `total`. (A car with no position yet is a row with status unknown and counts; the caller passes every trip car.) */
 export function tally(target, cars, options = {}) {
   const skipping = options.skipping ?? new Set();
+  const notSharing = options.notSharing ?? new Set();
   const rows = [...cars]
     .sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity) || (a.id < b.id ? -1 : 1))
-    .map((c) => ({ id: c.id, status: status(c, target, options), skipping: skipping.has(c.id) }));
-  const counted = rows.filter((r) => !r.skipping);
+    .map((c) => ({ id: c.id, status: status(c, target, options), skipping: skipping.has(c.id), notSharing: notSharing.has(c.id) }));
+  const counted = rows.filter((r) => !r.skipping && !r.notSharing);
   const here = counted.filter((r) => r.status.kind === 'here').length;
   return { rows, here, total: counted.length, title: `${here} of ${counted.length} here` };
 }

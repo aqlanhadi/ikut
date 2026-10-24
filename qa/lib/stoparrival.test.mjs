@@ -59,3 +59,11 @@ test('a skipping car stays a row but leaves the count', () => {
   assert.equal(t.rows.find((r) => r.id === 'c3').skipping, true);
   assert.equal(tally(target, cars, { skipping: new Set(['c3', 'c4']) }).title, '2 of 2 here');
 });
+
+test('a car nobody shares location from stays a row but leaves the count (#231)', () => {
+  const cars = [car('c1', 20_000), car('c2', 19_920), car('c3', 11_000), { id: 'c4', number: 4 }];
+  const t = tally(target, cars, { notSharing: new Set(['c3']) });
+  assert.equal(t.title, '2 of 3 here');
+  assert.equal(t.rows.find((r) => r.id === 'c3').notSharing, true);
+  assert.equal(tally(target, cars, { notSharing: new Set(['c3']), skipping: new Set(['c4']) }).title, '2 of 2 here');
+});

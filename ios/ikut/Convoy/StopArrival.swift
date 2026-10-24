@@ -59,9 +59,8 @@ enum StopArrival {
     struct Tally: Equatable, Sendable {
         var rows: [Row]
         /// Skipping cars and cars nobody shares location from leave the count: "3 of 3 here" with a fourth car
-        /// skipping. A car with no position yet still
-        /// counts: it has a row of its own ("Waiting for location") because `tally` adds one for every trip car in
-        /// neither list.
+        /// skipping. A car with no position yet still counts: it has a row of its own ("Waiting for location")
+        /// because `tally` adds one for every trip car in neither list.
         var counted: [Row] { rows.filter { !$0.skipping && !$0.notSharing } }
         var here: Int { counted.filter(\.isHere).count }
         var total: Int { counted.count }
