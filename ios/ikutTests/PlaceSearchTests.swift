@@ -72,7 +72,7 @@ struct PlaceSearchTests {
 
     @Test func completionsBecomeRowsWithBoldMatchesAndAQueryRow() {
         let place = SearchSuggestion(title: "Petronas KLCC", subtitle: "Kuala Lumpur", highlights: [NSRange(location: 0, length: 4)])
-        let query = SearchSuggestion(title: "petrol station", subtitle: "Search nearby", highlights: [NSRange(location: 0, length: 4)])
+        let query = SearchSuggestion(title: "petrol station", subtitle: "Search Nearby", highlights: [NSRange(location: 0, length: 4)])
         #expect(!place.isQuery && query.isQuery)
         #expect(query.shownTitle == "Search petrol station")
         #expect(query.shownHighlights == [NSRange(location: 7, length: 4)])

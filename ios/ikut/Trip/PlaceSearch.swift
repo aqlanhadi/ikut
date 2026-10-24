@@ -31,8 +31,8 @@ enum SearchRegion {
 
 /// One line of "as you type": a place (name, area) or a query ("Search petrol station").
 struct SearchSuggestion: Identifiable, Equatable {
-    /// Apple's own subtitle on a query completion.
-    static let queryMarker = "Search nearby"
+    /// Apple's own subtitle on a query completion, matched as MapKit writes it (not our words, so not sentence case).
+    static let queryMarker = "Search Nearby"
     static let queryPrefix = "Search "
 
     var title: String
