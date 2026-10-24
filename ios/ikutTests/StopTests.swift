@@ -457,7 +457,7 @@ struct StopLogicTests {
             StopPillPlanner.current(requests: [mine], memory: memory, now: t0.addingTimeInterval(2)) else {
             Issue.record("expected the asked pill"); return
         }
-        #expect(title == "Informed the convoy")
+        #expect(title == "Sent to the convoy")
         #expect(detail == "Waiting for 3 cars")
         #expect(StopPillPlanner.current(requests: [mine], memory: memory, now: t0.addingTimeInterval(10)) == nil)
         // An old request of mine that was already open is not announced again.
@@ -588,11 +588,11 @@ struct StopAskTests {
         let ask = RequestStopModel(context: context(), service: service)
         ask.choose(StopReason.all[0])
         #expect(await ask.send() == false)
-        #expect(ask.sending == .failed("Could not reach the convoy. Try again in a moment."))
+        #expect(ask.sending == .failed("Couldn’t reach the convoy. Try again in a moment."))
         let noFix = RequestStopModel(context: context(withFix: false), service: FakeStopService())
         noFix.choose(StopReason.all[0])
         #expect(await noFix.send() == false)
-        #expect(noFix.sending == .failed("Waiting for your location. Try again in a moment."))
+        #expect(noFix.sending == .failed("Your phone hasn’t found where you are yet. Try again in a moment."))
     }
 
     @Test func onlyTheMessageIsBehindThePassengerCheck() {
@@ -606,7 +606,7 @@ struct StopAskTests {
     }
 
     @Test func sendingGoesThroughTheServiceWithTheReasonOnTheCard() async {
-        // The ask works with no passenger check at all: reason, then Inform the convoy.
+        // The ask works with no passenger check at all: reason, then Tell the convoy.
         let service = FakeStopService()
         let model = StopCardModel(context: context(), service: service)
         #expect(model.screen == .home)

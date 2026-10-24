@@ -61,7 +61,7 @@ final class RequestStopModel {
     func send() async -> Bool {
         guard let reason, canSend else { return false }
         guard let snapshot = context.snapshot() else {
-            sending = .failed("Waiting for your location. Try again in a moment.")
+            sending = .failed("Your phone hasn’t found where you are yet. Try again in a moment.")
             return false
         }
         sending = .sending
@@ -71,7 +71,7 @@ final class RequestStopModel {
             sending = .idle
             return true
         } catch {
-            sending = .failed("Could not reach the convoy. Try again in a moment.")
+            sending = .failed("Couldn’t reach the convoy. Try again in a moment.")
             return false
         }
     }

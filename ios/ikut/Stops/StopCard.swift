@@ -33,7 +33,7 @@ final class StopCardModel {
 /// The stop card, layered on top of the convoy panel. It opens only when someone taps the Pit stop
 /// button, and closes by itself when the stop closes. Sending is always an explicit tap. What it shows
 /// follows the board: the four reasons, then the chosen reason with an optional message and one
-/// "Inform the convoy" button; once a request is open, the request with a row per car, OK, We’ve
+/// "Tell the convoy" button; once a request is open, the request with a row per car, OK, We’ve
 /// stopped and Cancel request. Every button works while the car moves; only the message field asks
 /// "Are you a passenger?" first.
 struct StopCard: View {
@@ -169,7 +169,7 @@ struct StopCard: View {
                 Text(message).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
             }
             StopActionButton(
-                title: "Inform the convoy", style: .primary, height: big ? 72 : 50, disabled: !ask.canSend, id: "stop.send"
+                title: "Tell the convoy", style: .primary, height: big ? 72 : 50, disabled: !ask.canSend, id: "stop.send"
             ) { send() }
             StopActionButton(
                 title: StopLogic.cleanedMessage(ask.message) == nil ? "Add a message" : "Change the message",
@@ -183,7 +183,7 @@ struct StopCard: View {
     }
 
     private var sentScreen: some View {
-        StopCardFrame(title: "Informed the convoy", subtitle: "Waiting for the other cars", onClose: onClose) {
+        StopCardFrame(title: "Sent to the convoy", subtitle: "Waiting for the other cars", onClose: onClose) {
             Text("Each car taps OK when it sees your request.")
                 .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
         } actions: {}

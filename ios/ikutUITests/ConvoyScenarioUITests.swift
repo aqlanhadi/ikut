@@ -68,7 +68,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             XCTAssertTrue(joining.exists, "car 4 should be under JOINING")
             XCTAssertTrue(joining.label.contains("Daniel"), "joining row should be Daniel's car: \(joining.label)")
             XCTAssertTrue(element("convoy.row.5").label.contains(name), "row 5 should be this phone's car: \(element("convoy.row.5").label)")
-            XCTAssertTrue(element("convoy.header").label.hasPrefix("4 in Convoy"), "header: \(element("convoy.header").label)")
+            XCTAssertTrue(element("convoy.header").label.hasPrefix("4 in convoy"), "header: \(element("convoy.header").label)")
             shot("01-before-drive")
         }
 
@@ -94,7 +94,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
         try step("4. Car 4 merges: JOINING goes, order 1, 2, 4, 3, 5") {
             try waitFor("car 4 leaves JOINING", timeout: 120 / speed + 60) { !exists("joining.row.4") }
             try waitFor("convoy order 1, 2, 4, 3, 5", timeout: 60) { convoyOrder() == [1, 2, 4, 3, 5] }
-            XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in Convoy"), "header: \(element("convoy.header").label)")
+            XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in convoy"), "header: \(element("convoy.header").label)")
             shot("04-car4-merged")
         }
 
@@ -159,7 +159,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
                 element("convoy.row.5").label.contains(" km ahead · parked")
             }
             XCTAssertTrue(element("convoy.row.1").label.contains("km behind"), "Aisha's row: \(element("convoy.row.1").label)")
-            XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in Convoy"), "header: \(element("convoy.header").label)")
+            XCTAssertTrue(element("convoy.header").label.hasPrefix("5 in convoy"), "header: \(element("convoy.header").label)")
             XCTAssertFalse(exists("catchup.pill"), "too early for the heads-up")
             XCTAssertFalse(exists("convoy.separation"), "a far car is in the convoy, not fallen behind: \(element("convoy.separation").label)")
             shot("p01-parked-ahead")

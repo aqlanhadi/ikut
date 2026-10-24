@@ -35,7 +35,7 @@ struct JoiningRowText: Equatable, Identifiable, Sendable {
     var subtitleIsWarning: Bool
     /// "18 min", or "--" when unknown.
     var trailingPrimary: String
-    /// "to merge".
+    /// "to join".
     var trailingSecondary: String
     var isStale: Bool
 }
@@ -259,8 +259,8 @@ final class ConvoyModel {
 
     // MARK: Strings
 
-    /// "3 in Convoy".
-    var title: String { "\(convoy.count) in Convoy" }
+    /// "3 in convoy".
+    var title: String { "\(convoy.count) in convoy" }
 
     /// "Spread 6.4 km · ETA Ipoh 14:52"; either part is dropped when unknown.
     var subtitle: String {
@@ -299,7 +299,7 @@ final class ConvoyModel {
                 let aheadOfReference = snapshot.etaReference != nil && e.timeBehindReference == nil
                 secondary = arrival(forCar: e.id).map {
                     ConvoyFormat.eta($0, locale: locale, timeZone: timeZone)
-                } ?? (aheadOfReference ? "" : "Calculating ETA")
+                } ?? (aheadOfReference ? "" : "Working out ETA")
             }
             return ConvoyRowText(
                 id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
@@ -347,10 +347,10 @@ final class ConvoyModel {
                     ? ConvoyFormat.paused
                     : e.isStale
                     ? ConvoyFormat.lastSeen(age: e.age ?? 0)
-                    : (e.position == nil ? "Waiting for location" : ConvoyFormat.speed(metersPerSecond: e.speed)),
+                    : (e.position == nil ? "Waiting for its location" : ConvoyFormat.speed(metersPerSecond: e.speed)),
                 subtitleIsWarning: e.isStale,
                 trailingPrimary: joinAmount(e)?.text ?? "--",
-                trailingSecondary: "to merge", isStale: e.isStale)
+                trailingSecondary: "to join", isStale: e.isStale)
         }
     }
 

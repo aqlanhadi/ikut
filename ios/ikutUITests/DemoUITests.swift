@@ -138,7 +138,7 @@ class DemoBase: TwoPhoneConvoyBase {
         shot("debris-marker")
     }
 
-    /// Pit stop > Fuel > Add a message > Inform the convoy: Faiz asks with a passenger's message.
+    /// Pit stop > Fuel > Add a message > Tell the convoy: Faiz asks with a passenger's message.
     func requestFuelStop() {
         let pitStop = stopButton
         guard soft("Pit stop button", timeout: 20, core: true, {
@@ -167,7 +167,7 @@ class DemoBase: TwoPhoneConvoyBase {
         shot("pit-stop-message")
         app.buttons["stop.messageDone"].tap()
         let send = app.buttons["stop.send"]
-        guard soft("Inform the convoy is ready", timeout: 30, core: true, { send.exists && send.isEnabled }) else { return }
+        guard soft("Tell the convoy is ready", timeout: 30, core: true, { send.exists && send.isEnabled }) else { return }
         send.tap()
         soft("the request is sent and the card shows the message", timeout: 90, core: true) { element("stop.message").exists }
         shot("stop-requested")

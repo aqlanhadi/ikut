@@ -14,7 +14,7 @@
 // DemoPassengerUITests); the script and they take turns through marker files, see lib/demo-common.mjs.
 //
 // The highlight: Faiz (phone 2, a passenger in Aisha's car) taps Pit stop > Fuel, adds the message "Low on fuel, next
-// R&R please" (the passenger check first) and taps Inform the convoy; Hafiz and Daniel tap OK; Aisha, whose car asked,
+// R&R please" (the passenger check first) and taps Tell the convoy; Hafiz and Daniel tap OK; Aisha, whose car asked,
 // opens the card on phone 1 and watches the OKs come in; after 45 s she taps We've stopped and the request closes on
 // both phones.
 
@@ -53,7 +53,7 @@ const timeline = (d) => {
     { at: DROP.from, text: (t) => `Hafiz loses signal (${w.gap('hafiz', t)}); he keeps driving but cannot report`, run: async (x) => x.cars.hafiz.goOffline() },
     { at: DROP.from + 60, text: () => 'on both phones the Hafiz row goes stale: "Last seen ..."', note: true },
     { at: DROP.to, text: () => 'Hafiz gets signal back, his position jumps to where he is now', run: async (x) => x.cars.hafiz.goOnline() },
-    { at: STOP_AT, who: 'phone2', text: () => 'THE HIGHLIGHT. Faiz taps Pit stop > Fuel > Add a message ("Low on fuel, next R&R please") > Inform the convoy on phone 2; Hafiz and Daniel tap OK', run: (x) => stopStory(x) },
+    { at: STOP_AT, who: 'phone2', text: () => 'THE HIGHLIGHT. Faiz taps Pit stop > Fuel > Add a message ("Low on fuel, next R&R please") > Tell the convoy on phone 2; Hafiz and Daniel tap OK', run: (x) => stopStory(x) },
     { at: STOP_AT + 40, who: 'phone1', text: () => 'phone 1: the OKs come in on the stop card (her own car asked, so there is no OK for her)', note: true },
     { at: STOP_AT + 40 + STOP_OPEN_S, who: 'phone1', text: () => "Aisha taps We've stopped on phone 1; the request closes on both phones", note: true },
     { at: END_AT - 60, text: () => 'the map stays open and the convoy keeps driving until the end', note: true },

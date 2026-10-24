@@ -229,7 +229,7 @@ struct TripMapView: View {
                         Color.car(hex: overlay.colorHex),
                         style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [6, 6]))
                 if let merge = overlay.merge {
-                    Annotation("Merge point", coordinate: merge.clCoordinate, anchor: .center) {
+                    Annotation("Join point", coordinate: merge.clCoordinate, anchor: .center) {
                         MergePointView(colorHex: overlay.colorHex, containerWidth: mapMaxX)
                     }
                     .annotationTitles(.hidden)
@@ -795,7 +795,7 @@ struct TripMapView: View {
         let live = liveServices
             ? StopService.actions(
                 context: context,
-                onError: { _ in glanceError.actionFinished(failure: "Could not reach the convoy. Try again in a moment.") },
+                onError: { _ in glanceError.actionFinished(failure: "Couldn’t reach the convoy. Try again in a moment.") },
                 onSuccess: { glanceError.actionFinished(failure: nil) })
             : .none
         return StopRequestActions(

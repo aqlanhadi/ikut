@@ -341,7 +341,8 @@ struct StopArrivalCard: View {
     /// HERE, a segment per car (green once there), "3 of 4 here".
     private func progress(_ tally: StopArrival.Tally) -> some View {
         HStack(spacing: Spacing.m) {
-            Text("HERE").font(.caption2.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
+            Text("Here").font(.caption2.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
+                .textCase(.uppercase)
             HStack(spacing: 3) {
                 ForEach(tally.counted) { row in
                     Capsule().fill(row.isHere ? Color.ikutPositive : Color(.systemGray5)).frame(height: 6)

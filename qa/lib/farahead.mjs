@@ -133,7 +133,7 @@ export function carPhrase(carName) {
 }
 
 /** AlertWording.catchUp spoken line. */
-export const catchUpSpoken = (due) => `${due.carPhrase} is ${distanceText(due.distance)} behind you.`;
+export const catchUpSpoken = (due) => `${due.carPhrase} is ${distanceText(due.distance, true)} behind you.`;
 
 /**
  * CatchUpHeadsUp: once per stop, after the car behind was seen more than LEAD_TIME away; re-armed once my car
