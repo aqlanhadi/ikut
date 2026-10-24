@@ -547,6 +547,25 @@ describe("purgeTripData (emulator)", () => {
     assert.equal((await ref.get()).data()!.status, "active");
   });
 
+  it("deletes the stop votes under an ended trip's event and under an expired event on an active trip", async () => {
+    const ended = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    await addEvent(ended, "stop1");
+    await ended.collection("events/stop1/votes").doc("carA").set({ userId: "u1", at: at(200) });
+    await ended.collection("events/stop1/votes").doc("carB").set({ userId: "u2", at: at(200) });
+    const active = await seedRetentionTrip({ status: "active" });
+    await addEvent(active, "stop2", at(2));
+    await active.collection("events/stop2/votes").doc("carA").set({ userId: "u1", at: at(3) });
+    await addEvent(active, "stop3", Timestamp.fromMillis(NOW.getTime() + 3_600_000));
+    await active.collection("events/stop3/votes").doc("carA").set({ userId: "u1", at: at(1) });
+    const result = await purgeTripData(db, NOW);
+    assert.equal(result.failed, 0);
+    assert.equal((await ended.collection("events/stop1/votes").get()).size, 0);
+    assert.equal((await active.collection("events/stop2/votes").get()).size, 0);
+    assert.ok(result.votes >= 3);
+    // A live event keeps its votes.
+    assert.equal((await active.collection("events/stop3/votes").get()).size, 1);
+  });
+
   it("keeps a non-expired event and an event without expiresAt", async () => {
     const ref = await seedRetentionTrip({ status: "active" });
     await addEvent(ref, "future", Timestamp.fromMillis(NOW.getTime() + 3_600_000));
