@@ -149,13 +149,13 @@ struct AlertWordingTests {
     @Test func approach() {
         let a = alert(alertEvent(.debris, id: "1", ago: 360), distance: 500)
         #expect(a.id == "1@approach")
-        #expect(a.title == "Debris ahead in 500 meters")
-        #expect(a.spoken == "Debris ahead in 500 meters, reported by Aqlan’s car.")
+        #expect(a.title == "Debris ahead in 500 m")
+        #expect(a.spoken == "Debris ahead in 500 metres, reported by Aqlan’s car.")
     }
 
     @Test func distanceText() {
-        #expect(AlertWording.distanceText(512) == "500 meters")
-        #expect(AlertWording.distanceText(10) == "50 meters")
+        #expect(AlertWording.distanceText(512) == "500 m")
+        #expect(AlertWording.distanceText(10) == "50 m")
         #expect(AlertWording.distanceText(1_000) == "1 km")
         #expect(AlertWording.distanceText(1_240) == "1.2 km")
     }
@@ -166,8 +166,8 @@ struct AlertWordingTests {
         #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-59), now: alertT0) == "just now")
         #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-60), now: alertT0) == "1 min ago")
         #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-59 * 60), now: alertT0) == "59 min ago")
-        #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-3 * 3600), now: alertT0) == "3 hr ago")
-        #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-30 * 3600), now: alertT0) == "30 hr ago")
+        #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-3 * 3600), now: alertT0) == "3 h ago")
+        #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-30 * 3600), now: alertT0) == "30 h ago")
     }
 
     @Test func unknownAuthor() {
@@ -441,8 +441,8 @@ struct AlertCenterTests {
         #expect(!(await rig.center.announce(event: e, distance: 500)))
         #expect(!(await rig.center.announce(event: e)))
         #expect(rig.speaker.spoken.map(\.key) == ["1", "1@approach"])
-        #expect(rig.speaker.spoken.last?.text == "Debris ahead in 500 meters, reported by Aqlan’s car.")
-        #expect(rig.center.current?.title == "Debris ahead in 500 meters")
+        #expect(rig.speaker.spoken.last?.text == "Debris ahead in 500 metres, reported by Aqlan’s car.")
+        #expect(rig.center.current?.title == "Debris ahead in 500 m")
     }
 
     @Test func announceIgnoresOwnEventsAndRequiresStart() async {

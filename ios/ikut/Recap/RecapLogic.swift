@@ -322,12 +322,6 @@ enum RecapLogic {
     /// "14:58".
     static func clock(_ date: Date) -> String { clockFormatter.string(from: date) }
 
-    /// "2:47" for the "On the road" tile.
-    static func hoursMinutes(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int((seconds / 60).rounded()))
-        return "\(total / 60):\(String(format: "%02d", total % 60))"
-    }
-
     // MARK: Whole recap
 
     static func recap(_ s: RecapSnapshot, originName: String? = nil, now: Date = Date()) -> Recap {
@@ -358,7 +352,7 @@ enum RecapLogic {
         } ?? RecapStat(label: "Stops", value: "\(stops)", unit: "", note: stops == 1 ? "1 stop requested" : "\(stops) stops requested")
         let stats = [
             RecapStat(label: "Distance", value: distance.map { "\(RouteFormat.kilometres($0))" } ?? "–", unit: "km", note: arrivedNote),
-            RecapStat(label: "On the road", value: duration.map(hoursMinutes) ?? "–", unit: "hr", note: timeNote),
+            RecapStat(label: "On the road", value: duration.map(ConvoyFormat.duration) ?? "–", unit: "", note: timeNote),
             spreadTile,
             RecapStat(label: "Road reports", value: "\(reports)", unit: "", note: spread == nil ? "Hazards and conditions" : (stops == 1 ? "1 stop" : "\(stops) stops")),
         ]

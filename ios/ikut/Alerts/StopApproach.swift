@@ -80,6 +80,6 @@ extension AlertWording {
             id: "\(due.stopId)@stopapproach", eventId: due.stopId, tripId: tripId, type: .other("stopApproach"),
             category: .status, severity: .medium, distance: due.distance,
             title: "\(due.name) in \(distance)", body: body,
-            spoken: "\(due.name) in \(distance). \(advice).", kind: .stopApproach)
+            spoken: "\(due.name) in \(distanceText(due.distance, spoken: true)). \(advice).", kind: .stopApproach)
     }
 }

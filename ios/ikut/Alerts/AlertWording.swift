@@ -71,7 +71,7 @@ enum AlertWording {
             category: .status, severity: .medium, distance: due.distance,
             title: "\(due.carPhrase) is behind you",
             body: "\(distance) · about \(ConvoyFormat.duration(due.seconds)) away",
-            spoken: "\(due.carPhrase) is \(distance) behind you.", kind: .catchUp)
+            spoken: "\(due.carPhrase) is \(distanceText(due.distance, spoken: true)) behind you.", kind: .catchUp)
     }
 
     static func alertId(eventId: String, approach: Bool) -> String {
@@ -84,10 +84,10 @@ enum AlertWording {
         return trimmed.isEmpty ? unknownCar : "\(trimmed)’s car"
     }
 
-    /// "just now", "6 min ago", "2 hr ago". Unknown or future times read as "just now".
+    /// "just now", "6 min ago", "2 h ago". Unknown or future times read as "just now".
     static func relativeTime(since date: Date?, now: Date) -> String {
         guard let date else { return "just now" }
-        return ConvoyFormat.ago(now.timeIntervalSince(date), hourUnit: "hr", days: false)
+        return ConvoyFormat.ago(now.timeIntervalSince(date), days: false)
     }
 
     /// Short name of what was reported, e.g. "Debris".
@@ -109,14 +109,14 @@ enum AlertWording {
         }
     }
 
-    /// Distance as spoken and shown: rounded to 50 m below a kilometre, "1.2 km" above.
-    static func distanceText(_ meters: Double) -> String {
+    /// Distance rounded to 50 m below a kilometre, "1.2 km" above. Shown as "500 m"; spoken as "500 metres".
+    static func distanceText(_ meters: Double, spoken: Bool = false) -> String {
         if meters >= 1_000 {
             let km = (meters / 100).rounded() / 10
             return km == km.rounded() ? "\(Int(km)) km" : "\(km) km"
         }
         let rounded = max(50, Int((meters / 50).rounded()) * 50)
-        return "\(rounded) meters"
+        return spoken ? "\(rounded) metres" : "\(rounded) m"
     }
 
     // MARK: Pieces
@@ -151,7 +151,7 @@ enum AlertWording {
         switch event.category {
         case .hazard, .condition:
             let what = label(for: event.type)
-            if let distance { return "\(what) ahead in \(distanceText(distance)), reported by \(car)." }
+            if let distance { return "\(what) ahead in \(distanceText(distance, spoken: true)), reported by \(car)." }
             return "\(what) reported by \(car)."
         case .stopRequest:
             return spokenStopRequest(for: event.type, authorName: authorName, far: far)

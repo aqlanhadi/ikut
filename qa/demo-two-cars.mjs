@@ -46,7 +46,7 @@ const timeline = (d) => {
     { at: 45, text: (t) => `convoy spread: Hafiz is ${((w.offsetOf('lead', t) - w.offsetOf('hafiz', t)) / 1000).toFixed(1)} km behind Aisha and falling back`, note: true },
     { at: REPORT_AT, who: 'phone1', text: () => 'Aisha opens Report on phone 1 and taps Debris', run: async (x) => x.sync.mark('report.a') },
     { at: REPORT_AT + 6, text: () => 'debris marker appears on both phones', note: true },
-    { at: alertAt('faiz'), who: 'phone2', text: () => 'phone 2 (Faiz, behind Aisha) gets the approach alert: "Debris ahead in 500 meters"', note: true },
+    { at: alertAt('faiz'), who: 'phone2', text: () => 'phone 2 (Faiz, behind Aisha) gets the approach alert: "Debris ahead in 500 metres"', note: true },
     { at: alertAt('daniel'), text: () => 'Daniel gets the approach alert, Hafiz later (see the "approach alert" lines of this log)', note: true },
     { at: DROP.from, text: (t) => `Hafiz loses signal (${w.gap('hafiz', t)}); he keeps driving but cannot report`, run: async (x) => x.cars.hafiz.goOffline() },
     { at: DROP.from + 60, text: () => 'on both phones the Hafiz row goes stale: "Last seen ..."', note: true },

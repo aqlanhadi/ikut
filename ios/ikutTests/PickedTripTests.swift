@@ -29,7 +29,7 @@ struct PickedTripTests {
         let line = try #require(PickedTripLogic.statsLine(recap))
         // Demo: the KL to Ipoh route, 4 cars, 2 h 47.
         #expect(line.contains(" km"))
-        #expect(line.contains("2 h 47"))
+        #expect(line.contains("2 h 47 min"))
         #expect(line.contains("4 cars"))
         #expect(line.split(separator: "·").count >= 3)
     }
@@ -47,18 +47,26 @@ struct PickedTripTests {
         recap.routeDistance = 204_600
         recap.duration = 2 * 3600 + 47 * 60
         recap.carCount = 4
-        #expect(PickedTripLogic.statsLine(recap) == "205 km · 2 h 47 · 4 cars · 1 stop")
+        #expect(PickedTripLogic.statsLine(recap) == "205 km · 2 h 47 min · 4 cars · 1 stop")
         recap.stopCount = 2
         recap.duration = 5 * 60 + 20
         #expect(PickedTripLogic.statsLine(recap) == "205 km · 5 min · 4 cars · 2 stops")
     }
 
-    @Test func hoursMinutesPadsMinutes() {
-        #expect(PickedTripLogic.hoursMinutes(2 * 3600 + 5 * 60) == "2 h 05")
-        #expect(PickedTripLogic.hoursMinutes(59 * 60) == "59 min")
-        #expect(PickedTripLogic.hoursMinutes(10) == nil)
-        #expect(PickedTripLogic.hoursMinutes(2 * 3600) == "2 h 00")
-        #expect(PickedTripLogic.hoursMinutes(60 * 60) == "1 h 00")
+    @Test func theTripLineReadsADurationInTheOneFormat() {
+        var recap = RecapLogic.recap(.demo())
+        recap.carCount = 0
+        recap.stopCount = 0
+        recap.routeDistance = nil
+        func line(_ seconds: Double) -> String? {
+            recap.duration = seconds
+            return PickedTripLogic.statsLine(recap)
+        }
+        #expect(line(2 * 3600 + 5 * 60) == "2 h 5 min")
+        #expect(line(59 * 60) == "59 min")
+        #expect(line(10) == nil)
+        #expect(line(2 * 3600) == "2 h")
+        #expect(line(3600) == "1 h")
     }
 
     // MARK: Which route

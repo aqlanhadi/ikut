@@ -532,7 +532,7 @@ struct HazardRegionTests {
         let region = HazardRegion(id: "a", latitude: 3, longitude: 101, radius: 500, label: "Debris", distanceAhead: 400)
         let content = LocalHazardNotifier.content(for: region, tripId: "t1")
         #expect(content.title == "Debris ahead")
-        #expect(content.body == "About 500 meters ahead on your route.")
+        #expect(content.body == "About 500 m ahead on your route.")
         #expect(content.threadIdentifier == AlertCenter.threadIdentifier(tripId: "t1"))
     }
 }

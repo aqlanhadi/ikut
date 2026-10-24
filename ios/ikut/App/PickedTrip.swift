@@ -13,25 +13,16 @@ enum PickedTripLogic {
         return "To \(entry.destination) · \(ended.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale)))"
     }
 
-    /// "205 km · 2 h 47 · 4 cars · 1 stop". A part the recap can't give is left out: no route, no
+    /// "205 km · 2 h 47 min · 4 cars · 1 stop". A part the recap can't give is left out: no route, no
     /// duration, no cars, and no stops (positions and events are purged 7 days after the end, so none
     /// can mean none kept).
     static func statsLine(_ recap: Recap) -> String? {
         var parts: [String] = []
         if let meters = recap.routeDistance { parts.append(RouteFormat.distance(meters)) }
-        if let duration = recap.duration, let text = hoursMinutes(duration) { parts.append(text) }
+        if let duration = recap.duration, duration >= 30 { parts.append(ConvoyFormat.duration(duration)) }
         if recap.carCount > 0 { parts.append(recap.carCount == 1 ? "1 car" : "\(recap.carCount) cars") }
         if recap.stopCount > 0 { parts.append(recap.stopCount == 1 ? "1 stop" : "\(recap.stopCount) stops") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    /// "2 h 47", or "47 min" under an hour; nil for no time at all.
-    static func hoursMinutes(_ seconds: TimeInterval) -> String? {
-        let total = Int((seconds / 60).rounded())
-        guard total > 0 else { return nil }
-        // `drive` reads a whole hour as "2 h"; this sheet has always said "2 h 00".
-        if total >= 60, total % 60 == 0 { return "\(total / 60) h 00" }
-        return StopFormat.drive(seconds: seconds)
     }
 
     /// The route to draw for the picked trip, best first: the recap's own full route once it has loaded;

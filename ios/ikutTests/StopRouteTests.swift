@@ -301,12 +301,10 @@ struct StopFormatTests {
 
     @Test func theTotalOnTheRouteCard() {
         #expect(StopFormat.total(distance: 205_400, driveSeconds: 2 * 3600 + 40 * 60, stopMinutes: 35)
-            == "205 km · 2 h 40 + 35 min of stops")
-        #expect(StopFormat.total(distance: 205_400, driveSeconds: 2 * 3600 + 25 * 60, stopMinutes: 0) == "205 km · 2 h 25")
+            == "205 km · 2 h 40 min + 35 min of stops")
+        #expect(StopFormat.total(distance: 205_400, driveSeconds: 2 * 3600 + 25 * 60, stopMinutes: 0) == "205 km · 2 h 25 min")
         #expect(StopFormat.total(distance: 80_000, driveSeconds: 2 * 3600 + 5 * 60, stopMinutes: 75)
-            == "80 km · 2 h 05 + 1 h 15 min of stops")
-        #expect(StopFormat.drive(seconds: 45 * 60) == "45 min")
-        #expect(StopFormat.drive(seconds: 2 * 3600) == "2 h")
+            == "80 km · 2 h 5 min + 1 h 15 min of stops")
     }
 
     @Test func aMeetingTimePickedAsAClockTimeIsTheNextTimeItOccurs() throws {

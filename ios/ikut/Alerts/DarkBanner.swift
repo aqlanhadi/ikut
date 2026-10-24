@@ -61,7 +61,7 @@ extension DarkBanner where Icon == Image, Trailing == EmptyView {
 #Preview {
     VStack(spacing: Spacing.m) {
         DarkBanner(title: "Passed the debris", symbol: "checkmark", circle: .green)
-        DarkBanner(title: "Debris ahead in 500 meters", subtitle: "Reported by Wyna’s car · 4 min ago",
+        DarkBanner(title: "Debris ahead in 500 m", subtitle: "Reported by Wyna’s car · 4 min ago",
                    symbol: "exclamationmark.triangle.fill", circle: .orange)
         DarkBanner(
             title: "Message from Wyna’s car",

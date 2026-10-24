@@ -42,21 +42,9 @@ enum StopFormat {
         detail(kind: stop.kind, minutes: stop.minutes, meetAt: stop.meetAt, timeZone: timeZone)
     }
 
-    /// "2 h 40", "2 h 05", "2 h", "45 min": drive time on the route card.
-    static func drive(seconds: Double) -> String {
-        let total = max(1, Int((seconds / 60).rounded()))
-        let hours = total / 60
-        let minutes = total % 60
-        switch (hours, minutes) {
-        case (0, _): return "\(minutes) min"
-        case (_, 0): return "\(hours) h"
-        default: return "\(hours) h \(String(format: "%02d", minutes))"
-        }
-    }
-
-    /// "205 km · 2 h 40 + 35 min of stops", or "205 km · 2 h 25" when no stop has a length.
+    /// "205 km · 2 h 40 min + 35 min of stops", or "205 km · 2 h 25 min" when no stop has a length.
     static func total(distance: Double, driveSeconds: Double, stopMinutes: Int) -> String {
-        var line = "\(RouteFormat.distance(distance)) · \(drive(seconds: driveSeconds))"
+        var line = "\(RouteFormat.distance(distance)) · \(ConvoyFormat.duration(driveSeconds))"
         if stopMinutes > 0 { line += " + \(length(minutes: stopMinutes)) of stops" }
         return line
     }

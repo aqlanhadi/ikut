@@ -56,12 +56,12 @@ enum ConvoyFormat {
     static let paused = "Paused"
 
     /// "just now", "2 min ago", "3 h ago", "2 d ago" for something `age` seconds old. Under a minute is "just now".
-    /// `hourUnit` is how hours read ("h" here, "hr" in an alert's words); `days: false` keeps counting in hours.
-    static func ago(_ age: TimeInterval, hourUnit: String = "h", days: Bool = true) -> String {
+    /// `days: false` keeps counting in hours ("30 h ago"), for an alert that old.
+    static func ago(_ age: TimeInterval, days: Bool = true) -> String {
         let a = max(0, age.isFinite ? age : 0)
         if a < 60 { return "just now" }
         if a < 3600 { return "\(Int(a / 60)) min ago" }
-        if a < 86_400 || !days { return "\(Int(a / 3600)) \(hourUnit) ago" }
+        if a < 86_400 || !days { return "\(Int(a / 3600)) h ago" }
         return "\(Int(a / 86_400)) d ago"
     }
 

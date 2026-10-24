@@ -189,8 +189,10 @@ struct RecapLogicTests {
         #expect(list[0].others == nil)
     }
 
-    @Test func hoursMinutesFormat() {
-        #expect(RecapLogic.hoursMinutes(10_020) == "2:47")
-        #expect(RecapLogic.hoursMinutes(59) == "0:01")
+    @Test func theOnTheRoadTileReadsAsOneDurationWithNoUnit() {
+        let r = RecapLogic.recap(snapshot(), now: t0.addingTimeInterval(10_000 + 8 * 24 * 3600))
+        #expect(r.stats[1].label == "On the road")
+        #expect(r.stats[1].value == "2 h 47 min")
+        #expect(r.stats[1].unit == "")
     }
 }

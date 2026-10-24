@@ -185,7 +185,7 @@ enum MapDemo {
     /// The debris 3 km ahead as an approach alert.
     static let debrisAlert = TripAlert(
         id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
-        severity: .high, distance: 500, title: "Debris ahead in 500 meters",
+        severity: .high, distance: 500, title: "Debris ahead in 500 m",
         body: "Debris reported by Wyna’s car", spoken: "")
 
     /// `IKUT_MAP_DEMO_ALERT=stop` or `debris` shows that banner at the top, to check it against the card.

@@ -8,9 +8,9 @@ struct TicketDrive: Sendable, Equatable {
     /// Seconds.
     var travelTime: Double
 
-    /// "About 2 h 10 from you · 185 km": the big destination above it already says where, so no "To".
+    /// "About 2 h 10 min from you · 185 km": the big destination above it already says where, so no "To".
     var line: String {
-        "About \(StopFormat.drive(seconds: travelTime)) from you · \(RouteFormat.distance(distance))"
+        "About \(ConvoyFormat.duration(travelTime)) from you · \(RouteFormat.distance(distance))"
     }
 
     /// One MapKit request from the phone's location; nil when location is off or denied, or there's no road.

@@ -109,7 +109,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             try waitFor("approach banner", timeout: 200 / speed + 60, poll: 0.3) { approachBanner().exists }
             let text = approachBanner().label
             XCTAssertTrue(text.contains("Debris ahead in"), "banner: \(text)")
-            XCTAssertTrue(text.contains("meters"), "banner: \(text)")
+            XCTAssertNotNil(text.range(of: #"\d+ m\b"#, options: .regularExpression), "banner: \(text)")
             XCTAssertTrue(text.contains("Show it on the map"), "banner: \(text)")
             // Let the convoy list finish folding and the camera settle on the hazard.
             Thread.sleep(forTimeInterval: 1.5)

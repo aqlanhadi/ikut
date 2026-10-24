@@ -227,7 +227,7 @@ struct OwnWayTests {
     // MARK: Join ticket
 
     @Test func ticketLineReadsFromYouWithDistance() {
-        #expect(TicketDrive(distance: 185_000, travelTime: 7800).line == "About 2 h 10 from you · 185 km")
+        #expect(TicketDrive(distance: 185_000, travelTime: 7800).line == "About 2 h 10 min from you · 185 km")
         #expect(TicketDrive(distance: 30_000, travelTime: 2700).line == "About 45 min from you · 30 km")
     }
 
@@ -252,7 +252,7 @@ struct OwnWayTests {
         let model = ticketModel(coordinate: .init(latitude: 4.6, longitude: 101.09), drive: TicketDrive(distance: 185_000, travelTime: 7800))
         model.start()
         await waitUntil(.seconds(2)) { model.ticketDrive != nil }
-        #expect(model.ticketDrive?.line == "About 2 h 10 from you · 185 km")
+        #expect(model.ticketDrive?.line == "About 2 h 10 min from you · 185 km")
     }
 
     @Test func ticketHasNoDriveWithoutLocationOrDestination() async {

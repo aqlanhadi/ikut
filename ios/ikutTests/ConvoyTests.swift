@@ -148,8 +148,8 @@ struct ConvoyTests {
         #expect(ConvoyFormat.ago(60) == "1 min ago")
         #expect(ConvoyFormat.ago(3 * 3600) == "3 h ago")
         #expect(ConvoyFormat.ago(3 * 86_400) == "3 d ago")
-        #expect(ConvoyFormat.ago(3 * 3600, hourUnit: "hr") == "3 hr ago")
-        #expect(ConvoyFormat.ago(30 * 3600, hourUnit: "hr", days: false) == "30 hr ago")
+        #expect(ConvoyFormat.ago(3 * 3600) == "3 h ago")
+        #expect(ConvoyFormat.ago(30 * 3600, days: false) == "30 h ago")
     }
 
     @Test func lastSeenText() {
