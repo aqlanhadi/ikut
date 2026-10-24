@@ -24,4 +24,9 @@ enum FirestorePaths {
 
     static func events(tripId: String) -> String { "\(trip(tripId))/events" }
     static func event(tripId: String, eventId: String) -> String { "\(events(tripId: tripId))/\(eventId)" }
+    /// A car's OK on a stop request; the document id is the car id.
+    static func votes(tripId: String, eventId: String) -> String { "\(event(tripId: tripId, eventId: eventId))/votes" }
+    static func vote(tripId: String, eventId: String, carId: String) -> String {
+        "\(votes(tripId: tripId, eventId: eventId))/\(carId)"
+    }
 }

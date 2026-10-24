@@ -118,4 +118,24 @@ struct ModelTests {
         #expect(FirestorePaths.position(tripId: "t", carId: "c") == "trips/t/positions/c")
         #expect(FirestorePaths.event(tripId: "t", eventId: "e") == "trips/t/events/e")
     }
+
+    /// Every path the app reads or writes, byte for byte (a wrong one writes to the wrong place).
+    @Test func everyPathIsPinned() {
+        #expect(FirestorePaths.trips == "trips")
+        #expect(FirestorePaths.trip("t") == "trips/t")
+        #expect(FirestorePaths.cars(tripId: "t") == "trips/t/cars")
+        #expect(FirestorePaths.car(tripId: "t", carId: "c") == "trips/t/cars/c")
+        #expect(FirestorePaths.members(tripId: "t") == "trips/t/members")
+        #expect(FirestorePaths.member(tripId: "t", userId: "u") == "trips/t/members/u")
+        #expect(FirestorePaths.stops(tripId: "t") == "trips/t/stops")
+        #expect(FirestorePaths.stop(tripId: "t", stopId: "s") == "trips/t/stops/s")
+        #expect(FirestorePaths.answers(tripId: "t", stopId: "s") == "trips/t/stops/s/answers")
+        #expect(FirestorePaths.answer(tripId: "t", stopId: "s", carId: "c") == "trips/t/stops/s/answers/c")
+        #expect(FirestorePaths.positions(tripId: "t") == "trips/t/positions")
+        #expect(FirestorePaths.position(tripId: "t", carId: "c") == "trips/t/positions/c")
+        #expect(FirestorePaths.events(tripId: "t") == "trips/t/events")
+        #expect(FirestorePaths.event(tripId: "t", eventId: "e") == "trips/t/events/e")
+        #expect(FirestorePaths.votes(tripId: "t", eventId: "e") == "trips/t/events/e/votes")
+        #expect(FirestorePaths.vote(tripId: "t", eventId: "e", carId: "c") == "trips/t/events/e/votes/c")
+    }
 }

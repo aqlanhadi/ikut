@@ -13,10 +13,6 @@ protocol StopServing: Sendable {
 /// Writes wait for the server's verdict so a rule rejection throws; if the server hasn't answered
 /// within `EventService.writeTimeout` (offline) they return and Firestore keeps the write queued.
 struct StopService: StopServing {
-    static func votes(tripId: String, eventId: String) -> String {
-        "\(FirestorePaths.event(tripId: tripId, eventId: eventId))/votes"
-    }
-
     // MARK: Writes
 
     /// Writes a stop event through `EventService.report`: the reason in `type`, the optional message,
@@ -33,7 +29,7 @@ struct StopService: StopServing {
     /// The viewer's car says OK. Replaces the car's earlier OK (a second phone in the car writes the same document).
     func ok(tripId: String, eventId: String, carId: String, userId: String) async throws {
         nonisolated(unsafe) let payload: [String: Any] = ["userId": userId, "at": FieldValue.serverTimestamp()]
-        let ref = Firestore.firestore().document("\(Self.votes(tripId: tripId, eventId: eventId))/\(carId)")
+        let ref = Firestore.firestore().document(FirestorePaths.vote(tripId: tripId, eventId: eventId, carId: carId))
         try await ServerWrite.commit { try await ref.setData(payload) }
     }
 
@@ -167,7 +163,7 @@ private final class StopHub: @unchecked Sendable {
         lock.unlock()
         removed.forEach { $0.remove() }
         for eventId in added {
-            let reg = Firestore.firestore().collection(StopService.votes(tripId: context.tripId, eventId: eventId))
+            let reg = Firestore.firestore().collection(FirestorePaths.votes(tripId: context.tripId, eventId: eventId))
                 .addSnapshotListener { [self] snapshot, _ in
                     guard let snapshot else { return }
                     let decoded = snapshot.decoded(StopVote.self)

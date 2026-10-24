@@ -79,7 +79,7 @@ enum TripService {
     ) async throws -> (tripId: String, carId: String) {
         let db = Firestore.firestore()
         let tripRef = db.collection(FirestorePaths.trips).document()
-        let carRef = tripRef.collection("cars").document()
+        let carRef = db.collection(FirestorePaths.cars(tripId: tripRef.documentID)).document()
 
         let trip = makeTrip(
             name: name, code: generateCode(), organizerId: organizer.id,
@@ -92,7 +92,7 @@ enum TripService {
         nonisolated(unsafe) let batch = db.batch()
         try batch.setData(from: trip, forDocument: tripRef)
         try batch.setData(
-            from: member, forDocument: tripRef.collection("members").document(organizer.id))
+            from: member, forDocument: db.document(FirestorePaths.member(tripId: tripRef.documentID, userId: organizer.id)))
         // A trip the server hasn't seen can't be joined, so a queued create is a failure here.
         guard try await ServerWrite.commit(within: createTimeout, { try await batch.commit() }) else {
             throw ServerWrite.Offline()
@@ -161,7 +161,7 @@ extension TripService {
         nonisolated(unsafe) let batch = db.batch()
         batch.updateData(payload, forDocument: tripRef)
         for (id, offset) in result.offsets {
-            batch.updateData(["routeOffset": offset], forDocument: tripRef.collection("stops").document(id))
+            batch.updateData(["routeOffset": offset], forDocument: db.document(FirestorePaths.stop(tripId: tripId, stopId: id)))
         }
         return try await ServerWrite.commit { try await batch.commit() }
     }
@@ -184,11 +184,12 @@ extension TripService {
         nonisolated(unsafe) let batch = db.batch()
         batch.updateData(payload, forDocument: tripRef)
         for stop in plan.stops {
-            let ref = stop.id.map { tripRef.collection("stops").document($0) } ?? tripRef.collection("stops").document()
+            let ref = stop.id.map { db.document(FirestorePaths.stop(tripId: tripId, stopId: $0)) }
+                ?? db.collection(FirestorePaths.stops(tripId: tripId)).document()
             try batch.setData(from: stop, forDocument: ref)
         }
         for id in plan.removedIds {
-            batch.deleteDocument(tripRef.collection("stops").document(id))
+            batch.deleteDocument(db.document(FirestorePaths.stop(tripId: tripId, stopId: id)))
         }
         guard try await ServerWrite.commit({ try await batch.commit() }) else { throw ServerWrite.Offline() }
     }
