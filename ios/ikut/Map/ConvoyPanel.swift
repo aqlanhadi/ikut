@@ -117,8 +117,10 @@ struct ConvoyPanel: View {
         return length
     }
 
-    /// One fixed size for both ends whatever their length; a long name truncates rather than shrinks.
-    private let endSize: CGFloat = 30
+    /// Both ends use one text style whatever their length (it grows with the text size); a long name wraps to
+    /// a second line, and only then shrinks a little. It never truncates at the default size.
+    private var endFont: Font { .system(.title, design: .rounded).weight(.bold) }
+    private var endLines: Int { ConvoyEndName.lineLimit(accessibilitySize: typeSize.isAccessibilitySize) }
 
     /// Display names: "KL" for Kuala Lumpur and other well-known short forms, else the full name.
     private var originShort: String? { originName.map(ConvoyFormat.placeShortName) }
@@ -155,9 +157,10 @@ struct ConvoyPanel: View {
             VStack(alignment: .leading, spacing: 0) {
                 StatCaption("From")
                 Text(text.from)
-                    .font(.system(size: endSize, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .font(endFont)
+                    .lineLimit(endLines)
+                    .minimumScaleFactor(ConvoyEndName.minimumScale)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let joinLine = text.joinLine {
                     Text(joinLine)
                         .font(.footnote)
@@ -175,9 +178,10 @@ struct ConvoyPanel: View {
             VStack(alignment: .trailing, spacing: 0) {
                 StatCaption("To")
                 Text(destinationShort)
-                    .font(.system(size: endSize, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .font(endFont)
+                    .lineLimit(endLines)
+                    .minimumScaleFactor(ConvoyEndName.minimumScale)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let arrive, !mineArrived {
                     Text("Arrive \(Text(arrive).foregroundStyle(Color.ikutPositive).fontWeight(.semibold))")
                         .font(.footnote)

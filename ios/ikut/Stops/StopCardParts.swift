@@ -146,12 +146,14 @@ struct StopActionButton: View {
 struct StopReasonIcon: View {
     var symbol: String
     var size: CGFloat = 46
+    @ScaledMetric(relativeTo: .headline) private var textScale: CGFloat = 1
 
     var body: some View {
+        let drawn = size * MarkerMetrics.scale(textScale)
         Image(systemName: symbol)
-            .font(.system(size: size * 0.43, weight: .semibold))
+            .font(.system(size: drawn * 0.43, weight: .semibold))
             .foregroundStyle(.white)
-            .frame(width: size, height: size)
+            .frame(width: drawn, height: drawn)
             .background(Color.orange, in: Circle())
             .accessibilityHidden(true)
     }

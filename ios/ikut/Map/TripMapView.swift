@@ -931,11 +931,16 @@ struct TripMapView: View {
 // MARK: - Palette
 
 enum MapPalette {
+    /// Fills under white labels (Report, the progress bar): the same blue in both modes on purpose, since the
+    /// lighter dark-mode blue would put a white label under 4.5:1.
     static let accent = Color(red: 0, green: 113 / 255, blue: 227 / 255)
+    /// The route line and its edge read against map imagery in both modes, so they stay one value.
     static let route = Color(red: 10 / 255, green: 132 / 255, blue: 1)
     static let routeCasing = Color(red: 0, green: 96 / 255, blue: 223 / 255)
-    static let live = Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255)
-    static let warning = Color(red: 201 / 255, green: 52 / 255, blue: 0)
+    /// The system green (the same 34C759 in light, a lighter one in dark).
+    static let live = Color.green
+    /// The warning orange-red, with the lighter orange in dark that the rest of the app uses.
+    static let warning = Color.ikutWarning
     /// Stale-car chip text: the warning red on light, a lighter orange on dark so it stays legible.
     static let staleChipText = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
@@ -1000,49 +1005,59 @@ struct MapMarkerView: View {
 
     @State private var markerX: CGFloat?
     @State private var chipWidth: CGFloat = 120
-    private let badge: CGFloat = 32
+    /// What the text size does to a point; the marker's circle, wedge and glyphs all grow by it, up to
+    /// `MarkerMetrics.maxGrowth`.
+    @ScaledMetric(relativeTo: .subheadline) private var textScale: CGFloat = 1
+    private var scale: CGFloat { MarkerMetrics.scale(textScale) }
+    private var badge: CGFloat { 32 * scale }
+    private var frameSize: CGFloat { 58 * scale }
 
     var body: some View {
         ZStack {
-            if let heading = marker.heading {
-                Wedge()
-                    .fill(Color(mapHex: marker.colorHex))
-                    .overlay(Wedge().stroke(.white, lineWidth: 1.5))
-                    .frame(width: 14, height: 10)
-                    .frame(width: 58, height: 58, alignment: .top)
-                    .rotationEffect(.degrees(MapMarkerBuilder.rotation(heading: heading, cameraHeading: cameraHeading)))
+            ZStack {
+                if let heading = marker.heading {
+                    Wedge()
+                        .fill(Color(mapHex: marker.colorHex))
+                        .overlay(Wedge().stroke(.white, lineWidth: 1.5))
+                        .frame(width: 14 * scale, height: 10 * scale)
+                        .frame(width: frameSize, height: frameSize, alignment: .top)
+                        .rotationEffect(.degrees(MapMarkerBuilder.rotation(heading: heading, cameraHeading: cameraHeading)))
+                }
+                Text(marker.number.map(String.init) ?? "·")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: badge, height: badge)
+                    .background(Color(mapHex: marker.colorHex), in: Circle())
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+                    .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    .overlay(alignment: .bottomTrailing) {
+                        if marker.hasArrived {
+                            glyph("checkmark", weight: .heavy, size: 15, fill: Color.ikutPositive, ring: 1.5)
+                                .offset(x: 5 * scale, y: 5 * scale)
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if marker.isLead {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 8 * scale, weight: .bold))
+                                .foregroundStyle(Color.ikutLeadYellow)
+                                .frame(width: 14 * scale, height: 14 * scale)
+                                .background(.white, in: Circle())
+                                .offset(x: 5 * scale, y: -5 * scale)
+                        }
+                    }
             }
-            Text(marker.number.map(String.init) ?? "·")
-                .font(.system(.subheadline, design: .rounded).weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: badge, height: badge)
-                .background(Color(mapHex: marker.colorHex), in: Circle())
-                .overlay(Circle().strokeBorder(.white, lineWidth: 3))
-                .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-                .overlay(alignment: .bottomTrailing) {
-                    if marker.hasArrived {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 8, weight: .heavy))
-                            .foregroundStyle(.white)
-                            .frame(width: 15, height: 15)
-                            .background(Color.ikutPositive, in: Circle())
-                            .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
-                            .offset(x: 5, y: 5)
-                    }
+            .opacity(marker.isStale ? 0.6 : 1)
+            // A small clock on a car that has gone quiet, at full strength, so stale reads without the fade.
+            .overlay(alignment: .bottomLeading) {
+                if MarkerMetrics.showsStaleBadge(marker) {
+                    glyph("clock.fill", weight: .bold, size: 15, fill: MapColors.staleBadge.color, ring: 1.5)
+                        .padding(.leading, (frameSize - badge) / 2 - 5 * scale)
+                        .padding(.bottom, (frameSize - badge) / 2 - 5 * scale)
                 }
-                .overlay(alignment: .topTrailing) {
-                    if marker.isLead {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color(red: 1, green: 0.8, blue: 0))
-                            .frame(width: 14, height: 14)
-                            .background(.white, in: Circle())
-                            .offset(x: 5, y: -5)
-                    }
-                }
+            }
         }
-        .frame(width: 58, height: 58)
-        .opacity(marker.isStale ? 0.6 : 1)
+        .frame(width: frameSize, height: frameSize)
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { markerX = $0 }
         .overlay(alignment: side == .trailing ? .leading : .trailing) {
             HStack(spacing: Spacing.xs) {
@@ -1068,6 +1083,16 @@ struct MapMarkerView: View {
         MapChipPlacement.side(markerX: markerX, chipWidth: chipWidth, containerWidth: containerWidth)
     }
 
+    /// A white glyph in a small filled circle with a white ring (the arrived tick, the stale clock).
+    private func glyph(_ symbol: String, weight: Font.Weight, size: CGFloat, fill: Color, ring: CGFloat) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 8 * scale, weight: weight))
+            .foregroundStyle(.white)
+            .frame(width: size * scale, height: size * scale)
+            .background(fill, in: Circle())
+            .overlay(Circle().strokeBorder(.white, lineWidth: ring))
+    }
+
     private var accessibilityText: String {
         var text = marker.name
         if marker.isMine { text += ", " + YouOnline.spoken(online: marker.youOnline) }
@@ -1078,6 +1103,8 @@ struct MapMarkerView: View {
             text += ", sharing paused"
         } else if marker.isStale, let age = marker.ageText {
             text += ", last seen \(age)"
+        } else if marker.isStale {
+            text += ", not updating"
         }
         return text
     }
