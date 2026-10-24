@@ -41,6 +41,9 @@ final class ReportToastModel {
         self.clock = clock
     }
 
+    /// Whether a timer is set to hide the toast; none while a failure is showing.
+    var hideIsScheduled: Bool { hideTask.map { !$0.isCancelled } ?? false }
+
     var isUndoAvailable: Bool {
         if case .reported = state { true } else { false }
     }

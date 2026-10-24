@@ -54,7 +54,7 @@ struct ApproachPill: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(alert.title), \(ConvoyFormat.distance(distance)). Show it on the map")
         }
-        .announces(alert.title)
+        .announces(alert.title, id: alert.id)
         .glanceTransition(edge: .top)
     }
 }
@@ -80,7 +80,7 @@ struct StopApproachPill: View {
             .accessibilityLabel("\(alert.title), \(alert.body), \(ConvoyFormat.distance(distance))")
             .accessibilityIdentifier("stopapproach.pill")
         }
-        .announces("\(alert.title), \(alert.body)")
+        .announces("\(alert.title), \(alert.body)", id: alert.id)
         .glanceTransition(edge: .top)
     }
 }
@@ -113,7 +113,7 @@ struct CatchUpPill: View {
             .accessibilityLabel([title, subtitle, ConvoyFormat.distance(distance)].compactMap { $0 }.joined(separator: ", "))
             .accessibilityIdentifier("catchup.pill")
         }
-        .announces(alert.title)
+        .announces(alert.title, id: alert.id)
         .glanceTransition(edge: .top)
     }
 }

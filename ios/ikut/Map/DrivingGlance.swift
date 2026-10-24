@@ -53,6 +53,11 @@ struct GlanceError: Equatable {
         cause = nil
     }
 
+    /// A stop action finished: a failure shows `message`; a success clears an earlier send error.
+    mutating func actionFinished(failure message: String?) {
+        if let message { show(message, cause: .send) } else { resolve(.send) }
+    }
+
     /// The cause is gone (pause ended, a later action went through): the error goes with it.
     mutating func resolve(_ cause: Cause) {
         if self.cause == cause { close() }
@@ -93,9 +98,10 @@ extension View {
     /// Slides in from `edge`, or fades with Reduce Motion.
     func glanceTransition(edge: Edge) -> some View { modifier(GlanceTransition(edge: edge)) }
 
-    /// Says `text` to VoiceOver when this appears (and again only if the text changes), not on each redraw.
-    func announces(_ text: String) -> some View {
-        task(id: text) { AccessibilityNotification.Announcement(text).post() }
+    /// Says `text` to VoiceOver when this appears, not on each redraw. It speaks again only when `id` changes,
+    /// so a live distance or "N min ago" in `text` doesn't repeat it; without an `id`, the text is the identity.
+    func announces(_ text: String, id: String? = nil) -> some View {
+        task(id: id ?? text) { AccessibilityNotification.Announcement(text).post() }
     }
 }
 

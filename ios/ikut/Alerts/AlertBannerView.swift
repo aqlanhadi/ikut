@@ -26,7 +26,7 @@ struct AlertBannerView: View {
         ZStack(alignment: .top) {
             if let alert = shown {
                 banner(alert)
-                    .announces([alert.title, alert.body].joined(separator: ", "))
+                    .announces([alert.title, alert.body].joined(separator: ", "), id: alert.id)
                     .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
         }
@@ -41,7 +41,7 @@ struct AlertBannerView: View {
             Button { center.dismiss() } label: {
                 Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Dismiss")
+            .accessibilityLabel("Close")
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)

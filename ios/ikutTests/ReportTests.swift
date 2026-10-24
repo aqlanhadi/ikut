@@ -167,6 +167,7 @@ struct ReportToastModelTests {
         service.failReport = URLError(.timedOut)
         let toast = model(service, undo: .milliseconds(20))
         await toast.submit(debris(), context: context, snapshot: snapshot).value
+        #expect(!toast.hideIsScheduled)
         try await Task.sleep(for: .milliseconds(200))
         guard case .failed = toast.state else {
             Issue.record("the failure vanished: \(toast.state)")

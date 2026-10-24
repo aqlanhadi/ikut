@@ -191,6 +191,7 @@ struct TripMapView: View {
             .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
+            .task(id: passedText) { await expirePassed() }
     }
 
     // MARK: Map
@@ -314,6 +315,16 @@ struct TripMapView: View {
         return !bannerHiding.contains(alert.category)
     }
 
+    /// "Passed the debris" goes after a few seconds; held while VoiceOver runs (a new hazard or Close takes it away).
+    /// Its own task: `watchApproach` is cancelled the moment the approach ends, which would clear it at once.
+    private func expirePassed() async {
+        guard passedText != nil,
+              let hold = DrivingGlance.passedDuration(voiceOver: UIAccessibility.isVoiceOverRunning) else { return }
+        try? await Task.sleep(for: hold)
+        guard !Task.isCancelled else { return }
+        withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { passedText = nil }
+    }
+
     /// A hazard approach alert (one with a distance) brings my car and the hazard into view, with
     /// its pill on top; others stay banners.
     private func followApproachIfNeeded() {
@@ -359,10 +370,6 @@ struct TripMapView: View {
                     passedText = "Passed the \(label)"
                 }
                 endHazardFocus()
-                // Held while VoiceOver runs: a new hazard or a Close takes it away.
-                guard let hold = DrivingGlance.passedDuration(voiceOver: UIAccessibility.isVoiceOverRunning) else { return }
-                try? await Task.sleep(for: hold)
-                withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { passedText = nil }
                 return
             }
             if distance == nil, Date().timeIntervalSince(started) > 180 {
@@ -748,7 +755,10 @@ struct TripMapView: View {
     /// Live actions that also tell the pill what happened (a tap on OK is confirmed there for a few seconds).
     private func stopActions(_ context: StopContext) -> StopRequestActions {
         let live = liveServices
-            ? StopService.actions(context: context, onError: { _ in showStopError("Could not reach the convoy. Try again in a moment.") })
+            ? StopService.actions(
+                context: context,
+                onError: { _ in glanceError.actionFinished(failure: "Could not reach the convoy. Try again in a moment.") },
+                onSuccess: { glanceError.actionFinished(failure: nil) })
             : .none
         return StopRequestActions(
             ok: { eventId in

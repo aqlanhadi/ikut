@@ -3,6 +3,8 @@ import SwiftUI
 /// The "Reported debris · Undo" banner. Overlay it at the top or bottom of the host screen.
 struct ReportToastView: View {
     @Bindable var model: ReportToastModel
+    /// Where it comes from: the top on the map, the bottom in the report sheet.
+    var edge: Edge = .top
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -16,7 +18,7 @@ struct ReportToastView: View {
                 } trailing: {
                     EmptyView()
                 }
-                .modifier(Placement())
+                .modifier(Placement(edge: edge))
             case .reported(let label, _):
                 DarkBanner(title: "Reported \(label)", symbol: "checkmark", circle: .green) {
                     Button("Undo") { Task { await model.undo() } }
@@ -27,7 +29,7 @@ struct ReportToastView: View {
                         .foregroundStyle(.white)
                         .accessibilityHint("Removes the report")
                 }
-                .modifier(Placement())
+                .modifier(Placement(edge: edge))
                 .announces("Reported \(label). Undo is available.")
                 .accessibilityAction(named: "Close") { model.dismiss() }
             case .failed(let message):
@@ -38,7 +40,7 @@ struct ReportToastView: View {
                     }
                     .accessibilityLabel("Close")
                 }
-                .modifier(Placement())
+                .modifier(Placement(edge: edge))
                 .announces(message)
             }
         }
@@ -49,9 +51,10 @@ struct ReportToastView: View {
 
     /// How each state comes and goes; the host places and pads the toast.
     private struct Placement: ViewModifier {
+        let edge: Edge
         func body(content: Content) -> some View {
             content
-                .glanceTransition(edge: .top)
+                .glanceTransition(edge: edge)
                 .accessibilityElement(children: .contain)
         }
     }

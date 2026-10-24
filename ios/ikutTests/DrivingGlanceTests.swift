@@ -45,3 +45,28 @@ struct DrivingGlanceTests {
         #expect(error.cause == nil)
     }
 }
+
+struct DrivingGlanceWiringTests {
+    @Test func aLaterSuccessClearsASendError() {
+        var error = GlanceError()
+        error.actionFinished(failure: "Could not reach the convoy.")
+        #expect(error.message != nil)
+        error.actionFinished(failure: nil)
+        #expect(error.message == nil)
+    }
+
+    @Test func aSuccessLeavesAPauseErrorAlone() {
+        var error = GlanceError()
+        error.show("Could not pause.", cause: .pause)
+        error.actionFinished(failure: nil)
+        #expect(error.message == "Could not pause.")
+    }
+
+    @Test func theStopPillAnnouncesOncePerRequestWhateverItsDistance() {
+        let near = StopPill.question(eventId: "e1", symbol: "fuelpump", title: "Wyna needs fuel · 2 km behind", detail: "Car 2 · asked 1 min ago")
+        let far = StopPill.question(eventId: "e1", symbol: "fuelpump", title: "Wyna needs fuel · 3 km behind", detail: "Car 2 · asked 2 min ago")
+        let other = StopPill.question(eventId: "e2", symbol: "fuelpump", title: "Wyna needs fuel", detail: "Car 2")
+        #expect(near.id == far.id)
+        #expect(near.id != other.id)
+    }
+}
