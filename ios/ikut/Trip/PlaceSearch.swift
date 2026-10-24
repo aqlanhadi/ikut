@@ -225,7 +225,7 @@ struct PlaceSearchResults: View {
     private var hasRows: Bool { model.pastedPin || model.showingResults || model.isSearching || !model.suggestions.isEmpty }
 
     var body: some View {
-        if hasRows { CardHeader(model.pastedPin ? "Pin" : model.showingResults ? "Results" : "Suggestions") }
+        if hasRows { CardHeader(model.pastedPin ? "Dropped pin" : model.showingResults ? "Results" : "Suggestions") }
         VStack(spacing: 0) {
             if let pin = model.droppedPin {
                 resultRow(pin, isPin: true)
@@ -242,7 +242,7 @@ struct PlaceSearchResults: View {
         .ikutCard()
         .padding(.top, hasRows ? 0 : Spacing.m)
         .fullScreenCover(isPresented: $choosingOnMap) {
-            MapPickView(origin: model.origin, along: model.along, namer: PinNamer(geocoder: model.geocoder)) { place in
+            MapPickView(origin: model.origin, along: model.along, geocoder: model.geocoder) { place in
                 choosingOnMap = false
                 onPick(place)
             }
@@ -295,15 +295,20 @@ struct PlaceSearchResults: View {
         }
     }
 
-    private func resultRow(_ result: DestinationResult, isPin: Bool = false) -> some View {
+    @ViewBuilder private func resultRow(_ result: DestinationResult, isPin: Bool = false) -> some View {
+        if isPin {
+            PlaceResultRow(pin: result, disabled: busy, action: { onPick(result) }) { trailing(result) }
+        } else {
+            PlaceResultRow(result: shownResult(result), disabled: busy, action: { onPick(result) }) { trailing(result) }
+        }
+    }
+
+    private func shownResult(_ result: DestinationResult) -> DestinationResult {
         var shown = result
-        if showsKind, !isPin {
+        if showsKind {
             shown.subtitle = [PlaceKind.word(for: result), result.subtitle].filter { !$0.isEmpty }.joined(separator: " · ")
         }
-        if isPin {
-            return AnyView(PlaceResultRow(pin: shown, disabled: busy, action: { onPick(result) }) { trailing(result) })
-        }
-        return AnyView(PlaceResultRow(result: shown, disabled: busy, action: { onPick(result) }) { trailing(result) })
+        return shown
     }
 
     @ViewBuilder private func trailing(_ result: DestinationResult) -> some View {

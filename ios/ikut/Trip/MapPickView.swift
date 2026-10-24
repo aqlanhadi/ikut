@@ -8,21 +8,24 @@ struct MapPickView: View {
     var origin: CLLocationCoordinate2D?
     /// The trip's route when adding a stop: drawn, and the label says how far along the spot is.
     var along: AlongRoute?
-    var namer: PinNamer
     var onUse: (DestinationResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var position: MapCameraPosition
     @State private var center: CLLocationCoordinate2D
     @State private var span: MKCoordinateSpan
+    @State private var namer: PinNamer
+    /// Between a camera change and its settle, the centre is not yet the spot to name.
+    @State private var moving = false
 
     init(
-        origin: CLLocationCoordinate2D?, along: AlongRoute? = nil, start: CLLocationCoordinate2D? = nil, namer: PinNamer,
+        origin: CLLocationCoordinate2D?, along: AlongRoute? = nil, start: CLLocationCoordinate2D? = nil,
+        geocoder: ReverseGeocoding = CLReverseGeocoder(),
         onUse: @escaping (DestinationResult) -> Void
     ) {
         self.origin = origin
         self.along = along
-        self.namer = namer
+        _namer = State(initialValue: PinNamer(geocoder: geocoder))
         self.onUse = onUse
         var region = Self.startRegion(origin: origin, route: along?.line.coordinates ?? [])
         if let start { region.center = start }
@@ -53,7 +56,9 @@ struct MapPickView: View {
                     }
                 }
                 .mapControls { MapCompass() }
+                .onMapCameraChange(frequency: .continuous) { _ in moving = true }
                 .onMapCameraChange(frequency: .onEnd) { context in
+                    moving = false
                     center = context.region.center
                     span = context.region.span
                     namer.start(center)
@@ -76,6 +81,7 @@ struct MapPickView: View {
             .safeAreaInset(edge: .bottom) {
                 Button("Use this place") { onUse(spot) }
                     .buttonStyle(PillButtonStyle())
+                    .disabled(moving)
                     .ikutBottomBar()
             }
             .onAppear { namer.start(center) }

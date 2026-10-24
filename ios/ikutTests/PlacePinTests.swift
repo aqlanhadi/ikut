@@ -50,7 +50,6 @@ struct PlacePinTests {
         expectSpot("3.139 101.687", 3.139, 101.687)
         expectSpot("  +3.139 , -101.687 ", 3.139, -101.687)
         expectSpot("-33.8, 151.2", -33.8, 151.2)
-        expectSpot("3, 101", 3, 101)
     }
 
     @Test func degreesMinutesSecondsWithHemispheres() {
@@ -60,6 +59,41 @@ struct PlacePinTests {
         expectSpot("101°41'E 3°08'N", 3 + 8.0 / 60, 101 + 41.0 / 60)
         expectSpot("3.139°N 101.687°E", 3.139, 101.687)
         expectSpot("3 N 101 W", 3, -101)
+    }
+
+    @Test func theHemisphereLetterMayComeBeforeTheNumber() {
+        expectSpot("N 3°08'20\" E 101°41'13\"", 3 + 8.0 / 60 + 20.0 / 3600, 101 + 41.0 / 60 + 13.0 / 3600)
+        expectSpot("N3.139 E101.687", 3.139, 101.687)
+        expectSpot("S33.8, E151.2", -33.8, 151.2)
+        expectSpot("E101.687 N3.139", 3.139, 101.687)
+        expectSpot("N 3.139 101.687 E", 3.139, 101.687)
+        #expect(CoordinateParser.parse("N3.139 N101.687") == nil)
+        #expect(CoordinateParser.parse("N3.139 E 101.687 W") == nil)
+    }
+
+    @Test func decimalNeedsOneNumberWithADecimalPoint() {
+        for text in ["1, 2", "3, 101", "3 101", "Lot 3, 101"] { #expect(CoordinateParser.parse(text) == nil, "\(text)") }
+        expectSpot("3, 101.5", 3, 101.5)
+        expectSpot("3.5,101", 3.5, 101)
+        expectSpot("3°N 101°E", 3, 101)
+    }
+
+    @Test func bracketsAndTrailingPunctuationAreIgnored() {
+        expectSpot("(3.139, 101.687)", 3.139, 101.687)
+        expectSpot("[3.139, 101.687]", 3.139, 101.687)
+        expectSpot("3.139, 101.687.", 3.139, 101.687)
+        expectSpot("3.139, 101.687,", 3.139, 101.687)
+        expectSpot("(3°08'20\"N 101°41'13\"E).", 3 + 8.0 / 60 + 20.0 / 3600, 101 + 41.0 / 60 + 13.0 / 3600)
+        #expect(CoordinateParser.parse("(Jalan 2.)") == nil)
+    }
+
+    @Test func linksTakeThePlaceNotTheViewport() {
+        #expect(CoordinateParser.parse("https://maps.apple.com/?q=Petrol&sll=3.139,101.687") == nil)
+        #expect(CoordinateParser.parse("https://maps.apple.com/?center=3.139,101.687") == nil)
+        expectSpot("https://maps.apple.com/?ll=4.2,101.25&sll=3.139,101.687", 4.2, 101.25)
+        expectSpot("https://maps.apple.com/place?address=Jalan%20Ampang&coordinate=3.139,101.687&name=X", 3.139, 101.687)
+        expectSpot("https://www.google.com/maps/place/X/@3.139,101.687,15z/data=!3m1!4b1!3d4.2!4d101.25", 4.2, 101.25)
+        expectSpot("https://www.google.com/maps/dir/?api=1&destination=4.2,101.25", 4.2, 101.25)
     }
 
     @Test func googleAndAppleMapsLinks() {
@@ -93,6 +127,7 @@ struct PlacePinTests {
         let source = QuietSuggestions()
         let model = CreateTripModel(suggestions: { source }, places: QuietPlaces(), geocoder: geocoder)
         model.query = "3.139, 101.687"
+        model.pinDelay = .milliseconds(10)
         model.queryChanged()
         #expect(source.asked.isEmpty && model.suggestions.isEmpty && model.showsList)
         // Before the geocode answers the pin is named by its coordinates, never blank.
@@ -106,6 +141,20 @@ struct PlacePinTests {
         model.query = "Tapah"
         model.queryChanged()
         #expect(model.droppedPin == nil && source.asked == ["Tapah"])
+    }
+
+    @Test func aBurstOfKeystrokesAsksTheGeocoderOnce() async throws {
+        let geocoder = FakeGeocoder()
+        let model = CreateTripModel(suggestions: { QuietSuggestions() }, places: QuietPlaces(), geocoder: geocoder)
+        model.pinDelay = .milliseconds(80)
+        for text in ["3.139, 101.6", "3.139, 101.68", "3.139, 101.687"] {
+            model.query = text
+            model.queryChanged()
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.droppedPin?.coordinate.longitude == 101.687 && geocoder.asked.isEmpty)
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(geocoder.asked == ["3.139, 101.687"] && !model.pinNamer.isNaming)
     }
 
     @Test func aPinIsNamedByNameThenNearLocalityThenCoordinates() {

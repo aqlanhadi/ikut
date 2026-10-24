@@ -42,6 +42,8 @@ final class CreateTripModel {
     /// Names the spot when the field holds coordinates or a maps link.
     @ObservationIgnored let pinNamer: PinNamer
     @ObservationIgnored let geocoder: ReverseGeocoding
+    /// How long the field is quiet before a typed coordinate is looked up.
+    @ObservationIgnored var pinDelay: Duration = .milliseconds(400)
 
     init(
         suggestions: (@MainActor () -> SuggestionSource)? = nil, places: PlaceSearching = MapKitPlaceSearch(),
@@ -92,7 +94,7 @@ final class CreateTripModel {
             isSearching = false
             source.stop()
             if pinNamer.coordinate?.latitude != spot.latitude || pinNamer.coordinate?.longitude != spot.longitude {
-                pinNamer.start(spot)
+                pinNamer.start(spot, after: pinDelay)
             }
             return
         }
@@ -285,7 +287,6 @@ final class CreateTripModel {
         self.originName = originName
     }
 
-    /// Shows `suggestions` for `query`, as while typing.
     /// Shows the "Dropped pin" row for `query`, named `found`.
     func showPinForDemo(query: String, found: GeocodedName?, origin: CLLocationCoordinate2D, originName: String) {
         self.query = query
@@ -295,6 +296,7 @@ final class CreateTripModel {
         self.originName = originName
     }
 
+    /// Shows `suggestions` for `query`, as while typing.
     func showSuggestionsForDemo(query: String, suggestions: [SearchSuggestion], origin: CLLocationCoordinate2D, originName: String) {
         self.query = query
         self.suggestions = SearchSuggestion.rows(suggestions, for: query)

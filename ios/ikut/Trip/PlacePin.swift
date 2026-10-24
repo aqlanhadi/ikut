@@ -6,7 +6,7 @@ import Observation
 /// Apple Maps link. Pure; anything out of range or without coordinates is not a match (a text search runs instead).
 enum CoordinateParser {
     static func parse(_ text: String) -> CLLocationCoordinate2D? {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = cleaned(text)
         guard !text.isEmpty else { return nil }
         let lower = text.lowercased()
         if lower.hasPrefix("http") || lower.hasPrefix("maps.") || lower.hasPrefix("www.") || lower.hasPrefix("goo.gl") {
@@ -15,29 +15,55 @@ enum CoordinateParser {
         return degreesMinutesSeconds(text) ?? decimal(text)
     }
 
+    /// Without the brackets a pasted pair sits in, and the full stop or comma a sentence puts after it.
+    private static func cleaned(_ text: String) -> String {
+        var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let first = text.first, "([{<".contains(first) { text.removeFirst() }
+        while let last = text.last, ".,;:!?)]}>".contains(last) || last.isWhitespace { text.removeLast() }
+        return text
+    }
+
     private static let number = #"[+-]?\d{1,3}(?:\.\d+)?"#
 
-    /// "3.139, 101.687", "3.139 101.687", "+3.139,-101.687". A space alone only separates numbers with decimals, so
-    /// "12 34" stays a text search.
+    /// "3.139, 101.687", "3.139 101.687", "+3.139,-101.687". At least one number has a decimal point, so "3, 101"
+    /// and "Jalan 2, 3" stay a text search; a space alone only separates two numbers with decimals.
     private static func decimal(_ text: String) -> CLLocationCoordinate2D? {
         guard let m = match(#"^(\#(number))\s*([,;]|\s)\s*(\#(number))$"#, in: text) else { return nil }
+        guard m[1].contains(".") || m[3].contains(".") else { return nil }
         if m[2] != "," && m[2] != ";", !(m[1].contains(".") && m[3].contains(".")) { return nil }
         guard let lat = Double(m[1]), let lon = Double(m[3]) else { return nil }
         return coordinate(lat, lon)
     }
 
-    /// 3°08'20"N 101°41'13"E; minutes and seconds optional, hemisphere letters required, either order.
+    /// 3°08'20"N 101°41'13"E, N 3°08'20" E 101°41'13", N3.139 E101.687: minutes and seconds optional, one hemisphere
+    /// letter per part, before or after its number, either order.
     private static func degreesMinutesSeconds(_ text: String) -> CLLocationCoordinate2D? {
-        let part = #"(\d{1,3}(?:\.\d+)?)\s*°?\s*(?:(\d{1,2}(?:\.\d+)?)\s*['′’]\s*)?(?:(\d{1,2}(?:\.\d+)?)\s*(?:["″”]|''|′′)\s*)?([NSEWnsew])"#
-        guard let m = match(#"^\#(part)\s*[,;]?\s*\#(part)$"#, in: text) else { return nil }
-        func value(_ at: Int) -> (Double, Character)? {
-            guard let degrees = Double(m[at]) else { return nil }
-            let minutes = Double(m[at + 1]) ?? 0, seconds = Double(m[at + 2]) ?? 0
-            guard minutes < 60, seconds < 60, let hemisphere = m[at + 3].uppercased().first else { return nil }
+        let letter = #"([NSEWnsew])"#
+        let number = #"(\d{1,3}(?:\.\d+)?)\s*°?\s*(?:(\d{1,2}(?:\.\d+)?)\s*['′’]\s*)?(?:(\d{1,2}(?:\.\d+)?)\s*(?:["″”]|''|′′)\s*)?"#
+        // The letter's side is part of the pattern, so "N 3 E 101" is not read as "N 3 E" then a bare number.
+        func part(leading: Bool) -> String { leading ? #"\#(letter)\s*\#(number)"# : #"\#(number)\#(letter)"# }
+        var found: [String]?
+        var lettersFirst = (false, false)
+        for first in [false, true] {
+            for second in [false, true] where found == nil {
+                if let m = match(#"^\#(part(leading: first))\s*[,;]?\s*\#(part(leading: second))$"#, in: text) {
+                    found = m
+                    lettersFirst = (first, second)
+                }
+            }
+        }
+        guard let m = found else { return nil }
+        // Groups per part: the letter and three numbers, in the order the part wrote them.
+        func value(_ at: Int, leading: Bool) -> (Double, Character)? {
+            let l = leading ? m[at] : m[at + 3]
+            let n = leading ? at + 1 : at
+            guard let degrees = Double(m[n]) else { return nil }
+            let minutes = Double(m[n + 1]) ?? 0, seconds = Double(m[n + 2]) ?? 0
+            guard minutes < 60, seconds < 60, let hemisphere = l.uppercased().first else { return nil }
             let sign: Double = "SW".contains(hemisphere) ? -1 : 1
             return (sign * (degrees + minutes / 60 + seconds / 3600), hemisphere)
         }
-        guard let a = value(1), let b = value(5) else { return nil }
+        guard let a = value(1, leading: lettersFirst.0), let b = value(5, leading: lettersFirst.1) else { return nil }
         switch ("NS".contains(a.1), "NS".contains(b.1)) {
         case (true, false): return coordinate(a.0, b.0)
         case (false, true): return coordinate(b.0, a.0)
@@ -45,21 +71,22 @@ enum CoordinateParser {
         }
     }
 
-    /// Google Maps (`@lat,long`, `q=`, `ll=`, `!3d…!4d…`) and Apple Maps (`ll=`, `q=` or `sll=` with coordinates).
-    /// `address=` and a `q=` that is a name are not coordinates.
+    /// The place a maps link points at: `ll`, `q` (when it holds coordinates), `query`, `destination`, `daddr` and
+    /// Apple's `coordinate`, else Google's `!3d…!4d…` (the place), else `@lat,long`. `sll` and `center` are where the
+    /// map was looking, never the place; `address=` and a `q=` that is a name are not coordinates.
     private static func link(_ text: String) -> CLLocationCoordinate2D? {
         let withScheme = text.lowercased().hasPrefix("http") ? text : "https://" + text
         if let items = URLComponents(string: withScheme)?.queryItems {
-            for key in ["ll", "q", "query", "sll", "center", "destination", "daddr"] {
+            for key in ["ll", "q", "query", "destination", "daddr", "coordinate"] {
                 for item in items where item.name == key {
                     if let value = item.value, let found = decimal(value.trimmingCharacters(in: .whitespaces)) { return found }
                 }
             }
         }
-        if let m = match(#"@(\#(number)),(\#(number))"#, in: text), let lat = Double(m[1]), let lon = Double(m[2]) {
+        if let m = match(#"!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)"#, in: text), let lat = Double(m[1]), let lon = Double(m[2]) {
             return coordinate(lat, lon)
         }
-        if let m = match(#"!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)"#, in: text), let lat = Double(m[1]), let lon = Double(m[2]) {
+        if let m = match(#"@(\#(number)),(\#(number))"#, in: text), let lat = Double(m[1]), let lon = Double(m[2]) {
             return coordinate(lat, lon)
         }
         return nil
@@ -137,12 +164,21 @@ final class PinNamer {
     /// What the pin is called now: the geocoded name once it answers, the coordinates before.
     var place: DestinationResult? { coordinate.map { PinName.place(found, at: $0) } }
 
-    func start(_ c: CLLocationCoordinate2D) {
+    /// Asks for the name of `c` after `delay` of quiet; a newer spot cancels this one, so a burst of typing asks once.
+    func start(_ c: CLLocationCoordinate2D, after delay: Duration = .zero) {
         task?.cancel()
+        generation += 1
+        let mine = generation
         coordinate = c
         found = nil
         isNaming = true
-        task = Task { await lookup(c) }
+        task = Task {
+            if delay > .zero {
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled, mine == generation else { return }
+            }
+            await resolve(c, generation: mine)
+        }
     }
 
     #if DEBUG
@@ -163,10 +199,13 @@ final class PinNamer {
     /// One geocode for `c`; an answer that arrives after a newer spot was asked for is dropped.
     func lookup(_ c: CLLocationCoordinate2D) async {
         generation += 1
-        let mine = generation
         coordinate = c
         found = nil
         isNaming = true
+        await resolve(c, generation: generation)
+    }
+
+    private func resolve(_ c: CLLocationCoordinate2D, generation mine: Int) async {
         let answer = await geocoder.lookup(c)
         guard mine == generation else { return }
         found = answer
