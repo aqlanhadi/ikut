@@ -63,3 +63,33 @@ enum LobbyLogic {
         return "On the road since \(startedAt.formatted(style))"
     }
 }
+
+extension LobbyLogic {
+    /// "K7M2QX" shown as "K7M 2QX".
+    static func displayCode(_ code: String) -> String {
+        guard code.count == 6 else { return code }
+        return "\(code.prefix(3)) \(code.suffix(3))"
+    }
+
+    /// "You (organizer, tracker) · Siti", "Wyna (tracker) · 3 others", "Daniel · no tracker yet".
+    static func peopleLine(members: [Member], trackerUserId: String?, currentUserId: String?) -> String {
+        guard !members.isEmpty else { return "No one yet" }
+        let ordered = members.filter { $0.id == currentUserId } + members.filter { $0.id != currentUserId }
+        func label(_ m: Member) -> String {
+            var roles: [String] = []
+            if m.role == .organizer { roles.append("organizer") }
+            if let id = m.id, id == trackerUserId { roles.append("tracker") }
+            let name = m.id == currentUserId ? "You" : m.displayName
+            return roles.isEmpty ? name : "\(name) (\(roles.joined(separator: ", ")))"
+        }
+        var parts: [String]
+        if ordered.count <= 2 {
+            parts = ordered.map(label)
+        } else {
+            parts = ordered.prefix(1).map(label)
+            parts.append("\(ordered.count - 1) others")
+        }
+        if trackerUserId == nil { parts.append("no tracker yet") }
+        return parts.joined(separator: " · ")
+    }
+}
