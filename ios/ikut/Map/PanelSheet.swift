@@ -9,13 +9,20 @@ enum PanelSheet {
     /// What the sheet is showing now.
     enum Shown: Equatable { case folded, unfolded, card }
 
-    /// The panel's content heights before they are measured (folded, then unfolded), without the home indicator.
-    static let foldedEstimate: CGFloat = 290
-    static let unfoldedEstimate: CGFloat = 520
+    /// The panel's content heights before they are measured (folded, then unfolded), without the bar.
+    static let foldedEstimate: CGFloat = 220
+    static let unfoldedEstimate: CGFloat = 450
     static let cardEstimate: CGFloat = 330
-    /// What is left under the buttons: only this, and the system's own bottom safe area (the home indicator),
-    /// which the sheet adds by itself. Apple Maps' sheet is the same.
-    static let bottomMargin: CGFloat = Spacing.s
+    /// The gap beside Report and Pit stop (to the sheet's side edges), and under them to the sheet's bottom edge.
+    static let sideGap: CGFloat = Spacing.l
+    /// How far the buttons hang down into the sheet's bottom safe area (the home indicator's) so the gap under them
+    /// equals `sideGap`. Never negative, so a sheet without a safe area (an iPhone with a home button) keeps them
+    /// where the layout puts them; never more than leaves the indicator's own strip (`indicatorClearance`) free.
+    static func barLift(safeBottom: CGFloat) -> CGFloat {
+        max(0, min(safeBottom - sideGap, safeBottom - indicatorClearance))
+    }
+    /// The strip at the very bottom the home indicator draws in; the buttons stay above it.
+    static let indicatorClearance: CGFloat = 14
     /// The sheet never gets smaller than this, however little room the pills leave.
     static let minimumHeight: CGFloat = 150
 
@@ -25,15 +32,22 @@ enum PanelSheet {
         var card: CGFloat
     }
 
-    /// The detent heights: each content height (nil until seen; it already ends with `bottomMargin`), capped at
-    /// `room`, the map's height under the pills and banners (nil before the map is measured). No home-indicator
-    /// strip is added: a presented sheet already keeps its content out of the bottom safe area, so adding it
-    /// again (as Home's formula does for its own header) left about 34 pt of empty space under the buttons.
-    static func heights(folded: CGFloat?, unfolded: CGFloat?, card: CGFloat?, room: CGFloat?) -> Heights {
+    /// The bar's height before it is measured (Report and Pit stop with the space above them).
+    static let barEstimate: CGFloat = 62
+
+    /// The detent heights: each panel content height (nil until seen) plus the pinned bar's (nil until seen), capped
+    /// at `room`, the map's height under the pills and banners (nil before the map is measured). The card has no
+    /// bar. No home-indicator strip is added: a presented sheet already keeps its content out of the bottom safe
+    /// area, so adding it again (as Home's formula does for its own header) left about 34 pt of empty space.
+    /// When the content is taller than the cap, the list scrolls under the bar and the bar stays in view.
+    static func heights(folded: CGFloat?, unfolded: CGFloat?, card: CGFloat?, bar: CGFloat? = nil, room: CGFloat?) -> Heights {
         let cap = max(room ?? .greatestFiniteMagnitude, minimumHeight)
-        func fit(_ content: CGFloat?, _ estimate: CGFloat) -> CGFloat { min(content ?? estimate, cap).rounded() }
-        let short = fit(folded, foldedEstimate)
-        return Heights(short: short, tall: max(short, fit(unfolded, unfoldedEstimate)), card: fit(card, cardEstimate))
+        let barHeight = bar ?? barEstimate
+        func fit(_ content: CGFloat?, _ estimate: CGFloat, bar: CGFloat = 0) -> CGFloat {
+            min((content ?? estimate) + bar, cap).rounded()
+        }
+        let short = fit(folded, foldedEstimate, bar: barHeight)
+        return Heights(short: short, tall: max(short, fit(unfolded, unfoldedEstimate, bar: barHeight)), card: fit(card, cardEstimate))
     }
 
     /// What a detent the sheet reports means for the panel: tall (true) or short (false) when it is one of the
@@ -43,6 +57,16 @@ enum PanelSheet {
         if detent == .height(heights.short) { return false }
         if detent == .height(heights.tall) { return true }
         return nil
+    }
+
+    /// How long after a stop card closes the sheet's own detent reports are ignored. Swapping the card's single
+    /// detent for the panel's two makes the system pick one and report it, which is not the driver folding the list.
+    static let cardSwapQuiet: TimeInterval = 0.8
+
+    /// Whether a detent the sheet reports is the driver's drag: not on a card, and not the system re-picking
+    /// after the card closed (`sinceCardClosed`, nil when no card has closed lately).
+    static func acceptsDetentReport(shown: Shown, sinceCardClosed: TimeInterval?) -> Bool {
+        shown != .card && (sinceCardClosed ?? .greatestFiniteMagnitude) >= cardSwapQuiet
     }
 
     /// Whether an action waits for the sheet to go (it is up, and its own dismissal runs the action) or runs

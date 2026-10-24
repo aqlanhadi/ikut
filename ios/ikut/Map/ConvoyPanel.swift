@@ -3,8 +3,8 @@ import SwiftUI
 
 /// What Apple's own sheet at the bottom of the map holds (Map.dc.html): FROM and TO with the arrival
 /// time, a progress bar with every car and hazard on the route, spread / lead speed,
-/// one row per car (joining cars last, with dashed badges), then Report and Pit stop. Folded (the
-/// short detent) it is FROM/TO, progress, a one-line summary and the buttons; a tap on the header
+/// one row per car (joining cars last, with dashed badges). Report and Pit stop are `ConvoyActionBar`, pinned
+/// under it. Folded (the short detent) it is FROM/TO, progress and a one-line summary; a tap on the header
 /// or a drag of the sheet, unfolds it (the tall detent).
 ///
 /// The sheet (`TripMapView`, `PanelSheet`) is the surface and owns the sizes: this view only reports
@@ -14,12 +14,6 @@ struct ConvoyPanel: View {
     var model: TripMapModel
     @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var expanded: Bool
-    var canReport: Bool
-    /// What the Pit stop button says: "Pit stop", or the open stop ("Fuel · 2 of 4 OK") with a badge.
-    var stopButton = StopLogic.ButtonContent(
-        label: "Pit stop", symbol: "mappin.and.ellipse", badge: 0, accessibilityLabel: "Pit stop")
-    var onReport: () -> Void
-    var onStop: () -> Void
     /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
     var onNextStop: (String) -> Void = { _ in }
     /// The car tapped on the map (D34 7b): its row is highlighted and scrolled into view.
@@ -51,10 +45,8 @@ struct ConvoyPanel: View {
                 stats.transition(.opacity)
                 list.transition(.opacity)
             }
-            buttons
         }
         .padding(.horizontal, Spacing.l)
-        .padding(.bottom, PanelSheet.bottomMargin)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { onHeight($0) }
         .task(id: probe ? "" : originKey) {
             guard !probe, let start = model.mainRoute?.coordinates.first else { return }
@@ -348,8 +340,21 @@ struct ConvoyPanel: View {
             .padding(.bottom, Spacing.tight)
             .accessibilityIdentifier("convoy.separation")
     }
+}
 
-    private var buttons: some View {
+/// Report and Pit stop, pinned to the bottom of the convoy sheet (D34 7c): outside the scrolling panel, so they never
+/// move when the sheet folds, unfolds or is dragged, and the list scrolls under them. No background of its own: the
+/// sheet is the surface.
+struct ConvoyActionBar: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    var canReport: Bool
+    var stopButton: StopLogic.ButtonContent
+    var onReport: () -> Void
+    var onStop: () -> Void
+    /// How far the buttons hang down into the sheet's bottom safe area (`PanelSheet.barLift`).
+    var lift: CGFloat = 0
+
+    var body: some View {
         // At accessibility sizes Report and Pit stop take a row each; otherwise they share one.
         let stacked = typeSize.isAccessibilitySize
         let layout = stacked
@@ -398,7 +403,12 @@ struct ConvoyPanel: View {
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")
         }
+        .padding(.horizontal, Spacing.l)
         .padding(.top, Spacing.m)
+        // The sheet's bottom safe area is more than the side gap: the buttons hang down into it (the bar's layout
+        // height stops above it, so the detents are still content + bar) until the gap under them equals the gap
+        // beside them.
+        .padding(.bottom, -lift)
     }
 }
 
@@ -407,14 +417,14 @@ struct ConvoyPanel: View {
     @Previewable @State var expanded = true
     ZStack(alignment: .bottom) {
         Color(.systemGray4).ignoresSafeArea()
-        ConvoyPanel(model: MapDemo.model(), expanded: $expanded, canReport: true, onReport: {}, onStop: {}).previewCard()
+        ConvoyPanel(model: MapDemo.model(), expanded: $expanded).previewCard()
     }
 }
 
 #Preview("Panel collapsed") {
     ZStack(alignment: .bottom) {
         Color(.systemGray4).ignoresSafeArea()
-        ConvoyPanel(model: MapDemo.model(), expanded: .constant(false), canReport: false, onReport: {}, onStop: {}).previewCard()
+        ConvoyPanel(model: MapDemo.model(), expanded: .constant(false)).previewCard()
     }
 }
 

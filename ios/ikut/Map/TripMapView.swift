@@ -67,6 +67,11 @@ struct TripMapView: View {
     @State private var foldedContent: CGFloat?
     @State private var unfoldedContent: CGFloat?
     @State private var cardContent: CGFloat?
+    /// The pinned bar's own height and the sheet's bottom safe area (the home indicator's), measured.
+    @State private var barContent: CGFloat?
+    /// When the stop card last closed, so the system's re-pick of a detent after it is not read as a fold.
+    @State private var cardClosedAt: Date?
+    @State private var sheetSafeBottom: CGFloat = 34
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
     @State private var mapWidth: CGFloat = 0
@@ -571,7 +576,7 @@ struct TripMapView: View {
     }
 
     private var sheetHeights: PanelSheet.Heights {
-        PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, card: cardContent,
+        PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, card: cardContent, bar: barContent,
                            room: sheetRoom)
     }
 
@@ -617,6 +622,7 @@ struct TripMapView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+                        .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
                         // The list is laid out after the sheet has grown, so wait for it before scrolling to the row.
                         .task(id: SelectionScrollKey(car: selectedCar, expanded: panelExpanded)) {
                             guard panelExpanded, let car = selectedCar else { return }
@@ -629,6 +635,7 @@ struct TripMapView: View {
         }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
         .background(alignment: .top) { if shown != .card { probe } }
         .onAppear {
             panelUp = true
@@ -636,7 +643,12 @@ struct TripMapView: View {
         }
         .presentationDetents(PanelSheet.detents(shown, in: heights), selection: Binding(
             get: { PanelSheet.detent(shown, in: heights) },
-            set: { if shown != .card, let tall = PanelSheet.choice($0, in: heights) { setExpanded(tall) } }))
+            set: {
+                guard PanelSheet.acceptsDetentReport(shown: shown, sinceCardClosed: cardClosedAt.map { -$0.timeIntervalSinceNow }),
+                      let tall = PanelSheet.choice($0, in: heights) else { return }
+                setExpanded(tall)
+            }))
+        .onChange(of: cardShowing) { _, showing in if !showing { cardClosedAt = Date() } }
         .presentationDragIndicator(shown == .card ? .hidden : .visible)
         .presentationBackgroundInteraction(.enabled(upThrough: .height(shown == .card ? heights.card : heights.tall)))
         .interactiveDismissDisabled()
@@ -681,9 +693,7 @@ struct TripMapView: View {
     /// The other layout, laid out out of sight, so its height is known before the first fold or unfold.
     private var probe: some View {
         ConvoyPanel(
-            model: model, expanded: .constant(!panelExpanded), canReport: model.myCarId != nil,
-            stopButton: StopLogic.buttonContent(for: stopBoard),
-            onReport: {}, onStop: {},
+            model: model, expanded: .constant(!panelExpanded),
             onHeight: { if panelExpanded { foldedContent = $0 } else { unfoldedContent = $0 } },
             probe: true)
             .fixedSize(horizontal: false, vertical: true)
@@ -713,12 +723,18 @@ struct TripMapView: View {
 
     private var panel: some View {
         ConvoyPanel(
-            model: model, expanded: Binding(get: { panelExpanded }, set: { setExpanded($0) }), canReport: model.myCarId != nil,
-            stopButton: StopLogic.buttonContent(for: stopBoard),
-            onReport: openReport, onStop: openStopCard,
+            model: model, expanded: Binding(get: { panelExpanded }, set: { setExpanded($0) }),
             onNextStop: { id in withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { arrivalStopId = id } },
             selectedCar: selectedCar,
             onHeight: { if panelExpanded { unfoldedContent = $0 } else { foldedContent = $0 } })
+    }
+
+    /// Report and Pit stop: pinned to the sheet's bottom, outside the scrolling panel.
+    private var actionBar: some View {
+        ConvoyActionBar(
+            canReport: model.myCarId != nil, stopButton: StopLogic.buttonContent(for: stopBoard),
+            onReport: openReport, onStop: openStopCard, lift: PanelSheet.barLift(safeBottom: sheetSafeBottom))
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { barContent = $0 }
     }
 
     private var leaveHandler: (@MainActor @Sendable (String) async -> StopLeave.Result)? {
