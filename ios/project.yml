@@ -40,6 +40,8 @@ targets:
         NSLocationWhenInUseUsageDescription: ikut shows your car to the others in your trip while the trip is active.
         NSLocationAlwaysAndWhenInUseUsageDescription: ikut keeps sharing your car's position with your trip while the screen is off or you're using another app. Sharing stops when the trip ends.
         # Debug-only: lets a phone reach the emulators on the Mac. Empty in normal builds.
+        # NSLocalNetworkUsageDescription and NSAllowsLocalNetworking are for the emulators too: the
+        # "Strip local-network keys" phase below removes them from the built Info.plist in Release.
         IKUTEmulatorHost: $(IKUT_EMULATOR_HOST)
         NSLocalNetworkUsageDescription: ikut connects to a development server on your local network.
         NSAppTransportSecurity:
@@ -56,6 +58,15 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikut
         ASSETCATALOG_COMPILER_APPICON_NAME: ikut
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    postBuildScripts:
+      - name: Strip local-network keys (Release)
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$CONFIGURATION" != "Debug" ]; then
+            PLIST="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
+            /usr/libexec/PlistBuddy -c "Delete :NSLocalNetworkUsageDescription" "$PLIST" || true
+            /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity:NSAllowsLocalNetworking" "$PLIST" || true
+          fi
     dependencies:
       - package: Firebase
         product: FirebaseAuth
