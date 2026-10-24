@@ -95,7 +95,7 @@ for (const way of only ? [only] : ['north', 'south']) {
   const extra = near.filter((p) => p.ours && !Object.values(NAMES).some((re) => re.test(p.name ?? '')) && p.distance < 200);
   // Worked examples for the discovery page: what "Suggest stops" proposes, and three places for a stop request.
   const trip = { routeLength: line.length, routeSeconds: route.duration };
-  const show = (rows) => rows.map((r) => `${r.place.name ?? r.place.kind} at ${(r.place.routeOffset / 1000).toFixed(1)} km: ${r.why}`).join('\n  ') || 'none';
+  const show = (rows) => rows.map((r) => `${r.place.name ?? r.place.kind} at ${(r.place.routeOffset / 1000).toFixed(1)} km: ${r.where ? `${r.where} · ` : ''}${r.why}`).join('\n  ') || 'none';
   console.log(`suggest stops (every 2 h):\n  ${show(suggestStops(near, trip))}`);
   console.log(`suggest stops (every 1 h, for comparison):\n  ${show(suggestStops(near, { ...trip, every: 3600, window: 900 }))}`);
   const speed = line.length / route.duration;

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   toPlaces, roadIndex, slipRoads, carriageway, sideOf, along, straddles, isRnR, suggestStops, rankForRequest,
-  requestWhy, RouteLine,
+  requestWhere, requestWhy, RouteLine,
 } from './places.mjs';
 
 const NORTH_LON = 101.5; // northbound carriageway (drive on the left: it is the western one)
@@ -163,7 +163,8 @@ test('a stop request: ahead of the lead, on our side, within the most urgent rea
     place('Toilet in 15 min', 60 + 22.5), place('In 25 min', 60 + 37.5),
   ], { frontOffset: 60_000, reasons: ['toilet'], speed });
   assert.deepEqual(rows.map((r) => r.place.name), ['Toilet in 15 min']);
-  assert.equal(rows[0].why, '15 min ahead · toilets');
+  assert.equal(rows[0].where, '23 km ahead · about 15 min');
+  assert.equal(rows[0].why, 'toilets');
 });
 
 test('a stop request: covering every reason first, then nearest with lay-bys counted 15 min further', () => {
@@ -174,7 +175,7 @@ test('a stop request: covering every reason first, then nearest with lay-bys cou
     place('R&R further', 110),
   ], { frontOffset: 60_000, reasons: ['toilet', 'fuel'], speed });
   assert.deepEqual(rows.map((r) => r.place.name), ['R&R', 'A Layby', 'Toilets only']);
-  assert.equal(rows[2].why, '7 min ahead · toilets, no fuel');
+  assert.equal(rows[2].why, 'toilets, no fuel');
 });
 
 test('a stop request for fuel uses the asker\'s range when given', () => {
@@ -183,7 +184,9 @@ test('a stop request for fuel uses the asker\'s range when given', () => {
   assert.equal(rankForRequest([place('R&R', 55)], { ...ask, fuelRangeMeters: 30_000 }).length, 0);
 });
 
-test('the why line names what is missing and never says 0 min', () => {
-  assert.equal(requestWhy({ facilities: full }, ['rest'], 10), '1 min ahead · parking');
-  assert.equal(requestWhy({ facilities: { ...full, food: false } }, ['food', 'toilet'], 600), '10 min ahead · toilets, no food');
+test('where and why: the canvas words, what is missing, never 0 km or 0 min', () => {
+  assert.equal(requestWhere(18_000, 720), '18 km ahead · about 12 min');
+  assert.equal(requestWhere(300, 10), '1 km ahead · about 1 min');
+  assert.equal(requestWhy({ facilities: full }, ['rest']), 'parking');
+  assert.equal(requestWhy({ facilities: { ...full, food: false } }, ['food', 'toilet']), 'toilets, no food');
 });

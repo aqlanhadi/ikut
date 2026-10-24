@@ -10,7 +10,7 @@
 //   sideOf(point, line)              left or right of the route line (Malaysia drives on the left)
 //   along(places, line, ...)         places within reach of the route, with offset, side, carriageway, entrance
 //   suggestStops(candidates, trip)   "Suggest stops": an R&R on our side about every 2 hours
-//   rankForRequest(candidates, ask)  a stop request on the road: 3 places at most, each with one line of why
+//   rankForRequest(candidates, ask)  a stop request on the road: 3 places at most, each with where and why
 
 import { haversine, bearing, RouteLine } from '../../qa/lib/route.mjs';
 
@@ -442,18 +442,22 @@ export function rankForRequest(candidates, { frontOffset, reasons, speed, fuelRa
   rows.sort((a, b) => (covers(b.c) - covers(a.c)) || (cost(a) - cost(b)));
   return rows.slice(0, max).map(({ c, secs }) => ({
     place: c, minutes: Math.round(secs / 60),
-    why: requestWhy(c, reasons, secs),
+    where: requestWhere(c.routeOffset - frontOffset, secs),
+    why: requestWhy(c, reasons),
   }));
 }
 
-/** "9 min ahead · toilets" or "9 min ahead · toilets, no fuel": the time from the lead car, then what the place
- * has and lacks of what was asked for. */
-export function requestWhy(place, reasons, secs) {
+/** "18 km ahead · about 12 min", the RequestStop canvas's words for a place on the route ahead of the lead. */
+export function requestWhere(meters, secs) {
+  return `${Math.max(1, Math.round(meters / 1000))} km ahead · about ${Math.max(1, Math.round(secs / 60))} min`;
+}
+
+/** "toilets" or "toilets, no fuel": what the place has and lacks of what was asked for ("parking" for a rest). */
+export function requestWhy(place, reasons) {
   const asked = [...new Set(reasons.map((r) => NEEDS[r]).filter(Boolean))];
   const has = asked.filter((n) => place.facilities[n]);
   const lacks = asked.filter((n) => !place.facilities[n]);
-  const words = [has.join(', ') || (asked.length ? '' : 'parking'), lacks.length ? `no ${lacks.join(', ')}` : ''].filter(Boolean);
-  return `${Math.max(1, Math.round(secs / 60))} min ahead · ${words.join(', ')}`;
+  return [has.join(', ') || (asked.length ? '' : 'parking'), lacks.length ? `no ${lacks.join(', ')}` : ''].filter(Boolean).join(', ');
 }
 
 export { RouteLine };
