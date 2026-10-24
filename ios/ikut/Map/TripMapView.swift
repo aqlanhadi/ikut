@@ -1026,6 +1026,7 @@ struct MapMarkerView: View {
                 Text(marker.number.map(String.init) ?? "·")
                     .font(.system(.subheadline, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
+                    .minimumScaleFactor(0.7)
                     .frame(width: badge, height: badge)
                     .background(Color(mapHex: marker.colorHex), in: Circle())
                     .overlay(Circle().strokeBorder(.white, lineWidth: 3))
@@ -1103,8 +1104,6 @@ struct MapMarkerView: View {
             text += ", sharing paused"
         } else if marker.isStale, let age = marker.ageText {
             text += ", last seen \(age)"
-        } else if marker.isStale {
-            text += ", not updating"
         }
         return text
     }

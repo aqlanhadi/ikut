@@ -48,8 +48,8 @@ enum MarkerMetrics {
     /// `raw` is a `@ScaledMetric` of 1 (what the text size does to a point); the factor to draw with.
     static func scale(_ raw: CGFloat) -> CGFloat { min(max(raw, 1), maxGrowth) }
 
-    /// The small clock on a car that has gone quiet, so "stale" doesn't rest on the fade alone.
-    static func showsStaleBadge(_ marker: MapMarker) -> Bool { marker.isStale }
+    /// The small clock on a car that has gone quiet (not one that paused sharing: it says so in words), so "stale" doesn't rest on the fade alone.
+    static func showsStaleBadge(_ marker: MapMarker) -> Bool { marker.isStale && !marker.isPaused }
 }
 
 /// From / To on the convoy panel: a text style (not a fixed 30 pt) that wraps to two lines before it ever

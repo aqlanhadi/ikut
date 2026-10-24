@@ -152,7 +152,7 @@ struct StopReasonIcon: View {
         let drawn = size * MarkerMetrics.scale(textScale)
         Image(systemName: symbol)
             .font(.system(size: drawn * 0.43, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(.black)
             .frame(width: drawn, height: drawn)
             .background(Color.orange, in: Circle())
             .accessibilityHidden(true)

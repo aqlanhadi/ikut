@@ -3,10 +3,10 @@ import Testing
 @testable import ikut
 
 struct MapTypeColourTests {
-    private func marker(stale: Bool) -> MapMarker {
+    private func marker(stale: Bool, paused: Bool = false) -> MapMarker {
         MapMarker(
             id: "c", number: 1, name: "Car", colorHex: "#2563EB", coordinate: MapCoordinate(latitude: 4, longitude: 101),
-            heading: nil, isStale: stale, ageText: nil, isLead: false, isJoining: false, isMine: false)
+            heading: nil, isStale: stale, ageText: nil, isLead: false, isJoining: false, isMine: false, isPaused: paused)
     }
 
     @Test func aMarkerFollowsTheTextSizeButStopsAtOneAndAHalfOrSo() {
@@ -21,6 +21,7 @@ struct MapTypeColourTests {
     @Test func theClockShowsOnlyOnAStaleCar() {
         #expect(MarkerMetrics.showsStaleBadge(marker(stale: true)))
         #expect(!MarkerMetrics.showsStaleBadge(marker(stale: false)))
+        #expect(!MarkerMetrics.showsStaleBadge(marker(stale: true, paused: true)))
     }
 
     @Test func fromAndToWrapBeforeTheyShrink() {
@@ -51,7 +52,8 @@ struct MapTypeColourTests {
 
     @Test func blackGlyphsOnTheBrightFillsReadInBothModes() {
         // System yellow (FFCC00 light, FFD60A dark), system orange (FF9500, FF9F0A) and the banner blue.
-        for fill: UInt32 in [0xFFCC00, 0xFFD60A, 0xFF9500, 0xFF9F0A, MapColors.pillBlue.light, MapColors.pillBlue.dark] {
+        for fill: UInt32 in [0xFFCC00, 0xFFD60A, 0xFF9500, 0xFF9F0A, // also the stop reason icon
+             MapColors.pillBlue.light, MapColors.pillBlue.dark] {
             #expect(contrast(0x000000, fill) >= 4.5)
         }
     }
