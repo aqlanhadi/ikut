@@ -167,6 +167,7 @@ struct AlertWordingTests {
         #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-60), now: alertT0) == "1 min ago")
         #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-59 * 60), now: alertT0) == "59 min ago")
         #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-3 * 3600), now: alertT0) == "3 hr ago")
+        #expect(AlertWording.relativeTime(since: alertT0.addingTimeInterval(-30 * 3600), now: alertT0) == "30 hr ago")
     }
 
     @Test func unknownAuthor() {

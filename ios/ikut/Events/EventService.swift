@@ -4,9 +4,6 @@ import Foundation
 
 /// Reports, clears, undoes and listens to trip events (`trips/{tripId}/events`).
 enum EventService {
-    /// The rules cap `message` at 280 (UTF-16 units).
-    static let maxMessageLength = 280
-
     // MARK: Pure helpers
 
     /// Trims whitespace and newlines, caps the length, and returns nil when nothing is left.
@@ -21,7 +18,7 @@ enum EventService {
         var units = 0
         for character in trimmed {
             units += character.utf16.count
-            if units > maxMessageLength { break }
+            if units > StopLogic.maxMessageLength { break }
             capped.append(character)
         }
         capped = capped.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -198,32 +198,9 @@ extension TripService {
 enum RouteFormat {
     /// "205 km"
     static func distance(_ meters: Double) -> String {
-        "\(Int((meters / 1000).rounded())) km"
+        "\(kilometres(meters)) km"
     }
 
-    /// "2 hr 25 min", "2 hr", "45 min"
-    static func duration(_ seconds: Double) -> String {
-        let totalMinutes = max(1, Int((seconds / 60).rounded()))
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        switch (hours, minutes) {
-        case (0, _): return "\(minutes) min"
-        case (_, 0): return "\(hours) hr"
-        default: return "\(hours) hr \(minutes) min"
-        }
-    }
-
-    /// "2h 25m", "45m": the compact form for stat tiles.
-    static func shortDuration(_ seconds: Double) -> String {
-        let totalMinutes = max(1, Int((seconds / 60).rounded()))
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        return hours == 0 ? "\(minutes)m" : "\(hours)h \(String(format: "%02d", minutes))m"
-    }
-
-    /// "205 km · 2 hr 25 min via E1"
-    static func summary(_ route: BuiltRoute) -> String {
-        let base = "\(distance(route.distance)) · \(duration(route.travelTime))"
-        return route.name.isEmpty ? base : "\(base) via \(route.name)"
-    }
+    /// The whole kilometres `distance` prints, for a line that adds its own words ("18 km ahead").
+    static func kilometres(_ meters: Double) -> Int { Int((meters / 1000).rounded()) }
 }

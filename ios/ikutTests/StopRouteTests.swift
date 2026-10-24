@@ -280,6 +280,16 @@ struct StopNoteTextTests {
 }
 
 struct StopFormatTests {
+    @Test func lengthWords() {
+        #expect(StopFormat.length(minutes: 0) == "0 min")
+        #expect(StopFormat.length(minutes: 1) == "1 min")
+        #expect(StopFormat.length(minutes: 20) == "20 min")
+        #expect(StopFormat.length(minutes: 59) == "59 min")
+        #expect(StopFormat.length(minutes: 60) == "1 h")
+        #expect(StopFormat.length(minutes: 75) == "1 h 15 min")
+        #expect(StopFormat.length(minutes: 120) == "2 h")
+    }
+
     @Test func theLineUnderAStop() {
         let nine = Calendar.current.date(from: DateComponents(year: 2027, month: 1, day: 15, hour: 9, minute: 0))!
         #expect(StopFormat.detail(kind: .fuel, minutes: 20, meetAt: nil) == "Fuel · 20 min")

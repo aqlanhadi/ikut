@@ -21,6 +21,7 @@
 		0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */; };
 		10D7571EF4F2BC7E905F5A3A /* AlertCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AEFFFA195297151E2DEE401 /* AlertCenter.swift */; };
 		11CA80C194C3B109415910D3 /* CreateTripUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */; };
+		1376BA65DF4FC86D5ACBBA84 /* GeoPoint+Coordinate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C73E6E157AAC5F01E45FF7 /* GeoPoint+Coordinate.swift */; };
 		13AB18A30D92618B0F633AF8 /* PositionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B0DDAF1194DD5CA4B0A112 /* PositionBuilder.swift */; };
 		16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2392E5A1D08103853E77C151 /* ServerWriteTests.swift */; };
 		16C46AF24C556E0808E837F4 /* Polyline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89911FBE6E40CB98D46C337F /* Polyline.swift */; };
@@ -389,6 +390,7 @@
 		8EDC1FF24AC67487B6B4F31E /* PlaceSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearch.swift; sourceTree = "<group>"; };
 		8EEB2E053516041BB6ABA3EB /* StopContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopContext.swift; sourceTree = "<group>"; };
 		9256AE8480413335567EC1FC /* HazardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardModel.swift; sourceTree = "<group>"; };
+		92C73E6E157AAC5F01E45FF7 /* GeoPoint+Coordinate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeoPoint+Coordinate.swift"; sourceTree = "<group>"; };
 		951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefreshTests.swift; sourceTree = "<group>"; };
 		9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAll.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
@@ -943,6 +945,7 @@
 				16FA1B25A7565ED6310E01DB /* DocumentID+Sendable.swift */,
 				C46CA4198406B579655640C1 /* FirestoreDecoding.swift */,
 				A26B2BCA0CDF418B0CA82119 /* FirestorePaths.swift */,
+				92C73E6E157AAC5F01E45FF7 /* GeoPoint+Coordinate.swift */,
 				3EA475AFBE5E8DF067171FDC /* Member.swift */,
 				8D9BE33E452EA67593E95E26 /* PlannedStop.swift */,
 				89911FBE6E40CB98D46C337F /* Polyline.swift */,
@@ -1153,6 +1156,7 @@
 				3238E7CD833C608EF250940E /* EventService.swift in Sources */,
 				E54047B79F4DBB4FED8D948F /* FirestoreDecoding.swift in Sources */,
 				7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */,
+				1376BA65DF4FC86D5ACBBA84 /* GeoPoint+Coordinate.swift in Sources */,
 				4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */,
 				514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */,
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,

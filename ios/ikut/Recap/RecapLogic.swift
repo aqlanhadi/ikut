@@ -357,7 +357,7 @@ enum RecapLogic {
             RecapStat(label: "Final spread", value: String(format: "%.1f", $0 / 1000), unit: "km", note: "Front to back at the end")
         } ?? RecapStat(label: "Stops", value: "\(stops)", unit: "", note: stops == 1 ? "1 stop requested" : "\(stops) stops requested")
         let stats = [
-            RecapStat(label: "Distance", value: distance.map { "\(Int(($0 / 1000).rounded()))" } ?? "–", unit: "km", note: arrivedNote),
+            RecapStat(label: "Distance", value: distance.map { "\(RouteFormat.kilometres($0))" } ?? "–", unit: "km", note: arrivedNote),
             RecapStat(label: "On the road", value: duration.map(hoursMinutes) ?? "–", unit: "hr", note: timeNote),
             spreadTile,
             RecapStat(label: "Road reports", value: "\(reports)", unit: "", note: spread == nil ? "Hazards and conditions" : (stops == 1 ? "1 stop" : "\(stops) stops")),

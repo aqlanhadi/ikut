@@ -57,6 +57,8 @@ struct PickedTripTests {
         #expect(PickedTripLogic.hoursMinutes(2 * 3600 + 5 * 60) == "2 h 05")
         #expect(PickedTripLogic.hoursMinutes(59 * 60) == "59 min")
         #expect(PickedTripLogic.hoursMinutes(10) == nil)
+        #expect(PickedTripLogic.hoursMinutes(2 * 3600) == "2 h 00")
+        #expect(PickedTripLogic.hoursMinutes(60 * 60) == "1 h 00")
     }
 
     // MARK: Which route

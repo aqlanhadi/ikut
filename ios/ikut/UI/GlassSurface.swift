@@ -127,12 +127,6 @@ extension View {
 }
 
 extension Color {
-    /// The tile colour `surfaceTile` uses, for a tile that draws its own background (a car row).
-    static var surfaceTileBackground: Color {
-        if GlassSurface.useGlass, #available(iOS 26, *) { return surfaceTileFill }
-        return Color(.secondarySystemBackground)
-    }
-
     /// Light: a milky white; dark: a faint lift. Both let the glass behind show.
     static let surfaceTileFill = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.10) : UIColor(white: 1, alpha: 0.5)

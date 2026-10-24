@@ -87,11 +87,7 @@ enum AlertWording {
     /// "just now", "6 min ago", "2 hr ago". Unknown or future times read as "just now".
     static func relativeTime(since date: Date?, now: Date) -> String {
         guard let date else { return "just now" }
-        let seconds = now.timeIntervalSince(date)
-        if seconds < 60 { return "just now" }
-        let minutes = Int(seconds / 60)
-        if minutes < 60 { return "\(minutes) min ago" }
-        return "\(minutes / 60) hr ago"
+        return ConvoyFormat.ago(now.timeIntervalSince(date), hourUnit: "hr", days: false)
     }
 
     /// Short name of what was reported, e.g. "Debris".

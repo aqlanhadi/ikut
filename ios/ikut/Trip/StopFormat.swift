@@ -15,13 +15,7 @@ enum StopFormat {
 
     /// "20 min", "1 h", "1 h 15 min".
     static func length(minutes: Int) -> String {
-        let hours = minutes / 60
-        let rest = minutes % 60
-        switch (hours, rest) {
-        case (0, _): return "\(rest) min"
-        case (_, 0): return "\(hours) h"
-        default: return "\(hours) h \(rest) min"
-        }
+        minutes >= 1 ? ConvoyFormat.duration(TimeInterval(minutes) * 60) : "\(minutes) min"
     }
 
     /// "9:00", the clock time of a meeting.

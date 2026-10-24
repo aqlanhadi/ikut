@@ -504,7 +504,7 @@ final class TripSession {
         if let here = try? await RouteBuilder.currentLocation() {
             organizer = here
         } else if let own {
-            organizer = CLLocationCoordinate2D(latitude: own.location.latitude, longitude: own.location.longitude)
+            organizer = own.location.coordinate
         } else {
             throw RouteError.locationUnavailable
         }
