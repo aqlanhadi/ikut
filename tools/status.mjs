@@ -23,7 +23,8 @@ for (const [udid, name] of Object.entries(SIMS)) {
   const state = /\((Booted|Shutdown|Shutting Down|Booting)\)/.exec(devices.split('\n').find((l) => l.includes(udid)) ?? '')?.[1] ?? 'missing';
   const lock = `/tmp/ikut-sim-${udid}.lock`;
   const busy = fs.existsSync(lock) && sh('lockf', ['-k', '-t', '0', lock, 'true']).status === 75;
-  const holder = busy ? (fs.readFileSync(`/tmp/ikut-sim-${udid}.holder`, 'utf8').trim() || 'another run') : null;
+  let holder = null;
+  if (busy) { try { holder = fs.readFileSync(`/tmp/ikut-sim-${udid}.holder`, 'utf8').trim(); } catch {} holder ||= 'another run'; }
   console.log(`  ${name.padEnd(13)} ${state.padEnd(9)} ${busy ? `held by: ${holder}` : 'free'}`);
 }
 
@@ -47,7 +48,7 @@ for (const line of ps) {
   } else if (/simctl location \S+ start/.test(cmd)) {
     const udid = /location (\S+) start/.exec(cmd)[1];
     what = `location playback on ${SIMS[udid] ?? udid.slice(0, 8)}`;
-  } else if (/firebase.*emulators:start|cloud-firestore-emulator/.test(cmd) && /node|java/.test(cmd) && !/java/.test(cmd)) {
+  } else if (/firebase.*emulators:start|cloud-firestore-emulator/.test(cmd)) {
     what = 'firebase emulators';
   }
   if (what) rows.push(`  ${etime.padStart(11)}  ${what}  [pid ${pid}]`);
