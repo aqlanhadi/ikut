@@ -41,7 +41,7 @@ struct JoinServiceTests {
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip already has 10 cars.").contains("cars"))
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "That car is not part of this trip.").contains("no longer part"))
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "x").contains("6 letters"))
-        #expect(JoinService.message(code: .unavailable, serverMessage: "").contains("connection"))
+        #expect(JoinService.message(code: .unavailable, serverMessage: "").contains("signal"))
         #expect(JoinService.message(code: .unauthenticated, serverMessage: "").contains("signed out"))
         #expect(JoinService.message(code: nil, serverMessage: "").contains("That didn’t go through"))
     }
@@ -50,7 +50,7 @@ struct JoinServiceTests {
         let notFound = NSError(domain: FunctionsErrorDomain, code: FunctionsErrorCode.notFound.rawValue)
         #expect(JoinService.map(notFound).message.contains("No trip has that code"))
         let offline = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
-        #expect(JoinService.map(offline).message.contains("connection"))
+        #expect(JoinService.map(offline).message.contains("signal"))
         #expect(JoinService.map(JoinError(message: "hi")).message == "hi")
     }
 
