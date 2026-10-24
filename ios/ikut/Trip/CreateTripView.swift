@@ -39,16 +39,29 @@ final class CreateTripModel {
     /// The text a query search ran for, so setting the field to it does not go back to suggestions.
     @ObservationIgnored private var searchedText = ""
 
+    /// Names the spot when the field holds coordinates or a maps link.
+    @ObservationIgnored let pinNamer: PinNamer
+    @ObservationIgnored let geocoder: ReverseGeocoding
+    /// How long the field is quiet before a typed coordinate is looked up.
+    @ObservationIgnored var pinDelay: Duration = .milliseconds(400)
+
     init(
-        suggestions: (@MainActor () -> SuggestionSource)? = nil, places: PlaceSearching = MapKitPlaceSearch()
+        suggestions: (@MainActor () -> SuggestionSource)? = nil, places: PlaceSearching = MapKitPlaceSearch(),
+        geocoder: ReverseGeocoding = CLReverseGeocoder()
     ) {
         makeSource = suggestions ?? { MapKitSuggestionSource() }
         self.places = places
+        self.geocoder = geocoder
+        pinNamer = PinNamer(geocoder: geocoder)
     }
+
+    /// The "Dropped pin" row: set while the field holds coordinates or a maps link, in place of suggestions.
+    var droppedPin: DestinationResult? { pastedPin ? pinNamer.place : nil }
+    private(set) var pastedPin = false
 
     /// Whether the list under the field has anything to show: a search under way, suggestions or a query's results.
     /// One typed character shows none.
-    var showsList: Bool { showingResults || isSearching || !suggestions.isEmpty }
+    var showsList: Bool { pastedPin || showingResults || isSearching || !suggestions.isEmpty }
 
     var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     var isWorking: Bool { working != nil }
@@ -75,6 +88,20 @@ final class CreateTripModel {
         let source = source ?? makeSource()
         self.source = source
         source.onUpdate = { [weak self] query, outcome in self?.receive(query: query, outcome) }
+        if let spot = CoordinateParser.parse(text) {
+            pastedPin = true
+            suggestions = []
+            isSearching = false
+            source.stop()
+            if pinNamer.coordinate?.latitude != spot.latitude || pinNamer.coordinate?.longitude != spot.longitude {
+                pinNamer.start(spot, after: pinDelay)
+            }
+            return
+        }
+        if pastedPin {
+            pastedPin = false
+            pinNamer.clear()
+        }
         guard text.count >= 2 else {
             suggestions = []
             isSearching = false
@@ -87,7 +114,7 @@ final class CreateTripModel {
 
     /// MapKit's answer for `query`; one for an older query than the field now holds is dropped.
     func receive(query answered: String, _ outcome: Result<[SearchSuggestion], Error>) {
-        guard !showingResults, answered.trimmingCharacters(in: .whitespacesAndNewlines) == trimmedQuery,
+        guard !pastedPin, !showingResults, answered.trimmingCharacters(in: .whitespacesAndNewlines) == trimmedQuery,
               trimmedQuery.count >= 2 else { return }
         switch outcome {
         case .success(let found):
@@ -101,7 +128,7 @@ final class CreateTripModel {
 
     /// The keyboard's Search key: every match for the text.
     func submit() {
-        guard trimmedQuery.count >= 2 else { return }
+        guard trimmedQuery.count >= 2, !pastedPin else { return }
         runSearch(trimmedQuery)
     }
 
@@ -260,6 +287,15 @@ final class CreateTripModel {
         self.originName = originName
     }
 
+    /// Shows the "Dropped pin" row for `query`, named `found`.
+    func showPinForDemo(query: String, found: GeocodedName?, origin: CLLocationCoordinate2D, originName: String) {
+        self.query = query
+        pastedPin = true
+        pinNamer.setForDemo(CoordinateParser.parse(query), found)
+        self.origin = origin
+        self.originName = originName
+    }
+
     /// Shows `suggestions` for `query`, as while typing.
     func showSuggestionsForDemo(query: String, suggestions: [SearchSuggestion], origin: CLLocationCoordinate2D, originName: String) {
         self.query = query
@@ -347,7 +383,7 @@ struct CreateTripView: View {
                         .accessibilityLabel("Error: \(message)")
                 }
 
-                if model.showsList {
+                if model.showsList || searchFocused {
                     PlaceSearchResults(
                         model: model, distance: .fromYou,
                         workingLabel: changingTripId == nil ? "Creating trip" : "Updating trip", onPick: pick)
@@ -482,6 +518,28 @@ struct PlaceResultRow<Trailing: View>: View {
         subtitle = result.subtitle
         (symbol, color) = (kind.symbol, kind.color)
         label = [result.name, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+        self.disabled = disabled
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    /// A pasted pin: a pin icon, its name, "Dropped pin" and the coordinates under it.
+    init(pin: DestinationResult, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
+        title = AttributedString(pin.name)
+        subtitle = "Dropped pin · \(pin.subtitle)"
+        (symbol, color) = ("mappin", .red)
+        label = "Dropped pin, \(pin.name), \(pin.subtitle)"
+        self.disabled = disabled
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    /// A plain action row, like "Choose on map".
+    init(action title: String, symbol: String, color: Color, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
+        self.title = AttributedString(title)
+        subtitle = ""
+        (self.symbol, self.color) = (symbol, color)
+        label = title
         self.disabled = disabled
         self.action = action
         self.trailing = trailing()

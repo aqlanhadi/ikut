@@ -165,7 +165,7 @@ struct AddStopSheet: View {
             if let message = model.errorMessage {
                 InlineNote(message, tone: .alert).padding(.top, Spacing.m)
             }
-            if model.showsList {
+            if model.showsList || searchFocused {
                 PlaceSearchResults(model: model, distance: .alongRoute, showsKind: true, onPick: pick)
             }
         }
