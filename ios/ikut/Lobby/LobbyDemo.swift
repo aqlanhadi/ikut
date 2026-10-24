@@ -183,6 +183,8 @@ enum DemoScreens {
         case "road-header-parked": return AnyView(PanelHeaderDemo(.parked))
         case "road-header-never": return AnyView(PanelHeaderDemo(.never))
         case "road-header-convoy": return AnyView(PanelHeaderDemo(nil))
+        case "road-panel-short": return AnyView(MapDemo.view())
+        case "road-panel-tall": return AnyView(MapDemo.view(expanded: true))
         case "road-next-stop": return AnyView(NextStopDemo())
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))
         case "join-with-location": return nav(JoinDemo.ticket(withStops: true, drive: TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60)))

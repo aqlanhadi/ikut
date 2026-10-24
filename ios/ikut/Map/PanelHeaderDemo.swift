@@ -17,7 +17,7 @@ struct PanelHeaderDemo: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
-            ConvoyPanel(model: map, expanded: $expanded, canReport: true, onReport: {}, onStop: {})
+            ConvoyPanel(model: map, expanded: $expanded, canReport: true, onReport: {}, onStop: {}).previewCard()
         }
     }
 }

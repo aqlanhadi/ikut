@@ -9,7 +9,7 @@ enum HomeSheet {
     /// The short sheet of a picked trip (design/project/HomePicked.dc.html): back, name, date, stats line.
     static let pickedCompactMinimum: CGFloat = 172
     /// Room the drag indicator takes above the content.
-    static let indicatorRoom: CGFloat = 20
+    static let indicatorRoom = BottomSheet.indicatorRoom
 
     /// The short detent's height. A picked trip's follows its header (the text size can wrap it), and
     /// never goes below the design's height.
@@ -28,15 +28,11 @@ enum HomeSheet {
     }
 
     /// Whatever detent the sheet settles on, tall or not (a dragged sheet reports only its detent).
-    static func isExpanded(_ detent: PresentationDetent) -> Bool { detent == tall }
+    static func isExpanded(_ detent: PresentationDetent) -> Bool { BottomSheet.isTall(detent, tall: tall) }
 
     /// Home's sheet steps aside while anything else is pushed or presented from the root: a pushed screen,
     /// the name or location-denied sheet (wanted, or waiting for the name), or a route being opened.
     static func isCovered(pathCount: Int, showName: Bool, showDenied: Bool, afterName: Bool, opening: Bool) -> Bool {
         pathCount > 0 || showName || showDenied || afterName || opening
     }
-
-    /// A sheet of the root is presented only once Home's sheet is gone: one sheet can't come up while
-    /// another is still on its way down. `homeSheetUp` follows the sheet's own appear and dismiss.
-    static func presents(wanted: Bool, homeSheetUp: Bool) -> Bool { wanted && !homeSheetUp }
 }

@@ -58,6 +58,11 @@ extension View {
     func glassSurface(_ kind: GlassSurface.Kind = .floating) -> some View {
         modifier(GlassSurfaceModifier(kind: kind))
     }
+
+    /// The glass surface only when `on`: inside Apple's own sheet, the sheet is the surface.
+    @ViewBuilder func glassSurface(_ kind: GlassSurface.Kind = .floating, if on: Bool) -> some View {
+        if on { glassSurface(kind) } else { self }
+    }
 }
 
 /// Which kind of button face `surfaceButton` gives.

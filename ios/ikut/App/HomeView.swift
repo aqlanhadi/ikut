@@ -89,7 +89,7 @@ struct HomeView: View {
                     RecapView(tripId: tripId, onDone: { path = [] })
                 }
             }
-            .sheet(isPresented: Binding(get: { HomeSheet.presents(wanted: showName, homeSheetUp: homeSheetUp) },
+            .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showName, sheetUp: homeSheetUp) },
                                         set: { showName = $0 }),
                    onDismiss: {
                 // Home's sheet is held back until the route is open; a swipe-down instead of Continue drops the trip.
@@ -109,7 +109,7 @@ struct HomeView: View {
                 }
                 .presentationDetents([.medium])
             }
-            .sheet(isPresented: Binding(get: { HomeSheet.presents(wanted: showDenied, homeSheetUp: homeSheetUp) },
+            .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showDenied, sheetUp: homeSheetUp) },
                                         set: { showDenied = $0 })) {
                 LocationDeniedView { location.openSettings() }
             }
