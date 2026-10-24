@@ -69,6 +69,8 @@ struct TripMapView: View {
     @State private var cardContent: CGFloat?
     /// The pinned bar's own height and the sheet's bottom safe area (the home indicator's), measured.
     @State private var barContent: CGFloat?
+    /// When the stop card last closed, so the system's re-pick of a detent after it is not read as a fold.
+    @State private var cardClosedAt: Date?
     @State private var sheetSafeBottom: CGFloat = 34
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
@@ -641,7 +643,12 @@ struct TripMapView: View {
         }
         .presentationDetents(PanelSheet.detents(shown, in: heights), selection: Binding(
             get: { PanelSheet.detent(shown, in: heights) },
-            set: { if shown != .card, let tall = PanelSheet.choice($0, in: heights) { setExpanded(tall) } }))
+            set: {
+                guard PanelSheet.acceptsDetentReport(shown: shown, sinceCardClosed: cardClosedAt.map { -$0.timeIntervalSinceNow }),
+                      let tall = PanelSheet.choice($0, in: heights) else { return }
+                setExpanded(tall)
+            }))
+        .onChange(of: cardShowing) { _, showing in if !showing { cardClosedAt = Date() } }
         .presentationDragIndicator(shown == .card ? .hidden : .visible)
         .presentationBackgroundInteraction(.enabled(upThrough: .height(shown == .card ? heights.card : heights.tall)))
         .interactiveDismissDisabled()

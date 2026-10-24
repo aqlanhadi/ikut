@@ -59,6 +59,16 @@ enum PanelSheet {
         return nil
     }
 
+    /// How long after a stop card closes the sheet's own detent reports are ignored. Swapping the card's single
+    /// detent for the panel's two makes the system pick one and report it, which is not the driver folding the list.
+    static let cardSwapQuiet: TimeInterval = 0.8
+
+    /// Whether a detent the sheet reports is the driver's drag: not on a card, and not the system re-picking
+    /// after the card closed (`sinceCardClosed`, nil when no card has closed lately).
+    static func acceptsDetentReport(shown: Shown, sinceCardClosed: TimeInterval?) -> Bool {
+        shown != .card && (sinceCardClosed ?? .greatestFiniteMagnitude) >= cardSwapQuiet
+    }
+
     /// Whether an action waits for the sheet to go (it is up, and its own dismissal runs the action) or runs
     /// at once (the sheet is already gone, so no dismissal will come).
     enum ExitTiming: Equatable { case afterDismissal, now }

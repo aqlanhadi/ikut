@@ -119,6 +119,13 @@ struct PanelSheetTests {
         #expect(PanelSheet.sideGap == Spacing.l)
     }
 
+    @Test func theSystemsDetentPickAfterACardClosesIsNotAFold() {
+        #expect(!PanelSheet.acceptsDetentReport(shown: .card, sinceCardClosed: nil))
+        #expect(!PanelSheet.acceptsDetentReport(shown: .unfolded, sinceCardClosed: 0.1))
+        #expect(PanelSheet.acceptsDetentReport(shown: .unfolded, sinceCardClosed: PanelSheet.cardSwapQuiet))
+        #expect(PanelSheet.acceptsDetentReport(shown: .folded, sinceCardClosed: nil))
+    }
+
     @Test func anExitWaitsForTheSheetOnlyWhileItIsUp() {
         #expect(PanelSheet.exit(sheetUp: true) == .afterDismissal)
         #expect(PanelSheet.exit(sheetUp: false) == .now)
