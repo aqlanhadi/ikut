@@ -108,7 +108,7 @@ struct HomeView: View {
                     opening = routeAfterName != nil
                     showName = false
                 }
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showDenied, sheetUp: homeSheetUp) },
                                         set: { showDenied = $0 })) {

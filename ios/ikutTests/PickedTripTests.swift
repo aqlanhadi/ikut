@@ -108,8 +108,13 @@ struct PickedTripTests {
         // Both ends of the route sit between the sheet's top edge and the status bar.
         #expect(3.1 >= visibleBottom)
         #expect(4.6 <= mapTop - r.span.latitudeDelta * insets.top)
-        // The short picked sheet leaves more map than Home's list sheet.
-        #expect(TripsHomeView.obscured(mapHeight: 874, sheet: 172).bottom < TripsHomeView.obscured(mapHeight: 874).bottom)
+        // The map's own bottom padding covers a sheet no taller than it, so the camera keeps no extra room;
+        // a taller one keeps only the part above the padding.
+        let padding = HomeSheet.legalInset(compact: HomeSheet.compactHeight)
+        #expect(insets.bottom == 0)
+        let tall = TripsHomeView.obscured(mapHeight: 874, sheet: 500).bottom
+        #expect(abs(tall - Double(500 - padding) / 874) < 1e-9)
+        #expect(tall > insets.bottom)
     }
 
     @Test func focusCentresTheSpotAboveTheSheet() {

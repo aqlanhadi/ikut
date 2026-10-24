@@ -139,6 +139,9 @@ struct TripsHomeView: View {
         .onTapGesture { if picked != nil { closePicked() } }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
+        // The logo and Legal ride 10 pt above the folded sheet instead of under it. The padding goes on the
+        // Map itself, before it ignores the safe area, as on the driving map.
+        .safeAreaPadding(.bottom, HomeSheet.legalInset(compact: compact))
         .ignoresSafeArea()
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
             guard height != mapHeight else { return }
@@ -298,7 +301,7 @@ struct TripsHomeView: View {
     /// Camera for the picked trip: the selected item's spot, else the whole route, above the short sheet.
     private func refocus(animated: Bool) {
         guard let picked else { return }
-        let insets = Self.obscured(mapHeight: mapHeight, sheet: pickedCompact)
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: pickedCompact, padding: HomeSheet.legalInset(compact: compact))
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
             region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
@@ -360,9 +363,12 @@ struct TripsHomeView: View {
     /// the top, and the compact sheet at the bottom (the map runs under both). Before the map has a
     /// height the typical phone height stands in, rather than dividing by zero (which pushed the
     /// fit far south).
-    nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = HomeSheet.compactHeight) -> (top: Double, bottom: Double) {
+    nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = HomeSheet.compactHeight,
+                                      padding: CGFloat = HomeSheet.legalInset(compact: HomeSheet.compactHeight)) -> (top: Double, bottom: Double) {
         let height = mapHeight > sheet + Self.topObscured ? mapHeight : 874
-        return (Double(Self.topObscured / height), Double(sheet / height))
+        // The map's bottom safe-area padding (`HomeSheet.legalInset`) is already kept clear, since MapKit fits
+        // inside it; only the part of the sheet above that padding is left for the camera.
+        return (Double(Self.topObscured / height), Double(max(0, sheet - padding) / height))
     }
 
     /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
