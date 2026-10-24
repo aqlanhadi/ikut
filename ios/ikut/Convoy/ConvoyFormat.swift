@@ -41,9 +41,6 @@ enum ConvoyFormat {
         "\(Int((max(0, metersPerSecond.isFinite ? metersPerSecond : 0) * 3.6).rounded())) km/h"
     }
 
-    /// The viewer's own car, wherever the convoy names cars.
-    static let me = "Me"
-
     /// A car that reached the destination.
     static let arrived = "Arrived"
 

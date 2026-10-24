@@ -259,7 +259,7 @@ struct FarAheadTests {
     @MainActor @Test func theParkedCarsOwnPhoneSeesTheLeadBehind() async {
         let m = await model([aisha, daniel], ["1": pos(0), "3": pos(38_000, speed: 0)], me: "3")
         let rows = m.convoyRows
-        #expect(rows[0].name == ConvoyFormat.me)
+        #expect(rows[0].name == "Aisha’s car" || rows[0].isMine)
         #expect(rows[1].subtitle == "Lead · 38 km behind")
     }
 

@@ -67,7 +67,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             let joining = element("joining.row.4")
             XCTAssertTrue(joining.exists, "car 4 should be under JOINING")
             XCTAssertTrue(joining.label.contains("Daniel"), "joining row should be Daniel's car: \(joining.label)")
-            XCTAssertTrue(element("convoy.row.5").label.hasPrefix("Me"), "row 5 should be this phone's car: \(element("convoy.row.5").label)")
+            XCTAssertTrue(element("convoy.row.5").label.contains(name), "row 5 should be this phone's car: \(element("convoy.row.5").label)")
             XCTAssertTrue(element("convoy.header").label.hasPrefix("4 in Convoy"), "header: \(element("convoy.header").label)")
             shot("01-before-drive")
         }
@@ -153,7 +153,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
         // Car 6 (Mei) joined fifth, so this phone is car 6 in the list and Mei is row 5.
         try step("1. Parked ahead: Mei, this car, then cars 1, 2, 3; Mei's row says how far and that she is parked") {
             try waitFor("convoy order 5, 6, 1, 2, 3", timeout: 180) { convoyOrder() == [5, 6, 1, 2, 3] }
-            XCTAssertTrue(element("convoy.row.6").label.hasPrefix("Me"), "row 6 should be this phone's car: \(element("convoy.row.6").label)")
+            XCTAssertTrue(element("convoy.row.6").label.contains(name), "row 6 should be this phone's car: \(element("convoy.row.6").label)")
             // 4 km on: "4.0 km ahead · parked near <town>" once the town is found, "· parked" before.
             try waitFor("Mei's row: about 4 km ahead, parked", timeout: 60) {
                 element("convoy.row.5").label.contains(" km ahead · parked")

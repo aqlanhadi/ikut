@@ -31,6 +31,7 @@ struct TripMapView: View {
     /// The ask on screen now; the next one waits for it to be answered (`TripAskPlanner`).
     @State private var ask: TripAsk?
     @State private var screenAwake = ScreenAwake()
+    @State private var network = NetworkStatus()
     @State private var onScreen = false
     @Environment(\.scenePhase) private var scenePhase
     /// The open stop requests (and a "No answer"), from `StopService.listen`.
@@ -159,6 +160,8 @@ struct TripMapView: View {
             .onDisappear(perform: disappear)
             .task { await model.convoy.run() }
             .task { await model.hazards.run() }
+            .task { if liveServices { await network.run() } }
+            .onChange(of: network.isUp, initial: true) { _, up in if liveServices { model.networkUp = up } }
             .task(id: StopListenKey(carId: model.myCarId, routeLength: model.mainRoute?.length)) {
                 guard liveServices, let context = stopContext else { return }
                 for await board in StopService.listen(context: context) { stopBoard = board }
@@ -1049,18 +1052,17 @@ struct MapMarkerView: View {
         .opacity(marker.isStale ? 0.6 : 1)
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { markerX = $0 }
         .overlay(alignment: side == .trailing ? .leading : .trailing) {
-            Text(marker.label)
+            HStack(spacing: Spacing.xs) {
+                Text(marker.label)
+                if marker.isMine { YouTag(online: marker.youOnline, compact: true) }
+            }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isMine ? Color.white
-                    : marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
+                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, Spacing.chipX)
                 .padding(.vertical, Spacing.xs)
-                .background {
-                    // My own label is the accent blue so "Me" stands out from the white chips.
-                    if marker.isMine { Capsule().fill(MapPalette.accent) } else { Capsule().fill(.regularMaterial) }
-                }
+                .background(Capsule().fill(.regularMaterial))
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                 .padding(side == .trailing ? .leading : .trailing, MapChipPlacement.gap)
@@ -1074,7 +1076,8 @@ struct MapMarkerView: View {
     }
 
     private var accessibilityText: String {
-        var text = marker.isMine ? ConvoyFormat.me : marker.name
+        var text = marker.name
+        if marker.isMine { text += ", " + YouOnline.spoken(online: marker.youOnline) }
         if marker.hasArrived { text += ", arrived" }
         if marker.isLead { text += ", lead" }
         if marker.isJoining { text += ", joining" }

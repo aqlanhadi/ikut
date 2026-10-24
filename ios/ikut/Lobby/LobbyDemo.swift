@@ -184,6 +184,8 @@ enum DemoScreens {
         case "road-header-never": return AnyView(PanelHeaderDemo(.never))
         case "road-header-convoy": return AnyView(PanelHeaderDemo(nil))
         case "road-panel-short": return AnyView(MapDemo.view())
+        case "road-panel-you-online": return AnyView(MapDemo.view(expanded: true))
+        case "road-panel-you-offline": return AnyView(MapDemo.view(expanded: true, online: false))
         case "road-panel-tall": return AnyView(MapDemo.view(expanded: true))
         case "road-next-stop": return AnyView(NextStopDemo())
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))

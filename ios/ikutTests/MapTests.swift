@@ -58,8 +58,9 @@ struct MapMarkerTests {
         #expect(markers[1].colorHex == "#D9480F")
         #expect(markers[1].isMine)
         #expect(!markers[1].isLead)
-        // My own car reads "Me" rather than its name.
-        #expect(markers[1].label == "Me")
+        // My own car reads its name; the "You" tag is drawn after it.
+        #expect(markers[1].label != "Me")
+        #expect(markers[1].label == MapMarkerBuilder.shortName(markers[1].name))
     }
 
     @Test func staleCarIsFlaggedWithAge() {
