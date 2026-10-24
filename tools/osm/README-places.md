@@ -29,3 +29,17 @@ points inside them; the slip roads are the one-way `service` and `motorway_link`
 `version`, `generatedAt` (the data's own time, so the same download gives the same file), `source`, `license`, then `sites` (objects: `id`, `kind`, `name`, `at` `[lat, lon]`,
 `ring`, `facilities`, `brands`, `entries`, `exits`) and `fuel` (`[id, lat, lon, name]` per lone fuel station). A
 slip road is `[junctionLat, junctionLon, bearing, gateLat, gateLon, meters]`.
+
+## Publishing a new file to phones
+
+The app checks `https://ikut-b1083.web.app/places/manifest.json` once a week when it opens (`ios/ikut/Places/PlacesRefresher.swift`)
+and downloads the file only when its `generatedAt` is newer than the one in use. To publish:
+
+1. Run `extract.mjs` as above and commit the new bundled file (the next app build then carries the same file).
+2. From `main`: `cd firebase && firebase deploy --only hosting`. Its predeploy step runs `tools/osm/publish.mjs`, which copies the
+   bundled file and this readme to `firebase/hosting/places/` (not in git) and writes `manifest.json` there (version, generatedAt,
+   bytes, SHA-256). A plain `firebase deploy` publishes it too, so deploy from `main`.
+
+A phone ignores a hosted file whose size or hash does not match the manifest, that does not read, whose `version` is newer than
+the app knows, or that has fewer than half the sites of the bundled file. Never publish a file with a higher `version` without an
+app that reads it.

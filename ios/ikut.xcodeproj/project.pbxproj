@@ -146,6 +146,7 @@
 		9C88E9F61DEC32F38B28C02F /* NextStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 423FF6822F3DBBDDFF5571D9 /* NextStopTests.swift */; };
 		9EDC48B733121D1A6E0056D6 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0803549353B1CD91367C85 /* LobbyView.swift */; };
 		A068D03A44E44AD4E4982A1B /* RequestPlacesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */; };
+		A0DA932F784B100BA0FDFCD8 /* PlacesRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */; };
 		A394C64ECF58676AB0A60731 /* NextStopDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076A4E68B7B0C8291C62A7BB /* NextStopDemo.swift */; };
 		A5D7587052DDAC3FD53CC733 /* ConvoyScenarioUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */; };
 		A6127DCD2CA228902ADF16A4 /* TripMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265DA41B16D79FE07ABF962B /* TripMapView.swift */; };
@@ -157,6 +158,7 @@
 		A889D2AE7ED65EDEDDACD020 /* OwnWayDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD4FAF0956DC812EFB12371 /* OwnWayDemo.swift */; };
 		AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
+		AC852917E2B33237A9ED6448 /* PlacesRefresher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCC8291CDD3C3F118813710 /* PlacesRefresher.swift */; };
 		AE42D67433F25C45F00C1848 /* StopCardParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C456C99B4E7723AFF06FB58C /* StopCardParts.swift */; };
 		AE72CCADED8DA399C9756E21 /* OurSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E829D83EBFA088CE302217 /* OurSide.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
@@ -294,6 +296,7 @@
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
 		3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalTests.swift; sourceTree = "<group>"; };
 		3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometryTests.swift; sourceTree = "<group>"; };
+		3CCC8291CDD3C3F118813710 /* PlacesRefresher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefresher.swift; sourceTree = "<group>"; };
 		3D43EA449C4A10B16261D617 /* HazardMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardMapContent.swift; sourceTree = "<group>"; };
 		3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswerTests.swift; sourceTree = "<group>"; };
 		3EA475AFBE5E8DF067171FDC /* Member.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Member.swift; sourceTree = "<group>"; };
@@ -365,6 +368,7 @@
 		8EDC1FF24AC67487B6B4F31E /* PlaceSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearch.swift; sourceTree = "<group>"; };
 		8EEB2E053516041BB6ABA3EB /* StopContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopContext.swift; sourceTree = "<group>"; };
 		9256AE8480413335567EC1FC /* HazardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardModel.swift; sourceTree = "<group>"; };
+		951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefreshTests.swift; sourceTree = "<group>"; };
 		9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAll.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
 		991414E381145C07351D7F20 /* LocationDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationDeniedView.swift; sourceTree = "<group>"; };
@@ -715,6 +719,7 @@
 				7FE148B8C110122AD858B9D2 /* PlaceRules.swift */,
 				091A73560C6A3A87AF053698 /* PlaceSide.swift */,
 				180A672BC06876630D529E06 /* PlacesLoader.swift */,
+				3CCC8291CDD3C3F118813710 /* PlacesRefresher.swift */,
 				22D878D22F72D9E78CD9DE62 /* RequestPlaces.swift */,
 				8910BC2D6402772067EC5AE7 /* SuggestStops.swift */,
 			);
@@ -803,6 +808,7 @@
 				DE0DD61BCABA3D8EADF2ABE6 /* PlacesAlongTests.swift */,
 				9F6A312F64D63E711A33AAFF /* PlaceSearchTests.swift */,
 				7F7E06B398795C1AC5DEE699 /* PlacesKLIpohTests.swift */,
+				951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */,
 				17421B4EFD9D184F0F10E811 /* PlacesTests.swift */,
 				B1C004029CF785E6F7B0DC74 /* PolylineTests.swift */,
 				5A359927AF19ECCCD8185BBE /* RecapTests.swift */,
@@ -1124,6 +1130,7 @@
 				E749BE34EAD6F3EB2AC0C93E /* PlaceSearch.swift in Sources */,
 				76B843F8B3A574B935D96CC7 /* PlaceSide.swift in Sources */,
 				C44829D343D51C669D1496DC /* PlacesLoader.swift in Sources */,
+				AC852917E2B33237A9ED6448 /* PlacesRefresher.swift in Sources */,
 				E0C7E86BEDED57BD1C4A1256 /* PlannedStop.swift in Sources */,
 				16C46AF24C556E0808E837F4 /* Polyline.swift in Sources */,
 				9B4CB838014CB0BD376988F7 /* Position.swift in Sources */,
@@ -1237,6 +1244,7 @@
 				5495AF5D72E1641F830F1A7D /* PlaceSearchTests.swift in Sources */,
 				024A39ABA6D1550CACA273B3 /* PlacesAlongTests.swift in Sources */,
 				4151B4E056B2B1144C676055 /* PlacesKLIpohTests.swift in Sources */,
+				A0DA932F784B100BA0FDFCD8 /* PlacesRefreshTests.swift in Sources */,
 				01E9C9563F574C749E39846C /* PlacesTests.swift in Sources */,
 				0A6FE771CAA54DCA9D39B177 /* PolylineTests.swift in Sources */,
 				2DAE6B663058967FCC0164DA /* RecapTests.swift in Sources */,

@@ -37,3 +37,6 @@ qa/battery/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Built by tools/osm/publish.mjs at hosting deploy
+firebase/hosting/

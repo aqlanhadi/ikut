@@ -27,7 +27,9 @@ final class TripSession {
     private(set) var membershipLost = false
     /// True while leaving or ending; tracking is not restarted meanwhile.
     private(set) var isClosing = false
-    private(set) var isTracking = false
+    private(set) var isTracking = false {
+        didSet { PlacesRefresher.tripRunning = isTracking }
+    }
     /// Organizer only: rebuilds the main route mid-trip (a new destination, a stop skipped for everyone).
     let rebuilder: RouteRebuilder
 
@@ -119,6 +121,7 @@ final class TripSession {
         tracker.onFix = nil
         tracker.stop()
         removeListeners()
+        PlacesRefresher.tripRunning = false
     }
 
     /// Attaches the listeners; calling it again while running does nothing.

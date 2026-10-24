@@ -18,6 +18,26 @@
       ]
     }
   ],
+  "hosting": {
+    "public": "hosting",
+    "predeploy": [
+      "node \"$PROJECT_DIR/../tools/osm/publish.mjs\""
+    ],
+    "ignore": [
+      "**/.*"
+    ],
+    "headers": [
+      {
+        "source": "places/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      }
+    ]
+  },
   "emulators": {
     "singleProjectMode": true,
     "auth": {
