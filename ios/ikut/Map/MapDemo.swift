@@ -156,10 +156,10 @@ enum MapDemo {
         return model
     }
 
-    static func view(expanded: Bool = false, online: Bool = true) -> some View {
+    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false) -> some View {
         Backend.configure()
         let env = ProcessInfo.processInfo.environment
-        let five = env["IKUT_MAP_DEMO_CARS"] == "5"
+        let five = fiveCars || env["IKUT_MAP_DEMO_CARS"] == "5"
         let gallery = env["IKUT_MAP_DEMO_BANNERS"] != nil
         let model = model(fiveCars: five, parked: env["IKUT_MAP_DEMO_PARKED"])
         model.networkUp = online

@@ -5,7 +5,7 @@ import SwiftUI
 /// time, a progress bar with every car and hazard on the route, spread / lead speed,
 /// one row per car (joining cars last, with dashed badges), then Report and Pit stop. Folded (the
 /// short detent) it is FROM/TO, progress, a one-line summary and the buttons; a tap on the header
-/// or the handle, or a drag of the sheet, unfolds it (the tall detent).
+/// or a drag of the sheet, unfolds it (the tall detent).
 ///
 /// The sheet (`TripMapView`, `PanelSheet`) is the surface and owns the sizes: this view only reports
 /// its own height (`onHeight`) so the detents follow it. The alerts the panel's buttons lead to are
@@ -28,7 +28,6 @@ struct ConvoyPanel: View {
     /// move: it does no lookups and is not on screen or in VoiceOver.
     var probe = false
 
-    @State private var listHeight: CGFloat = 0
     @State private var originName: String?
     @State private var ownStartName: String?
     @State private var joinPlaceName: String?
@@ -37,11 +36,9 @@ struct ConvoyPanel: View {
     @State private var joinCoordinate: CLLocationCoordinate2D?
 
     private var convoy: ConvoyModel { model.convoy }
-    private let maxListHeight: CGFloat = 220
 
     var body: some View {
         VStack(spacing: 0) {
-            handle
             header
             progress
             // The summary and the list cross-fade, never slide; the header and the buttons stay in place.
@@ -135,20 +132,6 @@ struct ConvoyPanel: View {
 
     // MARK: Pieces
 
-    /// The strip under the sheet's own drag indicator: a tap on it folds or unfolds the list, and it is the
-    /// button VoiceOver and the UI tests find ("Expand convoy list").
-    private var handle: some View {
-        Color.clear
-            .frame(maxWidth: .infinity)
-            .frame(height: BottomSheet.indicatorRoom)
-            .contentShape(Rectangle())
-            .onTapGesture { expanded.toggle() }
-            .accessibilityElement()
-            .accessibilityLabel(expanded ? "Collapse convoy list" : "Expand convoy list")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { expanded.toggle() }
-    }
-
     private var header: some View {
         let destination = convoy.destinationName ?? ""
         let arrive = frontArrival.map { ConvoyFormat.clock($0) }
@@ -192,13 +175,24 @@ struct ConvoyPanel: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, Spacing.xs)
-        .padding(.top, Spacing.xs)
-        .contentShape(Rectangle())
-        .onTapGesture { expanded.toggle() }
+        // Room for the sheet's own grabber, which is the only handle (a second one confused VoiceOver).
+        .padding(.top, Spacing.xs + BottomSheet.indicatorRoom)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ConvoyHeader.label(title: convoy.title, text: text, destination: destination, arrive: arrive))
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("convoy.header")
+        // A tap on the header folds or unfolds the list. It is also the button VoiceOver and the UI tests find
+        // ("Expand convoy list"), beside the header's own words. The Next stop cell is in the grid below, not
+        // under this tap, so the two never meet.
+        .overlay {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { expanded.toggle() }
+                .accessibilityElement()
+                .accessibilityLabel(expanded ? "Collapse convoy list" : "Expand convoy list")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { expanded.toggle() }
+        }
     }
 
     @ViewBuilder
@@ -314,22 +308,8 @@ struct ConvoyPanel: View {
         .padding(.top, Spacing.cozy)
     }
 
+    /// The cars, in the sheet's own scroll: the list has none of its own, so the whole panel moves as one.
     private var list: some View {
-        ScrollView {
-            content
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
-                    })
-        }
-        .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
-        .frame(height: min(max(listHeight, 0), maxListHeight))
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollIndicators(.hidden)
-        .padding(.top, Spacing.tight)
-    }
-
-    private var content: some View {
         VStack(spacing: 0) {
             if let warning = model.separationWarning {
                 separation(warning)
@@ -350,6 +330,7 @@ struct ConvoyPanel: View {
                 JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline)
             }
         }
+        .padding(.top, Spacing.tight)
     }
 
     private func separation(_ text: String) -> some View {
@@ -375,9 +356,10 @@ struct ConvoyPanel: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
-            .surfaceButton(
-                .primary, tint: MapPalette.accent, fill: MapPalette.accent.opacity(canReport ? 1 : 0.4),
-                foreground: .white)
+            // Plain tinted buttons: the sheet is the glass, so a glass button on it would be glass on glass.
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .tint(MapPalette.accent)
             .disabled(!canReport)
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
@@ -405,12 +387,13 @@ struct ConvoyPanel: View {
                         }
                     }
             }
-            .surfaceButton(.secondary, fill: Color(.systemGray5).opacity(0.7), foreground: .primary)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(.primary)
             .layoutPriority(1)
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")
         }
-        .buttonStyle(.plain)
         .padding(.top, Spacing.m)
     }
 }
@@ -453,11 +436,6 @@ private struct ConvoyProgressBar: View {
         }
         .frame(height: 30)
     }
-}
-
-private struct ListHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 // MARK: - Rows
