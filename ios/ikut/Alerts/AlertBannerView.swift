@@ -26,6 +26,7 @@ struct AlertBannerView: View {
         ZStack(alignment: .top) {
             if let alert = shown {
                 banner(alert)
+                    .announces([alert.title, alert.body].joined(separator: ", "))
                     .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
         }

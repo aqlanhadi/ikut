@@ -174,6 +174,7 @@ enum MapDemo {
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
                 demoCard: env["IKUT_MAP_DEMO_CARD"], demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
                 demoExpanded: expanded || env["IKUT_MAP_DEMO_EXPANDED"] != nil,
+                demoError: env["IKUT_MAP_DEMO_ERROR"] == nil ? nil : "Could not reach the convoy. Try again in a moment.",
                 stopService: DemoStopService())
                 .overlay(alignment: .top) {
                     if gallery { BannerGallery(model: model).padding(.top, 72) }
@@ -258,6 +259,7 @@ enum MapDemo {
     }
 }
 
+/// `IKUT_MAP_DEMO_ERROR=1` on the map shows the error line with its Close button (it stays until closed).
 /// `IKUT_MAP_DEMO_BANNERS=1`: every dark banner the map can show, stacked under the trip pill so
 /// they can be compared on one screen. The map's own top stack would only ever show some of them.
 private struct BannerGallery: View {
@@ -275,6 +277,7 @@ private struct BannerGallery: View {
             ApproachPill(alert: MapDemo.debrisAlert, model: model) {}
             PassedBanner(text: "Passed the debris")
             ReportToastView(model: toast)
+            GlanceErrorBanner(message: "Could not reach the convoy. Try again in a moment.") {}
         }
         .padding(.horizontal, 12)
     }

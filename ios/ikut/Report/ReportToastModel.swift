@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 /// State behind the "Reported debris · Undo" toast. The host screen owns one, passes it to the
 /// report sheet and shows `ReportToastView` bound to it, so the toast outlives the sheet.
@@ -12,6 +13,9 @@ final class ReportToastModel {
         case failed(message: String)
     }
 
+    /// How long Undo stays: long enough to read, find and tap it (D34 N3).
+    static let undoTime: Duration = .seconds(8)
+
     private(set) var state: State = .hidden
     /// Bumped on every success / failure, for haptics.
     private(set) var reportedCount = 0
@@ -20,20 +24,20 @@ final class ReportToastModel {
     @ObservationIgnored private let service: any ReportService
     @ObservationIgnored private let clock: any Clock<Duration>
     @ObservationIgnored let undoWindow: Duration
-    @ObservationIgnored let errorWindow: Duration
+    @ObservationIgnored private let voiceOverRunning: @MainActor () -> Bool
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var tripId: String?
 
     init(
         service: any ReportService = LiveReportService(),
-        undoWindow: Duration = .seconds(5),
-        errorWindow: Duration = .seconds(6),
+        undoWindow: Duration = ReportToastModel.undoTime,
+        voiceOverRunning: @escaping @MainActor () -> Bool = { UIAccessibility.isVoiceOverRunning },
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.service = service
         self.undoWindow = undoWindow
-        self.errorWindow = errorWindow
+        self.voiceOverRunning = voiceOverRunning
         self.clock = clock
     }
 
@@ -60,7 +64,8 @@ final class ReportToastModel {
                 guard mine == generation else { return }
                 state = .reported(label: option.toastName, eventId: id)
                 reportedCount += 1
-                scheduleHide(generation: mine, after: undoWindow)
+                // With VoiceOver running the toast stays (Close or Undo ends it): it can't be read in time.
+                if !voiceOverRunning() { scheduleHide(generation: mine, after: undoWindow) }
             } catch {
                 guard mine == generation else { return }
                 fail("Couldn't report \(option.toastName). \(Self.reason(error))", generation: mine)
@@ -96,10 +101,10 @@ final class ReportToastModel {
     func showForDemo(_ state: State) { self.state = state }
     #endif
 
-    private func fail(_ message: String, generation mine: Int) {
+    private func fail(_ message: String, generation _: Int) {
         state = .failed(message: message)
         failureCount += 1
-        scheduleHide(generation: mine, after: errorWindow)
+        // A failure stays until it is closed or the next report replaces it.
     }
 
     private func scheduleHide(generation mine: Int, after delay: Duration) {

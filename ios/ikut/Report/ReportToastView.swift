@@ -3,6 +3,7 @@ import SwiftUI
 /// The "Reported debris · Undo" banner. Overlay it at the top or bottom of the host screen.
 struct ReportToastView: View {
     @Bindable var model: ReportToastModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -27,18 +28,21 @@ struct ReportToastView: View {
                         .accessibilityHint("Removes the report")
                 }
                 .modifier(Placement())
+                .announces("Reported \(label). Undo is available.")
+                .accessibilityAction(named: "Close") { model.dismiss() }
             case .failed(let message):
                 DarkBanner(title: message, symbol: "exclamationmark.triangle.fill", circle: .orange) {
                     Button { model.dismiss() } label: {
                         Image(systemName: "xmark").font(.body.weight(.semibold))
                             .frame(width: 44, height: 44)
                     }
-                    .accessibilityLabel("Dismiss")
+                    .accessibilityLabel("Close")
                 }
                 .modifier(Placement())
+                .announces(message)
             }
         }
-        .animation(.snappy, value: model.state)
+        .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: model.state)
         .sensoryFeedback(.success, trigger: model.reportedCount)
         .sensoryFeedback(.error, trigger: model.failureCount)
     }
@@ -47,7 +51,7 @@ struct ReportToastView: View {
     private struct Placement: ViewModifier {
         func body(content: Content) -> some View {
             content
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .glanceTransition(edge: .top)
                 .accessibilityElement(children: .contain)
         }
     }

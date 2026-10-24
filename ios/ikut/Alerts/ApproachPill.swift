@@ -54,7 +54,8 @@ struct ApproachPill: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(alert.title), \(ConvoyFormat.distance(distance)). Show it on the map")
         }
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .announces(alert.title)
+        .glanceTransition(edge: .top)
     }
 }
 
@@ -79,7 +80,8 @@ struct StopApproachPill: View {
             .accessibilityLabel("\(alert.title), \(alert.body), \(ConvoyFormat.distance(distance))")
             .accessibilityIdentifier("stopapproach.pill")
         }
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .announces("\(alert.title), \(alert.body)")
+        .glanceTransition(edge: .top)
     }
 }
 
@@ -111,18 +113,23 @@ struct CatchUpPill: View {
             .accessibilityLabel([title, subtitle, ConvoyFormat.distance(distance)].compactMap { $0 }.joined(separator: ", "))
             .accessibilityIdentifier("catchup.pill")
         }
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .announces(alert.title)
+        .glanceTransition(edge: .top)
     }
 }
 
 /// "Passed the debris", for a few seconds once the hazard being followed is behind.
 struct PassedBanner: View {
     let text: String
+    /// What VoiceOver's Close action does: the banner is held while VoiceOver runs.
+    var onClose: () -> Void = {}
 
     var body: some View {
         DarkBanner(title: text, symbol: "checkmark", circle: .green)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .accessibilityAction(named: "Close", onClose)
+            .glanceTransition(edge: .top)
             .accessibilityAddTraits(.updatesFrequently)
+            .announces(text)
     }
 }
 
@@ -135,7 +142,8 @@ struct RouteNoticeBanner: View {
         DarkBanner(
             title: notice.text, symbol: notice.waiting ? "antenna.radiowaves.left.and.right.slash" : "arrow.triangle.turn.up.right.diamond.fill",
             circle: notice.waiting ? .white.opacity(0.7) : .green)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .glanceTransition(edge: .top)
+            .announces(notice.text)
             .accessibilityIdentifier("route.notice")
     }
 }

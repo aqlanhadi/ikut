@@ -46,7 +46,7 @@ struct TripMapView: View {
     @State private var pillMemory = StopPillMemory()
     @State private var pillNow = Date()
     @State private var driving = DrivingDetector()
-    @State private var stopError: String?
+    @State private var glanceError = GlanceError()
     @State private var confirmLeave = false
     @State private var confirmEnd = false
     @State private var isWorking = false
@@ -96,7 +96,7 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
-        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false,
+        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
     ) {
@@ -106,6 +106,7 @@ struct TripMapView: View {
         liveServices = false
         self.stopService = stopService
         demoScreen = demoCard
+        _glanceError = State(initialValue: demoError.map { var e = GlanceError(); e.show($0, cause: .send); return e } ?? GlanceError())
         _stopCardOpen = State(initialValue: demoCard != nil)
         _panelExpanded = State(initialValue: demoExpanded)
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
@@ -135,7 +136,12 @@ struct TripMapView: View {
                 MapModeControl(mode: $model.mode)
                     .padding(.top, viewButtonsTop)
                     .padding(.trailing, Spacing.m)
-                    .animation(.snappy, value: viewButtonsTop)
+                    .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: viewButtonsTop)
+                    // The tall sheet would cut through it: fade it out, and back when the sheet folds.
+                    .opacity(DrivingGlance.modeControlOpacity(panelExpanded: panelExpanded))
+                    .allowsHitTesting(!panelExpanded)
+                    .accessibilityHidden(panelExpanded)
+                    .animation(.linear(duration: 0.2), value: panelExpanded)
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: Binding(get: { visible && !panelCovered }, set: { _ in }), onDismiss: panelDismissed) {
@@ -178,10 +184,11 @@ struct TripMapView: View {
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
             // The panel folding or a banner coming and going moves the visible middle; recenter on it.
-            .onChange(of: mapInsets) { _, insets in
-                if !panelExpanded, !stopCardOpen { legalInset = insets.bottom }
+            .onChange(of: mapInsets, initial: true) { _, insets in
+                if !panelExpanded, !stopCardOpen { legalInset = DrivingGlance.legalInset(foldedSheetHeight: insets.bottom) }
                 move(to: model.cameraTarget, animated: true)
             }
+            .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
     }
@@ -274,7 +281,7 @@ struct TripMapView: View {
     private func move(to target: CameraTarget?, animated: Bool) {
         guard let next = Self.position(for: cameraRoom.target(target)) else { return }
         if animated {
-            withAnimation(.easeInOut(duration: 0.8)) { camera = next }
+            withAnimation(DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)) { camera = next }
         } else {
             camera = next
         }
@@ -297,7 +304,7 @@ struct TripMapView: View {
         var toastHidden = false
         if case .hidden = toast.state { toastHidden = true }
         let nothingBelowSlot = bannerSlotEmpty && passedText == nil && session.rebuilder.notice == nil && toastHidden
-            && stopError == nil
+            && glanceError.message == nil
         return nothingBelowSlot ? topHeight : topHeight + Spacing.s
     }
 
@@ -347,17 +354,19 @@ struct TripMapView: View {
             let distance = model.approachDistance(eventId: alert.eventId)
             if let distance, distance <= 0 {
                 let label = model.hazards.markers.first { $0.id == alert.eventId }?.label.lowercased() ?? "hazard"
-                withAnimation(.snappy) {
+                withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) {
                     approach = nil
                     passedText = "Passed the \(label)"
                 }
                 endHazardFocus()
-                try? await Task.sleep(for: .seconds(3))
-                withAnimation(.snappy) { passedText = nil }
+                // Held while VoiceOver runs: a new hazard or a Close takes it away.
+                guard let hold = DrivingGlance.passedDuration(voiceOver: UIAccessibility.isVoiceOverRunning) else { return }
+                try? await Task.sleep(for: hold)
+                withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { passedText = nil }
                 return
             }
             if distance == nil, Date().timeIntervalSince(started) > 180 {
-                withAnimation(.snappy) { approach = nil }
+                withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { approach = nil }
                 endHazardFocus()
                 return
             }
@@ -370,11 +379,7 @@ struct TripMapView: View {
             tripPill
             if session.isPaused {
                 PausedBanner(session: session, onError: { message in
-                    stopError = message
-                    Task {
-                        try? await Task.sleep(for: .seconds(6))
-                        stopError = nil
-                    }
+                    glanceError.show(message, cause: .pause)
                 })
             }
             if let stopPill, !stopCardOpen {
@@ -391,10 +396,10 @@ struct TripMapView: View {
                 ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) }
             }
             AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
-            if let passedText { PassedBanner(text: passedText) }
+            if let passed = passedText { PassedBanner(text: passed) { passedText = nil } }
             if let notice = session.rebuilder.notice { RouteNoticeBanner(notice: notice) }
             ReportToastView(model: toast)
-            if let stopError { errorBanner(stopError) }
+            if let message = glanceError.message { GlanceErrorBanner(message: message) { glanceError.close() } }
         }
         .padding(.horizontal, Spacing.m)
         .padding(.top, Spacing.xs)
@@ -499,11 +504,11 @@ struct TripMapView: View {
     }
 
     private func openStopCard() {
-        withAnimation(.snappy) { stopCardOpen = true }
+        withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { stopCardOpen = true }
     }
 
     private func closeStopCard() {
-        withAnimation(.snappy) { stopCardOpen = false }
+        withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { stopCardOpen = false }
     }
 
     // MARK: The sheet
@@ -671,7 +676,7 @@ struct TripMapView: View {
                     skipAll: skipAllHandler,
                     listensToAnswers: liveServices
                 ) {
-                    withAnimation(.snappy) { arrivalStopId = nil }
+                    withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { arrivalStopId = nil }
                 }
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
             }
@@ -683,7 +688,7 @@ struct TripMapView: View {
             model: model, expanded: Binding(get: { panelExpanded }, set: { setExpanded($0) }), canReport: model.myCarId != nil,
             stopButton: StopLogic.buttonContent(for: stopBoard),
             onReport: openReport, onStop: openStopCard,
-            onNextStop: { id in withAnimation(.snappy) { arrivalStopId = id } },
+            onNextStop: { id in withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { arrivalStopId = id } },
             onHeight: { if panelExpanded { unfoldedContent = $0 } else { foldedContent = $0 } })
     }
 
@@ -787,7 +792,7 @@ struct TripMapView: View {
         guard liveServices, let next = StopPillPlanner.nextChange(requests: stopBoard.requests, memory: pillMemory, now: Date()) else { return }
         try? await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
         guard !Task.isCancelled else { return }
-        withAnimation(.snappy) { pillNow = Date() }
+        withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { pillNow = Date() }
     }
 
     /// Feeds the driving detector once a second from this phone's own speed.
@@ -799,25 +804,11 @@ struct TripMapView: View {
         }
     }
 
-    private func errorBanner(_ message: String) -> some View {
-        Label(message, systemImage: "exclamationmark.triangle.fill")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.gap)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red.opacity(0.9), in: Capsule())
-            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-            .accessibilityElement(children: .combine)
-    }
-
     private func showStopError(_ error: Error) { showStopError(error.localizedDescription) }
 
     private func showStopError(_ message: String) {
-        stopError = message
-        Task {
-            try? await Task.sleep(for: .seconds(6))
-            stopError = nil
-        }
+        // Stays until a later action goes through or the person closes it (D34 N3).
+        glanceError.show(message, cause: .send)
     }
 
     // MARK: Leave and end
@@ -829,7 +820,7 @@ struct TripMapView: View {
         guard !isWorking else { return }
         isWorking = true
         Task {
-            do { try await action() } catch { showStopError(error) }
+            do { try await action(); glanceError.resolve(.send) } catch { showStopError(error) }
             isWorking = false
         }
     }

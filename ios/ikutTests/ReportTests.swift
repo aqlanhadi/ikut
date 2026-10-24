@@ -84,9 +84,9 @@ struct ReportOptionTests {
 @MainActor
 struct ReportToastModelTests {
     private func model(
-        _ service: FakeReportService, undo: Duration = .seconds(30), error: Duration = .seconds(30)
+        _ service: FakeReportService, undo: Duration = .seconds(30), voiceOver: Bool = false
     ) -> ReportToastModel {
-        ReportToastModel(service: service, undoWindow: undo, errorWindow: error)
+        ReportToastModel(service: service, undoWindow: undo, voiceOverRunning: { voiceOver })
     }
 
     @Test func showsAfterReportWithRequestDetails() async {
@@ -162,13 +162,30 @@ struct ReportToastModelTests {
         #expect(!toast.isUndoAvailable)
     }
 
-    @Test func failureAutoHides() async {
+    @Test func failureStaysUntilClosed() async throws {
         let service = FakeReportService()
         service.failReport = URLError(.timedOut)
-        let toast = model(service, error: .milliseconds(80))
+        let toast = model(service, undo: .milliseconds(20))
         await toast.submit(debris(), context: context, snapshot: snapshot).value
-        await waitUntil { toast.state == .hidden }
+        try await Task.sleep(for: .milliseconds(200))
+        guard case .failed = toast.state else {
+            Issue.record("the failure vanished: \(toast.state)")
+            return
+        }
+        toast.dismiss()
         #expect(toast.state == .hidden)
+    }
+
+    @Test func undoHasAtLeastEightSeconds() {
+        #expect(ReportToastModel.undoTime >= .seconds(8))
+        #expect(ReportToastModel(service: FakeReportService()).undoWindow >= .seconds(8))
+    }
+
+    @Test func undoHoldsWhileVoiceOverRuns() async throws {
+        let toast = model(FakeReportService(), undo: .milliseconds(20), voiceOver: true)
+        await toast.submit(debris(), context: context, snapshot: snapshot).value
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(toast.isUndoAvailable)
     }
 
     @Test func undoFailureIsSurfaced() async {
