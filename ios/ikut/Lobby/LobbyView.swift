@@ -198,7 +198,7 @@ struct LobbyView: View {
             let granted = locationGranted
             await ownWay.load(
                 main: RouteLine(Polyline.decode(trip.route)),
-                destination: CLLocationCoordinate2D(latitude: trip.destination.coordinate.latitude, longitude: trip.destination.coordinate.longitude),
+                destination: trip.destination.coordinate.coordinate,
                 destinationName: trip.destination.name, car: car,
                 meetingPoint: TripSessionLogic.meetingPoint(in: model.stops), routeSeconds: trip.routeSeconds,
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
@@ -240,14 +240,7 @@ struct LobbyView: View {
                                 }
                             }
                         }
-                        if canEnd {
-                            Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
-                        }
-                        if canLeave {
-                            Button("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
-                                confirmLeave = true
-                            }
-                        }
+                        TripExitMenu(canEnd: canEnd, canLeave: canLeave, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -277,16 +270,10 @@ struct LobbyView: View {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.
             AlwaysLocationExplainerView(permission: location) { _ in session.alwaysExplainerShowing = false }
         }
-        .confirmationDialog("Leave this trip?", isPresented: $confirmLeave, titleVisibility: .visible) {
-            Button("Leave trip", role: .destructive) { run { try await session.leave(); onExit() } }
-        } message: {
-            Text("Your phone stops sharing its location.")
-        }
-        .confirmationDialog("End the trip for everyone?", isPresented: $confirmEnd, titleVisibility: .visible) {
-            Button("End trip", role: .destructive) { run { try await session.endTrip() } }
-        } message: {
-            Text("Everyone stops sharing their location. This can't be undone.")
-        }
+        .tripExitDialogs(
+            confirmLeave: $confirmLeave, confirmEnd: $confirmEnd,
+            leave: { run { try await session.leave(); onExit() } },
+            end: { run { try await session.endTrip() } })
     }
 
     private func run(_ action: @escaping () async throws -> Void) {

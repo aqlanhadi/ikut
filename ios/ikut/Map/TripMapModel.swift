@@ -207,7 +207,7 @@ final class TripMapModel {
     private func checkLeadArrival() {
         guard !isEnded, isTracker, myCar?.isLead == true, let write = arrivalWriter,
               let tripId = alertTripId ?? session?.tripId, let myCarId else { return }
-        let offset = convoy.convoy.first { $0.id == myCarId }?.convoyOffset
+        let offset = convoy.myEntry?.convoyOffset
         guard let stop = StopLeave.stopToMarkArrived(
                   stops: stops, isLeadTracker: true, tripStarted: tripStarted, position: positions[myCarId],
                   offset: offset, now: Date()),
@@ -246,7 +246,7 @@ final class TripMapModel {
     /// Seconds per meter along the main route for my car (`NextStop.pace`): my ETA over what is left of the route,
     /// else my speed; nil while I'm not in the convoy or with neither.
     func stopPace() -> Double? {
-        guard let length = mainRoute?.length, length > 0, let mine = convoy.convoy.first(where: { $0.id == myCarId })
+        guard let length = mainRoute?.length, length > 0, let mine = convoy.myEntry
         else { return nil }
         return NextStop.pace(
             travelTimeToGo: convoy.driveArrival(forCar: mine.id)?.timeIntervalSinceNow,
@@ -327,8 +327,8 @@ final class TripMapModel {
 
     /// Whether my phone counts as online: a network path and, as the tracker, a car that is not stale.
     var youOnline: Bool {
-        let mine = convoy.convoy.first { $0.id == myCarId }?.isStale
-            ?? convoy.joining.first { $0.id == myCarId }?.isStale ?? false
+        let mine = convoy.myEntry?.isStale
+            ?? convoy.myJoining?.isStale ?? false
         return YouOnline.isOnline(pathUp: networkUp, isTracker: isTracker, carStale: mine)
     }
 

@@ -4,14 +4,7 @@ import UIKit
 /// Shared look from the design canvas: grouped background, 24 pt inset cards,
 /// 50 pt pill buttons and the #0071E3 accent. All colors adapt to dark mode.
 extension Color {
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        func ui(_ v: UInt32) -> UIColor {
-            UIColor(
-                red: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255,
-                blue: CGFloat(v & 0xFF) / 255, alpha: 1)
-        }
-        return Color(UIColor { $0.userInterfaceStyle == .dark ? ui(dark) : ui(light) })
-    }
+    private static func dynamic(light: UInt32, dark: UInt32) -> Color { ModeColor(light: light, dark: dark).color }
 
     static let ikutAccent = dynamic(light: 0x0071E3, dark: 0x2997FF)
     /// "Tracking" and other positive status text (darker than system green for contrast on white).

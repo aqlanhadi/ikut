@@ -114,11 +114,13 @@ enum StopLogic {
     /// A stop request closes itself this long after it was asked (the rules cap `expiresAt` there).
     static let lifetime: TimeInterval = 30 * 60
 
-    /// The owner's first name from a car name: "Wyna’s X70" and "Wyna's car" both give "Wyna".
+    /// The owner's first name from a car name: "Wyna’s X70" and "Wyna's car" both give "Wyna". Spaces around the
+    /// name are trimmed; a name with no owner before the possessive, or no possessive, is kept as it is.
     static func ownerName(fromCarName name: String) -> String {
         for marker in ["’s ", "'s "] {
-            if let range = name.range(of: marker), range.lowerBound > name.startIndex {
-                return String(name[..<range.lowerBound])
+            if let range = name.range(of: marker) {
+                let head = name[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+                if !head.isEmpty { return head }
             }
         }
         return name

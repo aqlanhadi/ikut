@@ -108,6 +108,10 @@ struct ConvoySnapshot: Equatable, Sendable {
               let b = convoy.first(where: { $0.id == to }) else { return nil }
         return b.convoyOffset - a.convoyOffset
     }
+    /// The convoy entry of car `id`; nil when it is nil or not driving with the convoy.
+    func entry(_ id: String?) -> ConvoyEntry? { id.flatMap { id in convoy.first(where: { $0.id == id }) } }
+    /// The joining entry of car `id`; nil when it is nil or not joining.
+    func joiningEntry(_ id: String?) -> JoiningEntry? { id.flatMap { id in joining.first(where: { $0.id == id }) } }
     /// Every car (convoy and joining) has reached the destination; false with no cars.
     var everyoneArrived: Bool { !convoy.isEmpty && joining.isEmpty && convoy.allSatisfy(\.hasArrived) }
     func hasArrived(_ carId: String?) -> Bool {

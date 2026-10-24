@@ -221,7 +221,7 @@ struct TripMapView: View {
                     .stroke(.white, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
                 MapPolyline(coordinates: path)
                     .stroke(
-                        Color(mapHex: overlay.colorHex),
+                        Color.car(hex: overlay.colorHex),
                         style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [6, 6]))
                 if let merge = overlay.merge {
                     Annotation("Merge point", coordinate: merge.clCoordinate, anchor: .center) {
@@ -476,14 +476,7 @@ struct TripMapView: View {
                         set: { keepAwake = $0; keepAwakeAnswered = true }))
                     Toggle("Read alerts aloud", systemImage: "speaker.wave.2", isOn: $readAloud)
                 }
-                if canEnd {
-                    Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
-                }
-                if canLeave {
-                    Button("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
-                        confirmLeave = true
-                    }
-                }
+                TripExitMenu(canEnd: canEnd, canLeave: canLeave, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
@@ -652,17 +645,12 @@ struct TripMapView: View {
                 ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
             }
         }
-        .confirmationDialog("Leave this trip?", isPresented: Binding(get: { confirmLeave && panelUp }, set: { confirmLeave = $0 }), titleVisibility: .visible) {
-            Button("Leave trip", role: .destructive) { run { try await session.leave(); exit(onExit) } }
-        } message: {
-            Text("Your phone stops sharing its location.")
-        }
-        .confirmationDialog("End the trip for everyone?", isPresented: Binding(get: { confirmEnd && panelUp }, set: { confirmEnd = $0 }), titleVisibility: .visible) {
+        .tripExitDialogs(
+            confirmLeave: Binding(get: { confirmLeave && panelUp }, set: { confirmLeave = $0 }),
+            confirmEnd: Binding(get: { confirmEnd && panelUp }, set: { confirmEnd = $0 }),
+            leave: { run { try await session.leave(); exit(onExit) } },
             // Ending flips session.isEnded, which opens the recap (onEnded).
-            Button("End trip", role: .destructive) { run { try await session.endTrip() } }
-        } message: {
-            Text("Everyone stops sharing their location. This can't be undone.")
-        }
+            end: { run { try await session.endTrip() } })
         .alert("Get road alerts?", isPresented: asking(.roadAlerts)) {
             Button("Turn on") { answer(.roadAlerts) { _ = await alerts.requestPermission() } }
             Button("Not now", role: .cancel) { answer(.roadAlerts) }
@@ -991,21 +979,6 @@ enum MapPalette {
     })
 }
 
-extension Color {
-    /// "#RRGGBB" (the `#` is optional); gray when malformed.
-    init(mapHex hex: String) {
-        var s = hex.trimmingCharacters(in: .whitespaces)
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6, let v = UInt32(s, radix: 16) else {
-            self = .gray
-            return
-        }
-        self.init(
-            red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255,
-            blue: Double(v & 0xFF) / 255)
-    }
-}
-
 // MARK: - Mode control
 
 /// Follow / fit buttons; neither is highlighted in free mode.
@@ -1061,7 +1034,7 @@ struct MapMarkerView: View {
             ZStack {
                 if let heading = marker.heading {
                     Wedge()
-                        .fill(Color(mapHex: marker.colorHex))
+                        .fill(Color.car(hex: marker.colorHex))
                         .overlay(Wedge().stroke(.white, lineWidth: 1.5))
                         .frame(width: 14 * scale, height: 10 * scale)
                         .frame(width: frameSize, height: frameSize, alignment: .top)
@@ -1072,7 +1045,7 @@ struct MapMarkerView: View {
                     .foregroundStyle(.white)
                     .minimumScaleFactor(0.7)
                     .frame(width: badge, height: badge)
-                    .background(Color(mapHex: marker.colorHex), in: Circle())
+                    .background(Color.car(hex: marker.colorHex), in: Circle())
                     .overlay(Circle().strokeBorder(.white, lineWidth: 3))
                     .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
                     .overlay {
@@ -1189,7 +1162,7 @@ struct MergePointView: View {
     var body: some View {
         Circle()
             .fill(.white)
-            .overlay(Circle().strokeBorder(Color(mapHex: colorHex), lineWidth: 3))
+            .overlay(Circle().strokeBorder(Color.car(hex: colorHex), lineWidth: 3))
             .frame(width: 18, height: 18)
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { dotX = $0 }
             .overlay(alignment: side == .trailing ? .leading : .trailing) {
@@ -1200,7 +1173,7 @@ struct MergePointView: View {
                     .padding(.horizontal, Spacing.chipX)
                     .padding(.vertical, Spacing.xs)
                     .background(.regularMaterial, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color(mapHex: colorHex), lineWidth: 1.5))
+                    .overlay(Capsule().strokeBorder(Color.car(hex: colorHex), lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                     .padding(side == .trailing ? .leading : .trailing, Spacing.xl)

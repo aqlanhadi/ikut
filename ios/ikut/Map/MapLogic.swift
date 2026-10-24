@@ -52,7 +52,7 @@ struct MapMarker: Identifiable, Equatable, Sendable {
 
     /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
     var label: String {
-        var parts = [MapMarkerBuilder.shortName(name)]
+        var parts = [StopLogic.ownerName(fromCarName: name)]
         if isJoining { parts.append("joining") }
         if isPaused {
             parts.append("Paused")
@@ -89,7 +89,7 @@ enum MapMarkerBuilder {
             id: id, number: car.number, name: car.name, colorHex: car.color,
             coordinate: MapCoordinate(latitude: position.location.latitude, longitude: position.location.longitude),
             heading: validHeading(position.heading), isStale: isStale,
-            ageText: isStale ? agoText(age ?? 0) : nil,
+            ageText: isStale ? ConvoyFormat.ago(age ?? 0) : nil,
             isLead: car.isLead, isJoining: isJoining, isMine: id == myCarId,
             isPaused: TripSessionLogic.isPaused(car, now: now), hasArrived: hasArrived)
     }
@@ -98,24 +98,6 @@ enum MapMarkerBuilder {
     static func validHeading(_ heading: Double) -> Double? {
         guard heading.isFinite, heading >= 0 else { return nil }
         return heading.truncatingRemainder(dividingBy: 360)
-    }
-
-    /// "2 min ago", from `ConvoyFormat.lastSeen` without its prefix.
-    static func agoText(_ age: TimeInterval) -> String {
-        let text = ConvoyFormat.lastSeen(age: age)
-        let prefix = "Last seen "
-        return text.hasPrefix(prefix) ? String(text.dropFirst(prefix.count)) : text
-    }
-
-    /// "Wyna’s X70" -> "Wyna"; names without a possessive are kept as they are.
-    static func shortName(_ name: String) -> String {
-        for marker in ["’s ", "'s "] {
-            if let range = name.range(of: marker) {
-                let head = name[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
-                if !head.isEmpty { return head }
-            }
-        }
-        return name
     }
 
     /// Screen rotation for a marker's arrow: its heading relative to where the map's top points.
@@ -300,7 +282,7 @@ enum SeparationWarning {
     static func text(_ separated: [ConvoyEntry]) -> String? {
         guard let first = separated.first else { return nil }
         if separated.count > 1 { return "\(separated.count) cars have fallen behind." }
-        let name = MapMarkerBuilder.shortName(first.car.name)
+        let name = StopLogic.ownerName(fromCarName: first.car.name)
         guard let gap = first.gap else { return "\(name) has fallen behind." }
         return "\(name) is \(ConvoyFormat.distance(gap.distance)) behind the car ahead."
     }
@@ -333,7 +315,7 @@ enum MapReportSnapshot {
         if isTracker || device == nil, let p = carPosition {
             let offset = usesOwn ? p.routeOffset : p.convoyOffset
             return ReportSnapshot(
-                coordinate: CLLocationCoordinate2D(latitude: p.location.latitude, longitude: p.location.longitude),
+                coordinate: p.location.coordinate,
                 heading: p.heading, route: route, previousOffset: offset, capturedAt: now)
         }
         guard let device else { return nil }

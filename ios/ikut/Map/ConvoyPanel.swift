@@ -101,7 +101,7 @@ struct ConvoyPanel: View {
         c.map { "\($0.latitude),\($0.longitude)" } ?? ""
     }
 
-    private var myJoining: JoiningEntry? { convoy.joining.first(where: { $0.id == model.myCarId }) }
+    private var myJoining: JoiningEntry? { convoy.myJoining }
 
     /// My own trip's words: start town, and the joining line while my car is joining.
     private var headerText: ConvoyHeader.Text {
@@ -238,13 +238,13 @@ struct ConvoyPanel: View {
         if let mine = myEntry { return NextStop.cell(stops: model.stops, offset: mine.convoyOffset, pace: model.stopPace(), now: Date()) }
         // Still joining: the meeting point, how far my own way in has to go; after Leave, or my own "meet you along
         // the way", the next open stop ahead of where my road meets the main route.
-        guard let mine = convoy.joining.first(where: { $0.id == model.myCarId }) else { return nil }
+        guard let mine = convoy.myJoining else { return nil }
         return NextStop.joiningCell(
             stops: model.stops, distance: mine.distanceToMerge, seconds: mine.timeToMerge,
             mergeOffset: mine.car.mergeOffset, pace: model.joiningStopPace(), skipsMeet: model.skipsMeetingPoint)
     }
 
-    private var myEntry: ConvoyEntry? { convoy.convoy.first(where: { $0.id == model.myCarId }) }
+    private var myEntry: ConvoyEntry? { convoy.myEntry }
 
     /// Collapsed only (MapCollapsed.dc.html): overlapping car dots (dashed for joining cars), then
     /// "3 cars driving · Hafiz joins in 18 min · 6.4 km spread" and a chevron. Tapping expands.
@@ -263,13 +263,13 @@ struct ConvoyPanel: View {
             HStack(spacing: Spacing.gap) {
                 HStack(spacing: -5) {
                     ForEach(convoy.convoy) { e in
-                        Circle().fill(Color(mapHex: e.car.color))
+                        Circle().fill(Color.car(hex: e.car.color))
                             .frame(width: 14, height: 14)
                             .overlay(Circle().strokeBorder(Color(.systemBackground).opacity(0.8), lineWidth: 2))
                     }
                     ForEach(convoy.joining) { e in
                         Circle().fill(Color.white)
-                            .overlay(Circle().strokeBorder(Color(mapHex: e.car.color),
+                            .overlay(Circle().strokeBorder(Color.car(hex: e.car.color),
                                                            style: StrokeStyle(lineWidth: 2, dash: [2.5, 2])))
                             .frame(width: 14, height: 14)
                     }
@@ -426,7 +426,7 @@ private struct ConvoyProgressBar: View {
                 }
                 ForEach(Array(cars.enumerated()), id: \.offset) { _, car in
                     Circle()
-                        .fill(Color(mapHex: car.1))
+                        .fill(Color.car(hex: car.1))
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .overlay {
                             if car.2 { Circle().strokeBorder(MapPalette.accent, lineWidth: 2).padding(-2) }
@@ -450,7 +450,7 @@ private struct RowBadge: View {
     var dashed = false
 
     var body: some View {
-        let color = Color(mapHex: colorHex)
+        let color = Color.car(hex: colorHex)
         Text(number.map(String.init) ?? "·")
             .font(.system(.subheadline, design: .rounded).weight(.bold))
             .foregroundStyle(dashed ? color : .white)

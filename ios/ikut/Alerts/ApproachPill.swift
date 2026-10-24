@@ -13,7 +13,7 @@ extension TripMapModel {
     /// My car's offset on the main route, carried forward from my last fix at my speed (at most 30 s), and
     /// only while that fix is fresh: a fix older than `HazardLogic.Config.staleAfter` is returned as it was.
     func myOffsetNow(now: Date = Date()) -> Double? {
-        guard let myCarId, let me = convoy.convoy.first(where: { $0.id == myCarId }) else { return nil }
+        guard let me = convoy.myEntry else { return nil }
         var mine = me.convoyOffset
         if let at = me.position.updatedAt, !me.isPaused, now.timeIntervalSince(at) <= HazardLogic.Config.default.staleAfter {
             mine += me.speed * min(max(now.timeIntervalSince(at), 0), 30)
@@ -23,7 +23,7 @@ extension TripMapModel {
 
     /// Seconds to cover `distance` at my current speed; nil when unknown or barely moving.
     func secondsToCover(_ distance: Double) -> Double? {
-        guard let myCarId, let me = convoy.convoy.first(where: { $0.id == myCarId }), me.speed > 1 else { return nil }
+        guard let me = convoy.myEntry, me.speed > 1 else { return nil }
         return distance / me.speed
     }
 }
