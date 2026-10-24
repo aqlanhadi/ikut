@@ -395,7 +395,8 @@ struct CreateTripView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.ikutScreen)
-        .navigationTitle(changingTripId == nil ? "New Trip" : "Change Destination")
+        // One title: "Where to?" in the content, so the bar's title stays empty (HIG toolbars).
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             searchFocused = true

@@ -210,6 +210,14 @@ enum DemoScreens {
         case "road-skip-all-confirm": return AnyView(StopArrivalDemo(.skipAllConfirm))
         case "road-skip-all-others": return AnyView(StopArrivalDemo(.skipAllOthers))
         case "road-skip-all-meet": return AnyView(StopArrivalDemo(.skipAllMeeting))
+        // The recap as the pushed page: system Back, the trip name as the large title, Share in the bar (D34).
+        case "recap":
+            return AnyView(NavigationStack {
+                Color.clear.navigationTitle("Trips").navigationBarTitleDisplayMode(.inline)
+                    .navigationDestination(isPresented: .constant(true)) {
+                        RecapView(model: RecapModel(snapshot: .demo(), originName: "Tanjung Malim"))
+                    }
+            })
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":

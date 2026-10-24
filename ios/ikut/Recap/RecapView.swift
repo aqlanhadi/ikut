@@ -2,8 +2,8 @@ import FirebaseAuth
 import MapKit
 import SwiftUI
 
-/// After the trip (design/project/Summary.dc.html): title, route map with stats, awards and a
-/// filterable timeline, with Share and Done. Opened for every member when the trip ends. Home's past
+/// After the trip (design/project/Summary.dc.html): trip name as the large title, route map with stats, awards and a
+/// filterable timeline, with Share in the bar and Done below. Opened for every member when the trip ends. Home's past
 /// trips show the same content in the Home sheet instead (`PickedTripSheet`).
 struct RecapView: View {
     @State private var model: RecapModel
@@ -24,7 +24,6 @@ struct RecapView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                topBar
                 if let recap = model.recap, let snapshot = model.snapshot {
                     RecapContent(recap: recap, snapshot: snapshot, layout: .screen, filter: $filter,
                                  onOpenMap: { showMap = true }, onDone: onDone)
@@ -38,7 +37,18 @@ struct RecapView: View {
             .padding(.bottom, Spacing.xl)
         }
         .background(Color.ikutScreen)
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(model.recap?.title ?? "")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            if let recap = model.recap {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: RecapContent.shareText(recap)) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share Recap")
+                }
+            }
+        }
         .task { await model.load(myUserId: Auth.auth().currentUser?.uid) }
         .fullScreenCover(isPresented: $showMap) {
             if let recap = model.recap, let snapshot = model.snapshot {
@@ -46,23 +56,6 @@ struct RecapView: View {
             }
         }
         .accessibilityIdentifier("recap")
-    }
-
-    private var topBar: some View {
-        HStack {
-            MapCloseButton(action: onDone)
-            Spacer()
-            if let recap = model.recap {
-                ShareLink(item: RecapContent.shareText(recap)) {
-                    Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(.regularMaterial, in: Circle())
-                }
-                .tint(.primary)
-                .accessibilityLabel("Share recap")
-            }
-        }
-        .padding(.top, Spacing.s)
     }
 }
 

@@ -95,35 +95,31 @@ struct AddStopSheet: View {
     #endif
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: Spacing.cozy) {
-                header
-                if let picked { details(picked) } else { search }
-            }
-            .padding(.horizontal, Spacing.l)
-            .padding(.bottom, Spacing.l)
+        NavigationStack {
+            page { search }
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+                .navigationDestination(isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } })) {
+                    // The place's details push with the system Back and the edge swipe.
+                    page { if let picked { details(picked) } }
+                }
         }
-        .scrollDismissesKeyboard(.interactively)
-        .background(Color.ikutScreen)
         .presentationDragIndicator(.visible)
         .presentationDetents([.large])
         .onAppear { model.along = along }
     }
 
-    private var header: some View {
-        HStack {
-            Button(picked == nil ? "Cancel" : "Back") {
-                if picked == nil { dismiss() } else { picked = nil }
-            }
-            .frame(minWidth: 60, alignment: .leading)
-            Spacer()
-            Text("Add a stop").font(.headline).accessibilityAddTraits(.isHeader)
-            Spacer()
-            Color.clear.frame(width: 60, height: 1)
+    /// One step's scrolling page under the system bar (inline "Add a stop"), which stays put.
+    private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView {
+            VStack(spacing: Spacing.cozy) { content() }
+                .padding(.horizontal, Spacing.l)
+                .padding(.top, Spacing.s)
+                .padding(.bottom, Spacing.l)
         }
-        .padding(.horizontal, Spacing.xs)
-        .padding(.top, Spacing.m)
-        .frame(minHeight: 44)
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.ikutScreen)
+        .navigationTitle("Add a stop")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     // MARK: Step 1: search
