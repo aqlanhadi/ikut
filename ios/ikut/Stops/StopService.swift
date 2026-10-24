@@ -57,7 +57,8 @@ struct StopService: StopServing {
     @MainActor
     static func actions(
         context: StopContext, service: StopService = StopService(),
-        onError: @escaping @MainActor @Sendable (Error) -> Void = { _ in }
+        onError: @escaping @MainActor @Sendable (Error) -> Void = { _ in },
+        onSuccess: @escaping @MainActor @Sendable () -> Void = {}
     ) -> StopRequestActions {
         StopRequestActions(
             ok: { eventId in
@@ -65,6 +66,7 @@ struct StopService: StopServing {
                     do {
                         try await service.ok(
                             tripId: context.tripId, eventId: eventId, carId: context.carId, userId: context.userId)
+                        onSuccess()
                     } catch { onError(error) }
                 }
             },
@@ -73,6 +75,7 @@ struct StopService: StopServing {
                     do {
                         try await service.close(
                             tripId: context.tripId, eventId: eventId, reason: reason, userId: context.userId)
+                        onSuccess()
                     } catch { onError(error) }
                 }
             })

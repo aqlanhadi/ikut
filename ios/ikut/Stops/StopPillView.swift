@@ -19,7 +19,15 @@ struct StopPillView: View {
             }
         }
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .glanceTransition(edge: .top)
+        .announces(announcement, id: pill.id)
+    }
+
+    private var announcement: String {
+        switch pill {
+        case .question(_, _, let title, let detail), .confirm(_, let title, let detail), .asked(let title, let detail):
+            "\(title), \(detail)"
+        }
     }
 
     private func question(eventId: String, symbol: String, title: String, detail: String) -> some View {
