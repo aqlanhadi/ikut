@@ -50,14 +50,14 @@ import { httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
-import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, generateCode, loadRoutes, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
 import { ON_ROUTE_TOLERANCE, distinctValues, rebuildRoute, staleReads, syntheticTrack, townDetour } from './lib/rebuild.mjs';
 import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referenceId, relativeDistance, spokenStopRequest, togetherPairs } from './lib/farahead.mjs';
 import { tally as stopTally } from './lib/stoparrival.mjs';
 import { isOpen, leavingAt, nextStop } from './lib/stopleave.mjs';
-import { loadRoutes } from './generate-gpx.mjs';
 import { PROJECT_ID } from './lib/firebase-config.mjs';
-import { endsWithResult } from './lib/shell.mjs';
+import { endsWithResult, sleep } from './lib/shell.mjs';
+import { STOP_LIFETIME_SECONDS } from './lib/playground.mjs';
 import { connectEmulators, writePosition } from './lib/demo-common.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -140,11 +140,9 @@ const end = endsWithResult({
 
 // ---------------------------------------------------------------- logging, clock, checks
 
-const wallStart = Date.now();
 const clock = { T: -1e6, label: 'setup' };
 const stamp = () => (clock.T < 0 ? `[${clock.label.padEnd(7)}]` : `[T ${clock.T.toFixed(0).padStart(4, '0')}s]`);
 const log = (...a) => console.log(stamp(), ...a);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 
 function check(name, pass, detail = '') {
@@ -562,11 +560,6 @@ function segmentIndexAtOffset(route, offset) {
 }
 
 // TripService.codeAlphabet: A-Z and 2-9 without O, I, L.
-function generateCode() {
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
-}
-
 // ---------------------------------------------------------------- main
 
 async function main() {
@@ -667,7 +660,6 @@ async function main() {
     for (;;) { await sleep(1000); await hold(); }
   }
   if (opts.waitApp) {
-    console.log('@@READY');
     console.log(`waiting for a phone to join trip ${code} and start tracking (up to ${opts.waitTimeout} s)...`);
     writeState({ phase: 'waiting-for-app' });
     const known = new Set([...phones.values()].map((p) => p.carId));
@@ -682,7 +674,6 @@ async function main() {
     log(`phone car ${appCarId} is tracking; go in ${opts.goDelay} s`);
     for (let i = 0; i < opts.goDelay; i++) { await sleep(1000); await hold(); }
   } else {
-    console.log('@@READY');
     for (let i = 0; i < opts.startIn; i++) { await sleep(1000); await hold(); }
   }
 
@@ -762,7 +753,6 @@ async function main() {
 /** The rebuild scenario's stops once planned: {townId, townOffset, nextId, nextOffset, extra (what the loop adds)}. */
 let rebuildPlan = null;
 
-const STOP_LIFETIME_SECONDS = 30 * 60; // EventCategory.stopRequest.defaultExpiry
 
 async function runTimeline(ev, ctx) {
   const p = ctx.phones.get(ev.car);
@@ -795,15 +785,17 @@ async function rulesProbes(phones, tripId) {
   const car2 = phones.get('car2');
   const car1 = phones.get('car1');
   setLogLevel('silent'); // the SDK logs every denied write; they are expected here
-  const rejected = async (name, fn) => {
-    try { await fn(); check(name, false, 'write was accepted'); } catch (e) { check(name, /permission|PERMISSION/.test(`${e.code} ${e.message}`), e.code); }
-  };
   const base = { location: new GeoPoint(4.1, 101.3), speed: 1, heading: 10, routeOffset: 0, updatedAt: serverTimestamp() };
-  await rejected('rules: a car cannot write another car\'s position', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car1.carId}`), base));
-  await rejected('rules: heading 360 is rejected', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car2.carId}`), { ...base, heading: 360 }));
-  await rejected('rules: a position with a client timestamp is rejected', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car2.carId}`), { ...base, updatedAt: Timestamp.now() }));
+  await refused('rules: a car cannot write another car\'s position', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car1.carId}`), base));
+  await refused('rules: heading 360 is rejected', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car2.carId}`), { ...base, heading: 360 }));
+  await refused('rules: a position with a client timestamp is rejected', () => setDoc(doc(car2.db, `trips/${tripId}/positions/${car2.carId}`), { ...base, updatedAt: Timestamp.now() }));
   setLogLevel('error');
 }
+
+/** A write the rules must turn down: the check passes when it is refused for permission. */
+const refused = async (name, fn) => {
+  try { await fn(); check(name, false, 'write was accepted'); } catch (e) { check(name, /permission|PERMISSION/.test(`${e.code} ${e.message}`), e.code); }
+};
 
 /** The planned stop's id by its offset (read by car 1's phone). */
 const stopIdOf = (phones, offset) => phones.get('car1').allStops.find((s) => s.routeOffset === offset)?.id;
@@ -815,9 +807,6 @@ async function stopProbesBefore(phones, tripId) {
   const car4 = phones.get('car4');
   const id = stopIdOf(phones, STOP.offset);
   setLogLevel('silent');
-  const refused = async (name, fn) => {
-    try { await fn(); check(name, false, 'write was accepted'); } catch (e) { check(name, /permission|PERMISSION/.test(`${e.code} ${e.message}`), e.code); }
-  };
   await refused('rules: car 2 is not the lead car and cannot Leave the stop', () => updateDoc(doc(car2.db, `trips/${tripId}/stops/${id}`), { leftAt: serverTimestamp(), leftBy: car2.uid }));
   await refused('rules: car 2 cannot mark the lead car as arrived', () => updateDoc(doc(car2.db, `trips/${tripId}/stops/${id}`), { arrivedAt: serverTimestamp() }));
   const answer = doc(car4.db, `trips/${tripId}/stops/${id}/answers/${car4.carId}`);
@@ -834,9 +823,6 @@ async function stopProbesAfter(phones, tripId, organizer) {
   const car4 = phones.get('car4');
   const id = stopIdOf(phones, STOP.offset);
   setLogLevel('silent');
-  const refused = async (name, fn) => {
-    try { await fn(); check(name, false, 'write was accepted'); } catch (e) { check(name, /permission|PERMISSION/.test(`${e.code} ${e.message}`), e.code); }
-  };
   await refused('rules: a stop that was left takes no skip answer', () => setDoc(doc(car4.db, `trips/${tripId}/stops/${id}/answers/${car4.carId}`), { answer: 'skip', userId: car4.uid, at: serverTimestamp() }));
   await refused('rules: a stop that was left cannot be skipped for everyone', () => updateDoc(doc(organizer.db, `trips/${tripId}/stops/${id}`), { skipped: true, skippedBy: organizer.uid, skippedAt: serverTimestamp() }));
   await refused('rules: a stop is left once', () => updateDoc(doc(organizer.db, `trips/${tripId}/stops/${id}`), { leftAt: serverTimestamp(), leftBy: organizer.uid }));
@@ -844,6 +830,10 @@ async function stopProbesAfter(phones, tripId, organizer) {
 }
 
 // ---------------------------------------------------------------- scheduled checks
+
+/** A convoy order as `key@km > key@km`, and the same with the km left off (what the check expected). */
+const fmtOrder = (rows) => rows.map((r) => `${r.key}@${(r.offset / 1000).toFixed(1)}k`).join(' > ');
+const fmtOrderKeys = (rows) => fmtOrder(rows).replace(/@[\d.]+k/g, '');
 
 /** What the convoy list should read at scenario time T, from the GPX truth (ConvoyOrdering rules). */
 function expectedConvoyOrder(T, { truth, phones, appPresent }) {
@@ -932,9 +922,8 @@ function scheduleChecks({ phones, tripId, organizer, getAppCarId }) {
         .sort((a, b) => b.offset - a.offset);
       const joining = [...positions.entries()].filter(([, p]) => p.convoyOffset === undefined || p.convoyOffset === null).map(([id]) => names.get(id) ?? id);
       const expected = expectedConvoyOrder(clock.T, { truth: ctx.truth, phones, appPresent: Boolean(appCarId) });
-      const fmt = (rows) => rows.map((r) => `${r.key}@${(r.offset / 1000).toFixed(1)}k`).join(' > ');
       const ok = sameOrder(actual, expected);
-      check(label, ok, `convoy ${fmt(actual)}; joining [${joining.join(', ')}]; expected ${fmt(expected).replace(/@[\d.]+k/g, '')}`);
+      check(label, ok, `convoy ${fmtOrder(actual)}; joining [${joining.join(', ')}]; expected ${fmtOrderKeys(expected)}`);
     },
   });
 
@@ -1100,8 +1089,7 @@ function scheduleRebuildChecks({ phones, tripId, organizer }) {
         .filter(([, p]) => typeof p.convoyOffset === 'number')
         .map(([id, p]) => ({ key: names.get(id), offset: p.convoyOffset })).sort((a, b) => b.offset - a.offset);
       const expected = expectedConvoyOrder(clock.T, { truth: ctx.truth, phones, appPresent: false });
-      const fmt = (rows) => rows.map((r) => `${r.key}@${(r.offset / 1000).toFixed(1)}k`).join(' > ');
-      check(label, sameOrder(actual, expected), `convoy ${fmt(actual)}; expected ${fmt(expected).replace(/@[\d.]+k/g, '')}`);
+      check(label, sameOrder(actual, expected), `convoy ${fmtOrder(actual)}; expected ${fmtOrderKeys(expected)}`);
     },
   });
   return [

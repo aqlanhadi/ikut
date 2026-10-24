@@ -409,7 +409,7 @@ destination: {name, latitude, longitude}|null, cars: {key: {version (= that car'
 Own legs only (the shared stretches are the route); a car with no own road has `legs: []`. Long roads are simplified for display (about 5 m) above 60 kB encoded.
 
 `--dry-run` also builds a start-pin track (the car 4 road of osrm-car4.json), a straight one, an ending and a deviation on the stand-in route and checks
-their lengths and merge points; `node --test 'lib/*.test.mjs'` covers every pure function (track maths, divergence, plans, names, answers).
+their lengths and merge points; `npm test` (`node --test 'lib/*.test.mjs' '../tools/osm/*.test.mjs'`, so it also runs the OSM extract, places and publish tests) covers every pure function (track maths, divergence, plans, names, answers).
 
 ## Dashboard
 

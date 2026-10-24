@@ -14,14 +14,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RouteLine, haversine } from './lib/route.mjs';
 import { writeGpx } from './lib/gpx.mjs';
-import { CARS, CAR4_START, DURATION, FIX_HZ, GPX_EPOCH, SPEED_WOBBLE, TRIP, PARKED_CARS, STOP_CARS, WOBBLE_PERIOD } from './lib/scenario.mjs';
+import { CARS, CAR4_START, loadRoutes, toLine, DURATION, FIX_HZ, GPX_EPOCH, SPEED_WOBBLE, TRIP, PARKED_CARS, STOP_CARS, WOBBLE_PERIOD } from './lib/scenario.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(here, 'data');
 const gpxDir = path.join(here, 'gpx');
 const OSRM = 'https://router.project-osrm.org/route/v1/driving';
 
-const toLine = (coords) => coords.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
 
 async function osrm(from, to) {
   const url = `${OSRM}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?overview=full&geometries=geojson`;
@@ -44,12 +43,6 @@ async function fetchSnapshots() {
   const car4 = await osrm(CAR4_START, dest);
   fs.writeFileSync(path.join(dataDir, 'osrm-car4.json'), JSON.stringify(car4));
   console.log(`fetched main ${(main.distance / 1000).toFixed(1)} km, car4 ${(car4.distance / 1000).toFixed(1)} km`);
-}
-
-export function loadRoutes() {
-  const main = JSON.parse(fs.readFileSync(path.join(dataDir, 'osrm-main.json'), 'utf8'));
-  const car4 = JSON.parse(fs.readFileSync(path.join(dataDir, 'osrm-car4.json'), 'utf8'));
-  return { mainCoords: toLine(main.coordinates), car4Coords: toLine(car4.coordinates) };
 }
 
 // ---------------------------------------------------------------- deterministic noise

@@ -252,8 +252,7 @@ async function scenario() {
   sync.mark('cars.voted');
 
   await sync.wait('a.ok', 300);
-  const aCarId2 = [...carDocs2.entries()].find(([, c]) => c.number === 1)?.[0];
-  const aVote = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}/votes/${aCarId2}`))).data();
+  const aVote = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}/votes/${aCarId}`))).data();
   check('phone A said OK for its car', Boolean(aVote), JSON.stringify(aVote ? { userId: aVote.userId } : null));
   await sync.wait('a.stopped', 300);
   const closed = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();

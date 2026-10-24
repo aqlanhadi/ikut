@@ -40,7 +40,6 @@ const o = {
   name: 'Faiz',
   screens: path.join(here, 'screens'),
   logs: path.join(os.tmpdir(), 'ikut-qa'),
-  only: null,
   deadline: null,
   scenario: 'drive',
 };
@@ -59,7 +58,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else { console.error(`unknown option ${a}`); process.exit(64); }
 }
 if (!['drive', 'parked'].includes(o.scenario)) { console.error(`unknown scenario ${o.scenario} (drive or parked)`); process.exit(64); }
-o.only ??= o.scenario === 'parked'
+o.only = o.scenario === 'parked'
   ? 'ikutUITests/ConvoyScenarioUITests/testParkedAheadOfTheConvoy'
   : 'ikutUITests/ConvoyScenarioUITests/testFifthCarInSimulatedConvoy';
 await holdSimulators([o.udid]);

@@ -10,24 +10,11 @@
 // answers for a road that is there. The stops are {id, name, coordinate: {latitude, longitude}, routeOffset, kind,
 // order, skipped?, leftAt?, arrivedAt?}.
 
-import { RouteLine, bearing, haversine, truncate, Polyline } from './route.mjs';
+import { RouteLine, bearing, destinationPoint, haversine, truncate, Polyline } from './route.mjs';
 import { isOpen } from './stopleave.mjs';
 
 export const JUNCTION_TOLERANCE = 3; // m, StopRouting.junctionTolerance
 export const ON_ROUTE_TOLERANCE = 100; // m, OffRouteDetector.distance
-
-const RAD = Math.PI / 180;
-
-/** The point `meters` from `from` along `bearingDegrees`. */
-export function destinationPoint(from, bearingDegrees, meters) {
-  const d = meters / 6_371_008.8;
-  const b = bearingDegrees * RAD;
-  const lat1 = from.latitude * RAD;
-  const lon1 = from.longitude * RAD;
-  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
-  const lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
-  return { latitude: lat2 / RAD, longitude: lon2 / RAD };
-}
 
 /**
  * The road as planned with a town stop: the direct road up to `from` (meters along it), a loop out through the town

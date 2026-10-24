@@ -17,7 +17,7 @@ import { deleteUser, getAuth, signInAnonymously } from 'firebase/auth';
 import { deleteDoc, doc, initializeFirestore, onSnapshot, terminate } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { productionFirebaseConfig } from './lib/firebase-config.mjs';
-import { GAP_SECONDS, formatSummary, summarize } from './lib/battery.mjs';
+import { GAP_SECONDS, clock, formatSummary, summarize } from './lib/battery.mjs';
 
 const { values: opts, positionals } = parseArgs({
   allowPositionals: true,
@@ -64,7 +64,6 @@ console.log(`Watching "${car.name}" in "${preview.name}" (${code}) → ${out}`);
 console.log(`Ctrl-C to stop. Gaps over ${GAP_SECONDS} s are flagged as they happen.\n`);
 
 const updates = [];
-const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour12: false });
 const pct = (b) => (b == null ? '' : Math.round(b * 100));
 
 const stopPosition = onSnapshot(doc(db, `trips/${tripId}/positions/${car.id}`), (snap) => {

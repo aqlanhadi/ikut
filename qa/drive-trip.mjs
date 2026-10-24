@@ -13,7 +13,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { writeGpx } from './lib/gpx.mjs';
 import { holdSimulators, simctl } from './lib/shell.mjs';
-import { Polyline, haversine } from './lib/route.mjs';
+import { Polyline, RouteLine } from './lib/route.mjs';
 import { ownerQuery } from './lib/playground.mjs';
 
 const o = { udid: 'C0A40D2A-0607-4B95-A1BE-F8C9190D81C1', kmh: 90, speed: 1, from: 0, host: '127.0.0.1', code: null, gpx: null, route: null };
@@ -53,22 +53,16 @@ async function findTrip() {
 const trip = o.route ? { name: 'Route', code: '-', route: o.route } : await findTrip().catch((e) => { console.error(e.message); process.exit(1); });
 const line = Polyline.decode(trip.route);
 if (line.length < 2) { console.error(`trip ${trip.code} has no route`); process.exit(1); }
-const along = [0];
-for (let i = 1; i < line.length; i++) along.push(along[i - 1] + haversine(line[i - 1], line[i]));
-const total = along.at(-1);
+const route = new RouteLine(line);
+const total = route.length;
 const mps = o.kmh / 3.6;
 console.log(`${trip.name} (${trip.code}): ${(total / 1000).toFixed(1)} km, ${line.length} points, ${o.kmh} km/h` +
   `${o.speed === 1 ? '' : ` x${o.speed}`}, about ${Math.ceil((total - o.from) / mps / o.speed / 60)} min`);
 
 /** The point `m` meters along the route, and the index of the first vertex after it. */
 function pointAt(m) {
-  const found = along.findIndex((d) => d >= m);
-  if (found === -1) return { p: line.at(-1), next: line.length };
-  const i = Math.max(1, found);
-  const a = line[i - 1];
-  const b = line[i];
-  const f = along[i] === along[i - 1] ? 0 : (m - along[i - 1]) / (along[i] - along[i - 1]);
-  return { p: { latitude: a.latitude + (b.latitude - a.latitude) * f, longitude: a.longitude + (b.longitude - a.longitude) * f }, next: i };
+  const found = route.cumulative.findIndex((d) => d >= m);
+  return { p: route.coordinateAtOffset(m), next: found === -1 ? line.length : Math.max(1, found) };
 }
 
 // ---- GPX for Xcode: one point a second, timed at --kmh

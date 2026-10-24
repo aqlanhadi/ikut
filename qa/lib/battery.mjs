@@ -35,7 +35,7 @@ export function summarize(updates, now = updates.at(-1)?.t, gapSeconds = GAP_SEC
   };
 }
 
-const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour12: false });
+export const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour12: false });
 
 export function formatSummary(s) {
   const lines = [`writes            ${s.writes}`];

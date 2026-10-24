@@ -13,8 +13,8 @@
 // every second, the shared route and each car's own roads as `DEMO {"type":"geometry"}` whenever they change.
 // Every car drives a TRACK (lib/playground.mjs): the shared route from a km, or a start road that merges into it, an own
 // ending, a deviation (out to a pin, wait, back). Commands: prepare, useTrip, placeAt, ending, clearEnding, deviate,
-// cancelDeviation, addCar, removeCar, rename, vote, voteAll, askStop, markStopped, report, and the older place, speed, play, playAll,
-// drop. Cars: phone1, phone2, daniel, hafiz, g3, g4... Details in qa/README.md ("Playground").
+// cancelDeviation, addCar, removeCar, rename, vote, voteAll, askStop, markStopped, report, and the dashboard's own place, speed, play,
+// playAll, drop. Cars: phone1, phone2, daniel, hafiz, g3, g4... Details in qa/README.md ("Playground").
 
 
 import { execFile, spawn, spawnSync } from 'node:child_process';
@@ -24,14 +24,14 @@ import { createInterface } from 'node:readline';
 import { GeoPoint, deleteField, doc, setLogLevel, updateDoc } from 'firebase/firestore';
 import { START, Car, PROJECT_ID, emit, feedLocation, firebaseConfig, locStr, parseArgs, standInRoute, xcodeArgs } from './lib/demo-common.mjs';
 import { holdSimulators } from './lib/shell.mjs';
-import { loadRoutes } from './generate-gpx.mjs';
-import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
+import { loadRoutes } from './lib/scenario.mjs';
+import { CarRouteLogic, Polyline, RouteLine, destinationPoint, haversine } from './lib/route.mjs';
 import { PositionBuilder, PositionPublisher } from './lib/tracking.mjs';
 import {
   MAX_GENERATED, REPORT_TYPES, STOP_TYPES, UserError, ageSeconds, autoPick, carNameFor, carryState, composeTrack, coordIn, decodeDoc,
   encodeLine, ownerQuery, eventKindIn, eventStatus, locate, nameIn, newCarState, nextCar, nextWait, nudged, numberIn, offRouteCoords,
   messageIn, openStopSnapshot, optionalCoords, oksByCar, deviationStep, seenAfterChange, planDeviation, planEnding, planStart, relocate, shouldPark, sideRoad, startFrom,
-  stepTrack, trackFeedPoints, validDerivedData, destinationPoint, LEAVE_SLACK,
+  stepTrack, trackFeedPoints, validDerivedData, LEAVE_SLACK,
 } from './lib/playground.mjs';
 
 // --no-sim (developing the script itself): no builds and no simctl calls at all, for trying the cars without simulators.
