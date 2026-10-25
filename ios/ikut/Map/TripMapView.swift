@@ -166,7 +166,7 @@ struct TripMapView: View {
                 // padding, the 56 pt pill and the gap.
                 VStack(spacing: Spacing.s) {
                     MapModeControl(mode: $model.mode)
-                    if liveServices { ReadAloudButton(isOn: $readAloud) }
+                    ReadAloudButton(isOn: $readAloud)
                 }
                     .padding(.top, viewButtonsTop)
                     .padding(.trailing, Spacing.m)
