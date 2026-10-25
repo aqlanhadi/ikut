@@ -365,10 +365,7 @@ struct ConvoyActionBar: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
-            // Plain tinted buttons: the sheet is the glass, so a glass button on it would be glass on glass.
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .tint(MapPalette.accent)
+            .actionBarStyle(prominent: true)
             .disabled(!canReport)
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
@@ -396,9 +393,7 @@ struct ConvoyActionBar: View {
                         }
                     }
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .tint(.primary)
+            .actionBarStyle(prominent: false)
             .layoutPriority(1)
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")
@@ -409,6 +404,24 @@ struct ConvoyActionBar: View {
         // height stops above it, so the detents are still content + bar) until the gap under them equals the gap
         // beside them.
         .padding(.bottom, -lift)
+    }
+}
+
+private extension View {
+    /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): Report prominent and tinted
+    /// with the accent, Pit stop clear (`GlassSurface.useGlass` is the switch). Before iOS 26, the tinted and bordered capsules as before.
+    @ViewBuilder func actionBarStyle(prominent: Bool) -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            if prominent {
+                buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
+            } else {
+                buttonStyle(.glass).buttonBorderShape(.capsule).tint(.primary)
+            }
+        } else if prominent {
+            buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
+        } else {
+            buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.primary)
+        }
     }
 }
 
