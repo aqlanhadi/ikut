@@ -5,18 +5,19 @@ import SwiftUI
 /// (`.sheet` with two detents, always up, the map behind it stays touchable at the short one); the
 /// map's `expanded` state is what the detent selection reads and writes.
 enum HomeSheet {
-    /// Height of the sheet when short: title row, the two pills and the top of past trips.
+    /// Height of the sheet when short (at the default text size): the list shows its title row, the two pills and the first
+    /// past trips; a picked trip its header (back, name, date, Share, stats line) and the top of its recap card.
     static let compactHeight: CGFloat = 300
-    /// The short sheet of a picked trip (design/project/HomePicked.dc.html): back, name, date, stats line.
-    static let pickedCompactMinimum: CGFloat = 172
     /// Room the drag indicator takes above the content.
     static let indicatorRoom = BottomSheet.indicatorRoom
 
-    /// The short detent's height. A picked trip's follows its header (the text size can wrap it), and
-    /// never goes below the design's height.
-    static func compact(picked: Bool, pinnedHeight: CGFloat, bottomInset: CGFloat, margin: CGFloat) -> CGFloat {
-        guard picked else { return compactHeight }
-        return max(pickedCompactMinimum, pinnedHeight + indicatorRoom + bottomInset + margin)
+    /// What every change of Home's content runs on, the camera's flight included, so they start and end together.
+    static let motion = Animation.smooth(duration: 0.5)
+
+    /// The short detent's height, the same for the list and a picked trip (so a pick never resizes the sheet).
+    /// `scaled` is `compactHeight` scaled with the text size; it is capped so the tall detent stays well above it.
+    static func compact(scaled: CGFloat) -> CGFloat {
+        min(max(scaled, compactHeight), compactHeight * 1.5)
     }
 
     static let detentExtra = BottomSheet.detentExtra

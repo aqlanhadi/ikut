@@ -68,6 +68,16 @@ enum PickedTripLogic {
         !hadSnapshot && hasSnapshot && !itemSelected && !cameraMovedByUser
     }
 
+    /// Whether the camera already shows `target` closely enough that a late refit (the full route arriving after
+    /// the thinned one was fitted) would only nudge the picture: centre within 6% and span within 6% of the span.
+    static func nearlyShown(centerLatitude: Double, centerLongitude: Double, latitudeSpan: Double,
+                            target: MKCoordinateRegion) -> Bool {
+        let span = max(target.span.latitudeDelta, 1e-9)
+        return abs(centerLatitude - target.center.latitude) < 0.06 * span
+            && abs(centerLongitude - target.center.longitude) < 0.06 * span
+            && abs(latitudeSpan / span - 1) < 0.06
+    }
+
     /// What the map marks on the picked route: stops (red) and road reports (yellow) with a place.
     static func markers(_ recap: Recap?) -> [RecapTimelineItem] {
         (recap?.timeline ?? []).filter { ($0.kind == .stop || $0.kind == .hazard) && $0.coordinate != nil }
@@ -135,6 +145,16 @@ enum HomePickedDemo {
             return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model), selecting: stop)
         case "loading": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(tripId: "demo-never-loaded")))
         case "failed": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(failedTripId: entry.id)))
+        case "tap", "tour":
+            // Two more routes, so the list's fit is wider than the picked trip's and picking moves the camera.
+            func line(_ id: String, _ name: String, _ to: String, _ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> PastTripRoute {
+                PastTripsMapLogic.route(id: id, name: name, destinationName: to, destination: b, encodedRoute: Polyline.encode([a, b]))
+            }
+            let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
+            let drawn = [thin,
+                         line("sample-2", "Makan trip", "Melaka", kl, .init(latitude: 2.196, longitude: 102.25)),
+                         line("sample-3", "Cameron weekend", "Tanah Rata", kl, .init(latitude: 4.47, longitude: 101.38))]
+            return TripsHomeView(demo: past, routes: drawn, tappable: model, tour: name == "tour")
         case "list-tall": return TripsHomeView(demo: past, routes: [thin], expanded: true)
         default: return TripsHomeView(demo: past, routes: [thin])
         }
