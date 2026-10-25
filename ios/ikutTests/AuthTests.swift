@@ -79,8 +79,10 @@ struct MissingUserCheckTests {
 
     @Test func anInternalErrorNeedsTheServersWordForUserGone() async {
         let gone = NSError(domain: AuthErrorDomain, code: AuthErrorCode.internalError.rawValue,
-                           userInfo: [NSUnderlyingErrorKey: NSError(domain: "x", code: 1, userInfo: [NSLocalizedDescriptionKey: "INVALID_REFRESH_TOKEN"])])
-        let other = NSError(domain: AuthErrorDomain, code: AuthErrorCode.internalError.rawValue)
+                           userInfo: [NSUnderlyingErrorKey: NSError(domain: "x", code: 1, userInfo: [
+                               "FIRAuthErrorUserInfoDeserializedResponseKey": ["message": "INVALID_REFRESH_TOKEN"]])])
+        let other = NSError(domain: AuthErrorDomain, code: AuthErrorCode.internalError.rawValue, userInfo: [
+            "FIRAuthErrorUserInfoDeserializedResponseKey": ["message": "USER_NOT_FOUND"]])
         #expect(await run(throwing: gone).signedOut)
         #expect(!(await run(throwing: other).signedOut))
     }

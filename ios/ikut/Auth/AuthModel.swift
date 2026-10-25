@@ -59,17 +59,24 @@ final class AuthModel {
         }
     }
 
-    /// Server messages the SDK doesn't map to their own code: a token refresh for a deleted user
-    /// surfaces as `.internalError` carrying INVALID_REFRESH_TOKEN (what the emulator answers).
-    private nonisolated static let goneMessages = ["INVALID_REFRESH_TOKEN", "USER_NOT_FOUND", "USER_DISABLED", "TOKEN_EXPIRED"]
+    /// The server's message the SDK keeps in userInfo when it has no code of its own for it.
+    private nonisolated static let deserializedResponseKey = "FIRAuthErrorUserInfoDeserializedResponseKey"
 
     nonisolated static func isMissingUser(_ error: NSError) -> Bool {
         guard error.domain == AuthErrorDomain, let code = AuthErrorCode(rawValue: error.code) else { return false }
         if code == .internalError {
-            let detail = String(describing: error)
-            return goneMessages.contains { detail.contains($0) }
+            // A token refresh for a deleted user: `.internalError` carrying INVALID_REFRESH_TOKEN (the other
+            // gone cases arrive as their own codes, below). The message sits in the error or its underlying one.
+            return serverMessage(error) == "INVALID_REFRESH_TOKEN"
         }
         return [AuthErrorCode.userNotFound, .userDisabled, .userTokenExpired, .invalidUserToken].contains(code)
+    }
+
+    private nonisolated static func serverMessage(_ error: NSError) -> String? {
+        if let response = error.userInfo[deserializedResponseKey] as? [String: Any],
+           let message = response["message"] as? String { return message }
+        if let inner = error.userInfo[NSUnderlyingErrorKey] as? NSError { return serverMessage(inner) }
+        return nil
     }
 
     deinit {

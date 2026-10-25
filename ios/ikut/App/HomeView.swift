@@ -49,7 +49,7 @@ struct HomeView: View {
                         onNewTrip: { begin(.create) },
                         onJoin: { begin(.join(code: nil)) },
                         // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
-                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) },
+                        onOpenTrip: { entry in begin(.lobby(tripId: entry.id)) },
                         covered: homeSheetCovered,
                         sheetUp: $homeSheetUp
                     )

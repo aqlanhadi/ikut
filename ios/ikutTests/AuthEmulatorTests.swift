@@ -42,14 +42,7 @@ struct AuthEmulatorTests {
         try await AuthModel().signInAsGuest(name: "Ghost")
         let uid = try #require(Auth.auth().currentUser?.uid)
 
-        guard case .emulators(let host) = Backend.current else { return }
-        let url = URL(string: "http://\(host):9099/identitytoolkit.googleapis.com/v1/projects/ikut-b1083/accounts:delete")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["localId": uid])
-        _ = try await URLSession.shared.data(for: request)
+        try await deleteUserFromAuthEmulator(uid)
 
         let model = AuthModel()
         await waitUntil(.seconds(5)) { Auth.auth().currentUser == nil }
@@ -65,14 +58,7 @@ struct AuthEmulatorTests {
         let uid = try #require(Auth.auth().currentUser?.uid)
         #expect(model.state == .signedIn)
 
-        guard case .emulators(let host) = Backend.current else { return }
-        let url = URL(string: "http://\(host):9099/identitytoolkit.googleapis.com/v1/projects/ikut-b1083/accounts:delete")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["localId": uid])
-        _ = try await URLSession.shared.data(for: request)
+        try await deleteUserFromAuthEmulator(uid)
 
         let ref = Firestore.firestore().collection("trips").document()
         // The emulator turns the write away (the old token is still valid, but the user has no membership);
@@ -87,14 +73,7 @@ struct AuthEmulatorTests {
     @Test func aDeletedUsersTokenRefreshReadsAsGone() async throws {
         try await AuthModel().signInAsGuest(name: "Ghost")
         nonisolated(unsafe) let user = try #require(Auth.auth().currentUser)
-        guard case .emulators(let host) = Backend.current else { return }
-        let url = URL(string: "http://\(host):9099/identitytoolkit.googleapis.com/v1/projects/ikut-b1083/accounts:delete")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["localId": user.uid])
-        _ = try await URLSession.shared.data(for: request)
+        try await deleteUserFromAuthEmulator(user.uid)
 
         do {
             _ = try await user.getIDTokenResult(forcingRefresh: true)

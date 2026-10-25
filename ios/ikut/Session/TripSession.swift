@@ -129,6 +129,11 @@ final class TripSession {
     /// Attaches the listeners; calling it again while running does nothing.
     func start() {
         guard tripListener == nil else { return }
+        // No signed-in user: `members/` with an empty id is not a document path, and Firestore traps on it.
+        guard !userId.isEmpty else {
+            errorMessage = "Add your name to open this trip."
+            return
+        }
 
         tripListener = db.document(FirestorePaths.trip(tripId)).addSnapshotListener { [weak self] snapshot, error in
             let trip = try? snapshot?.data(as: Trip.self)
