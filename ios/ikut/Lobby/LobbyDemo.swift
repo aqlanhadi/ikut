@@ -227,6 +227,8 @@ enum DemoScreens {
         case "road-car-selected": return AnyView(MapDemo.view(selected: "c2"))
         case "road-car-selected-tall-5": return AnyView(MapDemo.view(expanded: true, fiveCars: true, selected: "c5"))
         case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true))
+        // The list unfolded; the debris approach folds it 3 s in, and my car passes the debris about 9 s later (D42).
+        case "road-hazard-pass": return AnyView(MapDemo.hazardPass())
         case "road-next-stop": return AnyView(NextStopDemo())
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))
         case "join-with-location": return nav(JoinDemo.ticket(withStops: true, drive: TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60)))

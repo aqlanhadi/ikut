@@ -182,6 +182,35 @@ enum MapDemo {
         }
     }
 
+    /// `road-hazard-pass`: the list unfolded; 3 s in, the approach alert for debris 420 m ahead of my car arrives (the
+    /// list folds), and my car (96 km/h, carried forward from its last fix) passes it about 9 s later ("Passed the
+    /// debris"). For watching the fold, and that the list stays folded after the pass.
+    static func hazardPass() -> some View {
+        let alerts = AlertCenter(bannerDuration: .seconds(3_600))
+        let model = model()
+        let main = RouteLine(densify(mainWaypoints))
+        let at = (model.convoy.myEntry?.convoyOffset ?? 0) + 420
+        if let spot = main.coordinate(atOffset: at) {
+            var debris = TripEvent(
+                type: .debris, location: GeoPoint(latitude: spot.latitude, longitude: spot.longitude),
+                heading: 0, routeOffset: at, authorId: "u-c2", carId: "c2", createdAt: Date().addingTimeInterval(-60))
+            debris.id = "demo-near"
+            model.setEvents([debris])
+        }
+        let alert = TripAlert(
+            id: "demo-near@approach", eventId: "demo-near", tripId: "demo", type: .debris, category: .hazard,
+            severity: .high, distance: 300, title: "Debris ahead in 300 m", body: "Debris reported by Wyna’s car", spoken: "")
+        return NavigationStack {
+            TripMapView(
+                session: TripSession(tripId: "demo", userId: "u-c1"), model: model, alerts: alerts,
+                demoExpanded: true, stopService: DemoStopService())
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(3))
+            alerts.showForDemo(alert)
+        }
+    }
+
     /// The debris 3 km ahead as an approach alert.
     static let debrisAlert = TripAlert(
         id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
