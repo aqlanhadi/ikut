@@ -230,10 +230,10 @@ final class DemoOrganizerUITests: DemoBase {
         finish()
     }
 
-    /// --end-trip, and always against production: the organizer ends the trip from the Trip menu.
+    /// --end-trip, and always against production: the organizer ends the trip from the lobby's Trip options menu.
     func endTrip() {
-        guard app.buttons["Trip menu"].exists else { note("Trip menu to end the trip", false, core: true); return }
-        openTripMenuItem("Trip menu", "End trip")
+        guard app.buttons["Back to lobby"].exists else { note("Back to lobby to end the trip", false, core: true); return }
+        endTripFromLobby()
         confirm("End trip")
         soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share recap"].exists }
     }

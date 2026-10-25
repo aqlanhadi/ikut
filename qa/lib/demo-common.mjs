@@ -388,7 +388,7 @@ export function startUiTest(o, spec) {
 
 /** The demos' UI test: log and result bundle named after the tag and the phone, check events for the dashboard. */
 function startTest(o, tag, phone, syncDir, say, onFail) {
-  const endTrip = o.endTrip || o.backend === 'production'; // phone 1 ends the trip from its Trip menu once `end` is written
+  const endTrip = o.endTrip || o.backend === 'production'; // phone 1 ends the trip from the lobby's Trip options menu once `end` is written
   return startUiTest(o, {
     udid: phone.udid, only: phone.test, id: phone.id, label: phone.label, say, onFail,
     logPath: path.join(o.logs, `${tag}-xcodebuild-${phone.id}.log`),
@@ -492,7 +492,7 @@ async function runDemoInner(config, o) {
   const endTrip = o.endTrip || o.backend === 'production'; // production: always end the trip, it is a real one
   let tripCreated = false;
   const cleanup = async () => {
-    // Let phone 1 end the trip (its Trip menu) before its test is stopped.
+    // Let phone 1 end the trip (the lobby's Trip options menu) before its test is stopped.
     if (endTrip && tripCreated && !sync.has('end')) {
       sync.mark('end');
       await Promise.race([Promise.all(tests.map((t) => t.exit)), sleep(60_000)]);

@@ -28,3 +28,23 @@ struct MapModeControl: View {
         .accessibilityAddTraits(mode == target ? .isSelected : [])
     }
 }
+
+// MARK: - Read alerts aloud
+
+/// Its own round glass button under the follow / fit control: the speaker is on (accent) or slashed (off).
+struct ReadAloudButton: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button { isOn.toggle() } label: {
+            Image(systemName: isOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(isOn ? Color.surfaceAccent : Color.primary)
+                .frame(width: 44, height: 44)
+        }
+        .glassSurface(.control)
+        .sensoryFeedback(.selection, trigger: isOn)
+        .accessibilityLabel("Read alerts aloud")
+        .accessibilityValue(isOn ? "On" : "Off")
+    }
+}

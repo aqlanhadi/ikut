@@ -130,6 +130,13 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
         button.tap()
     }
 
+    /// The map's back button, then the lobby's Trip options menu: the map no longer has trip controls.
+    func endTripFromLobby() {
+        app.buttons["Back to lobby"].tap()
+        XCTAssertTrue(app.buttons["Trip options"].waitForExistence(timeout: 15), "lobby has no Trip options")
+        openTripMenuItem("Trip options", "End trip")
+    }
+
     /// Taps the destructive button of a confirmation dialog (it repeats the menu item's title).
     func confirm(_ title: String) {
         let buttons = app.buttons.matching(NSPredicate(format: "label == %@", title))
@@ -276,7 +283,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             try waitMark("b.rejoined", timeout: 240)
             try waitFor("car 5 in A's list", timeout: 90) { element("convoy.row.5").exists }
             shot("14-b-rejoined")
-            openTripMenuItem("Trip menu", "End trip")
+            endTripFromLobby()
             confirm("End trip")
             // Ending the trip opens its recap (ae9efbb), not Home.
             try waitFor("recap after ending", timeout: 30) { labelled("label CONTAINS %@", "Share recap").exists }
@@ -399,7 +406,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
         }
 
         try step("8. pauses sharing in the lobby, then resumes") {
-            openTripMenuItem("Trip menu", "Back to lobby")
+            app.buttons["Back to lobby"].tap()
             XCTAssertTrue(app.buttons["Trip options"].waitForExistence(timeout: 15), "lobby has no Trip options")
             openTripMenuItem("Trip options", "Pause sharing")
             try waitFor("paused banner", timeout: 20) { labelled("label CONTAINS %@", "Sharing paused").exists }
