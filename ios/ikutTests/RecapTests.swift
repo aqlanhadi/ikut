@@ -4,6 +4,15 @@ import Testing
 @testable import ikut
 
 struct RecapLogicTests {
+    @Test func stepsNearEachOtherGlideAndFarOnesJump() {
+        let a = CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0)
+        #expect(RecapLogic.stepMove(from: a, to: .init(latitude: 3.2, longitude: 101.2), span: 0.15) == .glide)
+        #expect(RecapLogic.stepMove(from: a, to: .init(latitude: 3.0, longitude: 101.5), span: 0.15) == .jump)
+        #expect(RecapLogic.stepMove(from: a, to: .init(latitude: 5.0, longitude: 101.0), span: 0.15) == .jump)
+        #expect(RecapLogic.stepMove(from: nil, to: a, span: 0.15) == .jump)
+        #expect(RecapLogic.stepMove(from: a, to: nil, span: 0.15) == .jump)
+    }
+
     private let t0 = Fixtures.t0
     private let dest = CLLocationCoordinate2D(latitude: 4.6, longitude: 101.09)
 

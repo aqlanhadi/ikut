@@ -144,6 +144,18 @@ struct Recap: Equatable, Sendable {
 }
 
 enum RecapLogic {
+    /// How the recap map's camera gets from one step to the next.
+    enum StepMove: Equatable { case glide, jump }
+
+    /// A glide for a step within a few screen widths (`span` degrees each) of the last one; a jump for a farther
+    /// one, or when either step has no place. MapKit flies a long region change in a zoom-out-and-in arc over tiles
+    /// that haven't loaded, which looks worse than arriving.
+    static func stepMove(from: CLLocationCoordinate2D?, to: CLLocationCoordinate2D?, span: Double, widths: Double = 3) -> StepMove {
+        guard let from, let to else { return .jump }
+        let d = max(abs(from.latitude - to.latitude), abs(from.longitude - to.longitude))
+        return d <= span * widths ? .glide : .jump
+    }
+
     /// A car whose last fix is this close to the destination counts as arrived.
     static let arrivalRadius: CLLocationDistance = 1_000
     /// Positions and events are deleted this long after the trip ends.
