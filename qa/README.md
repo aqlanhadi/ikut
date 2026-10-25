@@ -22,8 +22,9 @@ drop, the one stretch that has to last in real seconds (see Things to know). Wit
 `--udid`, `--derived-data` (default `/tmp/ikut-dd-q1`, seed it from another derived-data folder's `SourcePackages`),
 `--deadline S`. Screenshots land in `qa/screens/`, logs in `$TMPDIR/ikut-qa/`.
 
-To join by hand instead: `node convoy-sim.mjs --speed 1 --wait-app`, join with the printed code from any simulator or
-phone, and feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
+To join by hand instead: `node convoy-sim.mjs --speed 1 --wait-app` (or `--setup-only`), join with the printed code
+from any simulator or phone (only the organizer starts a trip, so the script starts it once your car shares its
+location, and the lobby's button turns to Show map), and feed it the track with `xcrun simctl location <udid> start --speed=27.4 ...` (see `run-ui.mjs`).
 `node convoy-sim.mjs --help` lists the other flags.
 
 ## Waiting on a run
@@ -86,7 +87,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
 
 1. A creates the trip in the UI (name, New Trip, Where to? Ipoh, lobby) and reads the code off the lobby.
 2. B joins with the code as a new car; the script joins cars 3 and 4; both lobbies read "4 of 4 ready"; numbers 1, 2, 3, 4.
-3. A taps Start trip (only the organizer can); B's lobby reads "Waiting for A to start the trip" until then, and B taps Show map. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
+3. A taps Start trip (only the organizer can); B's lobby reads "Waiting for Aisha to start the trip" until then, and B taps Show map. All four drive the trip's route at 90 km/h (simctl playback for the phones, resynced every 20 s)
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
 4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.

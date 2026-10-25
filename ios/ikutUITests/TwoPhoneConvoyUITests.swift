@@ -305,11 +305,16 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             try waitMark("cars.joined", timeout: 180)
             try checkLobbyHasFourCars()
             XCTAssertTrue(labelled("label CONTAINS %@", "Lead").exists, "lobby is missing the organizer's (lead) car")
+            // A taps Start trip only after this mark, so until then B has only the waiting line, no Start trip.
+            let waiting = element("lobbyWaiting")
+            XCTAssertTrue(waiting.waitForExistence(timeout: 10), "B's lobby has no waiting line")
+            XCTAssertEqual(waiting.label, "Waiting for Aisha to start the trip")
+            XCTAssertFalse(app.buttons["Start trip"].exists, "A passenger must not be offered Start trip")
             shot("02-lobby-4-cars")
             mark("b.lobby4")
         }
 
-        try step("3. Start trip opens the map; convoy order 1, 3, 2, 4") {
+        try step("3. B waits, then Show map opens the map; convoy order 1, 3, 2, 4") {
             try waitMark("a.lobby4", timeout: 120)
             try openMap()
             mark("b.map")

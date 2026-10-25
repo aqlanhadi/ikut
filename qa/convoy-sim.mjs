@@ -662,7 +662,20 @@ async function main() {
   if (opts.setupOnly) {
     console.log('setup only: holding positions. Ctrl-C to stop.');
     writeState({ phase: 'hold' });
-    for (;;) { await sleep(1000); await hold(); }
+    // Only the organizer starts a trip: this script is the organizer, so once a phone that joined by hand shares its
+    // location (its car shows up in positions) the trip starts and its lobby offers Show map.
+    const known = new Set([...phones.values()].map((p) => p.carId));
+    for (;;) {
+      await sleep(1000);
+      await hold();
+      if (tripStarted) continue;
+      const snap = await getDocs(collection(organizer.db, `trips/${tripId}/positions`));
+      if (snap.docs.some((d) => !known.has(d.id))) {
+        await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+        tripStarted = true;
+        log('the organizer starts the trip: the phone can open the map');
+      }
+    }
   }
   if (opts.waitApp) {
     console.log(`waiting for a phone to join trip ${code} and start tracking (up to ${opts.waitTimeout} s)...`);

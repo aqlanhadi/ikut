@@ -98,6 +98,24 @@ struct LobbyTests {
         #expect(LobbyLogic.bottomBar(isOrganizer: true, started: false, ended: true, organizerName: nil) == Bar.showMap)
     }
 
+    @Test func noBarWhileLoadingOrAfterBeingRemoved() {
+        typealias Bar = LobbyLogic.BottomBar
+        // Loading: we can't tell the organizer from a participant yet.
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, tripLoaded: false, started: false, organizerName: nil) == Bar.none)
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, tripLoaded: false, started: true, organizerName: nil) == Bar.none)
+        // Removed from the trip: no waiting line, no map.
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, isMember: false, started: false, organizerName: "Aqlan") == Bar.none)
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, isMember: false, started: true, organizerName: "Aqlan") == Bar.none)
+    }
+
+    @Test func theOrganizerCanOnlyEndBeforeTheStart() {
+        #expect(!LobbyLogic.canLeaveTrip(isOrganizer: true, started: false, isLiveMember: true))
+        #expect(LobbyLogic.canLeaveTrip(isOrganizer: true, started: true, isLiveMember: true))
+        #expect(LobbyLogic.canLeaveTrip(isOrganizer: false, started: false, isLiveMember: true))
+        #expect(LobbyLogic.canLeaveTrip(isOrganizer: false, started: true, isLiveMember: true))
+        #expect(!LobbyLogic.canLeaveTrip(isOrganizer: false, started: true, isLiveMember: false))
+    }
+
     @Test func bottomBarWords() {
         #expect(LobbyLogic.BottomBar.startTrip.label == "Start trip")
         #expect(LobbyLogic.BottomBar.showMap.label == "Show map")

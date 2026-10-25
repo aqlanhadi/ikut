@@ -55,6 +55,8 @@ enum LobbyLogic {
     enum BottomBar: Equatable {
         case startTrip
         case showMap
+        /// No bar: the trip is still loading (we can't tell the organiser from a participant yet), or this user was removed.
+        case none
         /// A participant before the start; `organizerName` is nil while the members haven't loaded.
         case waiting(organizerName: String?)
 
@@ -62,15 +64,26 @@ enum LobbyLogic {
             switch self {
             case .startTrip: "Start trip"
             case .showMap: "Show map"
+            case .none: ""
             case .waiting(let name): "Waiting for \(name ?? "the organiser") to start the trip"
             }
         }
     }
 
     /// A trip that has ended has nobody left to wait for: everyone gets the map button (it leads on to the recap).
-    static func bottomBar(isOrganizer: Bool, started: Bool, ended: Bool = false, organizerName: String?) -> BottomBar {
+    static func bottomBar(
+        isOrganizer: Bool, tripLoaded: Bool = true, isMember: Bool = true, started: Bool, ended: Bool = false,
+        organizerName: String?
+    ) -> BottomBar {
+        if !tripLoaded || !isMember { return .none }
         if started || ended { return .showMap }
         return isOrganizer ? .startTrip : .waiting(organizerName: organizerName)
+    }
+
+    /// Leave trip is for participants always, and for the organizer only once the trip has started: before that they can
+    /// only End it, or the participants would wait on the lobby for a start that never comes (D39).
+    static func canLeaveTrip(isOrganizer: Bool, started: Bool, isLiveMember: Bool) -> Bool {
+        isLiveMember && (!isOrganizer || started)
     }
 
     /// The organizer's display name from the loaded members (their member id is their user id); nil if not loaded or blank.
