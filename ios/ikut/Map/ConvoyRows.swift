@@ -108,7 +108,7 @@ struct ConvoyRowView: View {
     }
 }
 
-/// A car's name on one line; my own car gets the "You" tag after it. The name gives way, the tag never wraps.
+/// A car's name on one line; my own car gets "• You" after it. The name gives way, the tag never wraps.
 private struct NameLine: View {
     var name: String
     var mine: Bool
@@ -116,9 +116,10 @@ private struct NameLine: View {
 
     var body: some View {
         HStack(spacing: Spacing.xs) {
-            Text(name).font(.body).lineLimit(1)
+            Text(name).lineLimit(1)
             if mine { YouTag(online: online).layoutPriority(1) }
         }
+        .font(.body)
     }
 }
 

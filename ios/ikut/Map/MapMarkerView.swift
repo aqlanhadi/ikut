@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Markers
 
-/// A numbered badge in the car's color, an arrow showing the heading, and a name chip.
+/// A numbered badge in the car's color, an arrow showing the heading, and the car's name beside it.
 /// Stale cars are dimmed and say how long ago they were seen; the designated lead has a small star.
 struct MapMarkerView: View {
     var marker: MapMarker
@@ -77,16 +77,16 @@ struct MapMarkerView: View {
         .overlay(alignment: side == .trailing ? .leading : .trailing) {
             HStack(spacing: Spacing.xs) {
                 Text(marker.label)
-                if marker.isMine { YouTag(online: marker.youOnline, compact: true) }
+                if marker.isMine { YouTag(online: marker.youOnline) }
             }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
-                .padding(.horizontal, Spacing.chipX)
-                .padding(.vertical, Spacing.xs)
-                .background(Capsule().fill(.regularMaterial))
-                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                // No capsule: a halo in the background colour, as on Apple's own map labels, keeps it readable.
+                .shadow(color: Color(.systemBackground), radius: 1)
+                .shadow(color: Color(.systemBackground), radius: 1)
+                .shadow(color: Color(.systemBackground).opacity(0.6), radius: 3)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                 .padding(side == .trailing ? .leading : .trailing, MapChipPlacement.gap)
         }

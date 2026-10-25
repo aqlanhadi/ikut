@@ -65,22 +65,16 @@ final class NetworkStatus {
     }
 }
 
-/// "You" in a small capsule after my car's name: green while I am online, yellow while offline. A tinted
-/// fill with the primary text colour, so it reads in light and dark.
+/// "• You" after my car's name, in the name's own font: "You" green while I am online, orange while offline.
 struct YouTag: View {
     var online: Bool
-    var compact = false
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
 
     var body: some View {
-        Text(YouOnline.text(online: online, differentiateWithoutColor: differentiate))
-            .font((compact ? Font.caption2 : Font.footnote).weight(.semibold))
-            .foregroundStyle(Color.primary)
+        (Text("• ") + Text(YouOnline.text(online: online, differentiateWithoutColor: differentiate))
+            .foregroundStyle(online ? Color.ikutPositive : Color.ikutWarning))
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, Spacing.chipX)
-            .padding(.vertical, Spacing.xxs)
-            .background((online ? MapPalette.live : Color.yellow).opacity(online ? 0.3 : 0.45), in: Capsule())
             .animation(.smooth, value: online)
             .accessibilityLabel(YouOnline.spoken(online: online))
     }
