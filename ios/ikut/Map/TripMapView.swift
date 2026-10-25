@@ -61,6 +61,7 @@ struct TripMapView: View {
     @State private var visible = false
     @State private var leaving = false
     @State private var afterPanel: (() -> Void)?
+    @State private var exitWait = PanelSheet.ExitWait()
     @State private var foldedContent: CGFloat?
     @State private var unfoldedContent: CGFloat?
     @State private var cardContent: CGFloat?
@@ -744,10 +745,14 @@ struct TripMapView: View {
         // The card went with the convoy sheet; it comes back with it if it is still wanted.
         presentedCard = nil
         cardDismissing = PanelSheet.cardsGone.dismissing
-        if let action = afterPanel {
-            afterPanel = nil
-            action()
-        }
+        runAfterPanel()
+    }
+
+    /// Runs the waiting action once, whether the dismissal report or the fallback gets here first.
+    private func runAfterPanel() {
+        guard exitWait.fire(), let action = afterPanel else { return }
+        afterPanel = nil
+        action()
     }
 
     /// Runs `action` once the sheet is gone: it would otherwise stay up over the screen that comes next.
@@ -757,7 +762,16 @@ struct TripMapView: View {
             action()
         case .afterDismissal:
             afterPanel = action
+            exitWait.arm()
             leaving = true
+            // A card up or sliding down must not hold the convoy sheet's dismissal; it goes with the sheet.
+            presentedCard = nil
+            cardDismissing = PanelSheet.cardsGone.dismissing
+            // A dismissal the sheet never reports must not keep the person on the map.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(PanelSheet.exitFallback))
+                if exitWait.waiting { panelDismissed() }
+            }
         }
     }
 
@@ -1119,6 +1133,7 @@ struct TripMapView: View {
         session.mapSheetUp = false
         leaving = false
         afterPanel = nil
+        _ = exitWait.fire()
         onScreen = false
         ask = nil
         session.askShowing = false

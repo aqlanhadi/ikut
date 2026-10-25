@@ -64,6 +64,22 @@ enum PanelSheet {
 
     static func exit(sheetUp: Bool) -> ExitTiming { sheetUp ? .afterDismissal : .now }
 
+    /// An action waiting for the convoy sheet's dismissal (Back to lobby, Leave). Its dismissal report runs it, or, if
+    /// the report never comes, the fallback `exitFallback` later does; whichever is first runs it, the other finds
+    /// nothing to run.
+    struct ExitWait: Equatable {
+        private(set) var waiting = false
+        mutating func arm() { waiting = true }
+        /// True once, to the first caller (the report or the fallback) while armed.
+        mutating func fire() -> Bool {
+            defer { waiting = false }
+            return waiting
+        }
+    }
+
+    /// How long the convoy sheet's dismissal may go unreported before the waiting action runs anyway.
+    static let exitFallback: TimeInterval = 1
+
     static func shown(expanded: Bool) -> Shown { expanded ? .unfolded : .folded }
 
     /// The card sheet's one detent: its content's measured height (nil until seen), capped at `room` like the
