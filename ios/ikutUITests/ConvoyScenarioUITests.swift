@@ -116,9 +116,13 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
             shot("06-approach-alert")
         }
 
-        try step("7. Hazard marker clears once every car has passed it") {
+        try step("7. Hazard marker clears once every car has passed it; the list stays folded until unfolded") {
             try waitFor("hazard marker gone", timeout: 90 / speed + 60) { !hazardMarker().exists }
             shot("07-hazard-cleared")
+            // Passing the hazard never unfolds the list by itself (#344); the driver does, for the rows below.
+            let expand = app.buttons["Expand convoy list"]
+            XCTAssertTrue(expand.exists, "the convoy list should stay folded after the hazard")
+            expand.tap()
         }
 
         try step("8. Stop request: the button shows it, the card has its message, OK, then closed") {

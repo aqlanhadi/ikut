@@ -23,6 +23,10 @@ struct ConvoyPanel: View {
     /// A hidden copy that only measures the other layout, so the sheet knows both heights before it is asked to
     /// move: it does no lookups and is not on screen or in VoiceOver.
     var probe = false
+    /// The on-screen panel's header words (its place names come from lookups the probe does not make), so a probe
+    /// measures the header the driver sees; and where the on-screen panel reports them.
+    var headerWords: ConvoyHeader.Text?
+    var onHeader: (ConvoyHeader.Text) -> Void = { _ in }
 
     @State private var originName: String?
     @State private var ownStartName: String?
@@ -48,6 +52,7 @@ struct ConvoyPanel: View {
         }
         .padding(.horizontal, Spacing.l)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { onHeight($0) }
+        .onChange(of: headerText, initial: true) { _, text in if !probe { onHeader(text) } }
         .task(id: probe ? "" : originKey) {
             guard !probe, let start = model.mainRoute?.coordinates.first else { return }
             originName = await RouteBuilder.placeName(at: start)
@@ -129,7 +134,7 @@ struct ConvoyPanel: View {
     private var header: some View {
         let destination = convoy.destinationName ?? ""
         let arrive = frontArrival.map { ConvoyFormat.clock($0) }
-        let text = headerText
+        let text = probe ? (headerWords ?? headerText) : headerText
         return HStack(alignment: .top, spacing: Spacing.s) {
             VStack(alignment: .leading, spacing: 0) {
                 StatCaption("From")

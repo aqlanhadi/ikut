@@ -85,12 +85,73 @@ enum PanelSheet {
         }
     }
 
-    /// A card has the one detent that fits it; the panel has its short and tall one.
-    static func detents(_ shown: Shown, in heights: Heights) -> Set<PresentationDetent> {
-        shown == .card ? [.height(heights.card)] : [.height(heights.short), .height(heights.tall)]
+    /// A card has the one detent that fits it; the panel has its short and tall one. While a card opens or closes
+    /// (`bridged`) the sheet has all three, so the swap is a move between two detents it already has, which the sheet
+    /// animates; swapping the set itself in the same update made it jump to the new height in one frame.
+    static func detents(_ shown: Shown, in heights: Heights, bridged: Bool = false) -> Set<PresentationDetent> {
+        if bridged { return [.height(heights.short), .height(heights.tall), .height(heights.card)] }
+        return shown == .card ? [.height(heights.card)] : [.height(heights.short), .height(heights.tall)]
     }
 
+    /// How long a card swap waits after bridging the detent set before it moves, so the sheet has the set first.
+    static let bridgeDelay: TimeInterval = 0.02
+
     static func detent(_ shown: Shown, in heights: Heights) -> PresentationDetent { .height(height(shown, in: heights)) }
+
+    // MARK: One motion (D42: A1, A2, A3, A6)
+
+    /// A measured height is taken at rest only when it differs from the one in use by more than this (a sub-point
+    /// re-layout is not a resize).
+    static let settleTolerance: CGFloat = 1
+    /// After a fold or card motion has finished (its removed views gone), how long before the held heights are let go.
+    static let settleAfterMotion: TimeInterval = 0.1
+    /// The longest a motion holds the heights, should its completion never come.
+    static let motionLongest: TimeInterval = 1.2
+
+    /// The heights the sheet uses. While it moves (a fold, a drag let go, a card opening or closing) it holds the panel's
+    /// short and tall heights, and the card's while the card is shown, so the detent it is moving to never changes under
+    /// it (the fold used to hand the sheet a new detent set mid-motion, which it applied in one frame). At rest each
+    /// measured height is taken when it differs by more than `settleTolerance`. `applied` nil (nothing used yet): the
+    /// measured ones.
+    static func settled(_ applied: Heights?, measured: Heights, moving: Bool, shown: Shown) -> Heights {
+        guard let applied else { return measured }
+        func take(_ old: CGFloat, _ new: CGFloat, hold: Bool) -> CGFloat {
+            !hold && abs(new - old) > settleTolerance ? new : old
+        }
+        return Heights(
+            short: take(applied.short, measured.short, hold: moving),
+            tall: take(applied.tall, measured.tall, hold: moving),
+            card: take(applied.card, measured.card, hold: moving && shown == .card))
+    }
+
+    /// What the sheet's body holds. A stop card is laid out unseen over the panel until its height is known
+    /// (`cardMeasured`), then the panel goes and the card shows, in the transaction that moves the detent to the card's
+    /// height: never both on screen, and never the card at the panel's height.
+    struct Layers: Equatable {
+        var panel: Bool
+        var card: Bool
+        var cardVisible: Bool
+    }
+
+    static func layers(cardRequested: Bool, cardMeasured: Bool) -> Layers {
+        guard cardRequested else { return Layers(panel: true, card: false, cardVisible: false) }
+        return cardMeasured
+            ? Layers(panel: false, card: true, cardVisible: true)
+            : Layers(panel: true, card: true, cardVisible: false)
+    }
+
+    /// How long a requested card waits for its height before it opens at what is known.
+    static let cardMeasureWait: TimeInterval = 0.3
+
+    /// The moments of a hazard approach that touch the convoy list.
+    enum HazardMoment: Equatable { case approaching, passed, gaveUp }
+
+    /// Whether the list is unfolded after `moment`, from `expanded` now. The approach folds it, so my car and the hazard
+    /// have the room; passing the hazard (or giving up on it) leaves it as it is: the owner's choice (#344), since the
+    /// unfolded list covers more than half the map while the car is moving.
+    static func expanded(_ expanded: Bool, after moment: HazardMoment) -> Bool {
+        moment == .approaching ? false : expanded
+    }
 
     /// The sheet steps aside for everything that is pushed or presented from under it: the trip ending (the
     /// recap), leaving the screen, and the Always location sheet that the lobby presents.
