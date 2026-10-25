@@ -14,6 +14,9 @@ struct LobbyView: View {
     @State private var model: LobbyModel
     @State private var session: TripSession
     @State private var routeInfo = TripRouteInfo()
+    // The same switch the map applies (TripMapView): the lobby is where it moved to.
+    @AppStorage("ikut.map.keepAwake") private var keepAwake = false
+    @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
     /// A participant's own trip: their start, where they join, their distance and drive time (D26).
     @State private var ownWay = OwnWayInfo()
     @State private var planner: StopPlanner
@@ -296,7 +299,7 @@ struct LobbyView: View {
                     .accessibilityLabel("Rename trip")
                 }
             }
-            if canLeaveTrip || canEnd || canPause {
+            if canLeaveTrip || canEnd || canPause || !isSample {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         if canPause {
@@ -309,6 +312,11 @@ struct LobbyView: View {
                                     run { try await session.pauseSharing() }
                                 }
                             }
+                        }
+                        if !isSample {
+                            Toggle("Keep screen on", systemImage: "sun.max", isOn: Binding(
+                                get: { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) },
+                                set: { keepAwake = $0; keepAwakeAnswered = true }))
                         }
                         TripExitMenu(canEnd: canEnd, canLeave: canLeaveTrip, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
                     } label: {

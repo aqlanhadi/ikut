@@ -6,8 +6,8 @@ import SwiftUI
 /// mode controls on the right and the convoy panel (list, Joining, Report, Stop) at the bottom.
 ///
 /// Push it with the lobby's existing session (never a second one). The Stop button opens the
-/// request sheet, an open stop request shows as a card above the panel, and the pill's menu can go
-/// back to the lobby, leave or end the trip; leaving and ending call `onExit` to return to Home.
+/// request sheet, an open stop request shows as a card above the panel, and the pill's back button goes
+/// back to the lobby, where the trip is left or ended.
 struct TripMapView: View {
     let session: TripSession
     var onExit: () -> Void
@@ -51,9 +51,6 @@ struct TripMapView: View {
     @State private var pillNow = Date()
     @State private var driving = DrivingDetector()
     @State private var glanceError = GlanceError()
-    @State private var confirmLeave = false
-    @State private var confirmEnd = false
-    @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
     /// The banner stack's height, for `mapInsets`; the sheet's own height comes from `sheetHeights`.
@@ -166,23 +163,22 @@ struct TripMapView: View {
                 // Below whatever is at the top (the trip pill, a banner, the stop pill), with the same gap
                 // the stack keeps between its own items. Before the stack is measured: its top
                 // padding, the 56 pt pill and the gap.
-                MapModeControl(mode: $model.mode)
-                    .padding(.top, viewButtonsTop)
-                    .padding(.trailing, Spacing.m)
-                    .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: viewButtonsTop)
-                    // The tall sheet would cut through it: fade it out, and back when the sheet folds.
-                    .opacity(DrivingGlance.modeControlOpacity(panelExpanded: panelExpanded))
-                    .allowsHitTesting(!panelExpanded)
-                    .accessibilityHidden(panelExpanded)
-                    .animation(.linear(duration: 0.2), value: panelExpanded)
+                VStack(spacing: Spacing.s) {
+                    MapModeControl(mode: $model.mode)
+                    ReadAloudButton(isOn: $readAloud)
+                }
+                .padding(.top, viewButtonsTop)
+                .padding(.trailing, Spacing.m)
+                .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: viewButtonsTop)
+                // The tall sheet would cut through it: fade it out, and back when the sheet folds.
+                .opacity(DrivingGlance.modeControlOpacity(panelExpanded: panelExpanded))
+                .allowsHitTesting(!panelExpanded)
+                .accessibilityHidden(panelExpanded)
+                .animation(.linear(duration: 0.2), value: panelExpanded)
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: Binding(get: { visible && !panelCovered }, set: { _ in }), onDismiss: panelDismissed) {
                 panelSheet
-            }
-            // A confirmation asked for while the sheet is away must not come up when it returns.
-            .onChange(of: panelCovered) { _, covered in
-                if covered { confirmLeave = false; confirmEnd = false }
             }
             .onChange(of: typeSize) { _, _ in
                 foldedContent = nil
@@ -511,6 +507,13 @@ struct TripMapView: View {
 
     private var tripPill: some View {
         HStack(spacing: Spacing.m) {
+            Button { exit { dismiss() } } label: {
+                Image(systemName: "chevron.backward")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Back to lobby")
             Circle()
                 .fill(pillDot)
                 .frame(width: 10, height: 10)
@@ -530,40 +533,23 @@ struct TripMapView: View {
                 .accessibilityIdentifier("trip.pill.status")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Menu {
-                Button("Back to lobby", systemImage: "chevron.backward") { exit { dismiss() } }
-                if liveServices {
-                    Toggle("Keep screen on", systemImage: "sun.max", isOn: Binding(
-                        get: { keepAwakeOn },
-                        set: { keepAwake = $0; keepAwakeAnswered = true }))
-                    Toggle("Read alerts aloud", systemImage: "speaker.wave.2", isOn: $readAloud)
-                }
-                TripExitMenu(canEnd: canEnd, canLeave: canLeave, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-                    .overlay(alignment: .topTrailing) {
-                        // MapBannerSlot.dc.html frame i: an error is held behind another message.
-                        if bannerSlot.errorHeld {
-                            Circle().fill(Color.red).frame(width: 12, height: 12)
-                                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                                .padding(.top, 2).padding(.trailing, 6)
-                                .accessibilityHidden(true)
-                                .accessibilityIdentifier("trip.pill.errorDot")
-                        }
-                    }
-            }
-            .tint(GlassSurface.active ? Color.surfaceAccent : nil)
-            .disabled(isWorking)
-            .accessibilityLabel("Trip menu")
-            .accessibilityValue(bannerSlot.errorHeld ? "error waiting" : "")
         }
-        // Map.dc.html: 6 pt top and bottom, 16 pt before the dot, 4 pt after the 44 pt menu button,
+        .overlay(alignment: .topTrailing) {
+            // MapBannerSlot.dc.html frame i: an error is held behind another message.
+            if bannerSlot.errorHeld {
+                Circle().fill(Color.red).frame(width: 12, height: 12)
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                    .padding(.top, 2).padding(.trailing, 6)
+                    .accessibilityHidden(true)
+                    .accessibilityIdentifier("trip.pill.errorDot")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityValue(bannerSlot.errorHeld ? "error waiting" : "")
+        // 6 pt top and bottom, 4 pt before the 44 pt back button, normal padding after the text,
         // so the pill is 56 pt tall in every state.
-        .padding(.leading, Spacing.l)
-        .padding(.trailing, Spacing.xs)
+        .padding(.leading, Spacing.xs)
+        .padding(.trailing, Spacing.l)
         .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
         .glassSurface(.pill)
@@ -825,12 +811,6 @@ struct TripMapView: View {
                 ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
             }
         }
-        .tripExitDialogs(
-            confirmLeave: Binding(get: { confirmLeave && panelUp }, set: { confirmLeave = $0 }),
-            confirmEnd: Binding(get: { confirmEnd && panelUp }, set: { confirmEnd = $0 }),
-            leave: { run { try await session.leave(); exit(onExit) } },
-            // Ending flips session.isEnded, which opens the recap (onEnded).
-            end: { run { try await session.endTrip() } })
         .alert("Get road alerts?", isPresented: asking(.roadAlerts)) {
             Button("Turn on") { answer(.roadAlerts) { _ = await alerts.requestPermission() } }
             Button("Not now", role: .cancel) { answer(.roadAlerts) }
@@ -1032,27 +1012,6 @@ struct TripMapView: View {
         while !Task.isCancelled {
             driving.feed(speed: model.phoneSpeed(), at: Date())
             try? await Task.sleep(for: .seconds(1))
-        }
-    }
-
-    private func showStopError(_ error: Error) { showStopError(error.localizedDescription) }
-
-    private func showStopError(_ message: String) {
-        // Stays until a later action goes through or the person closes it (D34 N3).
-        glanceError.show(message, cause: .send)
-    }
-
-    // MARK: Leave and end
-
-    private var canLeave: Bool { session.isLiveMember }
-    private var canEnd: Bool { session.isOrganizer && !session.isEnded }
-
-    private func run(_ action: @escaping () async throws -> Void) {
-        guard !isWorking else { return }
-        isWorking = true
-        Task {
-            do { try await action(); glanceError.resolve(.send) } catch { showStopError(error) }
-            isWorking = false
         }
     }
 
