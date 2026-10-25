@@ -137,6 +137,7 @@
 		7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26B2BCA0CDF418B0CA82119 /* FirestorePaths.swift */; };
 		80D285211412E053AE968E46 /* CarRouteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22B87A46A5250E86D1E67E5D /* CarRouteService.swift */; };
 		843411F16EA0BC70B57A05EB /* StopAnswer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CD4811E9FF9FE7940656C0 /* StopAnswer.swift */; };
+		8736207F4C70DFC6ED87A072 /* BannerSlotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385EEAB04673E246156A8065 /* BannerSlotTests.swift */; };
 		875D0079B62FB671E73E3916 /* README-places.md in Resources */ = {isa = PBXBuildFile; fileRef = CBAB9007352FC219EF36852D /* README-places.md */; };
 		896F02208FFDCCBE93C739BF /* StopCardDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8874DCFA37C43892F53DB83 /* StopCardDemo.swift */; };
 		8AD641712731A68B8D09EEF5 /* LobbyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */; };
@@ -201,6 +202,7 @@
 		C9E76ED13687B373DD99ADF5 /* PastTripsMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A21A541DABA60F6378B1D9 /* PastTripsMapTests.swift */; };
 		C9EBB30503561CC0D3A77FD9 /* PickedTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322ED2F251FFDF594FC7D83E /* PickedTrip.swift */; };
 		CF16B7E5CA6C18AB25129F71 /* CarSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CDB4BA1EF0FC2607680E93 /* CarSelection.swift */; };
+		D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59B3CC045531B01304008A /* BannerSlot.swift */; };
 		D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D7B5FA67D691851818F691 /* ConvoyTests.swift */; };
 		D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991414E381145C07351D7F20 /* LocationDeniedView.swift */; };
 		D3FFEEEA36F0755779F7E846 /* TicketStops.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D1B602E823F847DF7D44B34 /* TicketStops.swift */; };
@@ -327,6 +329,7 @@
 		322ED2F251FFDF594FC7D83E /* PickedTrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedTrip.swift; sourceTree = "<group>"; };
 		3375CFBCC39B1C2F76B90699 /* MapDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDemo.swift; sourceTree = "<group>"; };
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
+		385EEAB04673E246156A8065 /* BannerSlotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerSlotTests.swift; sourceTree = "<group>"; };
 		39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeSizeTests.swift; sourceTree = "<group>"; };
 		3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalTests.swift; sourceTree = "<group>"; };
 		3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometryTests.swift; sourceTree = "<group>"; };
@@ -415,6 +418,7 @@
 		99320F601C724896FA7271D4 /* DemoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUITests.swift; sourceTree = "<group>"; };
 		99B57D9F42E46F04ABDC9F7C /* SuggestStopsSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestStopsSheetTests.swift; sourceTree = "<group>"; };
 		99C9353808E19095E6015DC1 /* MapPickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPickView.swift; sourceTree = "<group>"; };
+		9A59B3CC045531B01304008A /* BannerSlot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerSlot.swift; sourceTree = "<group>"; };
 		9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthEmulatorTests.swift; sourceTree = "<group>"; };
 		9B8ECEB1452E465155C7324B /* TripSessionLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSessionLogic.swift; sourceTree = "<group>"; };
 		9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestPlacesTests.swift; sourceTree = "<group>"; };
@@ -646,6 +650,7 @@
 		7F65D13C5B6E78E6C8FB91E7 /* Map */ = {
 			isa = PBXGroup;
 			children = (
+				9A59B3CC045531B01304008A /* BannerSlot.swift */,
 				A3CDB4BA1EF0FC2607680E93 /* CarSelection.swift */,
 				4310BE369727B65548BADA52 /* ConvoyPanel.swift */,
 				E715F12926E78F920D452DEC /* ConvoyRows.swift */,
@@ -855,6 +860,7 @@
 				9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */,
 				D34759F3D28A64C5908B2C7D /* AuthTests.swift */,
 				1AB0B6EE647875B8999B3F6F /* BackendTests.swift */,
+				385EEAB04673E246156A8065 /* BannerSlotTests.swift */,
 				1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */,
 				550F55A2A60E4FCB64EDE29E /* CarSelectionTests.swift */,
 				6E4D3D4F86031C4EEBEE0B86 /* ConvoyHeaderTests.swift */,
@@ -1169,6 +1175,7 @@
 				591D0BEAD1974F23903F13DC /* ApproachPill.swift in Sources */,
 				0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */,
 				B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */,
+				D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */,
 				72445B83188E679CC45FEFED /* BottomSheet.swift in Sources */,
 				C70FB1E27983828B0CCE5EF8 /* Car.swift in Sources */,
 				D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */,
@@ -1340,6 +1347,7 @@
 				5E0572F32C4E89743D919B29 /* AuthEmulatorTests.swift in Sources */,
 				BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */,
 				17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */,
+				8736207F4C70DFC6ED87A072 /* BannerSlotTests.swift in Sources */,
 				6B6E898BB79ED1F3A1C67B5B /* CarRouteTests.swift in Sources */,
 				AD4863508523A905EF73CBB2 /* CarSelectionTests.swift in Sources */,
 				060EB7C0E06EE4CDFBEFFD24 /* ConvoyHeaderTests.swift in Sources */,

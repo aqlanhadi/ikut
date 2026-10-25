@@ -101,7 +101,44 @@ extension View {
     /// Says `text` to VoiceOver when this appears, not on each redraw. It speaks again only when `id` changes,
     /// so a live distance or "N min ago" in `text` doesn't repeat it; without an `id`, the text is the identity.
     func announces(_ text: String, id: String? = nil) -> some View {
-        task(id: id ?? text) { AccessibilityNotification.Announcement(text).post() }
+        modifier(Announces(text: text, key: id ?? text))
+    }
+}
+
+/// What the banner slot has already said (D34 2b): a message that waited behind a more urgent one and comes back is
+/// not said again. The map forgets a key once its message is gone for good, so a new appearance is announced.
+@MainActor
+final class SpokenBanners {
+    private var spoken: Set<String> = []
+
+    /// True the first time a key is asked for since it was last forgotten.
+    func claim(_ key: String) -> Bool { spoken.insert(key).inserted }
+
+    /// Forgets every key not in `live`.
+    func keep(_ live: Set<String>) { spoken.formIntersection(live) }
+}
+
+private struct SpokenBannersKey: EnvironmentKey {
+    static let defaultValue: SpokenBanners? = nil
+}
+
+extension EnvironmentValues {
+    var spokenBanners: SpokenBanners? {
+        get { self[SpokenBannersKey.self] }
+        set { self[SpokenBannersKey.self] = newValue }
+    }
+}
+
+private struct Announces: ViewModifier {
+    let text: String
+    let key: String
+    @Environment(\.spokenBanners) private var spoken
+
+    func body(content: Content) -> some View {
+        content.task(id: key) { @MainActor in
+            if let spoken, !spoken.claim(key) { return }
+            AccessibilityNotification.Announcement(text).post()
+        }
     }
 }
 

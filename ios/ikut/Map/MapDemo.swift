@@ -283,6 +283,74 @@ private struct BannerGallery: View {
     }
 }
 
+/// `IKUT_SCREEN=slot-*`: one state of the banner slot each (MapBannerSlot.dc.html), on the demo map. Nothing speaks.
+/// `slot-hazard-stop-waiting` (frame a: the hazard shows, the stop approach waits), `slot-stop-approach` (b),
+/// `slot-stop-request` (b2), `slot-paused` (c), `slot-catchup` (d), `slot-route-notice` (d2), `slot-passed` (e),
+/// `slot-undo-toast` (f), `slot-error` (g), `slot-error-held` (i: the hazard shows, a red dot on the trip pill).
+@MainActor
+enum BannerSlotDemo {
+    static let names = [
+        "slot-hazard-stop-waiting", "slot-stop-approach", "slot-stop-request", "slot-paused", "slot-catchup",
+        "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-error", "slot-error-held",
+    ]
+
+    private static let errorLine = "Couldn’t reach the convoy. Try again in a moment."
+
+    static func view(_ name: String) -> AnyView? {
+        switch name {
+        case "slot-hazard-stop-waiting": return AnyView(map(approach: true, plannedStop: true))
+        case "slot-stop-approach": return AnyView(StopApproachDemo.view())
+        case "slot-stop-request": return AnyView(map(board: MapDemo.stopBoard("lead")))
+        case "slot-paused": return AnyView(map(paused: true))
+        case "slot-catchup": return AnyView(map(parked: "catchup"))
+        case "slot-route-notice": return AnyView(StopApproachDemo.routeNotice(waiting: false))
+        case "slot-passed": return AnyView(map(passed: "Passed the debris"))
+        case "slot-undo-toast":
+            let toast = ReportToastModel()
+            toast.showForDemo(.reported(label: "debris", eventId: "demo-debris"))
+            return AnyView(map(toast: toast))
+        case "slot-error": return AnyView(map(error: errorLine))
+        case "slot-error-held": return AnyView(map(approach: true, error: errorLine))
+        default: return nil
+        }
+    }
+
+    private final class Silent: AlertAnnouncing {
+        func announce(event: TripEvent, distance: Double?) async -> Bool { false }
+        func announce(alert: TripAlert) -> Bool { true }
+    }
+    private static var announcer: Silent?
+
+    private static func map(
+        approach: Bool = false, plannedStop: Bool = false, board: StopBoard = .empty, paused: Bool = false,
+        parked: String? = nil, passed: String? = nil, toast: ReportToastModel? = nil, error: String? = nil
+    ) -> some View {
+        Backend.configure()
+        let model = MapDemo.model(parked: parked)
+        if plannedStop {
+            let main = RouteLine(MapDemo.densify(MapDemo.mainWaypoints))
+            let lead = model.convoy.convoy.first?.convoyOffset ?? 0
+            let spot = main.coordinate(atOffset: lead + 1_900) ?? main.coordinates[0]
+            let silent = Silent()
+            announcer = silent
+            model.startHazardAlerts(announcer: silent, userId: "u-c1", tripId: "demo")
+            model.setStops([PlannedStop(
+                id: "demo-stop", name: "R&R Tapah",
+                coordinate: GeoPoint(latitude: spot.latitude, longitude: spot.longitude), routeOffset: lead + 1_900,
+                kind: .fuel, minutes: 20, order: 0)])
+        }
+        model.setCars(model.cars)
+        let session = TripSession(tripId: "demo", userId: "u-c1")
+        if paused { session.pauseForDemo() }
+        return NavigationStack {
+            TripMapView(
+                session: session, model: model, stopBoard: board, demoError: error,
+                demoApproach: approach ? MapDemo.debrisAlert : nil, demoPassed: passed, demoToast: toast,
+                stopService: DemoStopService())
+        }
+    }
+}
+
 #Preview("Convoy map") {
     MapDemo.view()
 }
