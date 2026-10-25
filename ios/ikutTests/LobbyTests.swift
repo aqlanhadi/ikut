@@ -134,13 +134,19 @@ struct LobbyTests {
         #expect(LobbyLogic.organizerName(trip: nil, members: [member("u1", "Aqlan")]) == nil)
     }
 
-    @Test func onTheRoadLine() {
+    @Test func sinceLine() {
         let utc = TimeZone(identifier: "UTC")!
         let at = Date(timeIntervalSince1970: 21 * 3600 + 35 * 60)
-        let line = LobbyLogic.onTheRoadLine(startedAt: at, locale: Locale(identifier: "en_US"), timeZone: utc)
-        #expect(line?.hasPrefix("On the road since 9:35") == true)
+        let line = LobbyLogic.sinceLine(startedAt: at, locale: Locale(identifier: "en_US"), timeZone: utc)
+        #expect(line?.hasPrefix("Since 9:35") == true)
         #expect(line?.hasSuffix("PM") == true)
-        #expect(LobbyLogic.onTheRoadLine(startedAt: nil) == nil)
+        #expect(LobbyLogic.sinceLine(startedAt: nil) == nil)
+    }
+
+    @Test func title() {
+        #expect(LobbyLogic.title(started: false, ended: false) == "Gathering")
+        #expect(LobbyLogic.title(started: true, ended: false) == "Trip in progress")
+        #expect(LobbyLogic.title(started: false, ended: true) == "Trip ended")
     }
 }
 

@@ -97,13 +97,19 @@ enum LobbyLogic {
     /// where the organizer is through the stops still ahead (D25 4d, #189).
     static func canChangeDestination(canEdit: Bool) -> Bool { canEdit }
 
-    /// "On the road since 9:35 PM"; nil when the start time wasn't recorded.
-    static func onTheRoadLine(startedAt: Date?, locale: Locale = .current, timeZone: TimeZone = .current) -> String? {
+    /// The lobby's header (owner, 2026-10-25): Gathering before the start, Trip in progress once it has started.
+    static func title(started: Bool, ended: Bool) -> String {
+        if ended { return "Trip ended" }
+        return started ? "Trip in progress" : "Gathering"
+    }
+
+    /// "Since 9:35 PM", the line under Trip in progress; nil when the start time wasn't recorded.
+    static func sinceLine(startedAt: Date?, locale: Locale = .current, timeZone: TimeZone = .current) -> String? {
         guard let startedAt else { return nil }
         var style = Date.FormatStyle(date: .omitted, time: .shortened)
         style.locale = locale
         style.timeZone = timeZone
-        return "On the road since \(startedAt.formatted(style))"
+        return "Since \(startedAt.formatted(style))"
     }
 }
 
