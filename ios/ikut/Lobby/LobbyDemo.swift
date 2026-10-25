@@ -226,6 +226,10 @@ enum DemoScreens {
         // tall-5 selects the fifth car, whose row is below the sheet's fold and is scrolled to.
         case "road-car-selected": return AnyView(MapDemo.view(selected: "c2"))
         case "road-car-selected-tall-5": return AnyView(MapDemo.view(expanded: true, fiveCars: true, selected: "c5"))
+        // The card sheets over the convoy sheet (D44): Pit stop, "Fuel chosen" in it, and Report.
+        case "road-card-pit-stop": return AnyView(MapDemo.view(card: "home"))
+        case "road-card-pit-stop-reason": return AnyView(MapDemo.view(card: "reason"))
+        case "road-card-report": return AnyView(MapDemo.view(report: true))
         case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true))
         // The list unfolded; the debris approach folds it 3 s in, and my car passes the debris about 9 s later (D42).
         case "road-hazard-pass": return AnyView(MapDemo.hazardPass())

@@ -155,7 +155,7 @@ enum MapDemo {
         return model
     }
 
-    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, selected: String? = nil) -> some View {
+    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, selected: String? = nil, card: String? = nil, report: Bool = false) -> some View {
         Backend.configure()
         let env = ProcessInfo.processInfo.environment
         let five = fiveCars || env["IKUT_MAP_DEMO_CARS"] == "5"
@@ -171,7 +171,7 @@ enum MapDemo {
             TripMapView(
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
-                demoCard: env["IKUT_MAP_DEMO_CARD"], demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
+                demoCard: card ?? env["IKUT_MAP_DEMO_CARD"], demoReport: report || env["IKUT_MAP_DEMO_REPORT"] != nil, demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
                 demoExpanded: expanded || env["IKUT_MAP_DEMO_EXPANDED"] != nil,
                 demoError: env["IKUT_MAP_DEMO_ERROR"] == nil ? nil : "Couldn’t reach the convoy. Try again in a moment.",
                 demoSelected: selected ?? env["IKUT_MAP_DEMO_SELECTED"],

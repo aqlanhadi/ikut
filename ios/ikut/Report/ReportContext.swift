@@ -23,6 +23,23 @@ struct ReportContext: Sendable {
     var snapshot: @MainActor @Sendable () -> ReportSnapshot?
 }
 
+extension ReportContext {
+    /// The demo trip's context: a fixed fix, and no way to reach Firestore (`DemoReportService`).
+    static var demo: ReportContext {
+        ReportContext(tripId: "demo", carId: "c1", authorId: "u-c1") {
+            ReportSnapshot(
+                coordinate: .init(latitude: 3.1, longitude: 101.6), heading: 90, route: nil,
+                previousOffset: nil, capturedAt: Date().addingTimeInterval(-6))
+        }
+    }
+}
+
+/// Sends nothing: a demo report is only shown, never written.
+struct DemoReportService: ReportService {
+    func report(_ request: ReportRequest) async throws -> String { "demo-reported" }
+    func undo(tripId: String, eventId: String) async throws {}
+}
+
 /// One report to send: who, what and where.
 struct ReportRequest: Sendable {
     var type: EventType
