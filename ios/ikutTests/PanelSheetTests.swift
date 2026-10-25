@@ -153,4 +153,82 @@ struct PanelSheetTests {
         #expect(TripSessionLogic.explainerWants(wanted: true, askShowing: false))
         #expect(!TripSessionLogic.explainerWants(wanted: false, askShowing: false))
     }
+
+    // MARK: One motion (D42)
+
+    @Test func whileTheSheetMovesThePanelHeightsHold() {
+        // A1/A2: the fold's outgoing rows made the panel measure taller mid-motion, which changed the detent under the sheet.
+        let applied = PanelSheet.Heights(short: 282, tall: 512, card: 330)
+        let measured = PanelSheet.Heights(short: 600, tall: 700, card: 330)
+        #expect(PanelSheet.settled(applied, measured: measured, moving: true, shown: .folded) == applied)
+        #expect(PanelSheet.settled(applied, measured: measured, moving: true, shown: .unfolded) == applied)
+    }
+
+    @Test func atRestANewHeightIsTakenOnlyPastOnePoint() {
+        let applied = PanelSheet.Heights(short: 282, tall: 512, card: 330)
+        let nudged = PanelSheet.Heights(short: 282.6, tall: 511.2, card: 330.9)
+        #expect(PanelSheet.settled(applied, measured: nudged, moving: false, shown: .folded) == applied)
+        let grown = PanelSheet.Heights(short: 300, tall: 560, card: 410)
+        #expect(PanelSheet.settled(applied, measured: grown, moving: false, shown: .folded) == grown)
+        // Nothing in use yet: the measured heights.
+        #expect(PanelSheet.settled(nil, measured: grown, moving: true, shown: .folded) == grown)
+    }
+
+    @Test func aCardsHeightHoldsOnlyWhileTheCardIsShownAndMoving() {
+        let applied = PanelSheet.Heights(short: 282, tall: 512, card: 330)
+        let measured = PanelSheet.Heights(short: 282, tall: 512, card: 420)
+        // A6: a card measured while the list folds still opens at its own height.
+        #expect(PanelSheet.settled(applied, measured: measured, moving: true, shown: .folded).card == 420)
+        #expect(PanelSheet.settled(applied, measured: measured, moving: true, shown: .card).card == 330)
+        #expect(PanelSheet.settled(applied, measured: measured, moving: false, shown: .card).card == 420)
+    }
+
+    @Test func aCardIsLaidOutUnseenUntilItsHeightIsKnownThenReplacesThePanel() {
+        // A6: never the panel and the card on screen together, never the card at the panel's height.
+        #expect(PanelSheet.layers(cardRequested: false, cardMeasured: false) == .init(panel: true, card: false, cardVisible: false))
+        #expect(PanelSheet.layers(cardRequested: true, cardMeasured: false) == .init(panel: true, card: true, cardVisible: false))
+        #expect(PanelSheet.layers(cardRequested: true, cardMeasured: true) == .init(panel: false, card: true, cardVisible: true))
+        // A card closed while its measured flag is still set shows the panel at once.
+        #expect(PanelSheet.layers(cardRequested: false, cardMeasured: true) == .init(panel: true, card: false, cardVisible: false))
+        for requested in [false, true] {
+            for measured in [false, true] {
+                let l = PanelSheet.layers(cardRequested: requested, cardMeasured: measured)
+                #expect(!(l.panel && l.cardVisible))
+            }
+        }
+    }
+
+    @Test func aCardSwapMovesBetweenDetentsTheSheetAlreadyHas() {
+        // A6: swapping the detent set in the same update as the selection made the sheet jump to the card's height.
+        let h = heights()
+        for shown in [PanelSheet.Shown.folded, .unfolded, .card] {
+            let bridged = PanelSheet.detents(shown, in: h, bridged: true)
+            #expect(bridged == [.height(h.short), .height(h.tall), .height(h.card)])
+            for target in [PanelSheet.Shown.folded, .unfolded, .card] {
+                #expect(bridged.contains(PanelSheet.detent(target, in: h)))
+            }
+        }
+        // At rest the card has only its own detent, so it can't be dragged to the panel's.
+        #expect(PanelSheet.detents(.card, in: h) == [.height(h.card)])
+    }
+
+    @Test func aCardAskedForWhileAnotherClosesOpensOnceTheMotionIsOver() {
+        // A card closes and another is wanted within the close's motion: it waits while the detents are bridged...
+        #expect(!PanelSheet.opensCard(wanted: true, measured: false, bridged: true))
+        // ...and opens once the motion is over (card wanted, not measured, motion over -> open).
+        #expect(PanelSheet.opensCard(wanted: true, measured: false, bridged: false))
+        // Nothing to open: not wanted, or already on the sheet.
+        #expect(!PanelSheet.opensCard(wanted: false, measured: false, bridged: false))
+        #expect(!PanelSheet.opensCard(wanted: true, measured: true, bridged: false))
+    }
+
+    @Test func aHazardApproachFoldsTheListAndPassingItLeavesItFolded() {
+        // A3 and #344: the approach folds; passing the hazard (or giving up on it) never unfolds it.
+        #expect(PanelSheet.expanded(true, after: .approaching) == false)
+        #expect(PanelSheet.expanded(false, after: .approaching) == false)
+        #expect(PanelSheet.expanded(false, after: .passed) == false)
+        #expect(PanelSheet.expanded(false, after: .gaveUp) == false)
+        // Unfolded by the driver during the approach: stays as the driver left it.
+        #expect(PanelSheet.expanded(true, after: .passed) == true)
+    }
 }

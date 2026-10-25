@@ -13,6 +13,7 @@ import SwiftUI
 struct ConvoyPanel: View {
     var model: TripMapModel
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var expanded: Bool
     /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
     var onNextStop: (String) -> Void = { _ in }
@@ -23,6 +24,10 @@ struct ConvoyPanel: View {
     /// A hidden copy that only measures the other layout, so the sheet knows both heights before it is asked to
     /// move: it does no lookups and is not on screen or in VoiceOver.
     var probe = false
+    /// The on-screen panel's header words (its place names come from lookups the probe does not make), so a probe
+    /// measures the header the driver sees; and where the on-screen panel reports them.
+    var headerWords: ConvoyHeader.Text?
+    var onHeader: (ConvoyHeader.Text) -> Void = { _ in }
 
     @State private var originName: String?
     @State private var ownStartName: String?
@@ -37,17 +42,20 @@ struct ConvoyPanel: View {
         VStack(spacing: 0) {
             header
             progress
-            // The summary and the list cross-fade, never slide; the header and the buttons stay in place.
+            // The summary and the list swap as the sheet starts to move: the outgoing one goes at once (so the short
+            // sheet never shows the list's rows, nor the tall one both), the incoming one fades in quickly. Never a
+            // slide; the header and the buttons stay in place.
             if !expanded {
-                summary.transition(.opacity)
+                summary.transition(swap)
             }
             if expanded {
-                stats.transition(.opacity)
-                list.transition(.opacity)
+                stats.transition(swap)
+                list.transition(swap)
             }
         }
         .padding(.horizontal, Spacing.l)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { onHeight($0) }
+        .onChange(of: headerText, initial: true) { _, text in if !probe { onHeader(text) } }
         .task(id: probe ? "" : originKey) {
             guard !probe, let start = model.mainRoute?.coordinates.first else { return }
             originName = await RouteBuilder.placeName(at: start)
@@ -78,6 +86,10 @@ struct ConvoyPanel: View {
     }
 
     // MARK: Derived values
+
+    private var swap: AnyTransition {
+        .asymmetric(insertion: .opacity.animation(Motion.quick(reduceMotion: reduceMotion)), removal: .identity)
+    }
 
     private var originKey: String {
         guard let c = model.mainRoute?.coordinates.first else { return "" }
@@ -129,7 +141,7 @@ struct ConvoyPanel: View {
     private var header: some View {
         let destination = convoy.destinationName ?? ""
         let arrive = frontArrival.map { ConvoyFormat.clock($0) }
-        let text = headerText
+        let text = probe ? (headerWords ?? headerText) : headerText
         return HStack(alignment: .top, spacing: Spacing.s) {
             VStack(alignment: .leading, spacing: 0) {
                 StatCaption("From")
