@@ -225,7 +225,10 @@ struct LobbyView: View {
                 midTrip: LobbyLogic.isStarted(trip: model.trip) ? { [session] in try await session.rebuilder.changeDestination(to: $0) } : nil
             ) { _ in showChangeDestination = false }
         }
-        .navigationTitle("Trip lobby")
+        .navigationTitle(LobbyLogic.title(started: isStarted, ended: session.isEnded))
+        .lobbySubtitle(
+            title: LobbyLogic.title(started: isStarted, ended: session.isEnded),
+            subtitle: isStarted ? LobbyLogic.sinceLine(startedAt: model.trip?.startedAt ?? model.trip?.createdAt) : nil)
         .onChange(of: session.isEnded, initial: true) { _, ended in
             if ended { onEnded(model.tripId) }
         }
@@ -360,18 +363,8 @@ struct LobbyView: View {
         } else if session.membershipLost && model.trip != nil {
             exitBanner("You’re no longer in this trip", systemImage: "person.fill.xmark")
         } else if isStarted {
-            VStack(spacing: Spacing.xxs) {
-                Label("Trip in progress", systemImage: "car.fill")
-                    .font(.footnote.weight(.semibold))
-                if let since = LobbyLogic.onTheRoadLine(startedAt: model.trip?.startedAt ?? model.trip?.createdAt) {
-                    Text(since).font(.caption)
-                }
-            }
-            .foregroundStyle(Color.ikutPositive)
-            .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.tight)
-            .background(Color.ikutPositive.opacity(0.15), in: RoundedRectangle(cornerRadius: Radius.control))
-            .padding(.bottom, Spacing.xs)
-            .accessibilityElement(children: .combine)
+            // Trip in progress and since when are the header now (`lobbySubtitle`).
+            EmptyView()
         } else if session.isTracking && !session.isPaused {
             Label("Sharing location", systemImage: "location.fill")
                 .font(.footnote.weight(.semibold))
@@ -750,6 +743,27 @@ struct LobbyView: View {
     .environment(LocationPermission())
 }
 #endif
+
+private extension View {
+    /// The line under the lobby's title ("Since 9:35 PM"): the navigation subtitle on iOS 26, before that a
+    /// two-line title in the bar's middle.
+    @ViewBuilder func lobbySubtitle(title: String, subtitle: String?) -> some View {
+        if #available(iOS 26, *) {
+            navigationSubtitle(subtitle ?? "")
+        } else {
+            toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 0) {
+                        Text(title).font(.headline)
+                        if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isHeader)
+                }
+            }
+        }
+    }
+}
 
 /// What the participant's own-way-in task reloads on.
 private struct OwnWayTaskKey: Equatable {
