@@ -90,7 +90,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
    from 3.0 km (A), 2.2 km (3), 1.4 km (B) and 0.6 km (4): convoy panel order 1, 3, 2, 4 on both phones and in Firestore.
 4. A reports Debris from the Report sheet; B sees the marker and gets the approach alert (the pill, the map framing B and the debris, the debris pinging). Car 3 then reports an
    accident: the marker shows on both phones, B (behind it) is alerted, A (ahead) is not.
-5. B taps Pit stop, Fuel, Add a message (the phone drives, so "Are you a passenger?" first), types "Need fuel, next R and R please" and taps Inform the convoy. A's Pit
+5. B taps Pit stop, Fuel, Add a message (the phone drives, so "Are you a passenger?" first), types "Need fuel, next R and R please" and taps Tell the convoy. A's Pit
    stop button shows the stop with a badge (the card does not open by itself) and the pill asks for an OK; A taps OK on the pill, cars 3 and 4 say OK, A opens the stop from the
    Pit stop button (four OKs, the message in full) and taps We've stopped, B's button shows 4 of 4 OK and then both buttons are Pit stop again. The script checks the event (message, no
    place, `expiresAt` 30 minutes after `createdAt`), A's vote and the close (`status closed`, `closedReason stopped`).
@@ -287,7 +287,7 @@ Timeline (T = seconds after go; the same shape in both, differences marked):
 | 0 | Aisha (phone 1) leads, Daniel and Hafiz behind; Faiz rides in her car (phone 2) | Faiz (phone 2) 800 m behind Aisha, ahead of Daniel and Hafiz |
 | 75 | Faiz (co-pilot) reports Debris from his Report sheet; the scripted cars behind log "approach alert" | Aisha reports Debris from phone 1; phone 2 behind gets the approach alert (about T+90) |
 | 150-270 | Hafiz loses signal; both phones show "Last seen" from about T+210; he comes back | same |
-| 300 | **Highlight.** Faiz (a passenger in Aisha's car) taps Pit stop > Fuel > Add a message (the passenger check first), types "Low on fuel, next R&R please" and taps Inform the convoy on phone 2; Hafiz and Daniel tap OK | same, but Faiz drives his own car |
+| 300 | **Highlight.** Faiz (a passenger in Aisha's car) taps Pit stop > Fuel > Add a message (the passenger check first), types "Low on fuel, next R&R please" and taps Tell the convoy on phone 2; Hafiz and Daniel tap OK | same, but Faiz drives his own car |
 | about 340 | Phone 1: Aisha opens the stop from the Pit stop button and watches the OKs come in (her car asked, so she has none to give) | Phone 1: the pill asks Aisha for an OK, she taps it, then the card shows the OKs |
 | about 390 | The request has been open 45 s; Aisha taps We've stopped and the button is Pit stop again on both phones | same |
 | 560 | End; the maps stay open until then | same |
