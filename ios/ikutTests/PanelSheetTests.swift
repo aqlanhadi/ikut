@@ -39,6 +39,16 @@ struct PanelSheetTests {
         #expect(PanelSheet.barLift(safeBottom: 20) <= 20 - PanelSheet.indicatorClearance)
     }
 
+    @Test func aCardsButtonsHangUntilTheGapUnderThemIsTheCardsPadding() {
+        // 34 pt safe area, 20 pt card padding: lifted 14, so 20 pt is left under the buttons.
+        #expect(PanelSheet.barLift(safeBottom: 34, gap: Spacing.block) == 14)
+        #expect(PanelSheet.barLift(safeBottom: 0, gap: Spacing.block) == 0)
+    }
+
+    @Test func theQuestionBannersCornerIsConcentricWithTheOKCapsule() {
+        #expect(StopPillView.questionRadius == 44)
+    }
+
     @Test func aLayoutNotSeenYetUsesTheEstimate() {
         let h = heights(folded: nil, unfolded: nil, bar: nil)
         #expect(h.short == PanelSheet.foldedEstimate + PanelSheet.barEstimate)

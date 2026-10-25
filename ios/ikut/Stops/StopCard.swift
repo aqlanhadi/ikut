@@ -65,6 +65,7 @@ struct StopCard: View {
 
     /// Buttons are big while the car moves, so they can be hit at a glance.
     private var big: Bool { driving }
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         screen
@@ -127,7 +128,7 @@ struct StopCard: View {
 
     /// The four reasons, laid out as in the Report sheet: a two column grid, icon and label in each tile.
     private var tilesScreen: some View {
-        StopCardFrame(title: "Ask to stop", subtitle: nil, onClose: onClose) {
+        CardSheetFrame(title: "Ask to stop", subtitle: nil, onClose: onClose) {
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap
             ) {
@@ -162,7 +163,7 @@ struct StopCard: View {
     /// same screen with a bigger button.
     private func askScreen(_ reason: StopReason) -> some View {
         let ask = model.ask
-        return StopCardFrame(title: reason.label, subtitle: "Ask the convoy to stop", onClose: onClose) {
+        return CardSheetFrame(title: reason.label, subtitle: "Ask the convoy to stop", onClose: onClose) {
             if let text = StopLogic.cleanedMessage(ask.message) { StopMessageTile(text: text) }
         } actions: {
             if case .failed(let message) = ask.sending {
@@ -183,7 +184,7 @@ struct StopCard: View {
     }
 
     private var sentScreen: some View {
-        StopCardFrame(title: "Sent to the convoy", subtitle: "Waiting for the other cars", onClose: onClose) {
+        CardSheetFrame(title: "Sent to the convoy", subtitle: "Waiting for the other cars", onClose: onClose) {
             Text("Each car taps OK when it sees your request.")
                 .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
         } actions: {}
@@ -200,7 +201,7 @@ struct StopCard: View {
 
     /// "Are you a passenger?" as a short block inside the same card: the question, and two buttons.
     private var passengerScreen: some View {
-        StopCardFrame(title: "Add a message", subtitle: nil, onClose: onClose) {
+        CardSheetFrame(title: "Add a message", subtitle: nil, onClose: onClose) {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("Are you a passenger?").font(.title3.bold())
                 Text("Only a passenger can type while the car moves.").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
@@ -223,7 +224,7 @@ struct StopCard: View {
     /// The message field: up to 280 characters, empty means no message.
     private var messageScreen: some View {
         let ask = model.ask
-        return StopCardFrame(title: "Add a message", subtitle: nil, onClose: onClose) {
+        return CardSheetFrame(title: "Add a message", subtitle: nil, onClose: onClose) {
             TextField("Say why, in a few words", text: Bindable(ask).message, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($messageFocused)
@@ -264,7 +265,7 @@ struct StopCard: View {
     /// The one screen for every role: the message in full, a row per car, and the buttons this
     /// viewer may press.
     private func requestScreen(_ state: StopRequestState) -> some View {
-        StopCardFrame(title: state.title, subtitle: subtitle(state), onClose: onClose) {
+        CardSheetFrame(title: state.title, subtitle: subtitle(state), onClose: onClose) {
             if let message = state.message { StopMessageTile(text: message) }
             ForEach(state.rows) { StopVoterRow(row: $0) }
             StopPlaceRows(places: model.places.places)
@@ -280,19 +281,27 @@ struct StopCard: View {
     ) -> some View {
         let canOK = !StopLogic.viewerIsRequester(state)
         let needsOK = StopLogic.needsAnswer(state)
-        if canOK {
-            StopActionButton(
-                title: needsOK ? "OK" : "You said OK", style: needsOK ? .primary : .positive, height: height,
-                id: "stop.ok\(suffix)"
-            ) {
-                if needsOK { actions.ok(state.eventId) }
-            }
+        let stopHeight = needsOK ? secondaryHeight : height
+        let sideBySide = canOK && state.canMarkStopped && !typeSize.isAccessibilitySize
+        let shared = max(height, stopHeight)
+        let ok = StopActionButton(
+            title: needsOK ? "OK" : "You said OK", style: needsOK ? .primary : .positive,
+            height: sideBySide ? shared : height,
+            id: "stop.ok\(suffix)"
+        ) {
+            if needsOK { actions.ok(state.eventId) }
         }
-        if state.canMarkStopped {
-            StopActionButton(
-                title: "We’ve stopped", style: needsOK ? .secondary : .primary,
-                height: needsOK ? secondaryHeight : height, id: "stop.stopped\(suffix)"
-            ) { actions.close(state.eventId, .stopped) }
+        let stopped = StopActionButton(
+            title: "We’ve stopped", style: needsOK ? .secondary : .primary,
+            height: sideBySide ? shared : stopHeight,
+            id: "stop.stopped\(suffix)"
+        ) { actions.close(state.eventId, .stopped) }
+        if sideBySide {
+            // Side by side, equal width and the taller of the two heights; stacked at accessibility text sizes.
+            HStack(spacing: Spacing.s) { ok; stopped }
+        } else {
+            if canOK { ok }
+            if state.canMarkStopped { stopped }
         }
         if state.isAuthor {
             StopActionButton(
@@ -304,7 +313,7 @@ struct StopCard: View {
     // MARK: Two or more open requests
 
     private var multiScreen: some View {
-        StopCardFrame(title: "\(board.requests.count) stops open", subtitle: nil, onClose: onClose) {
+        CardSheetFrame(title: "\(board.requests.count) stops open", subtitle: nil, onClose: onClose) {
             ForEach(Array(board.requests.enumerated()), id: \.element.eventId) { index, state in
                 miniRequest(state, suffix: ".\(index)")
             }

@@ -20,8 +20,12 @@ struct ReportSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.cozy) {
-            header
+        // The same frame as the stop cards (title, close button, 20 pt padding); the grid needs no cap, so it never
+        // scrolls inside one.
+        CardSheetFrame(
+            title: "What’s on the road?", bodyCap: .infinity, closeIdentifier: "sheet.close",
+            containerIdentifier: "report.card", onClose: { dismiss() }
+        ) {
             pinCard
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap) {
                 ForEach(ReportOption.events) { option in
@@ -35,16 +39,6 @@ struct ReportSheet: View {
                 }
             }
         }
-        .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.m)
-        .padding(.bottom, Spacing.block)
-    }
-
-    private var header: some View {
-        SheetHeader(
-            title: "What’s on the road?",
-            subtitle: "Pinned where you tapped Report, not where you send it. Cars behind you get an alert.",
-            onClose: { dismiss() })
     }
 
     private var pinCard: some View {

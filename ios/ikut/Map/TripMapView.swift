@@ -81,6 +81,8 @@ struct TripMapView: View {
     /// The heights the sheet uses (`PanelSheet.settled`); nil until the first measurement.
     @State private var appliedHeights: PanelSheet.Heights?
     @State private var sheetSafeBottom: CGFloat = 34
+    /// The card sheet's own bottom safe area, which its buttons hang into.
+    @State private var cardSafeBottom: CGFloat = 34
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
     @State private var mapWidth: CGFloat = 0
@@ -877,17 +879,24 @@ struct TripMapView: View {
     /// own), as tall as its content up to the room under the pills, with the map above it still touchable.
     private var cardSheet: some View {
         let card = cardNow ?? lastCard
-        return ScrollView {
+        let sheet = ScrollView {
             cardView(card)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
         }
         .scrollBounceBehavior(.basedOnSize)
         .environment(\.inPanelSheet, true)
+        // The gap under the buttons equals the gap beside them (the card's 20 pt), as on the convoy sheet's bar.
+        .environment(\.cardActionLift, PanelSheet.barLift(safeBottom: cardSafeBottom, gap: Spacing.block))
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { cardSafeBottom = $0 }
         .presentationDetents([.height(cardHeight)])
         .presentationDragIndicator(.hidden)
         .presentationBackgroundInteraction(.enabled)
         // The stop cards have no swipe down (#123): their body scrolls, and Close is the way out.
         .interactiveDismissDisabled(card != .report)
+        // Report sits on the same material as the stop pill's question banner; the stop cards keep the sheet's own.
+        return Group {
+            if card == .report { sheet.presentationBackground(.regularMaterial) } else { sheet }
+        }
     }
 
     @ViewBuilder private func cardView(_ card: MapCard?) -> some View {
