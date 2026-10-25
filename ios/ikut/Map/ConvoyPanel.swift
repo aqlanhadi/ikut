@@ -13,6 +13,7 @@ import SwiftUI
 struct ConvoyPanel: View {
     var model: TripMapModel
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var expanded: Bool
     /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
     var onNextStop: (String) -> Void = { _ in }
@@ -41,13 +42,15 @@ struct ConvoyPanel: View {
         VStack(spacing: 0) {
             header
             progress
-            // The summary and the list cross-fade, never slide; the header and the buttons stay in place.
+            // The summary and the list swap as the sheet starts to move: the outgoing one goes at once (so the short
+            // sheet never shows the list's rows, nor the tall one both), the incoming one fades in quickly. Never a
+            // slide; the header and the buttons stay in place.
             if !expanded {
-                summary.transition(.opacity)
+                summary.transition(swap)
             }
             if expanded {
-                stats.transition(.opacity)
-                list.transition(.opacity)
+                stats.transition(swap)
+                list.transition(swap)
             }
         }
         .padding(.horizontal, Spacing.l)
@@ -83,6 +86,10 @@ struct ConvoyPanel: View {
     }
 
     // MARK: Derived values
+
+    private var swap: AnyTransition {
+        .asymmetric(insertion: .opacity.animation(Motion.quick(reduceMotion: reduceMotion)), removal: .identity)
+    }
 
     private var originKey: String {
         guard let c = model.mainRoute?.coordinates.first else { return "" }
@@ -352,6 +359,7 @@ struct ConvoyPanel: View {
 /// sheet is the surface.
 struct ConvoyActionBar: View {
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var canReport: Bool
     var stopButton: StopLogic.ButtonContent
     var onReport: () -> Void
