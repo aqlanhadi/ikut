@@ -65,6 +65,19 @@ extension View {
     }
 }
 
+extension View {
+    /// A round button floating over the map: interactive Liquid Glass on iOS 26, else the pill's frosted
+    /// material and shadow in a circle.
+    @ViewBuilder func roundGlass() -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            background(.regularMaterial, in: Circle())
+                .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        }
+    }
+}
+
 /// Which kind of button face `surfaceButton` gives.
 enum SurfaceButtonRole {
     /// The main action: Liquid Glass tinted with the accent colour (prominent).
