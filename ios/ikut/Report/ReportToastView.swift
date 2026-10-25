@@ -5,6 +5,8 @@ struct ReportToastView: View {
     @Bindable var model: ReportToastModel
     /// Where it comes from: the top on the map, the bottom in the report sheet.
     var edge: Edge = .top
+    /// The map plays them from its banner slot instead (`reportHaptics`), since the toast is only drawn while it has the slot.
+    var haptics = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -45,9 +47,15 @@ struct ReportToastView: View {
             }
         }
         .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: model.state)
-        .sensoryFeedback(.impact(weight: .medium), trigger: model.submittedCount)
-        .sensoryFeedback(.success, trigger: model.reportedCount)
-        .sensoryFeedback(.error, trigger: model.failureCount)
+        .modifier(HapticsIf(model: model, on: haptics))
+    }
+
+    private struct HapticsIf: ViewModifier {
+        let model: ReportToastModel
+        let on: Bool
+        func body(content: Content) -> some View {
+            if on { content.reportHaptics(model) } else { content }
+        }
     }
 
     /// How each state comes and goes; the host places and pads the toast.
@@ -58,6 +66,16 @@ struct ReportToastView: View {
                 .glanceTransition(edge: edge)
                 .accessibilityElement(children: .contain)
         }
+    }
+}
+
+extension View {
+    /// The tap, success and failure haptics of a report, for a view that is always on screen while the report runs.
+    func reportHaptics(_ model: ReportToastModel) -> some View {
+        self
+            .sensoryFeedback(.impact(weight: .medium), trigger: model.submittedCount)
+            .sensoryFeedback(.success, trigger: model.reportedCount)
+            .sensoryFeedback(.error, trigger: model.failureCount)
     }
 }
 

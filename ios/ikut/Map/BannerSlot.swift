@@ -20,15 +20,17 @@ enum BannerSlot {
         /// their time run out unseen.
         case toast
         case passed
-        /// Sharing paused: stays until resumed.
+        /// An error stays until it is fixed or closed, and the driver has to see it: it goes over the standing
+        /// messages below (a failed Resume would otherwise hide behind the pause it failed to end).
+        case error
+        /// Sharing paused: stays until resumed; comes back once the error is closed.
         case paused
-        // The rest: the newest of these shows (`restOrder` breaks a tie). D38's "destination changed" joins here.
+        // The rest: the newest of these shows (`tieOrder` breaks a tie). D38's "destination changed" joins here.
         case catchUp
         case alertBanner
         case routeNotice
-        case error
 
-        /// Lower is more urgent. Everything from `catchUp` on has the same rank: those compete on arrival.
+        /// Lower is more urgent. The last three have the same rank: those compete on arrival.
         var rank: Int {
             switch self {
             case .hazardApproach: 0
@@ -36,15 +38,15 @@ enum BannerSlot {
             case .stopApproach: 2
             case .toast: 3
             case .passed: 4
-            case .paused: 5
-            case .catchUp, .alertBanner, .routeNotice, .error: 6
+            case .error: 5
+            case .paused: 6
+            case .catchUp, .alertBanner, .routeNotice: 7
             }
         }
 
-        /// Among "the rest" with the same arrival: an error first (it never times out), then the others.
+        /// Among "the rest" with the same arrival.
         fileprivate var tieOrder: Int {
             switch self {
-            case .error: 0
             case .alertBanner: 1
             case .catchUp: 2
             case .routeNotice: 3
@@ -62,17 +64,53 @@ enum BannerSlot {
 
     /// - Parameters:
     ///   - present: what is up now.
-    ///   - arrivals: since when each has been up (`Arrivals`); a missing one counts as oldest.
+    ///   - arrivals: since when each has been up (`Arrivals`); a missing one (up this very frame) counts as the newest.
     static func resolve(present: Set<Message>, arrivals: [Message: Date] = [:]) -> Result {
         let top = present.min { a, b in
             if a.rank != b.rank { return a.rank < b.rank }
-            if a.rank == 6 {
-                let da = arrivals[a] ?? .distantPast, db = arrivals[b] ?? .distantPast
+            if a.rank == 7 {
+                let da = arrivals[a] ?? .distantFuture, db = arrivals[b] ?? .distantFuture
                 if da != db { return da > db }
             }
             return a.tieOrder < b.tieOrder
         }
         return Result(shown: top, errorHeld: present.contains(.error) && top != .error)
+    }
+
+    /// What the map has in hand, as plain values: `present` turns it into the messages that want the slot, each with
+    /// an identity that changes when it is another message of the same kind (also what it announces under).
+    struct Inputs {
+        var hazardApproachId: String?
+        var stopPillId: String?
+        /// The planned-stop approach, only when its pill can be drawn (its stop is known).
+        var stopApproachId: String?
+        var toast: ReportToastModel.State = .hidden
+        var passedText: String?
+        var error: String?
+        var paused = false
+        var catchUpId: String?
+        var alertBannerId: String?
+        var routeNoticeText: String?
+    }
+
+    static func present(_ i: Inputs) -> [Message: String] {
+        var present: [Message: String] = [:]
+        if let id = i.hazardApproachId { present[.hazardApproach] = id }
+        if let id = i.stopPillId { present[.stopPill] = id }
+        if let id = i.stopApproachId { present[.stopApproach] = id }
+        switch i.toast {
+        case .hidden: break
+        case .sending(let label): present[.toast] = "Sending \(label)"
+        case .reported(let label, _): present[.toast] = "Reported \(label). You can undo it."
+        case .failed(let message): present[.toast] = message
+        }
+        if let text = i.passedText { present[.passed] = text }
+        if let message = i.error { present[.error] = message }
+        if i.paused { present[.paused] = "paused" }
+        if let id = i.catchUpId { present[.catchUp] = id }
+        if let id = i.alertBannerId { present[.alertBanner] = id }
+        if let text = i.routeNoticeText { present[.routeNotice] = text }
+        return present
     }
 
     /// Remembers since when each message has been up, so "the newest of the rest" can be told. A message with a

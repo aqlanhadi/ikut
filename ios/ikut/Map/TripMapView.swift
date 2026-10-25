@@ -365,23 +365,13 @@ struct TripMapView: View {
     /// Every message that wants the slot, with an identity that changes when it is another message of the same
     /// kind. The identity is also what the message announces under, so `SpokenBanners` keeps it while it waits.
     private var bannerPresent: [BannerSlot.Message: String] {
-        var present: [BannerSlot.Message: String] = [:]
-        if let approach { present[.hazardApproach] = approach.id }
-        if let stopPill, !stopCardOpen { present[.stopPill] = stopPill.id }
-        if let alert = model.stopApproach, stopApproachKind != nil { present[.stopApproach] = alert.id }
-        switch toast.state {
-        case .hidden: break
-        case .sending(let label): present[.toast] = "Sending \(label)"
-        case .reported(let label, _): present[.toast] = "Reported \(label). You can undo it."
-        case .failed(let message): present[.toast] = message
-        }
-        if let passedText { present[.passed] = passedText }
-        if session.isPaused { present[.paused] = "paused" }
-        if let catchUp = model.catchUp { present[.catchUp] = catchUp.id }
-        if let alert = alertBannerAlert { present[.alertBanner] = alert.id }
-        if let notice = session.rebuilder.notice { present[.routeNotice] = notice.text }
-        if let message = glanceError.message { present[.error] = message }
-        return present
+        BannerSlot.present(.init(
+            hazardApproachId: approach?.id,
+            stopPillId: stopCardOpen ? nil : stopPill?.id,
+            stopApproachId: stopApproachKind == nil ? nil : model.stopApproach?.id,
+            toast: toast.state, passedText: passedText, error: glanceError.message, paused: session.isPaused,
+            catchUpId: model.catchUp?.id, alertBannerId: alertBannerAlert?.id,
+            routeNoticeText: session.rebuilder.notice?.text))
     }
 
     private var bannerSlot: BannerSlot.Result {
@@ -481,7 +471,7 @@ struct TripMapView: View {
                     StopApproachPill(alert: stopApproach, kind: kind, model: model)
                 }
             case .toast:
-                ReportToastView(model: toast)
+                ReportToastView(model: toast, haptics: false)
             case .passed:
                 if let passed = passedText { PassedBanner(text: passed) { passedText = nil } }
             case .paused:
@@ -503,6 +493,8 @@ struct TripMapView: View {
         }
         .frame(maxWidth: .infinity)
         .environment(\.spokenBanners, spokenBanners)
+        // Always mounted, unlike the toast: a report made while another message has the slot still gives its haptics.
+        .reportHaptics(toast)
         .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: bannerSlot.shown)
         .onChange(of: bannerPresent, initial: true) { _, present in
             bannerArrivals.update(present: present, now: Date())

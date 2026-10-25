@@ -18,10 +18,10 @@ struct BannerSlotTests {
         for message in M.allCases { #expect(shown([message]) == message) }
     }
 
-    @Test func theRankingIsHazardStopStopApproachPassedPausedThenTheRest() {
-        let order: [M] = [.hazardApproach, .stopPill, .stopApproach, .toast, .passed, .paused]
+    @Test func theRankingIsHazardStopStopApproachToastPassedErrorPausedThenTheRest() {
+        let order: [M] = [.hazardApproach, .stopPill, .stopApproach, .toast, .passed, .error, .paused]
         for (i, higher) in order.enumerated() {
-            for lower in order[(i + 1)...] + [.catchUp, .alertBanner, .routeNotice, .error] {
+            for lower in order[(i + 1)...] + [.catchUp, .alertBanner, .routeNotice] {
                 #expect(shown([higher, lower]) == higher, "\(higher) over \(lower)")
                 #expect(shown([lower, higher]) == higher, "\(higher) over \(lower)")
             }
@@ -36,6 +36,7 @@ struct BannerSlotTests {
     @Test func theTimedMessagesShowOverPausedAndTheRest() {
         // Undo and Passed run on timers: a standing message must not use their time up unseen.
         #expect(shown([.toast, .paused, .error]) == .toast)
+        #expect(shown([.passed, .error]) == .passed)
         #expect(shown([.passed, .paused, .catchUp]) == .passed)
         #expect(shown([.toast, .passed]) == .toast)
     }
@@ -44,23 +45,56 @@ struct BannerSlotTests {
         let later = t0.addingTimeInterval(5)
         #expect(shown([.catchUp, .routeNotice], [.catchUp: t0, .routeNotice: later]) == .routeNotice)
         #expect(shown([.catchUp, .routeNotice], [.catchUp: later, .routeNotice: t0]) == .catchUp)
-        #expect(shown([.alertBanner, .error], [.alertBanner: later, .error: t0]) == .alertBanner)
-        #expect(shown([.alertBanner, .error], [.alertBanner: t0, .error: later]) == .error)
+        // Up this very frame, with no arrival yet: counts as the newest.
+        #expect(shown([.catchUp, .routeNotice], [.catchUp: t0]) == .routeNotice)
     }
 
-    @Test func anEqualArrivalGoesToTheErrorThenTheBannerThenTheCatchUp() {
-        #expect(shown([.catchUp, .alertBanner, .routeNotice, .error]) == .error)
+    @Test func anEqualArrivalGoesToTheBannerThenTheCatchUpThenTheNotice() {
         #expect(shown([.catchUp, .alertBanner, .routeNotice]) == .alertBanner)
         #expect(shown([.catchUp, .routeNotice]) == .catchUp)
     }
 
     @Test func anErrorHeldBehindAnotherMessageIsReportedForTheDot() {
         #expect(BannerSlot.resolve(present: [.error, .hazardApproach]).errorHeld)
-        #expect(BannerSlot.resolve(present: [.error, .paused]).errorHeld)
         #expect(!BannerSlot.resolve(present: [.error]).errorHeld)
         #expect(!BannerSlot.resolve(present: [.hazardApproach, .paused]).errorHeld)
-        // An error that is the newest of the rest has the slot itself.
-        #expect(!BannerSlot.resolve(present: [.error, .catchUp], arrivals: [.catchUp: t0, .error: t0.addingTimeInterval(1)]).errorHeld)
+    }
+
+    @Test func anErrorShowsOverPausedAndComesBackToItAfterClosing() {
+        // A failed Resume must be seen: the error has the slot, no dot, and Paused returns once it is closed.
+        #expect(BannerSlot.resolve(present: [.paused, .error]) == .init(shown: .error, errorHeld: false))
+        #expect(BannerSlot.resolve(present: [.paused]) == .init(shown: .paused, errorHeld: false))
+    }
+
+    @Test func anErrorBehindAHazardStopOrTimedMessageGetsTheDot() {
+        for top in [M.hazardApproach, .stopPill, .stopApproach, .toast, .passed] {
+            #expect(BannerSlot.resolve(present: [.paused, .error, top]) == .init(shown: top, errorHeld: true), "\(top)")
+        }
+    }
+
+    @Test func theErrorBeatsTheRestWhateverTheirArrival() {
+        let arrivals: [M: Date] = [.error: t0, .catchUp: t0.addingTimeInterval(9)]
+        #expect(BannerSlot.resolve(present: [.error, .catchUp], arrivals: arrivals) == .init(shown: .error, errorHeld: false))
+    }
+
+    @Test func thePresentSetFollowsTheInputs() {
+        var inputs = BannerSlot.Inputs()
+        #expect(BannerSlot.present(inputs).isEmpty)
+        inputs.paused = true
+        inputs.error = "Couldn’t resume. Try again in a moment."
+        // Paused with its own failed Resume: both are up, and the slot shows the error with no dot.
+        let both = BannerSlot.present(inputs)
+        #expect(both == [.paused: "paused", .error: "Couldn’t resume. Try again in a moment."])
+        #expect(BannerSlot.resolve(present: Set(both.keys)) == .init(shown: .error, errorHeld: false))
+        // A hazard comes: it takes the slot and the error waits with its dot.
+        inputs.hazardApproachId = "h@approach"
+        let held = BannerSlot.resolve(present: Set(BannerSlot.present(inputs).keys))
+        #expect(held == .init(shown: .hazardApproach, errorHeld: true))
+        // The toast's identity is what it announces under.
+        inputs = BannerSlot.Inputs(toast: .reported(label: "debris", eventId: "e"))
+        #expect(BannerSlot.present(inputs) == [.toast: "Reported debris. You can undo it."])
+        inputs = BannerSlot.Inputs(stopApproachId: "s", toast: .sending(label: "debris"), catchUpId: "c")
+        #expect(Set(BannerSlot.present(inputs).keys) == [.toast, .stopApproach, .catchUp])
     }
 
     @Test func aWaitingMessageComesBackWhenTheTopOneGoes() {
