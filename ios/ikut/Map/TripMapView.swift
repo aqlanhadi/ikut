@@ -132,15 +132,15 @@ struct TripMapView: View {
         demoScreen = demoCard
         _glanceError = State(initialValue: demoError.map { var e = GlanceError(); e.show($0, cause: .send); return e } ?? GlanceError())
         _stopCardOpen = State(initialValue: demoCard != nil && !demoReport)
-        if demoReport, let context = model.reportContext(authorId: session.userId) {
-            _reportContext = State(initialValue: context)
+        if demoReport {
+            _reportContext = State(initialValue: .demo)
             _showReport = State(initialValue: true)
         }
         _panelExpanded = State(initialValue: demoExpanded)
         _selectedCar = State(initialValue: demoSelected)
         _approach = State(initialValue: demoApproach)
         _passedText = State(initialValue: demoPassed)
-        _toast = State(initialValue: demoToast ?? ReportToastModel())
+        _toast = State(initialValue: demoToast ?? ReportToastModel(service: DemoReportService()))
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
         _stopBoard = State(initialValue: stopBoard)
         _model = State(initialValue: model)
@@ -628,18 +628,26 @@ struct TripMapView: View {
     /// its way out to be gone (`cardDismissed`), and a card changing into another (a stop closes, its arrival card
     /// follows) swaps in the sheet that is up.
     private func syncCard(_ want: MapCard?) {
-        if let want {
-            lastCard = want
-            if presentedCard == nil, !cardDismissing { presentedCard = want }
-        } else if presentedCard != nil {
-            cardDismissing = true
-            presentedCard = nil
-        }
+        if let want { lastCard = want }
+        let before = PanelSheet.CardSheet(presented: presentedCard != nil, dismissing: cardDismissing)
+        applyCard(PanelSheet.cardSync(before, wanted: want != nil), wanting: want)
     }
 
     private func cardDismissed() {
-        cardDismissing = false
-        syncCard(cardNow)
+        let before = PanelSheet.CardSheet(presented: presentedCard != nil, dismissing: cardDismissing)
+        applyCard(PanelSheet.cardDismissed(before, wanted: cardNow != nil), wanting: cardNow)
+    }
+
+    private func applyCard(_ next: PanelSheet.CardSheet, wanting want: MapCard?) {
+        let startedDismissing = next.dismissing && !cardDismissing
+        presentedCard = next.presented ? (presentedCard ?? want) : nil
+        cardDismissing = next.dismissing
+        guard startedDismissing else { return }
+        // A dismissal the sheet never reports must not hold the next card back.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(PanelSheet.cardDismissFallback))
+            if cardDismissing { cardDismissed() }
+        }
     }
 
     // MARK: The sheet
@@ -733,6 +741,9 @@ struct TripMapView: View {
     private func panelDismissed() {
         panelUp = false
         session.mapSheetUp = false
+        // The card went with the convoy sheet; it comes back with it if it is still wanted.
+        presentedCard = nil
+        cardDismissing = PanelSheet.cardsGone.dismissing
         if let action = afterPanel {
             afterPanel = nil
             action()
@@ -1020,7 +1031,7 @@ struct TripMapView: View {
     // MARK: Actions and lifecycle
 
     private func openReport() {
-        guard let context = model.reportContext(authorId: session.userId) else { return }
+        guard let context = liveServices ? model.reportContext(authorId: session.userId) : .demo else { return }
         reportContext = context
         showReport = true
     }

@@ -73,9 +73,39 @@ struct PanelSheetTests {
     @Test func detentsAreTheShortAndTallOne() {
         let h = heights()
         #expect(PanelSheet.detents(in: h) == [.height(300), .height(480)])
-        #expect(PanelSheet.detents(in: h) == [.height(300), .height(480)])
         #expect(PanelSheet.detent(.folded, in: h) == .height(300))
         #expect(PanelSheet.detent(.unfolded, in: h) == .height(480))
+    }
+
+    @Test func aCardWantedWithNothingUpOpens() {
+        #expect(PanelSheet.cardSync(.init(), wanted: true) == .init(presented: true, dismissing: false))
+    }
+
+    @Test func aCardWantedWhileAnotherIsUpSwapsInPlace() {
+        let up = PanelSheet.CardSheet(presented: true, dismissing: false)
+        #expect(PanelSheet.cardSync(up, wanted: true) == up)
+    }
+
+    @Test func aCardWantedWhileOneSlidesDownWaitsThenOpens() {
+        let closing = PanelSheet.CardSheet(presented: false, dismissing: true)
+        #expect(PanelSheet.cardSync(closing, wanted: true) == closing)
+        #expect(PanelSheet.cardDismissed(closing, wanted: true) == .init(presented: true, dismissing: false))
+        #expect(PanelSheet.cardDismissed(closing, wanted: false) == .init())
+    }
+
+    @Test func noCardWantedDismissesTheOneThatIsUp() {
+        let up = PanelSheet.CardSheet(presented: true, dismissing: false)
+        #expect(PanelSheet.cardSync(up, wanted: false) == .init(presented: false, dismissing: true))
+        #expect(PanelSheet.cardSync(.init(), wanted: false) == .init())
+    }
+
+    @Test func aDismissalThatNeverComesDoesNotHoldTheNextCardBack() {
+        // The fallback runs the same step as the sheet's own report; and the convoy sheet going away clears it.
+        let stuck = PanelSheet.CardSheet(presented: false, dismissing: true)
+        #expect(PanelSheet.cardDismissed(stuck, wanted: true).presented)
+        #expect(PanelSheet.cardsGone == .init(presented: false, dismissing: false))
+        #expect(PanelSheet.cardSync(PanelSheet.cardsGone, wanted: true).presented)
+        #expect(PanelSheet.cardDismissFallback > 0)
     }
 
     @Test func theShownStateFollowsTheFold() {
@@ -97,6 +127,7 @@ struct PanelSheetTests {
         #expect(PanelSheet.covered(shown: .folded, in: h, card: 340) == 340)
         #expect(PanelSheet.covered(shown: .unfolded, in: h, card: 340) == 480)
     }
+
     @Test func aDraggedSheetUnfoldsTheListOnlyAtTheTallDetent() {
         let h = heights()
         #expect(PanelSheet.choice(.height(480), in: h) == true)
@@ -157,7 +188,6 @@ struct PanelSheetTests {
         // A1/A2: the fold's outgoing rows made the panel measure taller mid-motion, which changed the detent under the sheet.
         let applied = PanelSheet.Heights(short: 282, tall: 512)
         let measured = PanelSheet.Heights(short: 600, tall: 700)
-        #expect(PanelSheet.settled(applied, measured: measured, moving: true) == applied)
         #expect(PanelSheet.settled(applied, measured: measured, moving: true) == applied)
     }
 

@@ -84,6 +84,39 @@ enum PanelSheet {
         }
     }
 
+    // MARK: The card sheet's open and close rule
+
+    /// Whether the card sheet is up, and whether one is on its way out (its dismissal not yet reported).
+    struct CardSheet: Equatable {
+        var presented = false
+        var dismissing = false
+    }
+
+    /// What the card sheet does when a card is `wanted` or not. One card at a time: a card asked for while another
+    /// is up swaps in the sheet that is up; one asked for while a card slides down waits for `cardDismissed`; none
+    /// wanted starts the dismissal of the one that is up.
+    static func cardSync(_ state: CardSheet, wanted: Bool) -> CardSheet {
+        var next = state
+        if wanted {
+            if !state.presented, !state.dismissing { next.presented = true }
+        } else if state.presented {
+            next = CardSheet(presented: false, dismissing: true)
+        }
+        return next
+    }
+
+    /// The sheet reported its dismissal (or the fallback `cardDismissFallback` ran): a card still wanted opens now.
+    static func cardDismissed(_ state: CardSheet, wanted: Bool) -> CardSheet {
+        cardSync(CardSheet(presented: state.presented, dismissing: false), wanted: wanted)
+    }
+
+    /// The convoy sheet under the card went away (the trip ended, the Always explainer, leaving), taking the card with it
+    /// and its dismissal report: nothing is up and nothing is on its way out; the card comes back with the convoy sheet.
+    static let cardsGone = CardSheet()
+
+    /// How long a dismissal may go unreported before the next card opens anyway.
+    static let cardDismissFallback: TimeInterval = 1
+
     /// The convoy sheet's two detents: short (folded) and tall (unfolded).
     static func detents(in heights: Heights) -> Set<PresentationDetent> { [.height(heights.short), .height(heights.tall)] }
 
