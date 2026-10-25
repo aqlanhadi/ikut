@@ -114,6 +114,11 @@ struct HomeView: View {
                                         set: { showDenied = $0 })) {
                 LocationDeniedView { location.openSettings() }
             }
+            .onChange(of: auth.state) { old, new in
+                // The server dropped this user mid-trip (AuthModel signed them out): back to Home, where the
+                // next Start or Join asks for a name again.
+                if old == .signedIn, new == .signedOut { path = [] }
+            }
             .onChange(of: pendingJoinCode, initial: true) {
                 guard let code = pendingJoinCode else { return }
                 pendingJoinCode = nil

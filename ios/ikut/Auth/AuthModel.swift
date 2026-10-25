@@ -30,24 +30,45 @@ final class AuthModel {
             Task { @MainActor in self?.apply(uid: uid, name: name) }
         }
         Task { await Self.dropMissingUser() }
+        // A write that hits its deadline may be waiting on a token the server won't give a deleted user.
+        ServerWrite.onTimeout = { await Self.dropMissingUser() }
     }
 
     /// Signs out a saved user the backend no longer has (the emulators were restarted, or the
-    /// account was deleted). Auth keeps the user in the Keychain, so the app would otherwise
-    /// look signed in while every Firestore write fails for want of a token.
-    private static func dropMissingUser() async {
-        guard let user = Auth.auth().currentUser else { return }
+    /// account was deleted). Auth keeps the user in the Keychain, and Firestore then waits on an ID
+    /// token that can never refresh, so no request leaves the phone and every write just times out.
+    /// Run at launch and when a write times out. Returns true when it signed the user out.
+    @discardableResult
+    static func dropMissingUser() async -> Bool {
+        guard let current = Auth.auth().currentUser else { return false }
+        nonisolated(unsafe) let user = current
+        return await dropIfMissing(reload: { try await user.reload() }, signOut: { try? Auth.auth().signOut() })
+    }
+
+    /// The decision on its own, so a test can feed it errors: only "user gone" errors sign out;
+    /// a network error or timeout keeps the user.
+    static func dropIfMissing(reload: () async throws -> Void, signOut: () -> Void) async -> Bool {
         do {
-            try await user.reload()
+            try await reload()
+            return false
         } catch let error as NSError where isMissingUser(error) {
-            try? Auth.auth().signOut()
+            signOut()
+            return true
         } catch {
-            // Offline or a server hiccup: keep the user.
+            return false
         }
     }
 
+    /// Server messages the SDK doesn't map to their own code: a token refresh for a deleted user
+    /// surfaces as `.internalError` carrying INVALID_REFRESH_TOKEN (what the emulator answers).
+    private nonisolated static let goneMessages = ["INVALID_REFRESH_TOKEN", "USER_NOT_FOUND", "USER_DISABLED", "TOKEN_EXPIRED"]
+
     nonisolated static func isMissingUser(_ error: NSError) -> Bool {
         guard error.domain == AuthErrorDomain, let code = AuthErrorCode(rawValue: error.code) else { return false }
+        if code == .internalError {
+            let detail = String(describing: error)
+            return goneMessages.contains { detail.contains($0) }
+        }
         return [AuthErrorCode.userNotFound, .userDisabled, .userTokenExpired, .invalidUserToken].contains(code)
     }
 

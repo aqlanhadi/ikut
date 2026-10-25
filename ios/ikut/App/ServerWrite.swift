@@ -1,3 +1,4 @@
+import FirebaseFirestore
 import Foundation
 
 /// Waits a bounded time for the server to accept a Firestore write.
@@ -9,6 +10,11 @@ import Foundation
 enum ServerWrite {
     static let defaultTimeout: Duration = .seconds(8)
 
+    /// Runs when a write hits its deadline, before the caller hears of it: AuthModel checks the user
+    /// is still known to the server (a deleted one is signed out). Bounded by `checkTimeout`.
+    nonisolated(unsafe) static var onTimeout: @Sendable () async -> Void = {}
+    static let checkTimeout: Duration = .seconds(3)
+
     /// Raised by callers that can't proceed on a queued write.
     struct Offline: LocalizedError {
         var errorDescription: String? { "Can’t reach the server. Check your signal and try again." }
@@ -19,6 +25,28 @@ enum ServerWrite {
     @discardableResult
     static func commit(
         within timeout: Duration = defaultTimeout,
+        _ write: @escaping @Sendable () async throws -> Void
+    ) async throws -> Bool {
+        let accepted: Bool
+        do {
+            accepted = try await attempt(within: timeout, write)
+        } catch {
+            // A deleted user whose token hasn't expired yet is turned away, not left hanging.
+            if isUnauthorised(error) { await checkAfterTimeout() }
+            throw error
+        }
+        if !accepted { await checkAfterTimeout() }
+        return accepted
+    }
+
+    private static func isUnauthorised(_ error: Error) -> Bool {
+        let ns = error as NSError
+        guard ns.domain == FirestoreErrorDomain, let code = FirestoreErrorCode.Code(rawValue: ns.code) else { return false }
+        return code == .permissionDenied || code == .unauthenticated
+    }
+
+    private static func attempt(
+        within timeout: Duration,
         _ write: @escaping @Sendable () async throws -> Void
     ) async throws -> Bool {
         let outcome = WriteOutcome<Bool>()
@@ -40,6 +68,16 @@ enum ServerWrite {
             }
         } onCancel: {
             outcome.finish(.failure(CancellationError()))
+        }
+    }
+
+    private static func checkAfterTimeout() async {
+        let check = onTimeout
+        let done = WriteOutcome<Bool>()
+        _ = try? await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+            done.install(continuation)
+            Task { await check(); done.finish(.success(true)) }
+            Task { try? await Task.sleep(for: checkTimeout); done.finish(.success(false)) }
         }
     }
 }

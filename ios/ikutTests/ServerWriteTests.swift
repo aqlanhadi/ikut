@@ -28,4 +28,19 @@ struct ServerWriteTests {
             try await ServerWrite.commit(within: .seconds(2)) { throw Rejected() }
         }
     }
+
+    @Test func timeoutRunsTheUserCheckButAcceptedAndRejectedDoNot() async throws {
+        nonisolated(unsafe) var checks = 0
+        let saved = ServerWrite.onTimeout
+        ServerWrite.onTimeout = { checks += 1 }
+        defer { ServerWrite.onTimeout = saved }
+
+        try await ServerWrite.commit(within: .seconds(2)) {}
+        _ = try? await ServerWrite.commit(within: .seconds(2)) { throw Rejected() }
+        #expect(checks == 0)
+
+        let accepted = try await ServerWrite.commit(within: .milliseconds(100)) { try await Self.stuckWrite() }
+        #expect(!accepted)
+        #expect(checks == 1)
+    }
 }

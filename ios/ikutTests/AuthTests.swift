@@ -1,3 +1,5 @@
+import FirebaseAuth
+import Foundation
 import Testing
 @testable import ikut
 
@@ -49,5 +51,43 @@ struct DisplayNameTests {
     @Test func errorsHaveUserFacingMessages() {
         #expect(DisplayName.ValidationError.empty.errorDescription?.isEmpty == false)
         #expect(DisplayName.ValidationError.tooLong(max: 30).errorDescription?.contains("30") == true)
+    }
+}
+
+struct MissingUserCheckTests {
+    private func run(throwing error: NSError?) async -> (dropped: Bool, signedOut: Bool) {
+        nonisolated(unsafe) var signedOut = false
+        let dropped = await AuthModel.dropIfMissing(
+            reload: { if let error { throw error } },
+            signOut: { signedOut = true })
+        return (dropped, signedOut)
+    }
+
+    @Test func aKnownUserStays() async {
+        let result = await run(throwing: nil)
+        #expect(!result.dropped && !result.signedOut)
+    }
+
+    @Test func aNetworkErrorKeepsTheUser() async {
+        let offline = NSError(domain: AuthErrorDomain, code: AuthErrorCode.networkError.rawValue)
+        let timedOut = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)
+        for error in [offline, timedOut] {
+            let result = await run(throwing: error)
+            #expect(!result.dropped && !result.signedOut)
+        }
+    }
+
+    @Test func anInternalErrorNeedsTheServersWordForUserGone() async {
+        let gone = NSError(domain: AuthErrorDomain, code: AuthErrorCode.internalError.rawValue,
+                           userInfo: [NSUnderlyingErrorKey: NSError(domain: "x", code: 1, userInfo: [NSLocalizedDescriptionKey: "INVALID_REFRESH_TOKEN"])])
+        let other = NSError(domain: AuthErrorDomain, code: AuthErrorCode.internalError.rawValue)
+        #expect(await run(throwing: gone).signedOut)
+        #expect(!(await run(throwing: other).signedOut))
+    }
+
+    @Test(arguments: [AuthErrorCode.userNotFound, .userTokenExpired, .invalidUserToken, .userDisabled])
+    func aUserTheServerLostIsSignedOut(code: AuthErrorCode) async {
+        let result = await run(throwing: NSError(domain: AuthErrorDomain, code: code.rawValue))
+        #expect(result.dropped && result.signedOut)
     }
 }
