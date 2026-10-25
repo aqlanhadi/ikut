@@ -12,16 +12,28 @@ struct RecapMapView: View {
 
     @State private var index = 0
     @State private var camera: MapCameraPosition = .automatic
+    /// The map's bottom safe area: up to the top of the stepper card, so the logo and Legal sit above it.
+    @State private var legalReach: CGFloat = 0
+    @State private var stepperTop: CGFloat = 0
+    @State private var screenHeight: CGFloat = 0
 
     private var steps: [RecapTimelineItem] { recap.timeline }
     private var current: RecapTimelineItem? { steps.indices.contains(index) ? steps[index] : nil }
 
     var body: some View {
-        RecapRouteMap(recap: recap, snapshot: snapshot, interactive: true, selectedId: current?.id, camera: $camera)
+        RecapRouteMap(recap: recap, snapshot: snapshot, interactive: true, selectedId: current?.id,
+                      legalInset: legalReach, camera: $camera)
             .ignoresSafeArea()
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom }) { screenHeight = $0 }
             .overlay(alignment: .top) { header }
             .overlay(alignment: .bottom) { stepper }
             .onChange(of: index) { _, _ in focus() }
+            // Legal follows the card's top once the card has stopped changing (it grows and shrinks with the step).
+            .task(id: stepperTop) {
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled else { return }
+                legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
+            }
     }
 
     private var header: some View {
@@ -70,6 +82,7 @@ struct RecapMapView: View {
         }
         .padding(Spacing.l)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
+        .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { stepperTop = $0 }
         .padding(.horizontal, Spacing.m)
         .padding(.bottom, Spacing.s)
     }

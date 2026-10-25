@@ -4,8 +4,8 @@ import Testing
 @testable import ikut
 
 struct DrivingGlanceTests {
-    @Test func legalInsetSitsTenPointsAboveTheFoldedSheet() {
-        #expect(DrivingGlance.legalInset(foldedSheetHeight: 180) == 190)
+    @Test func legalInsetReachesTheTopOfTheFoldedSheet() {
+        #expect(DrivingGlance.legalInset(foldedSheetHeight: 180) == 210)
         #expect(DrivingGlance.legalInset(foldedSheetHeight: 0) == 0)
     }
 

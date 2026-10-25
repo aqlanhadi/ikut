@@ -259,6 +259,13 @@ enum DemoScreens {
                         RecapView(model: RecapModel(snapshot: .demo(), originName: "Tanjung Malim"))
                     }
             })
+        // The recap's full-screen route map, with the step card over its bottom (Q15: Legal sits above the card).
+        case "recap-map":
+            let model = RecapModel(snapshot: .demo(), originName: "Tanjung Malim")
+            if let recap = model.recap, let snapshot = model.snapshot {
+                return AnyView(RecapMapView(recap: recap, snapshot: snapshot, onClose: {}))
+            }
+            return AnyView(Color.clear)
         case "add-search":
             return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
         case "add-details":

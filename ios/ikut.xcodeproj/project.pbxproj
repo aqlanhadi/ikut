@@ -129,6 +129,7 @@
 		7942FF1B470903985D10313B /* YouStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5055B23595FC815A408187BC /* YouStatus.swift */; };
 		79EE97E9F7D463AF192C5156 /* places.json in Resources */ = {isa = PBXBuildFile; fileRef = AC38E523FC312DCBB9D08A3B /* places.json */; };
 		7B2B2622524DCA230BA33FC3 /* DeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */; };
+		7B87C43B6A4F1680E6E47F60 /* MapLegal.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB13FBCD12557ADA61A0AD93 /* MapLegal.swift */; };
 		7CB4DED2FB0CD3F34170BACE /* StopAnswerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */; };
 		7CDF94F9A09AC073A5663F5C /* PlacePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1025A993964C9BD7063EFC61 /* PlacePin.swift */; };
 		7D38CD66489208EA7A56D806 /* RecapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00D2E21B9C9E2428BB8B757 /* RecapContent.swift */; };
@@ -470,6 +471,7 @@
 		D34759F3D28A64C5908B2C7D /* AuthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTests.swift; sourceTree = "<group>"; };
 		D34924ABFFA93014C880E890 /* CreateTripModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripModel.swift; sourceTree = "<group>"; };
 		D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyUITestCase.swift; sourceTree = "<group>"; };
+		DB13FBCD12557ADA61A0AD93 /* MapLegal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapLegal.swift; sourceTree = "<group>"; };
 		DBB0A694CC1459C9224678CC /* ConvoyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyModel.swift; sourceTree = "<group>"; };
 		DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardLogic.swift; sourceTree = "<group>"; };
 		DE0DD61BCABA3D8EADF2ABE6 /* PlacesAlongTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesAlongTests.swift; sourceTree = "<group>"; };
@@ -657,6 +659,7 @@
 				1361DC3293C4BFA1B3D9DA1B /* DrivingGlance.swift */,
 				7965946011270463EE3762F1 /* MapColors.swift */,
 				3375CFBCC39B1C2F76B90699 /* MapDemo.swift */,
+				DB13FBCD12557ADA61A0AD93 /* MapLegal.swift */,
 				5D2DCD6B9BBE9B44F7A7D956 /* MapLogic.swift */,
 				E32B7A73296BE953B6A5F8B1 /* MapMarkersDemo.swift */,
 				EE50F5D10052B6F1F9BB3997 /* MapMarkerView.swift */,
@@ -1227,6 +1230,7 @@
 				1D850DCEE3C7494160CDB1AD /* LocationPermission.swift in Sources */,
 				3BDC0CAEB4A0D68F7B58D638 /* MapColors.swift in Sources */,
 				4AC34867A11F17F1141F7F70 /* MapDemo.swift in Sources */,
+				7B87C43B6A4F1680E6E47F60 /* MapLegal.swift in Sources */,
 				8E5E18C2273234751092489C /* MapLogic.swift in Sources */,
 				624C36070F91D462E710D239 /* MapMarkerView.swift in Sources */,
 				965FDD2E1064F3BFA30E3A02 /* MapMarkersDemo.swift in Sources */,
