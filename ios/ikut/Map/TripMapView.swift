@@ -6,8 +6,8 @@ import SwiftUI
 /// mode controls on the right and the convoy panel (list, Joining, Report, Stop) at the bottom.
 ///
 /// Push it with the lobby's existing session (never a second one). The Stop button opens the
-/// request sheet, an open stop request shows as a card above the panel, and the pill's menu can go
-/// back to the lobby, leave or end the trip; leaving and ending call `onExit` to return to Home.
+/// request sheet, an open stop request shows as a card above the panel, and the pill's back button goes
+/// back to the lobby, where the trip is left or ended.
 struct TripMapView: View {
     let session: TripSession
     var onExit: () -> Void
@@ -51,7 +51,6 @@ struct TripMapView: View {
     @State private var pillNow = Date()
     @State private var driving = DrivingDetector()
     @State private var glanceError = GlanceError()
-    @State private var isWorking = false
     @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
     /// The banner stack's height, for `mapInsets`; the sheet's own height comes from `sheetHeights`.
@@ -168,14 +167,14 @@ struct TripMapView: View {
                     MapModeControl(mode: $model.mode)
                     ReadAloudButton(isOn: $readAloud)
                 }
-                    .padding(.top, viewButtonsTop)
-                    .padding(.trailing, Spacing.m)
-                    .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: viewButtonsTop)
-                    // The tall sheet would cut through it: fade it out, and back when the sheet folds.
-                    .opacity(DrivingGlance.modeControlOpacity(panelExpanded: panelExpanded))
-                    .allowsHitTesting(!panelExpanded)
-                    .accessibilityHidden(panelExpanded)
-                    .animation(.linear(duration: 0.2), value: panelExpanded)
+                .padding(.top, viewButtonsTop)
+                .padding(.trailing, Spacing.m)
+                .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: viewButtonsTop)
+                // The tall sheet would cut through it: fade it out, and back when the sheet folds.
+                .opacity(DrivingGlance.modeControlOpacity(panelExpanded: panelExpanded))
+                .allowsHitTesting(!panelExpanded)
+                .accessibilityHidden(panelExpanded)
+                .animation(.linear(duration: 0.2), value: panelExpanded)
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: Binding(get: { visible && !panelCovered }, set: { _ in }), onDismiss: panelDismissed) {
@@ -514,7 +513,6 @@ struct TripMapView: View {
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
             }
-            .disabled(isWorking)
             .accessibilityLabel("Back to lobby")
             Circle()
                 .fill(pillDot)
@@ -1014,25 +1012,6 @@ struct TripMapView: View {
         while !Task.isCancelled {
             driving.feed(speed: model.phoneSpeed(), at: Date())
             try? await Task.sleep(for: .seconds(1))
-        }
-    }
-
-    private func showStopError(_ error: Error) { showStopError(error.localizedDescription) }
-
-    private func showStopError(_ message: String) {
-        // Stays until a later action goes through or the person closes it (D34 N3).
-        glanceError.show(message, cause: .send)
-    }
-
-    // MARK: Leave and end
-
-
-    private func run(_ action: @escaping () async throws -> Void) {
-        guard !isWorking else { return }
-        isWorking = true
-        Task {
-            do { try await action(); glanceError.resolve(.send) } catch { showStopError(error) }
-            isWorking = false
         }
     }
 
