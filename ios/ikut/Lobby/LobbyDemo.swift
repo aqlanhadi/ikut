@@ -28,7 +28,7 @@ struct DemoRoads: LegRouting {
 @MainActor
 enum LobbyStopsDemo {
     enum Scene: String {
-        case organizer, organizerEmpty, member, meetAndFailure, turnBack, suggestAdded
+        case organizer, organizerEmpty, member, memberWaiting, meetAndFailure, turnBack, suggestAdded
     }
 
     /// KL to Ipoh, about 190 km.
@@ -68,6 +68,9 @@ enum LobbyStopsDemo {
             planner.showForDemo(items: tapah.map(StopDraft.init))
             return LobbyView(sample: model(tapah), planner: planner, organizer: true)
         case .member:
+            return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false)
+        case .memberWaiting:
+            // A participant before the organiser has started: the bottom bar is the waiting line (D39).
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false)
         case .turnBack:
             let items = stopsOnRoute.map(StopDraft.init)
@@ -205,6 +208,7 @@ enum DemoScreens {
         case "suggest-stops-short": return AnyView(SuggestStopsDemo.sheet(seconds: 50 * 60))
         case "suggest-stops-large": return AnyView(SuggestStopsDemo.sheet().dynamicTypeSize(.accessibility5))
         case "lobby-member": return nav(LobbyStopsDemo.lobby(.member))
+        case "lobby-waiting": return nav(LobbyStopsDemo.lobby(.memberWaiting))
         case "lobby-turnback": return nav(LobbyStopsDemo.lobby(.turnBack))
         case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))

@@ -85,6 +85,37 @@ struct LobbyTests {
         #expect(!LobbyLogic.isStarted(trip: trip(status: .ended, startedAt: Date())))
     }
 
+    @Test func bottomBarByRoleAndState() {
+        typealias Bar = LobbyLogic.BottomBar
+        // Before the start only the organizer has a button, and it starts the trip.
+        #expect(LobbyLogic.bottomBar(isOrganizer: true, started: false, organizerName: "Aqlan") == Bar.startTrip)
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, started: false, organizerName: "Aqlan") == Bar.waiting(organizerName: "Aqlan"))
+        // Once started, everyone gets Show map.
+        #expect(LobbyLogic.bottomBar(isOrganizer: true, started: true, organizerName: "Aqlan") == Bar.showMap)
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, started: true, organizerName: "Aqlan") == Bar.showMap)
+        // An ended trip has nobody to wait for.
+        #expect(LobbyLogic.bottomBar(isOrganizer: false, started: false, ended: true, organizerName: nil) == Bar.showMap)
+        #expect(LobbyLogic.bottomBar(isOrganizer: true, started: false, ended: true, organizerName: nil) == Bar.showMap)
+    }
+
+    @Test func bottomBarWords() {
+        #expect(LobbyLogic.BottomBar.startTrip.label == "Start trip")
+        #expect(LobbyLogic.BottomBar.showMap.label == "Show map")
+        #expect(LobbyLogic.BottomBar.waiting(organizerName: "Aqlan").label == "Waiting for Aqlan to start the trip")
+        #expect(LobbyLogic.BottomBar.waiting(organizerName: nil).label == "Waiting for the organiser to start the trip")
+    }
+
+    @Test func organizerNameComesFromTheLoadedMembers() {
+        let t = trip()
+        func member(_ id: String, _ name: String) -> Member {
+            Member(id: id, displayName: name, carId: "c1", role: .member)
+        }
+        #expect(LobbyLogic.organizerName(trip: t, members: [member("u2", "Wyna"), member("u1", "Aqlan")]) == "Aqlan")
+        #expect(LobbyLogic.organizerName(trip: t, members: [member("u2", "Wyna")]) == nil)
+        #expect(LobbyLogic.organizerName(trip: t, members: [member("u1", "  ")]) == nil)
+        #expect(LobbyLogic.organizerName(trip: nil, members: [member("u1", "Aqlan")]) == nil)
+    }
+
     @Test func onTheRoadLine() {
         let utc = TimeZone(identifier: "UTC")!
         let at = Date(timeIntervalSince1970: 21 * 3600 + 35 * 60)

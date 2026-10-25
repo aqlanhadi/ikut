@@ -50,6 +50,36 @@ enum LobbyLogic {
         return trip.startedAt != nil
     }
 
+    /// What the lobby's bottom bar offers (D39): only the organizer starts the trip; a participant waits in the
+    /// lobby, with no way to the map, until `startedAt` is set; then everyone gets Show map.
+    enum BottomBar: Equatable {
+        case startTrip
+        case showMap
+        /// A participant before the start; `organizerName` is nil while the members haven't loaded.
+        case waiting(organizerName: String?)
+
+        var label: String {
+            switch self {
+            case .startTrip: "Start trip"
+            case .showMap: "Show map"
+            case .waiting(let name): "Waiting for \(name ?? "the organiser") to start the trip"
+            }
+        }
+    }
+
+    /// A trip that has ended has nobody left to wait for: everyone gets the map button (it leads on to the recap).
+    static func bottomBar(isOrganizer: Bool, started: Bool, ended: Bool = false, organizerName: String?) -> BottomBar {
+        if started || ended { return .showMap }
+        return isOrganizer ? .startTrip : .waiting(organizerName: organizerName)
+    }
+
+    /// The organizer's display name from the loaded members (their member id is their user id); nil if not loaded or blank.
+    static func organizerName(trip: Trip?, members: [Member]) -> String? {
+        guard let trip, let name = members.first(where: { $0.id == trip.organizerId })?.displayName
+            .trimmingCharacters(in: .whitespaces), !name.isEmpty else { return nil }
+        return name
+    }
+
     /// Change destination is the organizer's until the trip ends; once it has started, the route is rebuilt from
     /// where the organizer is through the stops still ahead (D25 4d, #189).
     static func canChangeDestination(canEdit: Bool) -> Bool { canEdit }

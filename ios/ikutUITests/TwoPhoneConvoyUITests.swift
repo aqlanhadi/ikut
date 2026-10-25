@@ -109,6 +109,8 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
     }
 
     func openMap() throws {
+        // The organizer's phone taps Start trip; the other waits for it, then taps Show map.
+        XCTAssertTrue(lobbyActionButton.waitForExistence(timeout: 120), "The organizer didn't start the trip")
         lobbyActionButton.tap()
         XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 30), "Didn't reach the map")
         app.dismissMapAsks(first: 3)
@@ -152,7 +154,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             let result = button(beginningWith: "Ipoh")
             XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
             result.tap()
-            if !app.buttons["Start trip"].waitForExistence(timeout: 45) {
+            if !lobbyPresence.waitForExistence(timeout: 45) {
                 let error = labelled("identifier == %@", "createTripError")
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
                 throw WaitFailure()
