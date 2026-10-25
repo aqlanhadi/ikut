@@ -159,6 +159,40 @@ struct PanelSheetTests {
         #expect(PanelSheet.exit(sheetUp: true) == .afterDismissal)
         #expect(PanelSheet.exit(sheetUp: false) == .now)
     }
+    @Test func exitWaitRunsOnceWhenDismissalReported() {
+        var wait = PanelSheet.ExitWait()
+        wait.arm()
+        let first = wait.fire()
+        let second = wait.fire()
+        #expect(first)
+        #expect(!second)
+    }
+
+    @Test func exitWaitRunsOnFallbackWhenNeverReported() {
+        var wait = PanelSheet.ExitWait()
+        wait.arm()
+        #expect(PanelSheet.exitFallback > 0)
+        #expect(wait.waiting)
+        let fallback = wait.fire()
+        #expect(fallback)
+    }
+
+    @Test func exitWaitNotRunAgainWhenReportedAfterFallback() {
+        var wait = PanelSheet.ExitWait()
+        wait.arm()
+        let fallback = wait.fire()
+        let report = wait.fire()
+        #expect(fallback)
+        #expect(!report)
+        #expect(!wait.waiting)
+    }
+
+    @Test func exitWaitNeverArmedRunsNothing() {
+        var wait = PanelSheet.ExitWait()
+        let ran = wait.fire()
+        #expect(!ran)
+    }
+
 
     @Test func theMapInsetFollowsTheDetentOnShow() {
         let h = heights()
