@@ -24,7 +24,6 @@ import Testing
     @Test func aSelectionOpensOnlyAFoldedPanel() {
         #expect(CarSelection.opensPanel(selected: "c1", shown: .folded))
         #expect(!CarSelection.opensPanel(selected: "c1", shown: .unfolded))
-        #expect(!CarSelection.opensPanel(selected: "c1", shown: .card))
         #expect(!CarSelection.opensPanel(selected: nil, shown: .folded))
     }
 

@@ -20,28 +20,24 @@ struct ReportSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.cozy) {
-                header
-                pinCard
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap) {
-                    ForEach(ReportOption.events) { option in
-                        eventButton(option)
-                    }
-                }
-                CardHeader("About your car", inset: Spacing.xs, top: 0, bottom: 0)
-                HStack(spacing: Spacing.s) {
-                    ForEach(ReportOption.statuses) { option in
-                        statusButton(option)
-                    }
+        VStack(alignment: .leading, spacing: Spacing.cozy) {
+            header
+            pinCard
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap) {
+                ForEach(ReportOption.events) { option in
+                    eventButton(option)
                 }
             }
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.m)
-            .padding(.bottom, Spacing.block)
+            CardHeader("About your car", inset: Spacing.xs, top: 0, bottom: 0)
+            HStack(spacing: Spacing.s) {
+                ForEach(ReportOption.statuses) { option in
+                    statusButton(option)
+                }
+            }
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .padding(.horizontal, Spacing.l)
+        .padding(.top, Spacing.m)
+        .padding(.bottom, Spacing.block)
     }
 
     private var header: some View {
@@ -172,7 +168,8 @@ private struct ReportPreviewHost: View {
             .overlay(alignment: .bottom) { ReportToastView(model: toast, edge: .bottom).padding(.horizontal, Spacing.l).padding(.bottom, Spacing.xl) }
             .overlay { Button("Report") { showing = true }.buttonStyle(.borderedProminent) }
             .sheet(isPresented: $showing) {
-                ReportSheet(context: context, toast: toast) { _ in }
+                ScrollView { ReportSheet(context: context, toast: toast) { _ in } }
+                    .presentationDetents([.large])
             }
     }
 }

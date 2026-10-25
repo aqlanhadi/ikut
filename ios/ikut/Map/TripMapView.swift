@@ -66,20 +66,19 @@ struct TripMapView: View {
     @State private var cardContent: CGFloat?
     /// The pinned bar's own height and the sheet's bottom safe area (the home indicator's), measured.
     @State private var barContent: CGFloat?
-    /// When the stop card last closed, so the system's re-pick of a detent after it is not read as a fold.
-    @State private var cardClosedAt: Date?
-    /// One sheet motion at a time (D42): while a fold, a drag's release or a card swap runs, the heights hold
+    /// One sheet motion at a time (D42): while a fold or a drag's release runs, the heights hold
     /// (`PanelSheet.settled`).
     @State private var sheetMoving = false
     @State private var sheetMotion = 0
-    /// A card is opening or closing: the sheet has the panel's and the card's detents (`PanelSheet.detents`).
-    @State private var detentsBridged = false
+    /// The card sheet on screen (Report, Pit stop, who is here), and the one it last showed, so its content stays
+    /// while it slides down. `cardDismissing`: a card is on its way out, so the next waits for its dismissal.
+    @State private var presentedCard: MapCard?
+    @State private var lastCard: MapCard?
+    @State private var cardDismissing = false
     /// The on-screen panel's header words, for the probes (`ConvoyPanel.headerWords`).
     @State private var panelHeader: ConvoyHeader.Text?
     /// The heights the sheet uses (`PanelSheet.settled`); nil until the first measurement.
     @State private var appliedHeights: PanelSheet.Heights?
-    /// The requested card has been measured unseen and now holds the sheet (`PanelSheet.layers`).
-    @State private var cardMeasured = false
     @State private var sheetSafeBottom: CGFloat = 34
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
@@ -120,7 +119,7 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
-        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil, demoSelected: String? = nil,
+        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil, demoSelected: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
         stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
@@ -132,8 +131,11 @@ struct TripMapView: View {
         self.stopService = stopService
         demoScreen = demoCard
         _glanceError = State(initialValue: demoError.map { var e = GlanceError(); e.show($0, cause: .send); return e } ?? GlanceError())
-        _stopCardOpen = State(initialValue: demoCard != nil)
-        _cardMeasured = State(initialValue: demoCard != nil)
+        _stopCardOpen = State(initialValue: demoCard != nil && !demoReport)
+        if demoReport, let context = model.reportContext(authorId: session.userId) {
+            _reportContext = State(initialValue: context)
+            _showReport = State(initialValue: true)
+        }
         _panelExpanded = State(initialValue: demoExpanded)
         _selectedCar = State(initialValue: demoSelected)
         _approach = State(initialValue: demoApproach)
@@ -215,7 +217,7 @@ struct TripMapView: View {
             .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
             // The panel folding or a banner coming and going moves the visible middle; recenter on it.
             .onChange(of: mapInsets, initial: true) { _, insets in
-                if !panelExpanded, !stopCardOpen { legalInset = DrivingGlance.legalInset(foldedSheetHeight: insets.bottom) }
+                if !panelExpanded, cardNow == nil { legalInset = DrivingGlance.legalInset(foldedSheetHeight: insets.bottom) }
                 move(to: model.cameraTarget, animated: true)
             }
             .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
@@ -303,13 +305,13 @@ struct TripMapView: View {
     /// Rings a car and points the panel at its row; the camera and the follow mode stay as they are.
     private func selectCar(_ id: String?) {
         selectedCar = id
-        if CarSelection.opensPanel(selected: id, shown: shownNow) { setExpanded(true) }
+        if cardNow == nil, CarSelection.opensPanel(selected: id, shown: shownNow) { setExpanded(true) }
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
     private var mapInsets: EdgeInsets {
         let insets = MapObscuredInsets.insets(
-            mapHeight: mapHeight, top: topHeight, bottom: panelUp ? PanelSheet.height(shownNow, in: sheetHeights) : 0)
+            mapHeight: mapHeight, top: topHeight, bottom: panelUp ? PanelSheet.covered(shown: shownNow, in: sheetHeights, card: presentedCard == nil ? nil : cardHeight) : 0)
         return EdgeInsets(top: insets.top, leading: 0, bottom: insets.bottom, trailing: 0)
     }
 
@@ -602,6 +604,13 @@ struct TripMapView: View {
         model.stopContext(tripId: session.tripId, userId: session.userId, isOrganizer: session.isOrganizer)
     }
 
+    /// What the card sheet over the convoy sheet shows.
+    enum MapCard: Equatable, Identifiable {
+        case report, stopRequest, arrival(String)
+        /// One identity for all: a card changing into another swaps in the sheet that is up, never dismisses and re-presents.
+        var id: String { "card" }
+    }
+
     private struct SelectionScrollKey: Equatable { var car: String?; var expanded: Bool }
 
     private struct StopListenKey: Equatable {
@@ -609,33 +618,28 @@ struct TripMapView: View {
         var routeLength: Double?
     }
 
-    /// The card is laid out unseen first; it takes the sheet once its height is known (`openMeasuredCard`). A card
-    /// already up (the arrival card) changes in place, with the sheet's motion.
-    private func openStopCard() {
-        if cardMeasured { moveSheet(bridging: true) { stopCardOpen = true } } else { stopCardOpen = true }
-    }
+    private func openStopCard() { stopCardOpen = true }
 
-    private func closeStopCard() {
-        moveSheet(bridging: true) {
-            stopCardOpen = false
-            cardMeasured = cardMeasured && cardShowing
+    private func closeStopCard() { stopCardOpen = false }
+
+    private func closeArrivalCard() { arrivalStopId = nil }
+
+    /// The card sheet's state follows what is wanted (`cardNow`). One card at a time: a new one waits for the one on
+    /// its way out to be gone (`cardDismissed`), and a card changing into another (a stop closes, its arrival card
+    /// follows) swaps in the sheet that is up.
+    private func syncCard(_ want: MapCard?) {
+        if let want {
+            lastCard = want
+            if presentedCard == nil, !cardDismissing { presentedCard = want }
+        } else if presentedCard != nil {
+            cardDismissing = true
+            presentedCard = nil
         }
     }
 
-    private func closeArrivalCard() {
-        moveSheet(bridging: true) {
-            arrivalStopId = nil
-            cardMeasured = cardMeasured && cardShowing
-        }
-    }
-
-    /// The requested card has its height (or waited `PanelSheet.cardMeasureWait` for it): the detent moves to it, the
-    /// panel goes and the card shows, as one motion.
-    private func openMeasuredCard() {
-        guard PanelSheet.opensCard(wanted: cardShowing, measured: cardMeasured, bridged: detentsBridged) else { return }
-        resettle()
-        // Closed again before the motion starts: stays unmeasured, so the next open measures afresh.
-        moveSheet(bridging: true) { cardMeasured = cardShowing }
+    private func cardDismissed() {
+        cardDismissing = false
+        syncCard(cardNow)
     }
 
     // MARK: The sheet
@@ -645,11 +649,19 @@ struct TripMapView: View {
         arrivalStopId.map { StopArrival.target(stopId: $0, in: model.stops) != nil } ?? false
     }
 
-    /// A stop card takes the sheet's place: the Pit stop request (opened only by a tap on the button) or the
+    /// The card wanted over the convoy sheet: Report, the Pit stop request (opened only by a tap on the button) or the
     /// who-is-here card (the Next stop cell).
-    private var cardShowing: Bool { (stopCardOpen && stopContext != nil) || (arrivalOpen && !stopCardOpen) }
+    private var cardNow: MapCard? {
+        if showReport, reportContext != nil { return .report }
+        if stopCardOpen, stopContext != nil { return .stopRequest }
+        if arrivalOpen, let id = arrivalStopId { return .arrival(id) }
+        return nil
+    }
 
-    private var shownNow: PanelSheet.Shown { PanelSheet.shown(expanded: panelExpanded, cardOpen: cardShowing && cardMeasured) }
+    private var shownNow: PanelSheet.Shown { PanelSheet.shown(expanded: panelExpanded) }
+
+    /// The card sheet's detent: its content's height, up to the room under the pills.
+    private var cardHeight: CGFloat { PanelSheet.cardHeight(content: cardContent, room: sheetRoom) }
 
     /// The map's height under the pills and banners, where the sheet may reach to at most (the stop pill, a
     /// banner and the trip pill always stay visible above it, at any text size).
@@ -660,7 +672,7 @@ struct TripMapView: View {
 
     /// What the layouts measure now.
     private var measuredHeights: PanelSheet.Heights {
-        PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, card: cardContent, bar: barContent,
+        PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, bar: barContent,
                            room: sheetRoom)
     }
 
@@ -670,7 +682,7 @@ struct TripMapView: View {
     /// Takes the measured heights the sheet may use now; a change at rest (a car joins, the text grows) moves the
     /// sheet with its usual motion.
     private func resettle() {
-        let next = PanelSheet.settled(appliedHeights, measured: measuredHeights, moving: sheetMoving, shown: shownNow)
+        let next = PanelSheet.settled(appliedHeights, measured: measuredHeights, moving: sheetMoving)
         guard next != appliedHeights else { return }
         if appliedHeights == nil {
             appliedHeights = next
@@ -680,19 +692,12 @@ struct TripMapView: View {
     }
 
     /// Runs `change` as one sheet motion (`Motion.sheet`, a fade with Reduce Motion): the detent, the content swap and
-    /// the camera's re-centre in one transaction, with the heights held until it is over. A card swap (`bridging`)
-    /// first gives the sheet both detent sets and moves a moment later (`PanelSheet.bridgeDelay`); a fold or a drag
-    /// moves at once, since the driver's finger has just put the sheet there.
-    private func moveSheet(bridging: Bool = false, _ change: @escaping () -> Void) {
+    /// the camera's re-centre in one transaction, with the heights held until it is over.
+    private func moveSheet(_ change: @escaping () -> Void) {
         sheetMotion &+= 1
         let motion = sheetMotion
         sheetMoving = true
-        guard bridging else { return animateSheet(motion, change) }
-        detentsBridged = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(PanelSheet.bridgeDelay))
-            animateSheet(motion, change)
-        }
+        animateSheet(motion, change)
     }
 
     private func animateSheet(_ motion: Int, _ change: () -> Void) {
@@ -713,10 +718,7 @@ struct TripMapView: View {
     private func endSheetMotion(_ motion: Int) {
         guard motion == sheetMotion, sheetMoving else { return }
         sheetMoving = false
-        detentsBridged = false
         resettle()
-        // A card asked for while this motion held the bridged detents opens now (`PanelSheet.opensCard`).
-        openMeasuredCard()
     }
 
     /// Steps aside for the trip ending (the recap), an exit in progress and the lobby's Always sheet.
@@ -755,69 +757,38 @@ struct TripMapView: View {
     private var panelSheet: some View {
         let shown = shownNow
         let heights = sheetHeights
-        let layers = PanelSheet.layers(cardRequested: cardShowing, cardMeasured: cardMeasured)
-        // The panel and the card swap at once, as the sheet starts to move (never both on screen); with Reduce
-        // Motion the incoming one fades in instead.
-        let swapFade: Animation? = reduceMotion ? Motion.reduced : nil
-        return ZStack(alignment: .top) {
-            if layers.panel {
-                ScrollViewReader { proxy in
-                    ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
-                        .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
-                        // The list is laid out after the sheet has grown, so wait for it before scrolling to the row.
-                        .task(id: SelectionScrollKey(car: selectedCar, expanded: panelExpanded)) {
-                            guard panelExpanded, let car = selectedCar else { return }
-                            try? await Task.sleep(for: .milliseconds(350))
-                            guard !Task.isCancelled else { return }
-                            withAnimation(.smooth) { proxy.scrollTo(CarSelection.rowId(car), anchor: .center) }
-                        }
+        return ScrollViewReader { proxy in
+            ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+                .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
+                // The list is laid out after the sheet has grown, so wait for it before scrolling to the row.
+                .task(id: SelectionScrollKey(car: selectedCar, expanded: panelExpanded)) {
+                    guard panelExpanded, let car = selectedCar else { return }
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.smooth) { proxy.scrollTo(CarSelection.rowId(car), anchor: .center) }
                 }
-                .transition(.asymmetric(insertion: reduceMotion ? .opacity.animation(swapFade) : .identity, removal: .identity))
-            }
-            if layers.card {
-                ScrollView { cardView }.scrollBounceBehavior(.basedOnSize)
-                    .opacity(layers.cardVisible ? 1 : 0)
-                    .animation(swapFade, value: layers.cardVisible)
-                    .allowsHitTesting(layers.cardVisible)
-                    .accessibilityHidden(!layers.cardVisible)
-                    .transition(.identity)
-            }
         }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
-        .background(alignment: .top) { if shown != .card { probes } }
+        .background(alignment: .top) { probes }
         .onAppear {
             panelUp = true
             session.mapSheetUp = true
         }
-        .presentationDetents(PanelSheet.detents(shown, in: heights, bridged: detentsBridged), selection: Binding(
+        .presentationDetents(PanelSheet.detents(in: heights), selection: Binding(
             get: { PanelSheet.detent(shown, in: heights) },
             set: {
-                guard PanelSheet.acceptsDetentReport(shown: shown, sinceCardClosed: cardClosedAt.map { -$0.timeIntervalSinceNow }),
-                      let tall = PanelSheet.choice($0, in: heights) else { return }
+                guard let tall = PanelSheet.choice($0, in: heights) else { return }
                 setExpanded(tall)
             }))
-        .onChange(of: cardShowing) { _, showing in
-            guard !showing else { return }
-            cardClosedAt = Date()
-            // Closed some other way (the stop was skipped): the panel takes the sheet back with the same motion.
-            if cardMeasured { moveSheet(bridging: true) { cardMeasured = false } }
-        }
-        .task(id: cardShowing) {
-            guard cardShowing, !cardMeasured else { return }
-            try? await Task.sleep(for: .seconds(PanelSheet.cardMeasureWait))
-            guard !Task.isCancelled else { return }
-            openMeasuredCard()
-        }
         .onChange(of: measuredHeights, initial: true) { resettle() }
-        .presentationDragIndicator(shown == .card ? .hidden : .visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(shown == .card ? heights.card : heights.tall)))
+        .onChange(of: cardNow, initial: true) { _, want in syncCard(want) }
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: .height(heights.tall)))
         .interactiveDismissDisabled()
-        .sheet(isPresented: $showReport) {
-            if let reportContext {
-                ReportSheet(context: reportContext, toast: toast, onReported: { _ in })
-            }
+        .sheet(item: Binding(get: { presentedCard }, set: cardSetByTheSystem), onDismiss: cardDismissed) { _ in
+            cardSheet
         }
         .alert("Get road alerts?", isPresented: asking(.roadAlerts)) {
             Button("Turn on") { answer(.roadAlerts) { _ = await alerts.requestPermission() } }
@@ -866,35 +837,58 @@ struct TripMapView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    @ViewBuilder private var cardView: some View {
-        Group {
-            if stopCardOpen, let context = stopContext {
-                stopCard(context)
-                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardMeasuredHeight($0) }
-            } else if let id = arrivalStopId {
-                StopArrivalCard(
-                    model: model, stopId: id, tripId: session.tripId, frozenNow: nil, isOrganizer: session.isOrganizer,
-                    leave: leaveHandler,
-                    skip: skipHandler,
-                    skipAll: skipAllHandler,
-                    listensToAnswers: liveServices
-                ) {
-                    closeArrivalCard()
-                }
-                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardMeasuredHeight($0) }
-            }
-        }
+    /// A swipe down on a card (Report allows one) closes what it showed; the sheet going away because we changed
+    /// `presentedCard` ourselves has nothing left to clear.
+    private func cardSetByTheSystem(_ card: MapCard?) {
+        guard card == nil, presentedCard != nil else { return }
+        presentedCard = nil
+        cardDismissing = true
+        showReport = false
+        stopCardOpen = false
+        arrivalStopId = nil
     }
 
-    private func cardMeasuredHeight(_ height: CGFloat) {
-        cardContent = height
-        openMeasuredCard()
+    /// The card sheet: slides up from the bottom over the convoy sheet (the system's own, no glass or material of its
+    /// own), as tall as its content up to the room under the pills, with the map above it still touchable.
+    private var cardSheet: some View {
+        let card = cardNow ?? lastCard
+        return ScrollView {
+            cardView(card)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .environment(\.inPanelSheet, true)
+        .presentationDetents([.height(cardHeight)])
+        .presentationDragIndicator(.hidden)
+        .presentationBackgroundInteraction(.enabled)
+        // The stop cards have no swipe down (#123): their body scrolls, and Close is the way out.
+        .interactiveDismissDisabled(card != .report)
+    }
+
+    @ViewBuilder private func cardView(_ card: MapCard?) -> some View {
+        switch card {
+        case .report:
+            if let reportContext { ReportSheet(context: reportContext, toast: toast, onReported: { _ in }) }
+        case .stopRequest:
+            if let context = stopContext { stopCard(context) }
+        case .arrival(let id):
+            StopArrivalCard(
+                model: model, stopId: id, tripId: session.tripId, frozenNow: nil, isOrganizer: session.isOrganizer,
+                leave: leaveHandler,
+                skip: skipHandler,
+                skipAll: skipAllHandler,
+                listensToAnswers: liveServices
+            ) {
+                closeArrivalCard()
+            }
+        case nil:
+            EmptyView()
+        }
     }
 
     private var panel: some View {
         ConvoyPanel(
             model: model, expanded: Binding(get: { panelExpanded }, set: { setExpanded($0) }),
-            // The arrival card is laid out unseen, then takes the sheet once measured (`openMeasuredCard`).
             onNextStop: { id in arrivalStopId = id },
             selectedCar: selectedCar,
             onHeader: { panelHeader = $0 })
