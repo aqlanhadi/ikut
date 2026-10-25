@@ -409,9 +409,9 @@ struct ConvoyActionBar: View {
 
 private extension View {
     /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): Report prominent and tinted
-    /// with the accent, Pit stop clear. Before iOS 26, the tinted and bordered capsules as before.
+    /// with the accent, Pit stop clear (`GlassSurface.useGlass` is the switch). Before iOS 26, the tinted and bordered capsules as before.
     @ViewBuilder func actionBarStyle(prominent: Bool) -> some View {
-        if #available(iOS 26, *) {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
             if prominent {
                 buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
             } else {
