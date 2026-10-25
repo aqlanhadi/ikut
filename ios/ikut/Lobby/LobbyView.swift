@@ -17,6 +17,7 @@ struct LobbyView: View {
     /// A participant's own trip: their start, where they join, their distance and drive time (D26).
     @State private var ownWay = OwnWayInfo()
     @State private var planner: StopPlanner
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showAddStop = false
     @State private var showSuggestStops = false
     @State private var renaming = false
@@ -82,6 +83,11 @@ struct LobbyView: View {
             isOrganizer: isOrganizer, tripLoaded: model.trip != nil, isMember: !session.membershipLost,
             started: isStarted, ended: session.isEnded || model.trip?.status == .ended,
             organizerName: LobbyLogic.organizerName(trip: model.trip, members: model.members))
+        ZStack { barContent(bar) }
+            .animation(Motion.quick(reduceMotion: reduceMotion), value: bar)
+    }
+
+    @ViewBuilder private func barContent(_ bar: LobbyLogic.BottomBar) -> some View {
         switch bar {
         case .none:
             EmptyView()
@@ -91,8 +97,10 @@ struct LobbyView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .frame(minHeight: 50)
                 .accessibilityIdentifier("lobbyWaiting")
                 .ikutBottomBar()
+                .transition(.opacity)
         case .startTrip, .showMap:
             Button {
                 if bar == .startTrip {
@@ -105,6 +113,21 @@ struct LobbyView: View {
             }
             .actionButton(.primary)
             .ikutBottomBar()
+            .transition(.opacity)
+        }
+    }
+
+    /// Stop edits run in the banner motion, so the List slides the rows around an inserted, removed or moved one.
+    /// (A drag to reorder is animated by the List itself.)
+    private func addStop(_ place: StopDraft) {
+        withAnimation(Motion.banner(reduceMotion: reduceMotion)) { planner.add(place) }
+    }
+    private func removeStop(_ id: String) {
+        withAnimation(Motion.banner(reduceMotion: reduceMotion)) { planner.remove(id: id) }
+    }
+    private func moveStop(from index: Int, to destination: Int) {
+        withAnimation(Motion.banner(reduceMotion: reduceMotion)) {
+            planner.move(from: IndexSet(integer: index), to: destination)
         }
     }
 
@@ -216,7 +239,7 @@ struct LobbyView: View {
                 along: routeInfo.coordinates.count > 1
                     ? AlongRoute(coordinates: routeInfo.coordinates, seconds: routeInfo.travelTime) : nil,
                 canMeet: StopListLogic.canMeet(among: planner.items),
-                onAdd: { planner.add($0) })
+                onAdd: { addStop($0) })
         }
         .sheet(isPresented: $showSuggestStops) {
             SuggestStopsSheet(
@@ -226,7 +249,7 @@ struct LobbyView: View {
                     existing: SuggestStopsModel.existingOffsets(planner.items)),
                 summary: suggestSummary,
                 canAdd: { StopListLogic.canAdd(among: planner.items) },
-                onAdd: { planner.add($0) })
+                onAdd: { addStop($0) })
         }
         .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
         .navigationBarTitleDisplayMode(.inline)
@@ -458,10 +481,14 @@ struct LobbyView: View {
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
                 if planner.isBuilding && canEditStops {
                     ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
+                        .transition(.opacity)
                 } else if canEditStops, stops.count > 1 {
                     Text("Hold and drag to reorder").font(.footnote)
+                        .transition(.opacity)
                 }
             }
+            .animation(Motion.quick(reduceMotion: reduceMotion), value: planner.isBuilding)
+            .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
             .foregroundStyle(.secondary)
             .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.m).padding(.bottom, Spacing.tight)
@@ -527,7 +554,7 @@ struct LobbyView: View {
             .lobbyRow()
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if canEditStops {
-                    Button(role: .destructive) { planner.remove(id: stop.id) } label: {
+                    Button(role: .destructive) { removeStop(stop.id) } label: {
                         Label("Remove", systemImage: "trash")
                     }
                 }
@@ -535,12 +562,12 @@ struct LobbyView: View {
             .accessibilityActions {
                 if canEditStops {
                     if index > 0 {
-                        Button("Move up") { planner.move(from: IndexSet(integer: index), to: index - 1) }
+                        Button("Move up") { moveStop(from: index, to: index - 1) }
                     }
                     if index < stops.count - 1 {
-                        Button("Move down") { planner.move(from: IndexSet(integer: index), to: index + 2) }
+                        Button("Move down") { moveStop(from: index, to: index + 2) }
                     }
-                    Button("Remove") { planner.remove(id: stop.id) }
+                    Button("Remove") { removeStop(stop.id) }
                 }
             }
     }
