@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 /// The sizes and detents of Home's sheet, pure so they can be tested. The sheet is Apple's own
@@ -18,12 +19,14 @@ enum HomeSheet {
         return max(pickedCompactMinimum, pinnedHeight + indicatorRoom + bottomInset + margin)
     }
 
-    /// The Apple logo and Legal sit this far above the short sheet, as on the driving map.
-    static let legalMargin: CGFloat = 10
+    static let detentExtra = BottomSheet.detentExtra
+    /// From the screen's bottom edge to the top of the list's short sheet.
+    static let defaultReach: CGFloat = compactHeight + detentExtra
 
-    /// The map's bottom safe-area padding: from the screen's bottom edge to just above the short sheet.
-    /// MapKit fits regions inside it, so the camera keeps no bottom room of its own (`TripsHomeView.obscured`).
-    static func legalInset(compact: CGFloat) -> CGFloat { compact + legalMargin }
+    /// The map's bottom safe area: from the screen's bottom edge up to the top of the sheet where it rests. MapKit
+    /// keeps its own 10 pt between the logo and Legal and the edge of that area, which is Apple's 10 pt above
+    /// the sheet (owner, 2026-10-25: on every map, at every height the sheet rests at, the tall one too).
+    static func legalInset(reach: CGFloat) -> CGFloat { max(0, reach) }
 
     static func short(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
     static let tall = PresentationDetent.large
