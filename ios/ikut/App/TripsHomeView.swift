@@ -48,7 +48,7 @@ struct TripsHomeView: View {
     @State private var isDemo = false
     #if DEBUG
     /// Demo that can be tapped through: picking a trip gives it this recap (no server). `tour` also picks the
-    /// first trip and closes it again by itself, twice, so a screen recording needs no taps.
+    /// first trip and closes it again by itself (the second time pulling it up and down first), so a recording needs no taps.
     @State private var demoModel: RecapModel?
     @State private var tour = false
     #endif
@@ -125,10 +125,8 @@ struct TripsHomeView: View {
                 try? await Task.sleep(for: .seconds(3.5))
                 if cycle == 1 {
                     // Pulled up and back down, to see Legal follow the sheet.
-                    D41Trace.log("EVENT expand")
                     expanded = true
                     try? await Task.sleep(for: .seconds(3))
-                    D41Trace.log("EVENT collapse")
                     expanded = false
                     try? await Task.sleep(for: .seconds(2.5))
                 }
@@ -181,7 +179,7 @@ struct TripsHomeView: View {
         .onTapGesture { if picked != nil { closePicked() } }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
-        .onMapCameraChange(frequency: .continuous) { D41Trace.log("camera lat=\($0.camera.centerCoordinate.latitude) dist=\($0.camera.distance)"); cameraBox.record($0.camera, latitudeDelta: $0.region.span.latitudeDelta) }
+        .onMapCameraChange(frequency: .continuous) { cameraBox.record($0.camera, latitudeDelta: $0.region.span.latitudeDelta) }
         // The logo and Legal ride 10 pt above the sheet instead of under it, at each height it rests at. The
         // padding goes on the Map itself, before it ignores the safe area, as on the driving map.
         .safeAreaPadding(.bottom, HomeSheet.legalInset(reach: legalReach))
@@ -204,7 +202,6 @@ struct TripsHomeView: View {
                                              oldReach: legalReach, newReach: reach)
             camera = .camera(MapCamera(centerCoordinate: center, distance: seen.camera.distance, heading: 0, pitch: 0))
         }
-        D41Trace.log("legalReach \(legalReach) -> \(reach)")
         legalReach = reach
     }
 
@@ -317,7 +314,6 @@ struct TripsHomeView: View {
     }
 
     private func pick(_ entry: PastTrips.Entry) {
-        D41Trace.log("EVENT pick")
         cameraBeforePick = camera
         fetchedRoute = nil
         withAnimation(sheetMotion) {
@@ -338,7 +334,6 @@ struct TripsHomeView: View {
     /// Back to the list, with the camera where it was.
     private func closePicked() {
         guard picked != nil else { return }
-        D41Trace.log("EVENT close")
         withAnimation(sheetMotion) {
             picked = nil
             expanded = false
@@ -485,7 +480,7 @@ struct TripsHomeView: View {
         .padding(.horizontal, Spacing.l)
         .padding(.top, HomeSheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background { Color.clear.ignoresSafeArea().onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { D41Trace.log("sheetTop=\($0.minY) h=\($0.height)"); sheetFrame = $0 } }
+        .background { Color.clear.ignoresSafeArea().onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { sheetFrame = $0 } }
         .presentationDetents(HomeSheet.detents(compact: compact), selection: Binding(
             get: { HomeSheet.detent(expanded: expanded, compact: compact) },
             set: { expanded = HomeSheet.isExpanded($0) }))
@@ -661,14 +656,3 @@ final class CameraBox {
     /// The camera changed a moment ago: a glide is on, or the user is dragging.
     var isMoving: Bool { Date().timeIntervalSince(at) < 0.25 }
 }
-
-#if DEBUG
-enum D41Trace {
-    static let on = ProcessInfo.processInfo.environment["IKUT_TRACE"] != nil
-    static func log(_ text: @autoclosure () -> String) {
-        guard on else { return }
-        print(String(format: "TRACE %.3f ", Date().timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10_000)) + text())
-        fflush(stdout)
-    }
-}
-#endif
