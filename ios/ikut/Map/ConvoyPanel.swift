@@ -359,7 +359,6 @@ struct ConvoyPanel: View {
 /// sheet is the surface.
 struct ConvoyActionBar: View {
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var canReport: Bool
     var stopButton: StopLogic.ButtonContent
     var onReport: () -> Void

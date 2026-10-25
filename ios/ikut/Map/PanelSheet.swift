@@ -140,6 +140,13 @@ enum PanelSheet {
             : Layers(panel: true, card: true, cardVisible: false)
     }
 
+    /// Whether a wanted card opens now: it is not yet on the sheet, and no card swap still holds the bridged detent set.
+    /// While one does, its end (`TripMapView.endSheetMotion`) asks again, so a card asked for while another closes
+    /// (a stop closes and its arrival card follows) still opens.
+    static func opensCard(wanted: Bool, measured: Bool, bridged: Bool) -> Bool {
+        wanted && !measured && !bridged
+    }
+
     /// How long a requested card waits for its height before it opens at what is known.
     static let cardMeasureWait: TimeInterval = 0.3
 

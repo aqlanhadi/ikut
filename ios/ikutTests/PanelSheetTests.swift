@@ -212,6 +212,16 @@ struct PanelSheetTests {
         #expect(PanelSheet.detents(.card, in: h) == [.height(h.card)])
     }
 
+    @Test func aCardAskedForWhileAnotherClosesOpensOnceTheMotionIsOver() {
+        // A card closes and another is wanted within the close's motion: it waits while the detents are bridged...
+        #expect(!PanelSheet.opensCard(wanted: true, measured: false, bridged: true))
+        // ...and opens once the motion is over (card wanted, not measured, motion over -> open).
+        #expect(PanelSheet.opensCard(wanted: true, measured: false, bridged: false))
+        // Nothing to open: not wanted, or already on the sheet.
+        #expect(!PanelSheet.opensCard(wanted: false, measured: false, bridged: false))
+        #expect(!PanelSheet.opensCard(wanted: true, measured: true, bridged: false))
+    }
+
     @Test func aHazardApproachFoldsTheListAndPassingItLeavesItFolded() {
         // A3 and #344: the approach folds; passing the hazard (or giving up on it) never unfolds it.
         #expect(PanelSheet.expanded(true, after: .approaching) == false)

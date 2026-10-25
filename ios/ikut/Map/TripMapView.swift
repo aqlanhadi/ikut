@@ -638,7 +638,7 @@ struct TripMapView: View {
     /// The requested card has its height (or waited `PanelSheet.cardMeasureWait` for it): the detent moves to it, the
     /// panel goes and the card shows, as one motion.
     private func openMeasuredCard() {
-        guard cardShowing, !cardMeasured, !detentsBridged else { return }
+        guard PanelSheet.opensCard(wanted: cardShowing, measured: cardMeasured, bridged: detentsBridged) else { return }
         resettle()
         // Closed again before the motion starts: stays unmeasured, so the next open measures afresh.
         moveSheet(bridging: true) { cardMeasured = cardShowing }
@@ -721,6 +721,8 @@ struct TripMapView: View {
         sheetMoving = false
         detentsBridged = false
         resettle()
+        // A card asked for while this motion held the bridged detents opens now (`PanelSheet.opensCard`).
+        openMeasuredCard()
     }
 
     /// Steps aside for the trip ending (the recap), an exit in progress and the lobby's Always sheet.
