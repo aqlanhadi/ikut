@@ -36,6 +36,7 @@ struct RecapContent: View {
     var onSelect: ((RecapTimelineItem) -> Void)?
     var onDone: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .title) private var statValueSize: CGFloat = 28
     @ScaledMetric(relativeTo: .headline) private var statUnitSize: CGFloat = 17
 
@@ -182,6 +183,7 @@ struct RecapContent: View {
         }
         .padding(.horizontal, Spacing.l).padding(.top, Spacing.l).padding(.bottom, Spacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(Motion.quick(reduceMotion: reduceMotion), value: filter)
         .ikutCard()
     }
 

@@ -16,6 +16,7 @@ struct RecapMapView: View {
     @State private var legalReach: CGFloat = 0
     @State private var stepperTop: CGFloat = 0
     @State private var screenHeight: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var steps: [RecapTimelineItem] { recap.timeline }
     private var current: RecapTimelineItem? { steps.indices.contains(index) ? steps[index] : nil }
@@ -27,11 +28,12 @@ struct RecapMapView: View {
             .onGeometryChange(for: CGFloat.self, of: { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom }) { screenHeight = $0 }
             .overlay(alignment: .top) { header }
             .overlay(alignment: .bottom) { stepper }
-            .onChange(of: index) { _, _ in focus() }
-            // Legal follows the card's top once the card has stopped changing (it grows and shrinks with the step).
-            .task(id: stepperTop) {
-                try? await Task.sleep(for: .milliseconds(300))
-                guard !Task.isCancelled else { return }
+            // Legal follows the card's top in the same transaction as the step (the card's new height is known
+            // at once), so it moves with the card and nothing jumps afterwards.
+            .onChange(of: stepperTop) { _, _ in
+                legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
+            }
+            .onChange(of: screenHeight) { _, _ in
                 legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
             }
     }
@@ -63,16 +65,18 @@ struct RecapMapView: View {
                     Spacer(minLength: 0)
                 }
                 .accessibilityElement(children: .combine)
+                .id(item.id)
+                .transition(.opacity)
             }
             HStack(spacing: Spacing.gap) {
-                Button { index = max(0, index - 1) } label: { Image(systemName: "chevron.left").frame(width: 50, height: 44) }
+                Button { step(to: max(0, index - 1)) } label: { Image(systemName: "chevron.left").frame(width: 50, height: 44) }
                     .buttonStyle(.bordered).buttonBorderShape(.capsule)
                     .disabled(index == 0)
                     .accessibilityLabel("Previous")
                 Text(steps.isEmpty ? "No events" : "\(index + 1) of \(steps.count)")
                     .font(.subheadline.weight(.semibold)).monospacedDigit()
                     .frame(maxWidth: .infinity)
-                Button { index = min(steps.count - 1, index + 1) } label: { Image(systemName: "chevron.right").frame(width: 50, height: 44) }
+                Button { step(to: min(steps.count - 1, index + 1)) } label: { Image(systemName: "chevron.right").frame(width: 50, height: 44) }
                     .buttonStyle(.bordered).buttonBorderShape(.capsule)
                     .disabled(index >= steps.count - 1)
                     .accessibilityLabel("Next")
@@ -87,15 +91,25 @@ struct RecapMapView: View {
         .padding(.bottom, Spacing.s)
     }
 
-    private func focus() {
-        guard let c = current?.coordinate else {
-            withAnimation { camera = .automatic }
-            return
-        }
-        withAnimation {
-            camera = .region(MKCoordinateRegion(center: c, span: MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.15)))
+    /// One step: the card's text and height change on the camera's motion (a fade with Reduce Motion), and the
+    /// camera glides there on the same clock, or jumps when it is far or Reduce Motion is on.
+    private func step(to new: Int) {
+        guard new != index, steps.indices.contains(new) else { return }
+        let move = RecapLogic.stepMove(from: current?.coordinate, to: steps[new].coordinate, span: Self.span)
+        let cardMotion = reduceMotion ? Motion.reduced : Motion.camera(reduceMotion: false)
+        withAnimation(cardMotion) { index = new }
+        let target = steps[new].coordinate.map {
+            MapCameraPosition.region(MKCoordinateRegion(center: $0, span: MKCoordinateSpan(latitudeDelta: Self.span, longitudeDelta: Self.span)))
+        } ?? .automatic
+        if move == .glide {
+            withAnimation(Motion.camera(reduceMotion: reduceMotion)) { camera = target }
+        } else {
+            var t = Transaction(); t.disablesAnimations = true
+            withTransaction(t) { camera = target }
         }
     }
+
+    private static let span = 0.15
 }
 
 #if DEBUG
