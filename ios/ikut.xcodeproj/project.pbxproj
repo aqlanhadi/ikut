@@ -228,6 +228,7 @@
 		E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */; };
 		E65D046D442B93F1F5CBE70B /* PickedTripSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D336F2B85FEC1BD5D004993 /* PickedTripSheet.swift */; };
 		E749BE34EAD6F3EB2AC0C93E /* PlaceSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EDC1FF24AC67487B6B4F31E /* PlaceSearch.swift */; };
+		E85F99509444B04D5CDE137D /* MotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B8C14340A84BE731690F0DA /* MotionTests.swift */; };
 		E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */; };
 		E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */; };
 		EA34025E916A7D1EF7A5734B /* StopContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEB2E053516041BB6ABA3EB /* StopContext.swift */; };
@@ -240,6 +241,7 @@
 		F6B53E2E7B17959EE85F9245 /* PanelHeaderDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */; };
 		F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519810884A2F43AD0A1C337 /* HomeView.swift */; };
 		F8E045C650D5F0F83C461892 /* PlaceResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF960678563AF80F4392D216 /* PlaceResultRow.swift */; };
+		FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52C0A56BCBBB39D114D5E659 /* Motion.swift */; };
 		FD0670372EDB335CD4F4D390 /* StopApproachDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */; };
 		FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DBB4EC8798CACA623AE229 /* IkutApp.swift */; };
 		FE481F15A33FCA102C4B35D7 /* OwnWay.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF4929E443213AF6C3151555 /* OwnWay.swift */; };
@@ -319,6 +321,7 @@
 		2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		2AEFFFA195297151E2DEE401 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
 		2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAllTests.swift; sourceTree = "<group>"; };
+		2B8C14340A84BE731690F0DA /* MotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionTests.swift; sourceTree = "<group>"; };
 		2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachTests.swift; sourceTree = "<group>"; };
 		2CD43B7DF7793A412F23CD58 /* Trip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trip.swift; sourceTree = "<group>"; };
 		2E42A483FA023EFB82518B91 /* MapTypeColourTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTypeColourTests.swift; sourceTree = "<group>"; };
@@ -350,6 +353,7 @@
 		4AF3B9CBA8F2BD599933F59C /* StopApproach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproach.swift; sourceTree = "<group>"; };
 		4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachDemo.swift; sourceTree = "<group>"; };
 		5055B23595FC815A408187BC /* YouStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouStatus.swift; sourceTree = "<group>"; };
+		52C0A56BCBBB39D114D5E659 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillLogic.swift; sourceTree = "<group>"; };
 		55067EC070E1EB3342E091A2 /* StopPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPlanner.swift; sourceTree = "<group>"; };
 		550F55A2A60E4FCB64EDE29E /* CarSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarSelectionTests.swift; sourceTree = "<group>"; };
@@ -828,6 +832,7 @@
 				259104081FD2BD54F7BCE87D /* BottomSheet.swift */,
 				A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */,
 				4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */,
+				52C0A56BCBBB39D114D5E659 /* Motion.swift */,
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
 				091C79B7B0A90381F07CB73D /* TripComponents.swift */,
 				456F6193440599A0317F386C /* TripExitMenu.swift */,
@@ -879,6 +884,7 @@
 				D0D7948AC8E4880C3065A836 /* MapTests.swift */,
 				2E42A483FA023EFB82518B91 /* MapTypeColourTests.swift */,
 				FE37346B0076B57911BFD71C /* ModelTests.swift */,
+				2B8C14340A84BE731690F0DA /* MotionTests.swift */,
 				423FF6822F3DBBDDFF5571D9 /* NextStopTests.swift */,
 				01DEFBBB0C0EB62CCBCF7C6E /* OwnWayTests.swift */,
 				E15CBEF7B0C3614BFEFF1F8A /* PanelSheetTests.swift */,
@@ -1237,6 +1243,7 @@
 				11327790D090376570F14A7F /* MapModeControl.swift in Sources */,
 				F2C6459F43100013C9AEBA20 /* MapPickView.swift in Sources */,
 				6C9407949E903A1B7BD7E03E /* Member.swift in Sources */,
+				FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */,
 				7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */,
 				7F0F1E9387E6DF47B36D0E2D /* NextStop.swift in Sources */,
 				A394C64ECF58676AB0A60731 /* NextStopDemo.swift in Sources */,
@@ -1370,6 +1377,7 @@
 				BF856415E97C93CCF1248A8E /* MapTests.swift in Sources */,
 				ABBE74F1269488DABBAE4BAD /* MapTypeColourTests.swift in Sources */,
 				FECAA7A47E4F47DC37B0083F /* ModelTests.swift in Sources */,
+				E85F99509444B04D5CDE137D /* MotionTests.swift in Sources */,
 				9C88E9F61DEC32F38B28C02F /* NextStopTests.swift in Sources */,
 				2EB8598D20B54002BA5E917E /* OwnWayTests.swift in Sources */,
 				392FFE58478F1183C740556A /* PanelSheetTests.swift in Sources */,
