@@ -12,7 +12,7 @@ enum HomeSheet {
     static let indicatorRoom = BottomSheet.indicatorRoom
 
     /// What every change of Home's content runs on, the camera's flight included, so they start and end together.
-    static let motion = Animation.smooth(duration: 0.5)
+    static func motion(reduceMotion: Bool) -> Animation? { Motion.sheet(reduceMotion: reduceMotion) }
 
     /// The short detent's height, the same for the list and a picked trip (so a pick never resizes the sheet).
     /// `scaled` is `compactHeight` scaled with the text size; it is capped so the tall detent stays well above it.

@@ -331,12 +331,12 @@ struct TripsHomeView: View {
     }
 
     /// What the sheet's content change runs on: the camera's motion, or a short crossfade with Reduce Motion.
-    private var sheetMotion: Animation { reduceMotion ? .easeInOut(duration: 0.2) : HomeSheet.motion }
+    private var sheetMotion: Animation? { HomeSheet.motion(reduceMotion: reduceMotion) }
 
     /// Every camera move on Home goes through here: the same motion as the sheet's content change, and a jump
     /// with Reduce Motion.
     private func move(to position: MapCameraPosition, animated: Bool) {
-        if animated, !reduceMotion { withAnimation(HomeSheet.motion) { camera = position } } else { camera = position }
+        if animated, !reduceMotion { withAnimation(sheetMotion) { camera = position } } else { camera = position }
     }
 
     /// Camera for the picked trip: the selected item's spot, else the whole route, above the short sheet.
