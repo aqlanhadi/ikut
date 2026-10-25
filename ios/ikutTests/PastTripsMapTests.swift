@@ -110,7 +110,7 @@ struct PastTripsMapTests {
 
 struct HomeSheetTests {
     @Test func aTallerPickedSheetLeavesOnlyTheDifferenceToTheCamera() {
-        let padding = HomeSheet.legalInset(reach: HomeSheet.defaultReach)
+        let padding = HomeSheet.legalInset(compact: HomeSheet.compactHeight)
         let taller = TripsHomeView.obscured(mapHeight: 800, sheet: padding + 80)
         #expect(abs(taller.bottom - 80.0 / 800) < 1e-9)
         #expect(TripsHomeView.obscured(mapHeight: 800, sheet: HomeSheet.compactHeight).bottom == 0)
@@ -119,34 +119,11 @@ struct HomeSheetTests {
     @Test func legalInsetReachesTheTopOfTheRealListSheet() {
         // Measured on an iPhone 17 (874 pt): the 300 pt detent is a sheet 320.7 pt tall, its top at 545.3.
         #expect(abs(HomeSheet.defaultReach - (874 - 545.3)) < 2)
-        #expect(HomeSheet.legalInset(reach: HomeSheet.defaultReach) == HomeSheet.defaultReach)
-        #expect(HomeSheet.legalInset(reach: -5) == 0)
+        #expect(HomeSheet.legalInset(compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
+        #expect(HomeSheet.legalInset(compact: 390) == 420)
+        #expect(HomeSheet.legalInset(compact: -5) == HomeSheet.detentExtra)
         // The short list sheet never reaches above the map's safe area, so the camera keeps no room of its own.
         #expect(HomeSheet.compactHeight <= HomeSheet.defaultReach)
-    }
-
-    @Test func theReachFollowsTheSheetWhereverItRests() {
-        let reach = HomeSheet.defaultReach
-        // Short picked sheet, tall sheet (top at 60), another phone: each is taken.
-        #expect(abs(MapLegal.reach(sheetTop: 668.2, screenHeight: 874, current: reach) - 205.8) < 1e-9)
-        #expect(MapLegal.reach(sheetTop: 60, screenHeight: 874, current: reach) == 814)
-        // The same place (within a point): unchanged, so a settled sheet doesn't touch the map's safe area again.
-        #expect(MapLegal.reach(sheetTop: 874 - reach - 0.4, screenHeight: 874, current: reach) == reach)
-        // Before the map or the sheet has been measured: unchanged.
-        #expect(MapLegal.reach(sheetTop: 545, screenHeight: 0, current: reach) == reach)
-        #expect(MapLegal.reach(sheetTop: 0, screenHeight: 874, current: reach) == reach)
-    }
-
-    @Test func theCameraCentreMovesWithTheSafeAreaSoThePictureStays() {
-        let c = CLLocationCoordinate2D(latitude: 4.0, longitude: 101.0)
-        // 0.001 degrees a point; the area grows 100 pt (reach 330 to 230): its middle moves 50 pt down, so the
-        // centre coordinate goes 50 pt south.
-        let grown = MapLegal.recentred(c, degreesPerPoint: 0.001, oldReach: 330, newReach: 230)
-        #expect(abs(grown.latitude - 3.95) < 1e-9)
-        #expect(grown.longitude == 101.0)
-        // Shrinking it moves the centre north; no change, no move.
-        #expect(abs(MapLegal.recentred(c, degreesPerPoint: 0.001, oldReach: 230, newReach: 330).latitude - 4.05) < 1e-9)
-        #expect(MapLegal.recentred(c, degreesPerPoint: 0.001, oldReach: 330, newReach: 330).latitude == 4.0)
     }
 
     @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {

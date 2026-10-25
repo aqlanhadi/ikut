@@ -22,12 +22,13 @@ enum HomeSheet {
 
     static let detentExtra = BottomSheet.detentExtra
     /// From the screen's bottom edge to the top of the list's short sheet.
-    static let defaultReach: CGFloat = compactHeight + detentExtra
+    static let defaultReach: CGFloat = legalInset(compact: compactHeight)
 
-    /// The map's bottom safe area: from the screen's bottom edge up to the top of the sheet where it rests. MapKit
-    /// keeps its own 10 pt between the logo and Legal and the edge of that area, which is Apple's 10 pt above
-    /// the sheet (owner, 2026-10-25: on every map, at every height the sheet rests at, the tall one too).
-    static func legalInset(reach: CGFloat) -> CGFloat { max(0, reach) }
+    /// The map's bottom safe area: from the screen's bottom edge up to the top of the short sheet, which is its height
+    /// plus `detentExtra`. MapKit keeps its own 10 pt between the logo and Legal and the edge of that area, which is
+    /// Apple's 10 pt above the sheet. Fixed from the first frame: the tall sheet covers them and the map doesn't move
+    /// when the sheet is pulled up or down (owner 2026-10-25, #343).
+    static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
     static func short(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
     static let tall = PresentationDetent.large

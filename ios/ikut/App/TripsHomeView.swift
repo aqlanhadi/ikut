@@ -26,14 +26,9 @@ struct TripsHomeView: View {
     @State private var routes: [PastTripRoute] = []
     @State private var camera: MapCameraPosition
     @State private var mapHeight: CGFloat = 0
-    /// The whole screen's height, safe areas included (the map's own height leaves them out).
-    @State private var screenHeight: CGFloat = 0
-    /// The map's bottom safe area (`HomeSheet.legalInset`): up to the top of the sheet, as measured once it rests.
-    @State private var legalReach = HomeSheet.defaultReach
-    /// The camera as it last moved, read when the safe area changes (not state: it changes every frame of a glide).
+    /// The camera as it last moved, to tell whether a late refit would only nudge it (not state: it changes every
+    /// frame of a glide).
     @State private var cameraBox = CameraBox()
-    /// The sheet's frame on screen, to measure `legalReach` once it rests short.
-    @State private var sheetFrame: CGRect = .zero
     /// The past trip picked on the map, whose recap fills the sheet.
     @State private var picked: PickedTrip?
     /// Its route when it is older than the 12 drawn and the recap hasn't loaded yet.
@@ -113,7 +108,6 @@ struct TripsHomeView: View {
         ZStack {
             map
         }
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom }) { screenHeight = $0 }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
         #if DEBUG
@@ -124,7 +118,7 @@ struct TripsHomeView: View {
                 open(first)
                 try? await Task.sleep(for: .seconds(3.5))
                 if cycle == 1 {
-                    // Pulled up and back down, to see Legal follow the sheet.
+                    // Pulled up and back down, to see that the map and Legal stay put under the tall sheet.
                     expanded = true
                     try? await Task.sleep(for: .seconds(3))
                     expanded = false
@@ -134,15 +128,6 @@ struct TripsHomeView: View {
             }
         }
         #endif
-        // Follow the sheet's top once it has stopped moving and the camera has stopped gliding, at whatever
-        // height it rests.
-        .task(id: sheetFrame) {
-            try? await Task.sleep(for: .milliseconds(300))
-            while !Task.isCancelled, cameraBox.isMoving { try? await Task.sleep(for: .milliseconds(100)) }
-            guard !Task.isCancelled else { return }
-            let reach = MapLegal.reach(sheetTop: sheetFrame.minY, screenHeight: screenHeight, current: legalReach)
-            if reach != legalReach { follow(reach) }
-        }
         .onChange(of: picked?.model.snapshot != nil) { was, has in
             // The recap arrived, perhaps from Try again: its route is the full one and the dots come with it.
             guard let picked, !isDemo,
@@ -180,9 +165,10 @@ struct TripsHomeView: View {
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
         .onMapCameraChange(frequency: .continuous) { cameraBox.record($0.camera, latitudeDelta: $0.region.span.latitudeDelta) }
-        // The logo and Legal ride 10 pt above the sheet instead of under it, at each height it rests at. The
-        // padding goes on the Map itself, before it ignores the safe area, as on the driving map.
-        .safeAreaPadding(.bottom, HomeSheet.legalInset(reach: legalReach))
+        // The logo and Legal ride 10 pt above the short sheet instead of under it, from the first frame, and stay
+        // there when the sheet is pulled up (it covers them, as in Apple Maps; owner 2026-10-25, #343). The padding
+        // goes on the Map itself, before it ignores the safe area, as on the driving map.
+        .safeAreaPadding(.bottom, HomeSheet.legalInset(compact: compact))
         .ignoresSafeArea()
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
             guard height != mapHeight else { return }
@@ -190,19 +176,6 @@ struct TripsHomeView: View {
             // Refit for the real height while the camera is still ours.
             if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
         }
-    }
-
-    /// Moves the map's safe area to `reach` without moving the picture: the camera's centre is set to where it
-    /// has to be in the new area (MapKit would otherwise fit the camera's region into it, a jump in zoom).
-    private func follow(_ reach: CGFloat) {
-        // The region the map reports spans the map inside its safe area (measured: 544 pt of 874 under the list sheet).
-        let visible = screenHeight - legalReach
-        if !camera.followsUserLocation, visible > 0, let seen = cameraBox.seen, abs(seen.camera.heading) < 0.5 {
-            let center = MapLegal.recentred(seen.camera.centerCoordinate, degreesPerPoint: seen.latitudeDelta / Double(visible),
-                                             oldReach: legalReach, newReach: reach)
-            camera = .camera(MapCamera(centerCoordinate: center, distance: seen.camera.distance, heading: 0, pitch: 0))
-        }
-        legalReach = reach
     }
 
     @MapContentBuilder
@@ -371,7 +344,7 @@ struct TripsHomeView: View {
     /// nudge a picture that is already there.
     private func refocus(animated: Bool, settling: Bool = false) {
         guard let picked else { return }
-        let insets = Self.obscured(mapHeight: mapHeight, sheet: compact, padding: legalReach)
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: compact, padding: HomeSheet.legalInset(compact: compact))
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
             region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
@@ -480,7 +453,6 @@ struct TripsHomeView: View {
         .padding(.horizontal, Spacing.l)
         .padding(.top, HomeSheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background { Color.clear.ignoresSafeArea().onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { sheetFrame = $0 } }
         .presentationDetents(HomeSheet.detents(compact: compact), selection: Binding(
             get: { HomeSheet.detent(expanded: expanded, compact: compact) },
             set: { expanded = HomeSheet.isExpanded($0) }))
@@ -646,13 +618,8 @@ struct TripsHomeView: View {
 @MainActor
 final class CameraBox {
     private(set) var seen: (camera: MapCamera, latitudeDelta: Double)?
-    private var at = Date.distantPast
 
     func record(_ camera: MapCamera, latitudeDelta: Double) {
         seen = (camera, latitudeDelta)
-        at = Date()
     }
-
-    /// The camera changed a moment ago: a glide is on, or the user is dragging.
-    var isMoving: Bool { Date().timeIntervalSince(at) < 0.25 }
 }
