@@ -109,6 +109,20 @@ extension ConvoyModel {
     }
 }
 
+// MARK: - Auth emulator
+
+/// Deletes one user from the Auth emulator, as if the server had lost them (never touches anyone else).
+func deleteUserFromAuthEmulator(_ uid: String) async throws {
+    guard case .emulators(let host) = Backend.current else { return }
+    let url = URL(string: "http://\(host):9099/identitytoolkit.googleapis.com/v1/projects/ikut-b1083/accounts:delete")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(["localId": uid])
+    _ = try await URLSession.shared.data(for: request)
+}
+
 // MARK: - Waiting
 
 /// Polls until `condition` holds or `timeout` passes (for work that runs on a task). It does not fail on

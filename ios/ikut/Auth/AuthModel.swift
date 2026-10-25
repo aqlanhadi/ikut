@@ -30,25 +30,53 @@ final class AuthModel {
             Task { @MainActor in self?.apply(uid: uid, name: name) }
         }
         Task { await Self.dropMissingUser() }
+        // A write that hits its deadline may be waiting on a token the server won't give a deleted user.
+        ServerWrite.onTimeout = { await Self.dropMissingUser() }
     }
 
     /// Signs out a saved user the backend no longer has (the emulators were restarted, or the
-    /// account was deleted). Auth keeps the user in the Keychain, so the app would otherwise
-    /// look signed in while every Firestore write fails for want of a token.
-    private static func dropMissingUser() async {
-        guard let user = Auth.auth().currentUser else { return }
+    /// account was deleted). Auth keeps the user in the Keychain, and Firestore then waits on an ID
+    /// token that can never refresh, so no request leaves the phone and every write just times out.
+    /// Run at launch and when a write times out. Returns true when it signed the user out.
+    @discardableResult
+    static func dropMissingUser() async -> Bool {
+        guard let current = Auth.auth().currentUser else { return false }
+        nonisolated(unsafe) let user = current
+        return await dropIfMissing(reload: { try await user.reload() }, signOut: { try? Auth.auth().signOut() })
+    }
+
+    /// The decision on its own, so a test can feed it errors: only "user gone" errors sign out;
+    /// a network error or timeout keeps the user.
+    static func dropIfMissing(reload: () async throws -> Void, signOut: () -> Void) async -> Bool {
         do {
-            try await user.reload()
+            try await reload()
+            return false
         } catch let error as NSError where isMissingUser(error) {
-            try? Auth.auth().signOut()
+            signOut()
+            return true
         } catch {
-            // Offline or a server hiccup: keep the user.
+            return false
         }
     }
 
+    /// The server's message the SDK keeps in userInfo when it has no code of its own for it.
+    private nonisolated static let deserializedResponseKey = "FIRAuthErrorUserInfoDeserializedResponseKey"
+
     nonisolated static func isMissingUser(_ error: NSError) -> Bool {
         guard error.domain == AuthErrorDomain, let code = AuthErrorCode(rawValue: error.code) else { return false }
+        if code == .internalError {
+            // A token refresh for a deleted user: `.internalError` carrying INVALID_REFRESH_TOKEN (the other
+            // gone cases arrive as their own codes, below). The message sits in the error or its underlying one.
+            return serverMessage(error) == "INVALID_REFRESH_TOKEN"
+        }
         return [AuthErrorCode.userNotFound, .userDisabled, .userTokenExpired, .invalidUserToken].contains(code)
+    }
+
+    private nonisolated static func serverMessage(_ error: NSError) -> String? {
+        if let response = error.userInfo[deserializedResponseKey] as? [String: Any],
+           let message = response["message"] as? String { return message }
+        if let inner = error.userInfo[NSUnderlyingErrorKey] as? NSError { return serverMessage(inner) }
+        return nil
     }
 
     deinit {

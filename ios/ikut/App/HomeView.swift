@@ -49,7 +49,7 @@ struct HomeView: View {
                         onNewTrip: { begin(.create) },
                         onJoin: { begin(.join(code: nil)) },
                         // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
-                        onOpenTrip: { entry in path.append(.lobby(tripId: entry.id)) },
+                        onOpenTrip: { entry in begin(.lobby(tripId: entry.id)) },
                         covered: homeSheetCovered,
                         sheetUp: $homeSheetUp
                     )
@@ -113,6 +113,11 @@ struct HomeView: View {
             .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showDenied, sheetUp: homeSheetUp) },
                                         set: { showDenied = $0 })) {
                 LocationDeniedView { location.openSettings() }
+            }
+            .onChange(of: auth.state) { old, new in
+                // The server dropped this user mid-trip (AuthModel signed them out): back to Home, where the
+                // next Start or Join asks for a name again.
+                if old == .signedIn, new == .signedOut { path = [] }
             }
             .onChange(of: pendingJoinCode, initial: true) {
                 guard let code = pendingJoinCode else { return }

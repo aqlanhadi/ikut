@@ -99,6 +99,15 @@ private struct Rig {
 }
 
 @MainActor
+struct SessionSignedOutTests {
+    @Test func startWithoutAUserBuildsNoPathAndSaysWhy() {
+        let session = TripSession(tripId: "t1", userId: "")
+        session.start()
+        #expect(session.errorMessage != nil)
+    }
+}
+
+@MainActor
 struct SessionCarRouteTests {
     @Test func becomingTrackerEnsuresRouteOnceThenStartsWithOwnRoute() async throws {
         let rig = Rig()
