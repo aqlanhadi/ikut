@@ -101,4 +101,31 @@ struct SuggestStopsSheetTests {
         #expect(SuggestStopsModel.along(pick).contains(" along · "))
         #expect(SuggestStopsModel.chips(pick.place) == ["Fuel", "Food", "Toilets", "EV charging"])
     }
+
+    @Test func aSecondAddOfTheSamePickDoesNothing() throws {
+        let model = Self.model()
+        let pick = try #require(model.picks.first)
+        var drafts: [StopDraft] = []
+        for _ in 0..<2 where model.markAdded(pick) { drafts.append(model.draft(for: pick)) }
+        #expect(drafts.count == 1)
+    }
+
+    @Test func existingOffsetsLeaveOutTheMeetingPointAndUnplacedStops() {
+        let at = CLLocationCoordinate2D(latitude: 3.5, longitude: 101.5)
+        let items = [
+            StopDraft(name: "Meet", coordinate: at, kind: .meet, routeOffset: 0),
+            StopDraft(name: "Rest", coordinate: at, kind: .rest, minutes: 20, routeOffset: 55_000),
+            StopDraft(name: "New", coordinate: at, kind: .food),
+        ]
+        #expect(SuggestStopsModel.existingOffsets(items) == [55_000])
+    }
+
+    @Test func anRnRAddedInTheSheetCountsWhenTheTimeMoves() throws {
+        let model = Self.model()
+        let pick = try #require(model.picks.first)
+        model.markAdded(pick)
+        model.step(-1)
+        #expect(model.picks.isEmpty)
+        #expect(model.state == .nothing)
+    }
 }

@@ -28,7 +28,7 @@ final class SuggestStopsModel {
 
     private let line: RouteLine?
     private let routeSeconds: Double?
-    private let existing: [Double]
+    private var existing: [Double]
     private let sites: [PlaceSite]
     private let fuel: [FuelStation]
     private var candidates: [PlaceAlong]?
@@ -84,7 +84,19 @@ final class SuggestStopsModel {
             minutes: Self.stopMinutes, routeOffset: pick.place.routeOffset)
     }
 
-    func markAdded(_ pick: StopSuggestion) { added.insert(pick.id) }
+    /// Route offsets of the stops already planned: a meeting point is not a break.
+    static func existingOffsets(_ items: [StopDraft]) -> [Double] {
+        items.filter { !$0.isMeeting }.compactMap(\.routeOffset)
+    }
+
+    /// Records the add; false when this pick was already added, so a second tap does nothing. The added R&R counts
+    /// as an existing stop, so moving the time doesn't suggest another beside it.
+    @discardableResult
+    func markAdded(_ pick: StopSuggestion) -> Bool {
+        guard added.insert(pick.id).inserted else { return false }
+        existing.append(pick.place.routeOffset)
+        return true
+    }
     var allAdded: Bool { !picks.isEmpty && picks.allSatisfy { added.contains($0.id) } }
 
     /// "R&R Tapah (northbound) · 1 h 43 min along · 139 km".
@@ -189,8 +201,8 @@ struct SuggestStopsSheet: View {
                 Button { dismiss() } label: { Text("Not now").frame(maxWidth: .infinity) }
                     .actionButton(.secondary)
                 Button {
+                    guard model.markAdded(pick) else { return }
                     onAdd(model.draft(for: pick))
-                    model.markAdded(pick)
                     if model.allAdded { dismiss() }
                 } label: { Text("Add").frame(maxWidth: .infinity) }
                     .actionButton(.primary)

@@ -198,7 +198,7 @@ struct LobbyView: View {
                 model: SuggestStopsModel(
                     line: routeInfo.coordinates.count > 1 ? RouteLine(routeInfo.coordinates) : nil,
                     routeSeconds: routeInfo.travelTime,
-                    existing: planner.items.filter { !$0.isMeeting }.compactMap(\.routeOffset)),
+                    existing: SuggestStopsModel.existingOffsets(planner.items)),
                 summary: suggestSummary,
                 canAdd: { StopListLogic.canAdd(among: planner.items) },
                 onAdd: { planner.add($0) })
