@@ -204,7 +204,9 @@ enum DemoScreens {
         case "suggest-stops-moved": return AnyView(SuggestStopsDemo.sheet(moved: 1))
         case "suggest-stops-short": return AnyView(SuggestStopsDemo.sheet(seconds: 50 * 60))
         case "suggest-stops-large": return AnyView(SuggestStopsDemo.sheet().dynamicTypeSize(.accessibility5))
+        // lobby-member and lobby-waiting: a participant before the organiser starts (the waiting line, D39).
         case "lobby-member": return nav(LobbyStopsDemo.lobby(.member))
+        case "lobby-waiting": return nav(LobbyStopsDemo.lobby(.member))
         case "lobby-turnback": return nav(LobbyStopsDemo.lobby(.turnBack))
         case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))

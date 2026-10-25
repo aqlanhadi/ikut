@@ -114,20 +114,34 @@ struct StopAnswerEmulatorTests {
         try Auth.auth().signOut()
     }
 
+    /// Before the organizer starts the trip nobody can answer, the joiner's own car included, and a joiner cannot start it.
+    @Test func nobodyAnswersBeforeTheStart() async throws {
+        let trip = try await EmulatorTrip.make(name: "Early", route: Fixtures.longRoute, stops: [Fixtures.tapah])
+        let code = try await trip.code()
+        let (joiner, joinedCar) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
+        await #expect(throws: (any Error).self) {
+            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
+        }
+        // Only the organizer starts the trip: the joiner's Start is refused.
+        await TripService.markStarted(tripId: trip.tripId)
+        let doc = try await Firestore.firestore().document(FirestorePaths.trip(trip.tripId)).getDocument(as: Trip.self)
+        #expect(doc.startedAt == nil)
+    }
+
     /// A started trip with one stop; a second car joined. A car skips, undoes, skips again; the lead car, another
     /// car's answer and a skipped stop are refused.
     @Test func aCarSkipsAStopAndUndoesIt() async throws {
         let trip = try await EmulatorTrip.make(name: "Skips", route: Fixtures.longRoute, stops: [Fixtures.tapah])
         let code = try await trip.code()
 
+        // Only the organizer starts the trip (rules), so start it before the joiner signs in.
+        await TripService.markStarted(tripId: trip.tripId)
+        let started = try await Firestore.firestore().document(FirestorePaths.trip(trip.tripId)).getDocument(as: Trip.self)
+        #expect(started.startedAt != nil)
+
         let (joiner, joinedCar) = try await EmulatorTrip.joinAsGuest(
             code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
-
-        // Before the trip starts nobody can answer, the joiner's own car included.
-        await #expect(throws: (any Error).self) {
-            try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)
-        }
-        await TripService.markStarted(tripId: trip.tripId)
         let stream = StopAnswerService.listen(tripId: trip.tripId, stopId: "tapah")
 
         let sent = try await StopAnswerService.skip(tripId: trip.tripId, stopId: "tapah", carId: joinedCar, userId: joiner)

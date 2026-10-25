@@ -282,8 +282,9 @@ service cloud.firestore {
         && (optionalOf(request.resource.data, 'lastActivityAt') == null
             || request.resource.data.lastActivityAt is timestamp);
 
-      // Any member records when the trip first started (Start Trip); once, server time only.
+      // Only the organizer records when the trip first started (Start Trip); once, server time only.
       allow update: if isMember(tripId)
+        && resource.data.organizerId == request.auth.uid
         && resource.data.status == 'active'
         && resource.data.get('startedAt', null) == null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['startedAt'])

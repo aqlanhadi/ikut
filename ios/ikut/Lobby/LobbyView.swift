@@ -76,6 +76,38 @@ struct LobbyView: View {
         !session.isEnded && (LobbyLogic.isStarted(trip: model.trip) || startedHere)
     }
 
+    /// Organiser: Start trip. Participant: a plain waiting line until the trip starts, then Show map (D39).
+    @ViewBuilder private var bottomBar: some View {
+        let bar = LobbyLogic.bottomBar(
+            isOrganizer: isOrganizer, tripLoaded: model.trip != nil, isMember: !session.membershipLost,
+            started: isStarted, ended: session.isEnded || model.trip?.status == .ended,
+            organizerName: LobbyLogic.organizerName(trip: model.trip, members: model.members))
+        switch bar {
+        case .none:
+            EmptyView()
+        case .waiting:
+            Text(bar.label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("lobbyWaiting")
+                .ikutBottomBar()
+        case .startTrip, .showMap:
+            Button {
+                if bar == .startTrip {
+                    startedHere = true
+                    Task { await TripService.markStarted(tripId: model.tripId) }
+                }
+                showMap = true
+            } label: {
+                Text(bar.label).frame(maxWidth: .infinity)
+            }
+            .actionButton(.primary)
+            .ikutBottomBar()
+        }
+    }
+
     private var currentUserId: String? { Auth.auth().currentUser?.uid }
 
     /// Remembers this trip for Home's past list, with who else is in it once the members have loaded.
@@ -93,6 +125,10 @@ struct LobbyView: View {
     }
 
     private var canLeave: Bool { session.isLiveMember }
+    /// The Leave trip menu item: not the organizer before the start (they can only End it).
+    private var canLeaveTrip: Bool {
+        LobbyLogic.canLeaveTrip(isOrganizer: isOrganizer, started: isStarted, isLiveMember: canLeave)
+    }
     private var canEnd: Bool { isOrganizer && !session.isEnded }
     /// Rename and change destination: the organizer, before the trip ends.
     private var canEdit: Bool { isOrganizer && canLeave }
@@ -154,18 +190,7 @@ struct LobbyView: View {
         .contentMargins(.bottom, Spacing.l, for: .scrollContent)
         .background(Color.ikutScreen)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            let started = isStarted
-            Button {
-                if !started {
-                    startedHere = true
-                    Task { await TripService.markStarted(tripId: model.tripId) }
-                }
-                showMap = true
-            } label: {
-                Text(started ? "Back to map" : "Start trip").frame(maxWidth: .infinity)
-            }
-            .actionButton(.primary)
-            .ikutBottomBar()
+            bottomBar
         }
         // The map shares this lobby's session; the lobby stays on the stack underneath it.
         .navigationDestination(isPresented: $showMap) {
@@ -245,7 +270,7 @@ struct LobbyView: View {
                     .accessibilityLabel("Rename trip")
                 }
             }
-            if canLeave || canEnd || canPause {
+            if canLeaveTrip || canEnd || canPause {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         if canPause {
@@ -259,7 +284,7 @@ struct LobbyView: View {
                                 }
                             }
                         }
-                        TripExitMenu(canEnd: canEnd, canLeave: canLeave, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
+                        TripExitMenu(canEnd: canEnd, canLeave: canLeaveTrip, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }

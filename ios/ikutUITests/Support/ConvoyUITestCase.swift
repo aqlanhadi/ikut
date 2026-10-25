@@ -74,9 +74,16 @@ class ConvoyUITestCase: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    /// "Start trip" in a lobby that hasn't started, "Back to map" once the trip is on the road.
+    /// The lobby's button: "Start trip" for the organizer before the start, "Show map" for everyone once the trip is on
+    /// the road. A passenger before the start has no button, only the "Waiting for ..." line (`lobbyPresence`).
     var lobbyActionButton: XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label IN %@", ["Start trip", "Back to map"])).firstMatch
+        app.buttons.matching(NSPredicate(format: "label IN %@", ["Start trip", "Show map"])).firstMatch
+    }
+
+    /// Anything of the lobby's bottom bar: its button, or the passenger's waiting line.
+    var lobbyPresence: XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(
+            format: "label IN %@ OR identifier == %@", ["Start trip", "Show map"], "lobbyWaiting")).firstMatch
     }
 
     /// Badge numbers of the convoy rows, front of the convoy first (top of the list). Read from one snapshot of
@@ -161,7 +168,7 @@ class ConvoyUITestCase: XCTestCase {
     /// A phone that still holds an earlier trip opens in its lobby or map, not Home: say so instead of
     /// letting the next step report a field it cannot find.
     func failIfAlreadyInATrip() {
-        if lobbyActionButton.waitForExistence(timeout: 3) {
+        if lobbyPresence.waitForExistence(timeout: 3) {
             XCTFail("This phone is already in a trip (its lobby or map is open) and should start from Home: it holds an earlier session. Uninstall the app first (qa/run-convoy2.mjs does).")
         }
     }
@@ -192,7 +199,7 @@ class ConvoyUITestCase: XCTestCase {
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
         app.buttons["Join trip"].tap()
-        XCTAssertTrue(lobbyActionButton.waitForExistence(timeout: 30), "Didn't reach the lobby")
+        XCTAssertTrue(lobbyPresence.waitForExistence(timeout: 30), "Didn't reach the lobby")
         let notNow = app.buttons["Not now"]
         if notNow.waitForExistence(timeout: 4) { notNow.tap() }
     }

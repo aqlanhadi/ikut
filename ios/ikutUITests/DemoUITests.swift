@@ -73,7 +73,7 @@ class DemoBase: TwoPhoneConvoyBase {
 
     /// Waits for the lobby, dismissing the "Keep sharing while the screen is off" sheet (Not now) that covers it.
     func waitForLobby(timeout: TimeInterval) -> Bool {
-        let start = lobbyActionButton
+        let start = lobbyPresence
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
@@ -86,7 +86,7 @@ class DemoBase: TwoPhoneConvoyBase {
     /// Lobby to the map (no "Fit whole convoy": the map keeps following the car).
     func openDemoMap() {
         let start = lobbyActionButton
-        // Start trip turns into Back to map once the trip is on the road: tap until the map shows.
+        // A passenger waits for the organizer to start the trip: the button is Show map once it has; tap until the map shows.
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline, !app.buttons["Report"].exists {
             if app.buttons["Not now"].exists { app.buttons["Not now"].tap() }

@@ -594,6 +594,9 @@ async function main() {
     truth[c.key] = truthOffsets(tracks[c.key].points);
   }
 
+  // Only the organizer starts a trip (rules): the script is the organizer, so a phone that joined waits in its lobby for this.
+  let tripStarted = false;
+
   // The planned stop, written by the organizer before the start (stops rules; PlannedStop in ios/ikut/Model).
   if (STOPPING) {
     const at = mainRoute.coordinateAtOffset(STOP.offset);
@@ -609,6 +612,7 @@ async function main() {
     log(`the organizer plans ${STOP_NEXT.name} at ${nextOffset} m`);
     // Leave and arrivedAt are for a started trip (TripService.markStarted).
     await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+    tripStarted = true;
   }
 
   // The rebuild scenario's plan, written before the start: the town stop on the loop, R&R Tapah on the highway past it.
@@ -624,6 +628,7 @@ async function main() {
     const next = await plan(REBUILD.next, mainRoute.coordinateAtOffset(REBUILD.next.offset), 1);
     rebuildPlan = { townId: town.id, townOffset: town.routeOffset, nextId: next.id, nextOffset: next.routeOffset, extra: detour.extra };
     await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+    tripStarted = true;
   }
 
   // Tracker start-up: first fix, ensureRoute, then tracking (TripSession.runStartup).
@@ -657,7 +662,20 @@ async function main() {
   if (opts.setupOnly) {
     console.log('setup only: holding positions. Ctrl-C to stop.');
     writeState({ phase: 'hold' });
-    for (;;) { await sleep(1000); await hold(); }
+    // Only the organizer starts a trip: this script is the organizer, so once a phone that joined by hand shares its
+    // location (its car shows up in positions) the trip starts and its lobby offers Show map.
+    const known = new Set([...phones.values()].map((p) => p.carId));
+    for (;;) {
+      await sleep(1000);
+      await hold();
+      if (tripStarted) continue;
+      const snap = await getDocs(collection(organizer.db, `trips/${tripId}/positions`));
+      if (snap.docs.some((d) => !known.has(d.id))) {
+        await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+        tripStarted = true;
+        log('the organizer starts the trip: the phone can open the map');
+      }
+    }
   }
   if (opts.waitApp) {
     console.log(`waiting for a phone to join trip ${code} and start tracking (up to ${opts.waitTimeout} s)...`);
@@ -670,6 +688,11 @@ async function main() {
       await hold();
       const snap = await getDocs(collection(organizer.db, `trips/${tripId}/positions`));
       appCarId = snap.docs.map((d) => d.id).find((id) => !known.has(id)) ?? null;
+    }
+    if (!tripStarted) {
+      await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+      tripStarted = true;
+      log('the organizer starts the trip: the phone can open the map');
     }
     log(`phone car ${appCarId} is tracking; go in ${opts.goDelay} s`);
     for (let i = 0; i < opts.goDelay; i++) { await sleep(1000); await hold(); }
