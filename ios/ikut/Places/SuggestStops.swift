@@ -88,3 +88,27 @@ enum SuggestStops {
         return picks
     }
 }
+
+/// "Suggest after about" in the Suggest stops sheet (SuggestStops.dc.html, decision #315): the drive time to the
+/// first break, 1 h to 3 h in 30 min steps. It is passed to `SuggestStops.suggest(every:)` as it is, so a trip
+/// longer than about two of them gets one stop per interval; no second rule.
+enum SuggestAfter {
+    static let shortest: Double = 3_600
+    static let longest: Double = 10_800
+    static let step: Double = 1_800
+    /// A trip up to this long starts at halfway; a longer one at the usual 2 h.
+    static let halfwayUpTo: Double = 9_000
+
+    static func clamp(_ seconds: Double) -> Double { min(longest, max(shortest, seconds)) }
+
+    /// 2 h for a trip longer than 2 h 30 min; else half of it rounded up to 30 min (so KL to Ipoh, 2 h 25 min, reads
+    /// 1 h 30 min and its R&R at 1 h 43 min is inside the window), kept within 1 h to 3 h.
+    static func defaultSeconds(routeSeconds: Double) -> Double {
+        guard routeSeconds <= halfwayUpTo else { return PlaceRules.every }
+        return clamp((routeSeconds / 2 / step).rounded(.up) * step)
+    }
+
+    /// One step earlier (`-1`) or later (`+1`), held within 1 h to 3 h.
+    static func stepped(_ seconds: Double, by direction: Int) -> Double { clamp(seconds + Double(direction) * step) }
+    static func canStep(_ seconds: Double, by direction: Int) -> Bool { stepped(seconds, by: direction) != clamp(seconds) }
+}

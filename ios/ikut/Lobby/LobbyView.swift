@@ -18,6 +18,7 @@ struct LobbyView: View {
     @State private var ownWay = OwnWayInfo()
     @State private var planner: StopPlanner
     @State private var showAddStop = false
+    @State private var showSuggestStops = false
     @State private var renaming = false
     @State private var renameText = ""
     @State private var showChangeDestination = false
@@ -101,6 +102,14 @@ struct LobbyView: View {
     }
     /// Add, move and remove stops: the organizer, before the trip has started.
     private var canEditStops: Bool { canEdit && !isStarted }
+
+    /// "Kuala Lumpur to Ipoh · 205 km · 2 h 25 min", the line under the Suggest stops title.
+    private var suggestSummary: String {
+        var parts = [[routeInfo.originName, model.trip?.destination.name].compactMap { $0 }.joined(separator: " to ")]
+        if let distance = routeInfo.distance { parts.append(RouteFormat.distance(distance)) }
+        if let seconds = routeInfo.travelTime { parts.append(ConvoyFormat.duration(seconds)) }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
     private var canPause: Bool { (session.isTracking || session.isPaused) && canLeave }
 
@@ -182,6 +191,16 @@ struct LobbyView: View {
                 along: routeInfo.coordinates.count > 1
                     ? AlongRoute(coordinates: routeInfo.coordinates, seconds: routeInfo.travelTime) : nil,
                 canMeet: StopListLogic.canMeet(among: planner.items),
+                onAdd: { planner.add($0) })
+        }
+        .sheet(isPresented: $showSuggestStops) {
+            SuggestStopsSheet(
+                model: SuggestStopsModel(
+                    line: routeInfo.coordinates.count > 1 ? RouteLine(routeInfo.coordinates) : nil,
+                    routeSeconds: routeInfo.travelTime,
+                    existing: SuggestStopsModel.existingOffsets(planner.items)),
+                summary: suggestSummary,
+                canAdd: { StopListLogic.canAdd(among: planner.items) },
                 onAdd: { planner.add($0) })
         }
         .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
@@ -345,7 +364,8 @@ struct LobbyView: View {
             .frame(height: 104)
             .overlay(alignment: .topLeading) {
                 if canEdit {
-                    HStack(spacing: Spacing.tight) {
+                    // Change destination on the first row; Add a stop and Suggest stops beside each other on the second.
+                    VStack(alignment: .leading, spacing: 0) {
                         if canChangeDestination {
                             Button { showChangeDestination = true } label: {
                                 pill("Change destination", systemImage: "magnifyingglass")
@@ -353,12 +373,19 @@ struct LobbyView: View {
                             .buttonStyle(.plain)
                         }
                         if canEditStops {
-                            Button { showAddStop = true } label: {
-                                pill("Add a stop", systemImage: "plus")
+                            HStack(spacing: Spacing.tight) {
+                                Button { showAddStop = true } label: {
+                                    pill("Add a stop", systemImage: "plus")
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(!StopListLogic.canAdd(among: stops))
+                                .accessibilityIdentifier("stops.add")
+                                Button { showSuggestStops = true } label: {
+                                    pill("Suggest stops", systemImage: "sparkles")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("stops.suggest")
                             }
-                            .buttonStyle(.plain)
-                            .disabled(!StopListLogic.canAdd(among: stops))
-                            .accessibilityIdentifier("stops.add")
                         }
                     }
                     .padding(Spacing.gap)
