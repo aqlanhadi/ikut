@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import Foundation
 import Testing
 @testable import ikut
@@ -109,7 +110,7 @@ struct PastTripsMapTests {
 
 struct HomeSheetTests {
     @Test func aTallerPickedSheetLeavesOnlyTheDifferenceToTheCamera() {
-        let padding = HomeSheet.legalInset(reach: HomeSheet.defaultReach)
+        let padding = HomeSheet.legalInset(compact: HomeSheet.compactHeight)
         let taller = TripsHomeView.obscured(mapHeight: 800, sheet: padding + 80)
         #expect(abs(taller.bottom - 80.0 / 800) < 1e-9)
         #expect(TripsHomeView.obscured(mapHeight: 800, sheet: HomeSheet.compactHeight).bottom == 0)
@@ -118,34 +119,11 @@ struct HomeSheetTests {
     @Test func legalInsetReachesTheTopOfTheRealListSheet() {
         // Measured on an iPhone 17 (874 pt): the 300 pt detent is a sheet 320.7 pt tall, its top at 545.3.
         #expect(abs(HomeSheet.defaultReach - (874 - 545.3)) < 2)
-        #expect(HomeSheet.legalInset(reach: HomeSheet.defaultReach) == HomeSheet.defaultReach)
-        #expect(HomeSheet.legalInset(reach: -5) == 0)
+        #expect(HomeSheet.legalInset(compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
+        #expect(HomeSheet.legalInset(compact: 390) == 420)
+        #expect(HomeSheet.legalInset(compact: -5) == HomeSheet.detentExtra)
         // The short list sheet never reaches above the map's safe area, so the camera keeps no room of its own.
         #expect(HomeSheet.compactHeight <= HomeSheet.defaultReach)
-    }
-
-    @Test func theReachFollowsTheSheetWhereverItRests() {
-        let reach = HomeSheet.defaultReach
-        // Short picked sheet, tall sheet (top at 60), another phone: each is taken.
-        #expect(abs(MapLegal.reach(sheetTop: 668.2, screenHeight: 874, current: reach) - 205.8) < 1e-9)
-        #expect(MapLegal.reach(sheetTop: 60, screenHeight: 874, current: reach) == 814)
-        // The same place (within a point): unchanged, so a settled sheet doesn't touch the map's safe area again.
-        #expect(MapLegal.reach(sheetTop: 874 - reach - 0.4, screenHeight: 874, current: reach) == reach)
-        // Before the map or the sheet has been measured: unchanged.
-        #expect(MapLegal.reach(sheetTop: 545, screenHeight: 0, current: reach) == reach)
-        #expect(MapLegal.reach(sheetTop: 0, screenHeight: 874, current: reach) == reach)
-    }
-
-    @Test func theCameraCentreMovesWithTheSafeAreaSoThePictureStays() {
-        let c = CLLocationCoordinate2D(latitude: 4.0, longitude: 101.0)
-        // 0.001 degrees a point; the area grows 100 pt (reach 330 to 230): its middle moves 50 pt down, so the
-        // centre coordinate goes 50 pt south.
-        let grown = MapLegal.recentred(c, degreesPerPoint: 0.001, oldReach: 330, newReach: 230)
-        #expect(abs(grown.latitude - 3.95) < 1e-9)
-        #expect(grown.longitude == 101.0)
-        // Shrinking it moves the centre north; no change, no move.
-        #expect(abs(MapLegal.recentred(c, degreesPerPoint: 0.001, oldReach: 230, newReach: 330).latitude - 4.05) < 1e-9)
-        #expect(MapLegal.recentred(c, degreesPerPoint: 0.001, oldReach: 330, newReach: 330).latitude == 4.0)
     }
 
     @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {
@@ -167,31 +145,42 @@ struct HomeSheetTests {
         #expect(!BottomSheet.presents(wanted: false, sheetUp: false))
     }
 
-    @Test func listSheetIsShortUntilPulledUp() {
-        let compact = HomeSheet.compact(picked: false, pinnedHeight: 120, bottomInset: 34, margin: 16)
+    @Test func listAndPickedTripShareOneShortHeight() {
+        // The short height depends on the text size only: the same number whichever state shows, so a pick never
+        // replaces the detent.
+        let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight)
         #expect(compact == HomeSheet.compactHeight)
         #expect(HomeSheet.detent(expanded: false, compact: compact) == .height(300))
         #expect(HomeSheet.detent(expanded: true, compact: compact) == .large)
         #expect(HomeSheet.detents(compact: compact) == [.height(300), .large])
     }
 
-    @Test func pickedSheetFollowsItsHeaderButNeverGoesBelowTheDesign() {
-        // A short header: the design's height stands.
-        #expect(HomeSheet.compact(picked: true, pinnedHeight: 80, bottomInset: 34, margin: 16) == HomeSheet.pickedCompactMinimum)
-        // The largest text wraps the header: the sheet grows with it, past the home indicator.
-        let big = HomeSheet.compact(picked: true, pinnedHeight: 260, bottomInset: 34, margin: 16)
-        #expect(big == 260 + HomeSheet.indicatorRoom + 34 + 16)
-        #expect(big > HomeSheet.pickedCompactMinimum)
+    @Test func theShortHeightGrowsWithTheTextSizeWithinALimit() {
+        // Smaller text never goes below the design's height; the largest sizes stop at 1.5x so the tall detent stays tall.
+        #expect(HomeSheet.compact(scaled: 250) == HomeSheet.compactHeight)
+        #expect(HomeSheet.compact(scaled: 390) == 390)
+        #expect(HomeSheet.compact(scaled: 900) == HomeSheet.compactHeight * 1.5)
+    }
+
+    @Test func aLateRefitOnlyMovesAPictureThatIsOff() {
+        let target = MKCoordinateRegion(center: .init(latitude: 4.0, longitude: 101.0),
+                                        span: .init(latitudeDelta: 1.0, longitudeDelta: 0.5))
+        // Already there, or a hair off (the thinned route against the full one): no second flight.
+        #expect(PickedTripLogic.nearlyShown(centerLatitude: 4.0, centerLongitude: 101.0, latitudeSpan: 1.0, target: target))
+        #expect(PickedTripLogic.nearlyShown(centerLatitude: 4.03, centerLongitude: 101.02, latitudeSpan: 1.04, target: target))
+        // Still showing the list's fit: the camera goes to the trip.
+        #expect(!PickedTripLogic.nearlyShown(centerLatitude: 4.3, centerLongitude: 101.0, latitudeSpan: 1.0, target: target))
+        #expect(!PickedTripLogic.nearlyShown(centerLatitude: 4.0, centerLongitude: 101.0, latitudeSpan: 3.0, target: target))
     }
 
     @Test func theSelectedDetentIsWhatTheSheetReportsBack() {
         // Dragged to the top: tall. Dragged down, or the picked trip's short height: not tall.
         #expect(HomeSheet.isExpanded(.large))
         #expect(!HomeSheet.isExpanded(.height(300)))
-        #expect(!HomeSheet.isExpanded(.height(172)))
+        #expect(!HomeSheet.isExpanded(.height(230)))
         // A new short height after the text size changes still reads as short.
-        let before = HomeSheet.detent(expanded: false, compact: 172)
-        let after = HomeSheet.detent(expanded: false, compact: 230)
+        let before = HomeSheet.detent(expanded: false, compact: 300)
+        let after = HomeSheet.detent(expanded: false, compact: 390)
         #expect(before != after)
         #expect(!HomeSheet.isExpanded(after))
     }

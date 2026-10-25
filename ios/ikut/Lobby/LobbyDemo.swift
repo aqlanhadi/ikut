@@ -277,6 +277,8 @@ enum DemoScreens {
         // Home's sheet (D32): the list short and tall, and a picked trip short, tall, on a stop, loading, failed.
         case "home-compact": return home("list")
         case "home-tall": return home("list-tall")
+        case "home-tap": return home("tap")
+        case "home-tour": return home("tour")
         case "home-picked": return home("short")
         case "home-picked-tall": return home("tall")
         case "home-picked-item": return home("item")

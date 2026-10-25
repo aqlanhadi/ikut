@@ -120,7 +120,7 @@ struct PickedTripTests {
         #expect(4.6 <= mapTop - r.span.latitudeDelta * insets.top)
         // The map's own bottom padding covers a sheet no taller than it, so the camera keeps no extra room;
         // a taller one keeps only the part above the padding.
-        let padding = HomeSheet.legalInset(reach: HomeSheet.defaultReach)
+        let padding = HomeSheet.legalInset(compact: HomeSheet.compactHeight)
         #expect(insets.bottom == 0)
         let tall = TripsHomeView.obscured(mapHeight: 874, sheet: 500).bottom
         #expect(abs(tall - Double(500 - padding) / 874) < 1e-9)
