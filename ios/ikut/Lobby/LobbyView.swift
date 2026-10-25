@@ -387,35 +387,6 @@ struct LobbyView: View {
         let showStops = canEditStops || !stops.isEmpty
         routePreview(stops: stops)
             .frame(height: 104)
-            .overlay(alignment: .topLeading) {
-                if canEdit {
-                    // Change destination on the first row; Add a stop and Suggest stops beside each other on the second.
-                    VStack(alignment: .leading, spacing: 0) {
-                        if canChangeDestination {
-                            Button { showChangeDestination = true } label: {
-                                pill("Change destination", systemImage: "magnifyingglass")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if canEditStops {
-                            HStack(spacing: Spacing.tight) {
-                                Button { showAddStop = true } label: {
-                                    pill("Add a stop", systemImage: "plus")
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(!StopListLogic.canAdd(among: stops))
-                                .accessibilityIdentifier("stops.add")
-                                Button { showSuggestStops = true } label: {
-                                    pill("Suggest stops", systemImage: "sparkles")
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("stops.suggest")
-                            }
-                        }
-                    }
-                    .padding(Spacing.gap)
-                }
-            }
             .overlay(alignment: .bottomTrailing) {
                 if isStarted {
                     StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
@@ -429,6 +400,38 @@ struct LobbyView: View {
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: Radius.card, topTrailingRadius: Radius.card, style: .continuous))
             .cardSlice(top: true)
             .lobbyRow()
+
+        if canEdit, canChangeDestination || canEditStops {
+            // Below the map, so the map's logo and Legal stay clear.
+            VStack(alignment: .leading, spacing: 0) {
+                if canChangeDestination {
+                    Button { showChangeDestination = true } label: {
+                        pill("Change destination", systemImage: "magnifyingglass")
+                    }
+                    .buttonStyle(.plain)
+                }
+                if canEditStops {
+                    HStack(spacing: Spacing.tight) {
+                        Button { showAddStop = true } label: {
+                            pill("Add a stop", systemImage: "plus")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!StopListLogic.canAdd(among: stops))
+                        .accessibilityIdentifier("stops.add")
+                        Button { showSuggestStops = true } label: {
+                            pill("Suggest stops", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("stops.suggest")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.gap)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .cardSlice()
+            .lobbyRow()
+        }
 
         VStack(alignment: .leading, spacing: Spacing.gap) {
             Text(trip.name)
