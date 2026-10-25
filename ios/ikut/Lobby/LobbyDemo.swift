@@ -28,7 +28,7 @@ struct DemoRoads: LegRouting {
 @MainActor
 enum LobbyStopsDemo {
     enum Scene: String {
-        case organizer, organizerEmpty, member, meetAndFailure, turnBack
+        case organizer, organizerEmpty, member, meetAndFailure, turnBack, suggestAdded
     }
 
     /// KL to Ipoh, about 190 km.
@@ -62,6 +62,11 @@ enum LobbyStopsDemo {
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true)
         case .organizerEmpty:
             return LobbyView(sample: model([]), planner: planner, organizer: true)
+        case .suggestAdded:
+            // After Add in Suggest stops: the R&R is an ordinary 20 min Rest in the list (SuggestStops.dc.html d).
+            let tapah = [stop("s1", "R&R Tapah (northbound)", 4.2, 101.25, .rest, 20, 0)]
+            planner.showForDemo(items: tapah.map(StopDraft.init))
+            return LobbyView(sample: model(tapah), planner: planner, organizer: true)
         case .member:
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false)
         case .turnBack:
@@ -79,6 +84,24 @@ enum LobbyStopsDemo {
             planner.showForDemo(items: items, status: .failed(.init(place: .stop("s9"), reason: .failed("offline"))))
             return LobbyView(sample: model([]), planner: planner, organizer: true)
         }
+    }
+}
+
+/// The Suggest stops sheet on KL to Ipoh (SuggestStops.dc.html): one R&R on our side of the route.
+@MainActor
+enum SuggestStopsDemo {
+    static func sheet(seconds: Double = 2 * 3600 + 25 * 60, moved: Int = 0) -> some View {
+        let line = RouteLine(LobbyStopsDemo.route)
+        let at = CLLocationCoordinate2D(latitude: 4.2, longitude: 101.25)
+        let offset = line.project(at)?.offset ?? 0
+        let tapah = PlaceAlong(
+            id: "demo/tapah", kind: .services, name: "R&R Tapah (northbound)", coordinate: at, ring: nil,
+            facilities: [.fuel, .food, .toilets], brands: [], offset: offset, distance: 40, side: .left,
+            carriageway: .ours, ours: true, entrance: at, slipEntrance: false, routeOffset: offset)
+        let model = SuggestStopsModel(line: line, routeSeconds: seconds, existing: [], sites: [], fuel: [], candidates: [tapah])
+        for _ in 0..<abs(moved) { model.step(moved > 0 ? 1 : -1) }
+        let summary = "KL to Ipoh · \(RouteFormat.distance(line.length)) · \(ConvoyFormat.duration(seconds))"
+        return SuggestStopsSheet(model: model, summary: summary, canAdd: { true }, onAdd: { _ in })
     }
 }
 
@@ -174,6 +197,13 @@ enum DemoScreens {
                 .environment(LocationPermission()))
         case "lobby-organizer": return nav(LobbyStopsDemo.lobby(.organizer))
         case "lobby-empty": return nav(LobbyStopsDemo.lobby(.organizerEmpty))
+        case "lobby-suggest-added": return nav(LobbyStopsDemo.lobby(.suggestAdded))
+        // The Suggest stops sheet: the button is on lobby-empty; then the suggestion, the stepper moved, a short trip,
+        // and the largest text.
+        case "suggest-stops": return AnyView(SuggestStopsDemo.sheet())
+        case "suggest-stops-moved": return AnyView(SuggestStopsDemo.sheet(moved: 1))
+        case "suggest-stops-short": return AnyView(SuggestStopsDemo.sheet(seconds: 50 * 60))
+        case "suggest-stops-large": return AnyView(SuggestStopsDemo.sheet().dynamicTypeSize(.accessibility5))
         case "lobby-member": return nav(LobbyStopsDemo.lobby(.member))
         case "lobby-turnback": return nav(LobbyStopsDemo.lobby(.turnBack))
         case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
