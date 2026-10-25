@@ -451,7 +451,10 @@ struct TripMapView: View {
     // viewButtonsTop (above) reads what the slot shows and how the stack spaces it: change one, change the other.
     private var topStack: some View {
         VStack(spacing: Spacing.s) {
-            tripPill
+            HStack(spacing: Spacing.s) {
+                backButton
+                tripPill
+            }
             bannerSlotView
         }
         .padding(.horizontal, Spacing.m)
@@ -505,15 +508,22 @@ struct TripMapView: View {
         }
     }
 
+    /// Back to the lobby: a round glass button of its own beside the pill, as tall as it.
+    private var backButton: some View {
+        Button { exit { dismiss() } } label: {
+            Image(systemName: "chevron.backward")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 56, height: 56)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .roundGlass()
+        .accessibilityLabel("Back to lobby")
+    }
+
     private var tripPill: some View {
         HStack(spacing: Spacing.m) {
-            Button { exit { dismiss() } } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Back to lobby")
             Circle()
                 .fill(pillDot)
                 .frame(width: 10, height: 10)
@@ -546,10 +556,8 @@ struct TripMapView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityValue(bannerSlot.errorHeld ? "error waiting" : "")
-        // 6 pt top and bottom, 4 pt before the 44 pt back button, normal padding after the text,
-        // so the pill is 56 pt tall in every state.
-        .padding(.leading, Spacing.xs)
-        .padding(.trailing, Spacing.l)
+        // 6 pt top and bottom, 16 pt either side, so the pill is 56 pt tall in every state.
+        .padding(.horizontal, Spacing.l)
         .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
         .glassSurface(.pill)
