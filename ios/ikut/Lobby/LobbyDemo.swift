@@ -280,7 +280,7 @@ enum DemoScreens {
         case "stop-approach-food": return AnyView(StopApproachDemo.view(food: true))
         case "road-route-rebuilt": return AnyView(StopApproachDemo.routeNotice(waiting: false))
         case "road-route-waiting": return AnyView(StopApproachDemo.routeNotice(waiting: true))
-        default: return nil
+        default: return BannerSlotDemo.view(name)
         }
     }
 }

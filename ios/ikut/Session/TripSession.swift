@@ -85,6 +85,11 @@ final class TripSession {
 
     private var pauseStart: Date? { localPausedAt ?? car?.pausedAt }
 
+    #if DEBUG
+    /// The paused banner's demo state: sharing paused just now, with nothing behind it.
+    func pauseForDemo() { localPausedAt = clock() }
+    #endif
+
     private struct SessionKey: Equatable {
         var carId: String
         var tripRoute: String

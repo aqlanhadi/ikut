@@ -87,6 +87,10 @@ struct TripMapView: View {
     /// The approach folded the convoy list away; it opens again once the hazard is passed.
     @State private var unfoldAfterApproach = false
     @State private var passedText: String?
+    /// Since when each banner has been up, so the newest of "the rest" can be told (`BannerSlot`).
+    @State private var bannerArrivals = BannerSlot.Arrivals()
+    /// What the slot has already said, so a message coming back from waiting is not said again.
+    @State private var spokenBanners = SpokenBanners()
     /// Kept screen on while the map is up. Until `keepAwakeAnswered` (the person chose, by the menu or the old ask)
     /// the screen stays on (`ScreenAwake.preference`).
     @AppStorage("ikut.map.keepAwake") private var keepAwake = false
@@ -110,6 +114,7 @@ struct TripMapView: View {
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil, demoSelected: String? = nil,
+        demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
         stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
     ) {
@@ -123,6 +128,9 @@ struct TripMapView: View {
         _stopCardOpen = State(initialValue: demoCard != nil)
         _panelExpanded = State(initialValue: demoExpanded)
         _selectedCar = State(initialValue: demoSelected)
+        _approach = State(initialValue: demoApproach)
+        _passedText = State(initialValue: demoPassed)
+        _toast = State(initialValue: demoToast ?? ReportToastModel())
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
         _stopBoard = State(initialValue: stopBoard)
         _model = State(initialValue: model)
@@ -333,32 +341,49 @@ struct TripMapView: View {
     /// A stop request is announced by the pill at the top (and spoken), never by a banner.
     private var bannerHiding: Set<EventCategory> { [.stopRequest] }
 
-    /// Where the view buttons start: one `Spacing.s` below the last thing showing in the top stack,
-    /// the gap the stack keeps between its own items. The stack's height ends with a spacing after
-    /// its always-present, zero-height banner slot when nothing shows below it, so that is taken off.
+    /// Where the view buttons start: one `Spacing.s` below the banner slot when it shows something, the gap the
+    /// stack keeps between the pill and the slot. The stack's height ends with a spacing after the always-present,
+    /// zero-height slot when it is empty, so nothing is added then.
     private var viewButtonsTop: CGFloat {
         guard topHeight > 0 else { return Spacing.xs + 56 + Spacing.s }
-        var bannerSlotEmpty = true
-        if let alert = alerts.current {
-            bannerSlotEmpty = alert.kind != .event || bannerHiding.contains(alert.category) || alert.id == approach?.id
-        }
-        var toastHidden = false
-        if case .hidden = toast.state { toastHidden = true }
-        let nothingBelowSlot = bannerSlotEmpty && passedText == nil && session.rebuilder.notice == nil && toastHidden
-            && glanceError.message == nil
-        return nothingBelowSlot ? topHeight : topHeight + Spacing.s
+        return bannerSlot.shown == nil ? topHeight : topHeight + Spacing.s
     }
 
-    private var bannerShowing: Bool {
-        if approach != nil || passedText != nil || model.catchUp != nil || model.stopApproach != nil { return true }
-        guard let alert = alerts.current, alert.kind == .event else { return false }
-        return !bannerHiding.contains(alert.category)
+    /// The alert centre's banner, when it is drawn: an event that is not a stop request and not the approach pill.
+    private var alertBannerAlert: TripAlert? {
+        guard let alert = alerts.current, alert.kind == .event, !bannerHiding.contains(alert.category),
+              alert.id != approach?.id else { return nil }
+        return alert
     }
+
+    /// The planned stop coming up, with its kind, when its pill can be drawn.
+    private var stopApproachKind: PlannedStopKind? {
+        guard let stopApproach = model.stopApproach else { return nil }
+        return model.stops.first(where: { $0.id == stopApproach.eventId })?.kind
+    }
+
+    /// Every message that wants the slot, with an identity that changes when it is another message of the same
+    /// kind. The identity is also what the message announces under, so `SpokenBanners` keeps it while it waits.
+    private var bannerPresent: [BannerSlot.Message: String] {
+        BannerSlot.present(.init(
+            hazardApproachId: approach?.id,
+            stopPillId: stopCardOpen ? nil : stopPill?.id,
+            stopApproachId: stopApproachKind == nil ? nil : model.stopApproach?.id,
+            toast: toast.state, passedText: passedText, error: glanceError.message, paused: session.isPaused,
+            catchUpId: model.catchUp?.id, alertBannerId: alertBannerAlert?.id,
+            routeNoticeText: session.rebuilder.notice?.text))
+    }
+
+    private var bannerSlot: BannerSlot.Result {
+        BannerSlot.resolve(present: Set(bannerPresent.keys), arrivals: bannerArrivals.dates)
+    }
+
+    private var bannerShowing: Bool { bannerSlot.shown != nil }
 
     /// "Passed the debris" goes after a few seconds; held while VoiceOver runs (a new hazard or Close takes it away).
     /// Its own task: `watchApproach` is cancelled the moment the approach ends, which would clear it at once.
     private func expirePassed() async {
-        guard passedText != nil,
+        guard liveServices, passedText != nil,
               let hold = DrivingGlance.passedDuration(voiceOver: UIAccessibility.isVoiceOverRunning) else { return }
         try? await Task.sleep(for: hold)
         guard !Task.isCancelled else { return }
@@ -420,36 +445,61 @@ struct TripMapView: View {
         }
     }
 
-    // viewButtonsTop (above) reads what this stack shows and how it spaces it: change one, change the other.
+    // viewButtonsTop (above) reads what the slot shows and how the stack spaces it: change one, change the other.
     private var topStack: some View {
         VStack(spacing: Spacing.s) {
             tripPill
-            if session.isPaused {
-                PausedBanner(session: session, onError: { message in
-                    glanceError.show(message, cause: .pause)
-                })
-            }
-            if let stopPill, !stopCardOpen {
-                StopPillView(pill: stopPill, onButton: pillTapped)
-            }
-            if let catchUp = model.catchUp { CatchUpPill(alert: catchUp, model: model) }
-            // One pill at a time: a hazard 500 m ahead is more urgent than a stop 2 km ahead, which
-            // waits underneath (it was already spoken) and comes back once the hazard is passed.
-            if let stopApproach = model.stopApproach, approach == nil,
-               let kind = model.stops.first(where: { $0.id == stopApproach.eventId })?.kind {
-                StopApproachPill(alert: stopApproach, kind: kind, model: model)
-            }
-            if let approach {
-                ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) }
-            }
-            AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
-            if let passed = passedText { PassedBanner(text: passed) { passedText = nil } }
-            if let notice = session.rebuilder.notice { RouteNoticeBanner(notice: notice) }
-            ReportToastView(model: toast)
-            if let message = glanceError.message { GlanceErrorBanner(message: message) { glanceError.close() } }
+            bannerSlotView
         }
         .padding(.horizontal, Spacing.m)
         .padding(.top, Spacing.xs)
+    }
+
+    /// The one message under the pill (`BannerSlot` picks it). Zero-height while empty, always in the hierarchy so
+    /// the transitions run and it adds nothing to the stack. Stays at one place, under the pill.
+    private var bannerSlotView: some View {
+        ZStack(alignment: .top) {
+            switch bannerSlot.shown {
+            case .hazardApproach:
+                if let approach { ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) } }
+            case .stopPill:
+                if let stopPill, !stopCardOpen {
+                    StopPillView(pill: stopPill, onButton: pillTapped).glanceTransition(edge: .top)
+                }
+            case .stopApproach:
+                if let stopApproach = model.stopApproach, let kind = stopApproachKind {
+                    StopApproachPill(alert: stopApproach, kind: kind, model: model)
+                }
+            case .toast:
+                ReportToastView(model: toast, haptics: false)
+            case .passed:
+                if let passed = passedText { PassedBanner(text: passed) { passedText = nil } }
+            case .paused:
+                PausedBanner(session: session, onError: { message in
+                    glanceError.show(message, cause: .pause)
+                })
+                .glanceTransition(edge: .top)
+            case .catchUp:
+                if let catchUp = model.catchUp { CatchUpPill(alert: catchUp, model: model) }
+            case .alertBanner:
+                AlertBannerView(center: alerts, hiding: bannerHiding, hidingAlertId: approach?.id)
+            case .routeNotice:
+                if let notice = session.rebuilder.notice { RouteNoticeBanner(notice: notice) }
+            case .error:
+                if let message = glanceError.message { GlanceErrorBanner(message: message) { glanceError.close() } }
+            case nil:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .environment(\.spokenBanners, spokenBanners)
+        // Always mounted, unlike the toast: a report made while another message has the slot still gives its haptics.
+        .reportHaptics(toast)
+        .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: bannerSlot.shown)
+        .onChange(of: bannerPresent, initial: true) { _, present in
+            bannerArrivals.update(present: present, now: Date())
+            spokenBanners.keep(Set(present.values))
+        }
     }
 
     private var tripPill: some View {
@@ -487,10 +537,21 @@ struct TripMapView: View {
                     .font(.title3)
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
+                    .overlay(alignment: .topTrailing) {
+                        // MapBannerSlot.dc.html frame i: an error is held behind another message.
+                        if bannerSlot.errorHeld {
+                            Circle().fill(Color.red).frame(width: 12, height: 12)
+                                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                                .padding(.top, 2).padding(.trailing, 6)
+                                .accessibilityHidden(true)
+                                .accessibilityIdentifier("trip.pill.errorDot")
+                        }
+                    }
             }
             .tint(GlassSurface.active ? Color.surfaceAccent : nil)
             .disabled(isWorking)
             .accessibilityLabel("Trip menu")
+            .accessibilityValue(bannerSlot.errorHeld ? "error waiting" : "")
         }
         // Map.dc.html: 6 pt top and bottom, 16 pt before the dot, 4 pt after the 44 pt menu button,
         // so the pill is 56 pt tall in every state.
