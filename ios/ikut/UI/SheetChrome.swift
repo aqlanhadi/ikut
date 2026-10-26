@@ -14,6 +14,18 @@ extension View {
             .padding(.bottom, -lift)
     }
 
+    /// The sheet's bottom bar as a container: on iOS 26 a `safeAreaBar`, so the scrolling content under it fades out
+    /// with the system's soft bottom edge instead of reading through the bar; before that a plain bottom inset.
+    /// The bar's content takes `sheetActionBar(lift:)` as before.
+    @ViewBuilder func sheetBottomBar<Bar: View>(@ViewBuilder _ bar: () -> Bar) -> some View {
+        if #available(iOS 26, *) {
+            safeAreaBar(edge: .bottom, spacing: 0) { bar() }
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0) { bar() }
+        }
+    }
+
     /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): the main action prominent
     /// and tinted with the accent, the quieter one clear (`GlassSurface.useGlass` is the switch). Before iOS 26,
     /// the tinted and bordered capsules as before.
@@ -98,6 +110,73 @@ struct RoundGlassIconButton: View {
     private var isText: Bool { if case .text = face { true } else { false } }
 }
 
+/// The top row of a sheet over the map: [leading round button] [title over subtitle] [trailing round button], with the
+/// title block centred between them as Apple's inline sheet titles are. Each side reserves a button's width (44 pt)
+/// even with no button, so the block stays truly centred, and it keeps `Spacing.m` from each button. The title is one line
+/// (semibold title3; two at accessibility sizes), the subtitle up to two (footnote), truncating in the middle. Give it
+/// the sheet's side insets (`Spacing.l`) where it is used.
+struct SheetTopRow<Leading: View, Trailing: View>: View {
+    var title: String
+    var subtitle: String?
+    /// What VoiceOver reads for the title when it should say more than the title.
+    var titleLabel: String?
+    var subtitleIdentifier: String?
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let lines = typeSize.isAccessibilitySize ? 2 : 1
+        HStack(spacing: 0) {
+            leading.frame(width: 44, height: 44)
+            VStack(spacing: Spacing.xxs) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .lineLimit(lines)
+                    .truncationMode(.middle)
+                    .accessibilityLabel(titleLabel ?? title)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(Color.surfaceSecondary)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .accessibilityIdentifier(subtitleIdentifier ?? "")
+                }
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.m)
+            trailing.frame(width: 44, height: 44)
+        }
+        .frame(minHeight: 48)
+    }
+}
+
+/// The same round button for the system share sheet (a `ShareLink`, which isn't a `Button` to wrap).
+struct RoundGlassShareLink: View {
+    var item: String
+    var label = "Share invite"
+
+    var body: some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            ShareLink(item: item) { face.frame(width: 44, height: 44) }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
+                .accessibilityLabel(label)
+        } else {
+            ShareLink(item: item) {
+                face.foregroundStyle(.secondary).frame(width: 44, height: 44).background(.quaternary, in: Circle())
+            }
+            .accessibilityLabel(label)
+        }
+    }
+
+    private var face: some View { Image(systemName: "square.and.arrow.up").font(.footnote.weight(.bold)) }
+}
+
 /// The search bar of an Apple-Maps-style sheet (Home's Where to?, then the live search): a full-width capsule at
 /// least 48 pt tall on a light translucent fill with a hairline edge, a magnifier in .primary, then the text at the
 /// body size. Two forms with the same face: `SheetSearchButton` (a placeholder you tap) and `SheetSearchField`
@@ -106,6 +185,19 @@ enum SheetSearch {
     static let height: CGFloat = 48
     /// A capsule at the bar's height.
     static let radius: CGFloat = height / 2
+}
+
+extension View {
+    /// The search bar's face: raised Liquid Glass on iOS 26 (the same glass as the round buttons beside it; the glass
+    /// draws its own edge), the flat tile fill before that. Not interactive for the field form's sake: it must not
+    /// take the taps meant for the text field.
+    @ViewBuilder fileprivate func searchBarSurface(interactive: Bool = false) -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            glassEffect(interactive ? .regular.interactive() : .regular, in: Capsule())
+        } else {
+            surfaceTile(radius: SheetSearch.radius)
+        }
+    }
 }
 
 /// The TextField form. `clear` is the action of the clear button, shown when it isn't nil (pass it while there is text).
@@ -128,7 +220,7 @@ struct SheetSearchField<Field: View>: View {
         .padding(.leading, Spacing.m)
         .padding(.trailing, clear == nil ? Spacing.m : 0)
         .frame(minHeight: SheetSearch.height)
-        .surfaceTile(radius: SheetSearch.radius)
+        .searchBarSurface()
     }
 }
 
@@ -147,7 +239,7 @@ struct SheetSearchButton: View {
             .padding(.horizontal, Spacing.m)
             .frame(minHeight: SheetSearch.height)
             .contentShape(Capsule())
-            .surfaceTile(radius: SheetSearch.radius)
+            .searchBarSurface(interactive: true)
         }
         .buttonStyle(.plain)
     }

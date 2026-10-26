@@ -104,21 +104,24 @@ enum LobbyMapLogic {
         return result
     }
 
-    /// The fraction of the map's height kept clear at the top: the navigation bar with the status bar (`safeTop`, the
-    /// map's own top safe area, so it follows the layout: piece 2 takes the toolbar out) and room for the
-    /// destination flag, which stands about `flagRoom` above its coordinate. The sheet needs none at the bottom: the
-    /// map's bottom safe area (`LobbySheet.legalInset`) already sits above the medium sheet, and MapKit fits inside
-    /// it (`bottomPadding`). Before the map is measured a typical bar and phone height stand in.
+    /// The fraction of the map's height kept clear at the top: the status bar (`safeTop`, the map's own top safe area:
+    /// the lobby has no navigation bar, its header is in the sheet), the round "show the whole trip" button that hangs
+    /// under it, and room for the destination flag, which stands about `flagRoom` above its coordinate, so the flag
+    /// lands clear of both. The sheet needs none at the bottom: the map's bottom safe area (`LobbySheet.legalInset`)
+    /// already sits above the medium sheet, and MapKit fits inside it (`bottomPadding`). Before the map is measured a
+    /// typical status bar and phone height stand in.
     static func topFraction(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat = 0) -> Double {
-        let bar = safeTop > 0 ? safeTop : typicalBar
+        let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
         // MapKit fits a region inside the map's safe area, so the fractions are of the part above the bottom padding.
         let measured = mapHeight - bottomPadding
         let viewport = measured > 2 * (bar + flagRoom) ? measured : 874 - bottomPadding
         return Double((bar + flagRoom) / viewport)
     }
 
-    /// The bar with the status bar before it is measured.
-    static let typicalBar: CGFloat = 110
+    /// The status bar before it is measured.
+    static let typicalBar: CGFloat = 62
+    /// Under the status bar: the gap above the round map button, the button (56 pt) and a margin below it.
+    static let buttonBand: CGFloat = Spacing.xs + 56 + Spacing.s
     /// The destination flag: its pin and name above the coordinate, with a margin.
     static let flagRoom: CGFloat = 50
     /// Degrees of latitude shown when the camera flies to one stop.
@@ -162,7 +165,7 @@ struct LobbyMapView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var camera: MapCameraPosition = .automatic
     @State private var mapHeight: CGFloat = 0
-    /// The map's top safe area: the navigation bar and the status bar.
+    /// The map's top safe area: the status bar (the lobby has no navigation bar).
     @State private var safeTop: CGFloat = 0
     @State private var onStop = false
     @State private var fitted = false
@@ -215,7 +218,7 @@ struct LobbyMapView: View {
             .accessibilityIdentifier("lobby.wholeTrip")
         }
         // Measured here, outside the map's ignoresSafeArea (inside it the insets read zero): the top safe area is the
-        // status bar and the navigation bar, as the layout has them.
+        // status bar, as the layout has it.
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
             guard top != safeTop else { return }
             safeTop = top

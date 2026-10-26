@@ -119,26 +119,4 @@ extension LobbyLogic {
         guard code.count == 6 else { return code }
         return "\(code.prefix(3)) \(code.suffix(3))"
     }
-
-    /// "You (organiser, sharing location) · Siti", "Wyna (sharing location) · 3 others", "Daniel · no one sharing yet".
-    static func peopleLine(members: [Member], trackerUserId: String?, currentUserId: String?) -> String {
-        guard !members.isEmpty else { return "No one yet" }
-        let ordered = members.filter { $0.id == currentUserId } + members.filter { $0.id != currentUserId }
-        func label(_ m: Member) -> String {
-            var roles: [String] = []
-            if m.role == .organizer { roles.append("organiser") }
-            if let id = m.id, id == trackerUserId { roles.append("sharing location") }
-            let name = m.id == currentUserId ? "You" : m.displayName
-            return roles.isEmpty ? name : "\(name) (\(roles.joined(separator: ", ")))"
-        }
-        var parts: [String]
-        if ordered.count <= 2 {
-            parts = ordered.map(label)
-        } else {
-            parts = ordered.prefix(1).map(label)
-            parts.append("\(ordered.count - 1) others")
-        }
-        if trackerUserId == nil { parts.append("no one sharing yet") }
-        return parts.joined(separator: " · ")
-    }
 }

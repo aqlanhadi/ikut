@@ -103,7 +103,10 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
     func checkLobbyHasFourCars() throws {
         // The cars sit below the fold of the sheet at medium.
         pullLobbySheetUp()
-        try waitFor("lobby shows 4 of 4 ready", timeout: 90) { labelled("label CONTAINS %@", "4 of 4 ready").exists }
+        try waitFor("lobby shows 4 of 4 ready", timeout: 90) {
+            dismissAlwaysExplainerIfShown()
+            return labelled("label CONTAINS %@", "4 of 4 ready").exists
+        }
         // ("Wyna" only: typing an apostrophe may come out curly with smart punctuation.)
         for car in ["Wyna", "Hafiz’s Hilux", "Daniel’s City"] {
             XCTAssertTrue(labelled("label CONTAINS %@", car).exists, "lobby is missing \(car)")
@@ -125,18 +128,28 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
         if fit.waitForExistence(timeout: 5) { fit.tap() }
     }
 
-    func openTripMenuItem(_ menu: String, _ item: String) {
-        app.buttons[menu].tap()
-        let button = app.buttons[item]
-        XCTAssertTrue(button.waitForExistence(timeout: 5), "\(menu) has no \(item)")
-        button.tap()
+    /// A row of the lobby's tall sheet (Pause sharing, Leave trip, End trip), by identifier: pulls the sheet up if it
+    /// is at medium, then scrolls the list until the row can be tapped.
+    func tapLobbyRow(_ id: String) {
+        let row = app.buttons[id]
+        if !row.exists {
+            let grabber = app.otherElements["Sheet Grabber"]
+            if grabber.exists { grabber.swipeUp() }
+        }
+        var scrolls = 0
+        while !(row.exists && row.isHittable), scrolls < 8 {
+            app.collectionViews.firstMatch.swipeUp()
+            scrolls += 1
+        }
+        XCTAssertTrue(row.exists && row.isHittable, "the lobby has no \(id) row")
+        row.tap()
     }
 
-    /// The map's back button, then the lobby's Trip options menu: the map no longer has trip controls.
+    /// The map's back button, then the lobby's End trip row: the map no longer has trip controls.
     func endTripFromLobby() {
         app.buttons["Back to lobby"].tap()
-        XCTAssertTrue(app.buttons["Trip options"].waitForExistence(timeout: 15), "lobby has no Trip options")
-        openTripMenuItem("Trip options", "End trip")
+        XCTAssertTrue(waitForLobby(timeout: 15), "no lobby after Back to lobby")
+        tapLobbyRow("lobby.endTrip")
     }
 
     /// Taps the destructive button of a confirmation dialog (it repeats the menu item's title).
@@ -314,7 +327,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
         try step("2. lobby shows A and the scripted cars 3 and 4") {
             try waitMark("cars.joined", timeout: 180)
             try checkLobbyHasFourCars()
-            XCTAssertTrue(labelled("label CONTAINS %@", "Lead").exists, "lobby is missing the organizer's (lead) car")
+            XCTAssertTrue(labelled("identifier == %@", "lobby.car.1").exists, "lobby is missing the organizer's car (car 1)")
             // A taps Start trip only after this mark, so until then B has only the waiting line, no Start trip.
             let waiting = element("lobbyWaiting")
             XCTAssertTrue(waiting.waitForExistence(timeout: 10), "B's lobby has no waiting line")
@@ -410,8 +423,8 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
 
         try step("8. pauses sharing in the lobby, then resumes") {
             app.buttons["Back to lobby"].tap()
-            XCTAssertTrue(app.buttons["Trip options"].waitForExistence(timeout: 15), "lobby has no Trip options")
-            openTripMenuItem("Trip options", "Pause sharing")
+            XCTAssertTrue(waitForLobby(timeout: 15), "no lobby after Back to lobby")
+            tapLobbyRow("lobby.pause")
             try waitFor("paused banner", timeout: 20) { labelled("label CONTAINS %@", "Sharing paused").exists }
             shot("12-paused")
             mark("b.paused")
@@ -429,7 +442,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
 
         try step("9. leaves the trip") {
             try waitMark("a.sawResumed", timeout: 150)
-            openTripMenuItem("Trip options", "Leave trip")
+            tapLobbyRow("lobby.leaveTrip")
             confirm("Leave trip")
             let joinTrip = app.buttons["homeJoin"]
             XCTAssertTrue(joinTrip.waitForExistence(timeout: 30), "B didn't return Home after leaving")
@@ -444,7 +457,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             mark("b.rejoined")
             try waitMark("a.ended", timeout: 240)
             try waitFor("lobby says Trip ended", timeout: 60) { labelled("label CONTAINS %@", "Trip ended").exists }
-            XCTAssertFalse(app.buttons["Trip options"].exists, "an ended trip has no options left")
+            XCTAssertFalse(app.buttons["lobby.leaveTrip"].exists || app.buttons["lobby.endTrip"].exists, "an ended trip has no options left")
             shot("16-trip-ended")
             mark("b.done")
         }

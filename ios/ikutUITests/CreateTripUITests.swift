@@ -69,7 +69,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         XCTAssertTrue(waitForLobby(timeout: 30), "New trip to the lobby: no lobby sheet")
 
         // Lobby, Back: Home's sheet comes back.
-        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["Back to trips"].tap()
         let newTrip = app.buttons["homeWhereTo"]
         XCTAssertTrue(newTrip.waitForExistence(timeout: 15), "Back from the lobby: Home's sheet didn't come back")
         XCTAssertTrue(newTrip.isHittable, "Back from the lobby: Home's Where to? row isn't hittable")

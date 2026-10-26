@@ -753,7 +753,7 @@ struct TripMapView: View {
         let shown = shownNow
         let heights = sheetHeights
         return ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
-            .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
+            .sheetBottomBar { actionBar }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
