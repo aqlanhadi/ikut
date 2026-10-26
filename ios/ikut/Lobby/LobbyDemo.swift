@@ -60,10 +60,22 @@ enum LobbyStopsDemo {
             planner.sync(trip: model.trip, stops: model.stops)
             return model
         }
+        /// Wyna’s X70 joins 45 km along and Hafiz’s Hilux 90 km along, Daniel’s City leaves with the convoy.
+        func joining(_ base: LobbyModel) -> LobbyModel {
+            let offsets = ["c2": 45_000.0, "c3": 90_000.0, "c4": 0.0]
+            let cars = base.cars.map { car -> Car in
+                var car = car
+                car.mergeOffset = car.id.flatMap { offsets[$0] }
+                return car
+            }
+            return LobbyModel(sampleTrip: base.trip!, cars: cars, members: base.members, stops: base.stops)
+        }
+        /// The demo geocoder answers at once: Rawang near KL, Tanjung Malim further up.
+        let towns = JoinTowns(place: { $0.latitude < 3.55 ? "Rawang" : "Tanjung Malim" }, pause: .zero)
         switch scene {
         case .organizer:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
-            return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true)
+            return LobbyView(sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns)
         case .tall:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true, tall: true)
@@ -78,10 +90,10 @@ enum LobbyStopsDemo {
             let siti = Car(id: "c5", name: "Siti’s Bezza", color: "#8E8E93", trackerUserId: nil, isLead: false, route: nil,
                            mergeOffset: nil, state: .convoy, number: 5)
             let crowded = LobbyModel(
-                sampleTrip: base.trip!, cars: base.cars.map(ready) + [siti],
+                sampleTrip: base.trip!, cars: joining(base).cars.map(ready) + [siti],
                 members: base.members + [Member(id: "u8", displayName: "Nora", carId: "c5", role: .member)],
                 stops: base.stops)
-            return LobbyView(sample: crowded, planner: planner, organizer: true)
+            return LobbyView(sample: crowded, planner: planner, organizer: true, joinTowns: towns)
         case .organizerEmpty:
             return LobbyView(sample: model([]), planner: planner, organizer: true)
         case .suggestAdded:

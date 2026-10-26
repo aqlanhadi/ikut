@@ -42,18 +42,45 @@ enum LobbyContent {
 
     /// How a car meets the convoy, from what its own doc says (no position): no route of its own means it is on the
     /// main route, at its start or part-way along. Nil before the car's tracker has worked it out. The "never meets"
-    /// case needs the route's geometry, so it is left for piece 3 (join towns).
+    /// case needs the route's geometry (the other `join`).
     static func join(of car: Car) -> OwnWayJoin? {
-        if let route = car.route, !route.isEmpty { return .merges(offset: car.mergeOffset ?? 0) }
-        guard let offset = car.mergeOffset else { return nil }
+        let offset = OwnWayLogic.cleanOffset(car.mergeOffset)
+        if let route = car.route, !route.isEmpty { return .merges(offset: offset ?? 0) }
+        guard let offset else { return nil }
         return offset < OwnWayLogic.startsWithin ? .startsWithConvoy : .onRoute(offset: offset)
+    }
+
+    /// How a car meets the convoy, and whether its route goes to the trip's meeting point (so it "meets you" there).
+    struct CarJoin: Equatable {
+        var join: OwnWayJoin?
+        var viaMeeting = false
+        /// Cars driving to the meeting point read "Meets you at <it>" (nothing is looked up for them).
+        var meetsAtMeeting: Bool {
+            guard viaMeeting, case .merges(let offset)? = join else { return false }
+            return offset < OwnWayLogic.startsWithin
+        }
+    }
+
+    /// Like `join(of:)`, but with the main route's geometry it can also tell a car whose own route never meets it
+    /// (`.meetsAtDestination`), and a route that joins at the meeting point. Falls back to `join(of:)` without a route.
+    static func carJoin(of car: Car, main: RouteLine?, hasMeetingPoint: Bool) -> CarJoin {
+        if let main, !main.isEmpty, let found = OwnWayLogic.join(car: car, main: main, hasMeetingPoint: hasMeetingPoint) {
+            return CarJoin(join: found.join, viaMeeting: found.viaMeeting)
+        }
+        return CarJoin(join: join(of: car))
+    }
+
+    static func join(of car: Car, main: RouteLine?, hasMeetingPoint: Bool) -> OwnWayJoin? {
+        carJoin(of: car, main: main, hasMeetingPoint: hasMeetingPoint).join
     }
 
     /// `viewerLeavesFromTheStart`: the viewer is on the main route's start (the organiser always is), so a car that
     /// starts there "Leaves with you". `joinPlace` is the town a car joins near, for the join towns (D50 piece 3);
-    /// until it is given the line says "Joins the convoy".
+    /// until it is given the line says "Joins the convoy". `join` is `join(of:main:hasMeetingPoint:)` when the route is
+    /// known; `destination` names where a car that never meets the route does.
     static func carText(
-        _ item: LobbyCar, mine: Bool, viewerLeavesFromTheStart: Bool, joinPlace: String? = nil
+        _ item: LobbyCar, mine: Bool, viewerLeavesFromTheStart: Bool, joinPlace: String? = nil,
+        join known: OwnWayJoin? = nil, destination: String? = nil, meeting: String? = nil
     ) -> CarText {
         let name = mine ? "\(item.car.name) · You" : item.car.name
         guard item.hasTracker else { return CarText(name: name, line: "Not sharing location yet", ready: false, isMine: mine) }
@@ -61,10 +88,14 @@ enum LobbyContent {
         if mine {
             line = "Ready · leaves from your start"
         } else {
-            switch join(of: item.car) {
+            let who = viewerLeavesFromTheStart ? "you" : "the convoy"
+            switch known ?? join(of: item.car) {
+            case .merges where meeting != nil: line = "Meets \(who) at \(meeting!)"
             case .startsWithConvoy: line = viewerLeavesFromTheStart ? "Leaves with you" : "Leaves with the convoy"
-            case .onRoute, .merges: line = joinPlace.map { "Joins near \($0)" } ?? "Joins the convoy"
-            case .meetsAtDestination: line = "Meets the convoy at the end"
+            case .onRoute: line = "Waiting on the route"
+            case .merges: line = joinPlace.map { "Joins near \($0)" } ?? "Joins the convoy"
+            case .meetsAtDestination:
+                line = destination.map { "Meets \(who) at \($0)" } ?? "Meets the convoy at the end"
             case nil: line = "Sharing location"
             }
         }

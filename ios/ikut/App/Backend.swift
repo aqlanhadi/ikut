@@ -63,6 +63,7 @@ enum Backend {
         let defaults = UserDefaults.standard
         if defaults.string(forKey: userBackendKey) != kind, Auth.auth().currentUser != nil {
             try? Auth.auth().signOut()
+            Task { @MainActor in JoinTowns.forgetAll() }
         }
         defaults.set(kind, forKey: userBackendKey)
     }

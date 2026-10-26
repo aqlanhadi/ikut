@@ -592,12 +592,16 @@ struct TripsHomeView: View {
         }
     }
 
+    /// The search bar's height, which the name button is made to match (it grows with the text size).
+    @State private var barHeight = SheetSearch.height
+
     private var header: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             // Apple Maps' top row: the search bar and the name's avatar. Tapping the bar starts the same flow, in
             // Where to?, where the bar becomes editable.
             HStack(spacing: Spacing.gap) {
                 SheetSearchButton(placeholder: "Where to?", action: onNewTrip)
+                    .trackingHeight($barHeight)
                     .accessibilityIdentifier("homeWhereTo")
                 profileButton
             }
@@ -729,7 +733,7 @@ struct TripsHomeView: View {
     @ViewBuilder
     private var profileButton: some View {
         if let name = profileName {
-            RoundGlassIconButton(text: name.prefix(1).uppercased(), label: "Your name and settings", size: SheetSearch.height) {
+            RoundGlassIconButton(text: name.prefix(1).uppercased(), label: "Your name and settings", size: barHeight, exact: true) {
                 newName = name
                 renaming = true
             }

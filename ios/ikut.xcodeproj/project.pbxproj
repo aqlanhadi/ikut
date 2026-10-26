@@ -81,6 +81,7 @@
 		4A62431BEA2E9F01E17A2CE2 /* LocationAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F08168BB70493362B6773C8 /* LocationAccess.swift */; };
 		4ABFF0E282D863E458E06571 /* RecapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 698FEDDD6491F2113B929776 /* RecapService.swift */; };
 		4AC34867A11F17F1141F7F70 /* MapDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3375CFBCC39B1C2F76B90699 /* MapDemo.swift */; };
+		4B2726AABB0929C5FA48E233 /* JoinTowns.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F3CF9A6AAD541D8024D3F1 /* JoinTowns.swift */; };
 		4C2FA06DB04BD4142B933300 /* StopRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82641AA014018A19F3AFFE90 /* StopRouting.swift */; };
 		4CDFCFA89CBE14EB3CE2D9F7 /* StopApproach.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AF3B9CBA8F2BD599933F59C /* StopApproach.swift */; };
 		4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */; };
@@ -392,6 +393,7 @@
 		66FF5396649ED8B58EC123A7 /* TripAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAskTests.swift; sourceTree = "<group>"; };
 		67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarAheadTests.swift; sourceTree = "<group>"; };
 		698FEDDD6491F2113B929776 /* RecapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapService.swift; sourceTree = "<group>"; };
+		69F3CF9A6AAD541D8024D3F1 /* JoinTowns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTowns.swift; sourceTree = "<group>"; };
 		6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteTimeoutTests.swift; sourceTree = "<group>"; };
 		6CAD86226D34FC774F9DB35D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyScenarioUITests.swift; sourceTree = "<group>"; };
@@ -574,6 +576,7 @@
 			isa = PBXGroup;
 			children = (
 				1252A60E6727550F035DB2EA /* CarRow.swift */,
+				69F3CF9A6AAD541D8024D3F1 /* JoinTowns.swift */,
 				E803C8C9331D07C56F506F44 /* LobbyContent.swift */,
 				A934C926EBC010FFC24A37C0 /* LobbyDemo.swift */,
 				FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */,
@@ -1255,6 +1258,7 @@
 				386D45F03FBA22A2820ED469 /* JoinDemo.swift in Sources */,
 				BEFD37A841FAEB09281F0EDB /* JoinModel.swift in Sources */,
 				66E1D3BEB35CA17544C67084 /* JoinService.swift in Sources */,
+				4B2726AABB0929C5FA48E233 /* JoinTowns.swift in Sources */,
 				1DDB1C1F2C277F3876102F3C /* JoinTripView.swift in Sources */,
 				66086EF8F71F7F9414B5ED2F /* LiveSpeechEngine.swift in Sources */,
 				BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */,

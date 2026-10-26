@@ -63,39 +63,55 @@ struct RoundGlassIconButton: View {
     private var face: Face
     var label: String
     var size: CGFloat = 44
+    /// The circle is exactly `size` across (Home's name button, which must match the search bar's height as it
+    /// grows with the text size), glass included, whatever padding the glass style would add around the face.
+    var exact = false
     var action: () -> Void
 
-    init(systemImage: String, label: String, size: CGFloat = 44, action: @escaping () -> Void) {
+    init(systemImage: String, label: String, size: CGFloat = 44, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
         self.label = label
         self.size = size
+        self.exact = exact
         self.action = action
     }
 
-    /// A text face, such as the person's initial: .primary and semibold.
-    init(text: String, label: String, size: CGFloat = 44, action: @escaping () -> Void) {
+    /// A text face, such as the person's initial: .primary and semibold, shrinking to fit the circle.
+    init(text: String, label: String, size: CGFloat = 44, exact: Bool = false, action: @escaping () -> Void) {
         face = .text(text)
         self.label = label
         self.size = size
+        self.exact = exact
         self.action = action
     }
 
     @ViewBuilder private var faceView: some View {
         switch face {
         case .symbol(let name): Image(systemName: name).font(.footnote.weight(.bold))
-        case .text(let text): Text(text).font(.body.weight(.semibold))
+        case .text(let text): Text(text).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
         }
     }
 
     var body: some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
-            Button(action: action) {
-                faceView.frame(width: size, height: size)
+            if exact {
+                Button(action: action) {
+                    faceView.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
+                .frame(width: size, height: size)
+                .accessibilityLabel(label)
+            } else {
+                Button(action: action) {
+                    faceView.frame(width: size, height: size)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
+                .accessibilityLabel(label)
             }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .tint(.primary)
-            .accessibilityLabel(label)
         } else {
             Button(action: action) {
                 faceView
@@ -181,6 +197,16 @@ struct RoundGlassShareLink: View {
 /// least 48 pt tall on a light translucent fill with a hairline edge, a magnifier in .primary, then the text at the
 /// body size. Two forms with the same face: `SheetSearchButton` (a placeholder you tap) and `SheetSearchField`
 /// (a TextField you put inside it, with a clear button once there is text).
+extension View {
+    /// Reports this view's height into `height`, as it lays out (the search bar grows with the text size, and the
+    /// round button and Cancel beside it follow).
+    func trackingHeight(_ height: Binding<CGFloat>) -> some View {
+        onGeometryChange(for: CGFloat.self) { $0.size.height } action: { new in
+            if new > 0, abs(new - height.wrappedValue) > 0.1 { height.wrappedValue = new }
+        }
+    }
+}
+
 enum SheetSearch {
     static let height: CGFloat = 48
     /// A capsule at the bar's height.

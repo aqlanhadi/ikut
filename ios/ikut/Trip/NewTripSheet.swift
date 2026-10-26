@@ -7,6 +7,8 @@ struct WhereToSheet: View {
     @Bindable var flow: NewTripFlow
     var onClose: () -> Void
     @FocusState private var searchFocused: Bool
+    /// The search bar's height, which Cancel is made to match.
+    @State private var barHeight = SheetSearch.height
 
     private var model: CreateTripModel { flow.search }
 
@@ -28,6 +30,7 @@ struct WhereToSheet: View {
                         .onChange(of: model.query) { model.queryChanged() }
                         .onSubmit { model.submit() }
                 }
+                .trackingHeight($barHeight)
                 glassCapsule("Cancel", action: onClose)
             }
             .padding(.top, Spacing.xs)
@@ -59,9 +62,11 @@ struct WhereToSheet: View {
     /// Cancel: a glass capsule on the sheet (iOS 26), plain accent text otherwise.
     @ViewBuilder private func glassCapsule(_ title: String, action: @escaping () -> Void) -> some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
-            Button(title, action: action).buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(.primary)
+            Button(action: action) { Text(title).frame(maxHeight: .infinity) }
+                .buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(.primary)
+                .frame(height: barHeight)
         } else {
-            Button(title, action: action).foregroundStyle(Color.ikutAccent).frame(minHeight: 44)
+            Button(title, action: action).foregroundStyle(Color.ikutAccent).frame(minHeight: barHeight)
         }
     }
 }

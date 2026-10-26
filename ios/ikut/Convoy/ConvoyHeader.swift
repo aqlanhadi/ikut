@@ -31,7 +31,7 @@ enum ConvoyHeader {
             guard let amount else { return (name, name.lowercasedFirst) }
             return ("\(name) · \(amount.text)", "\(name.lowercasedFirst), \(amount.spoken) away")
         case .meetsAtDestination:
-            let name = "Meets the convoy in \(destination)"
+            let name = "Meets the convoy at \(destination)"
             guard let amount else { return (name, name.lowercasedFirst) }
             return ("\(name) · \(amount.text)", "\(name.lowercasedFirst), \(amount.spoken) away")
         case .startsWithConvoy, .onRoute, nil:
@@ -55,8 +55,8 @@ enum ConvoyHeader {
     static func label(title: String, text: Text, destination: String, arrive: String?) -> String {
         var parts = [title, "from \(text.from)"]
         if let spoken = text.spokenJoin { parts.append(spoken) }
-        // "meets the convoy in Ipoh, 160 km away" already names the destination.
-        if !(text.spokenJoin?.hasPrefix("meets the convoy in") ?? false) { parts.append("to \(destination)") }
+        // "meets the convoy at Ipoh, 160 km away" already names the destination.
+        if !(text.spokenJoin?.hasPrefix("meets the convoy at") ?? false) { parts.append("to \(destination)") }
         if let arrive { parts.append("arrive \(arrive)") }
         // "from Shah Alam to Ipoh" reads as one phrase when nothing sits between.
         return parts.enumerated().reduce(into: "") { out, item in

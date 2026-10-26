@@ -78,7 +78,7 @@ struct OwnWayTests {
     @Test func carFromTheFarSideMeetsTheConvoyAtTheDestination() throws {
         let found = try #require(OwnWayLogic.join(car: neverMergingCar(), main: main))
         #expect(found.join == .meetsAtDestination)
-        #expect(OwnWayLogic.joinLine(found.join, place: nil, destination: "Ipoh") == "Meets the convoy in Ipoh")
+        #expect(OwnWayLogic.joinLine(found.join, place: nil, destination: "Ipoh") == "Meets the convoy at Ipoh")
         #expect(OwnWayLogic.joinCoordinate(found.join, main: main) == nil)
     }
 
