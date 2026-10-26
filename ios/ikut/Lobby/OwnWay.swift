@@ -19,6 +19,13 @@ enum OwnWayLogic {
     /// A car on the main route this close to its start leaves with the convoy.
     static let startsWithin: CLLocationDistance = 2_000
 
+    /// A `mergeOffset` any member could have written to their own car doc: NaN and infinity are no offset at all, and
+    /// a negative one is the start. (Huge finite ones are clamped where they become a point on the route.)
+    static func cleanOffset(_ offset: Double?) -> Double? {
+        guard let offset, offset.isFinite else { return nil }
+        return max(0, offset)
+    }
+
     /// How the car meets the convoy and how far its own route runs before that; nil before its route is known
     /// (the tracker has no fix yet). Reads only the car doc: `CarRouteLogic` stored `route` (nil on the main route)
     /// and `mergeOffset`.
@@ -29,7 +36,7 @@ enum OwnWayLogic {
     ) -> (join: OwnWayJoin, ownToJoin: Double, own: RouteLine?, viaMeeting: Bool)? {
         guard let car, !main.isEmpty else { return nil }
         guard let encoded = car.route, !encoded.isEmpty else {
-            guard let offset = car.mergeOffset else { return nil }
+            guard let offset = cleanOffset(car.mergeOffset) else { return nil }
             return (offset < startsWithin ? .startsWithConvoy : .onRoute(offset: offset), 0, nil, false)
         }
         let own = RouteLine(Polyline.decode(encoded))
@@ -38,7 +45,7 @@ enum OwnWayLogic {
             return (.merges(offset: meet.mainOffset), meet.otherOffset, own, true)
         }
         if let merge = main.mergeOffset(of: own, tolerance: CarRouteLogic.mergeTolerance) {
-            return (.merges(offset: car.mergeOffset ?? merge.mainOffset), merge.otherOffset, own, false)
+            return (.merges(offset: cleanOffset(car.mergeOffset) ?? merge.mainOffset), merge.otherOffset, own, false)
         }
         return (.meetsAtDestination, own.length, own, false)
     }
@@ -57,7 +64,7 @@ enum OwnWayLogic {
         case .startsWithConvoy: return "Starts with the convoy"
         case .onRoute: return place.map { "Joins the convoy near \($0)" } ?? "Joins the convoy"
         case .merges: return place.map { "Joins the convoy near \($0)" } ?? "Joins the convoy"
-        case .meetsAtDestination: return "Meets the convoy in \(destination)"
+        case .meetsAtDestination: return "Meets the convoy at \(destination)"
         }
     }
 

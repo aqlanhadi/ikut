@@ -23,7 +23,9 @@ struct LobbyView: View {
     @State private var ownWay = OwnWayInfo()
     /// The main route as a line (for each car's join), and the towns the other cars join near.
     @State private var mainLine: RouteLine?
-    @State private var joinTowns = JoinTowns()
+    @State private var joinTowns: JoinTowns
+    /// How each car meets the main route, worked out once whenever the cars or the route change (not on each redraw).
+    @State private var joins: [String: LobbyContent.CarJoin] = [:]
     @State private var planner: StopPlanner
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showAddStop = false
@@ -64,6 +66,7 @@ struct LobbyView: View {
         self.onExit = onExit
         self.onEnded = onEnded
         _model = State(initialValue: LobbyModel(tripId: tripId))
+        _joinTowns = State(initialValue: JoinTowns.shared(for: tripId))
         _session = State(initialValue: TripSession(
             tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
         _planner = State(initialValue: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
@@ -74,6 +77,7 @@ struct LobbyView: View {
     init(sample model: LobbyModel) {
         onExit = {}
         _model = State(initialValue: model)
+        _joinTowns = State(initialValue: JoinTowns(place: { _ in nil }))
         _session = State(initialValue: TripSession(tripId: model.tripId, userId: ""))
         _planner = State(initialValue: StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in }))
         isSample = true
@@ -87,7 +91,7 @@ struct LobbyView: View {
     ) {
         self.init(sample: model)
         // A sample lobby never looks a town up unless the demo gives it a geocoder.
-        _joinTowns = State(initialValue: joinTowns ?? JoinTowns(place: { _ in nil }))
+        if let joinTowns { _joinTowns = State(initialValue: joinTowns) }
         _expanded = State(initialValue: tall)
         _planner = State(initialValue: planner)
         sampleOrganizer = organizer
@@ -342,12 +346,16 @@ struct LobbyView: View {
         }
         .onAppear {
             guard !isSample else { return }
+            joinTowns.open()
             model.start()
             session.start()
         }
         // The session keeps running when another screen (the map) is pushed on top; it stops when
         // the lobby is popped and the session is released.
-        .onDisappear { model.stop() }
+        .onDisappear {
+            model.stop()
+            joinTowns.cancel()
+        }
         .onChange(of: session.isTracking) { _, tracking in
             guard tracking else { return }
             let action = LocationAccess.nextAction(
@@ -465,11 +473,18 @@ struct LobbyView: View {
         return "\(mainLine?.length ?? 0)|\(meeting)|" + cars.joined(separator: ",")
     }
 
+    /// Works out how each car meets the route (decoding routes and finding the merge: not for every redraw), then asks
+    /// for the towns of the cars that join along the way.
     private func askJoinTowns() {
         guard let mainLine else { return }
-        joinTowns.request(
-            cars: model.groupedCars.filter { !isMine($0) }, main: mainLine,
-            hasMeetingPoint: TripSessionLogic.meetingPoint(in: model.stops) != nil)
+        let meeting = TripSessionLogic.meetingPoint(in: model.stops) != nil
+        var found: [String: LobbyContent.CarJoin] = [:]
+        for item in model.groupedCars {
+            guard let id = item.car.id else { continue }
+            found[id] = LobbyContent.carJoin(of: item.car, main: mainLine, hasMeetingPoint: meeting)
+        }
+        joins = found
+        joinTowns.request(cars: model.groupedCars.filter { !isMine($0) }, joins: found, main: mainLine)
     }
 
     private func isMine(_ item: LobbyCar) -> Bool {
@@ -488,13 +503,15 @@ struct LobbyView: View {
             ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { RowDivider() }
                 let mine = isMine(item)
-                let join = LobbyContent.join(
-                    of: item.car, main: mainLine,
-                    hasMeetingPoint: TripSessionLogic.meetingPoint(in: model.stops) != nil)
+                let carJoin = item.car.id.flatMap { joins[$0] } ?? LobbyContent.carJoin(
+                    of: item.car, main: nil, hasMeetingPoint: false)
                 let text = LobbyContent.carText(
                     item, mine: mine, viewerLeavesFromTheStart: isOrganizer || ownWay.join == .startsWithConvoy,
-                    joinPlace: item.car.id.flatMap { joinTowns.town(carId: $0, join: join) }, join: join,
-                    destination: model.trip?.destination.name)
+                    joinPlace: item.car.id.flatMap {
+                        joinTowns.town(carId: $0, join: carJoin.join, mainLength: mainLine?.length ?? 0)
+                    },
+                    join: carJoin.join, destination: model.trip?.destination.name,
+                    meeting: carJoin.meetsAtMeeting ? model.stops.first(where: \.isMeeting)?.name : nil)
                 let row = CarRow(text: text, number: item.car.number ?? index + 1, colorHex: item.car.color)
                 if mine, !isOrganizer, ownWay.joinCoordinate != nil {
                     Button { flyTo("join") } label: { row }
