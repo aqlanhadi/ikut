@@ -24,10 +24,6 @@ struct TripMapView: View {
     @State private var toast = ReportToastModel()
     @State private var camera: MapCameraPosition = .automatic
     @State private var cameraHeading = 0.0
-    /// The car the driver tapped (D34 7b): its marker is ringed and the panel shows its row. It never moves the camera.
-    @State private var selectedCar: String?
-    /// When a car's marker last took a tap, so the map's own tap handler can tell a tap on a car from one on the map.
-    @State private var carTappedAt = Date.distantPast
     /// The convoy list starts folded on every arrival at the map; the driver opens it when they want it.
     @State private var panelExpanded = false
     @State private var reportContext: ReportContext?
@@ -122,7 +118,7 @@ struct TripMapView: View {
     /// For the demo and previews: a model that is fed by hand and no live services.
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
-        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil, demoSelected: String? = nil,
+        alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
         stopService: any StopServing = StopService(),
         onExit: @escaping () -> Void = {}
@@ -140,7 +136,6 @@ struct TripMapView: View {
             _showReport = State(initialValue: true)
         }
         _panelExpanded = State(initialValue: demoExpanded)
-        _selectedCar = State(initialValue: demoSelected)
         _approach = State(initialValue: demoApproach)
         _passedText = State(initialValue: demoPassed)
         _toast = State(initialValue: demoToast ?? ReportToastModel(service: DemoReportService()))
@@ -225,7 +220,6 @@ struct TripMapView: View {
             }
             .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
-            .onChange(of: model.markers.map(\.id)) { _, ids in selectedCar = CarSelection.kept(selectedCar, among: ids) }
             .task(id: approach?.id) { await watchApproach() }
             .task(id: passedText) { await expirePassed() }
     }
@@ -264,30 +258,12 @@ struct TripMapView: View {
             }
             ForEach(model.markers) { marker in
                 Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
-                    MapMarkerView(
-                        marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX,
-                        selected: marker.id == selectedCar)
-                        // Handled here, not by `Map(selection:)`: MapKit reports no second tap on the car it already has
-                        // selected, so a re-tap could never clear it.
-                        .onTapGesture {
-                            // One tap can reach the marker twice; the second is not a re-tap.
-                            guard Date().timeIntervalSince(carTappedAt) > 0.4 else { return }
-                            carTappedAt = Date()
-                            selectCar(CarSelection.afterTap(on: marker.id, current: selectedCar))
-                        }
+                    MapMarkerView(marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX)
                 }
                 .annotationTitles(.hidden)
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-        // A tap on the empty map clears the selection. The map's gesture also fires for a tap on a car, a moment
-        // before the car's own, so it waits and stands down when a car took the tap.
-        .simultaneousGesture(TapGesture().onEnded {
-            Task {
-                try? await Task.sleep(for: .milliseconds(150))
-                if Date().timeIntervalSince(carTappedAt) > 0.4 { selectCar(nil) }
-            }
-        })
         // MapKit centers the camera, and fits regions, inside the safe area; `cameraRoom` does the
         // same for the rest of what covers the map, so my car is in the middle of what can be seen.
         .safeAreaPadding(.bottom, legalInset)
@@ -303,12 +279,6 @@ struct TripMapView: View {
         .onChange(of: camera.positionedByUser) { _, byUser in
             if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
         }
-    }
-
-    /// Rings a car and points the panel at its row; the camera and the follow mode stay as they are.
-    private func selectCar(_ id: String?) {
-        selectedCar = id
-        if cardNow == nil, CarSelection.opensPanel(selected: id, shown: shownNow) { setExpanded(true) }
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
@@ -614,8 +584,6 @@ struct TripMapView: View {
         var id: String { "card" }
     }
 
-    private struct SelectionScrollKey: Equatable { var car: String?; var expanded: Bool }
-
     private struct StopListenKey: Equatable {
         var carId: String?
         var routeLength: Double?
@@ -784,17 +752,8 @@ struct TripMapView: View {
     private var panelSheet: some View {
         let shown = shownNow
         let heights = sheetHeights
-        return ScrollViewReader { proxy in
-            ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
-                .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
-                // The list is laid out after the sheet has grown, so wait for it before scrolling to the row.
-                .task(id: SelectionScrollKey(car: selectedCar, expanded: panelExpanded)) {
-                    guard panelExpanded, let car = selectedCar else { return }
-                    try? await Task.sleep(for: .milliseconds(350))
-                    guard !Task.isCancelled else { return }
-                    withAnimation(.smooth) { proxy.scrollTo(CarSelection.rowId(car), anchor: .center) }
-                }
-        }
+        return ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+            .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
@@ -858,7 +817,7 @@ struct TripMapView: View {
 
     private func probe(unfolded: Bool) -> some View {
         ConvoyPanel(
-            model: model, expanded: .constant(unfolded), selectedCar: selectedCar,
+            model: model, expanded: .constant(unfolded),
             onHeight: { if unfolded { unfoldedContent = $0 } else { foldedContent = $0 } },
             probe: true, headerWords: panelHeader)
             .fixedSize(horizontal: false, vertical: true)
@@ -920,7 +879,6 @@ struct TripMapView: View {
         ConvoyPanel(
             model: model, expanded: Binding(get: { panelExpanded }, set: { setExpanded($0) }),
             onNextStop: { id in arrivalStopId = id },
-            selectedCar: selectedCar,
             onHeader: { panelHeader = $0 })
     }
 
