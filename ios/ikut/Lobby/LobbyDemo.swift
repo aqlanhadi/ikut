@@ -245,6 +245,28 @@ struct TripStartSwapDemo: View {
     }
 }
 
+/// `home-create-swap`: Home's New trip over the one map, and 2 s later Create trip, so the switch to the lobby can be
+/// watched: the same map, the camera from New trip's route to the whole trip above the lobby's sheet, New trip's sheet
+/// becoming the lobby's (D54). Nothing is written.
+struct HomeCreateSwapDemo: View {
+    @Environment(TripMapStage.self) private var stage
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if stage.tripId == nil {
+                HomePickedDemo.view("new-trip")
+            } else {
+                LobbyStopsDemo.lobby(.organizer)
+            }
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: "demo", started: false) }
+        }
+    }
+}
+
 /// Screens for screenshots and UI tests, opened by launching with `IKUT_SCREEN=<name>` (debug builds only).
 @MainActor
 enum DemoScreens {
@@ -412,6 +434,8 @@ enum DemoScreens {
         case "home-now-failed": return home("now-failed")
         case "home-where-to": return home("where-to")
         case "home-new-trip": return home("new-trip")
+        // New trip, then Create trip 2 s later: the switch to the lobby on the same map (D54).
+        case "home-create-swap": return nav(TripScreenHost(mode: .home) { HomeCreateSwapDemo() })
         case "home-picked-failed": return home("failed")
         case "stop-request-places": return AnyView(StopCardPreview(scene: "responder", screen: "places"))
         case "stop-request-places-two-reasons": return AnyView(StopCardPreview(scene: "two", screen: "places-two-reasons"))

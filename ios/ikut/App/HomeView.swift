@@ -24,6 +24,9 @@ struct HomeView: View {
     @State private var path: [Route] = []
     /// The one map's mode, camera and open trip, shared by Home and the trip (D54).
     @State private var stage = TripMapStage(mode: .home)
+    /// Where the app opens has been decided (`LaunchRoute`): until then nothing is drawn, so Home never flashes before
+    /// the trip this phone is in.
+    @State private var launched = false
     /// New trip's gates are through: Home's sheet becomes Where to? over its own map (no pushed screen).
     @State private var creating = false
     @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
@@ -53,7 +56,13 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             Group {
                 if hasSeenWelcome {
-                    TripScreenHost(stage: stage) { layer }
+                    if launched {
+                        TripScreenHost(stage: stage) { layer }
+                    } else {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .onAppear(perform: startLaunch)
+                    }
                 } else {
                     WelcomeView(
                         onGetStarted: { hasSeenWelcome = true },
@@ -126,15 +135,56 @@ struct HomeView: View {
                     if stage.tripId != nil { stage.exit() }
                 }
             }
-            .onChange(of: pendingJoinCode, initial: true) {
-                guard let code = pendingJoinCode else { return }
-                pendingJoinCode = nil
-                // A name comes first when signed out; the join carries on afterwards.
-                if auth.state != .signedIn { begin(.join(code: code)); return }
-                // Don't pull someone out of a trip they're already in.
-                if stage.tripId != nil { return }
-                Task { await open(.join(code: code), replacing: true) }
-            }
+            .onChange(of: pendingJoinCode, initial: true) { handlePendingJoin() }
+        }
+    }
+
+    /// A join link: Join, after the name when signed out. It waits while launch decides, and never pulls someone out
+    /// of a trip they're in.
+    private func handlePendingJoin() {
+        // Launch decides first: a trip this phone is in comes before the link.
+        guard launched || !hasSeenWelcome, let code = pendingJoinCode else { return }
+        pendingJoinCode = nil
+        // A name comes first when signed out; the join carries on afterwards.
+        if auth.state != .signedIn { begin(.join(code: code)); return }
+        // Don't pull someone out of a trip they're already in.
+        if stage.tripId != nil { return }
+        Task { await open(.join(code: code), replacing: true) }
+    }
+
+    /// Decides where the app opens (#401): straight into a trip this phone is still in, the lobby before Start and the
+    /// driving map after, with nothing else drawn first; otherwise Home (or Join for a link). Reads only when signed in
+    /// with a trip in Now.
+    private func startLaunch() {
+        let signedIn = auth.state == .signedIn
+        let entries = PastTrips.all()
+        guard LaunchRoute.needsReads(signedIn: signedIn, entries: entries) else {
+            finishLaunch(.home)
+            return
+        }
+        Task {
+            finishLaunch(await LaunchRoute.load(signedIn: signedIn, pendingJoin: pendingJoinCode, entries: entries))
+        }
+    }
+
+    private func finishLaunch(_ route: LaunchRoute) {
+        guard !launched else { return }
+        guard case .trip(let tripId, let started) = route else {
+            launched = true
+            handlePendingJoin()
+            return
+        }
+        // Never pulled out of a trip by a link (as mid-trip).
+        pendingJoinCode = nil
+        switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
+        case .ready, .showAlwaysExplainer:
+            // The map's first frame is the trip's: no flight, no Home before it.
+            stage.open(tripId: tripId, started: started)
+            launched = true
+        default:
+            // Location needs asking first, as for any trip opened from Home: over Home, then the trip.
+            launched = true
+            begin(.trip(tripId: tripId, started: started))
         }
     }
 
