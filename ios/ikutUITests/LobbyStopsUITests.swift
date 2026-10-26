@@ -58,4 +58,23 @@ final class LobbyStopsUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.5)
         XCTAssertGreaterThan(row("R&R Bidor").frame.minY, before, "R&R Bidor did not move down")
     }
+
+    /// Start trip with a car not sharing yet asks first (#362); Cancel leaves the lobby as it was.
+    func testStartWithACarNotSharingAsksFirst() {
+        app = XCUIApplication()
+        app.launchEnvironment["IKUT_SCREEN"] = "lobby-not-ready"
+        app.launch()
+        let start = app.buttons["Start trip"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "no alert after Start trip")
+        XCTAssertTrue(alert.staticTexts["Siti’s Bezza isn’t sharing yet"].exists, "alert title: \(alert.debugDescription)")
+        XCTAssertTrue(alert.staticTexts["Start anyway?"].exists)
+        XCTAssertTrue(alert.buttons["Start anyway"].exists)
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(start.exists, "Start trip is gone after Cancel")
+        XCTAssertFalse(app.buttons["Report"].exists, "the map opened after Cancel")
+    }
 }

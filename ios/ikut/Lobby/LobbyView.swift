@@ -149,11 +149,12 @@ struct LobbyView: View {
                     Text(bar.label).font(.headline).frame(maxWidth: .infinity, minHeight: 50)
                 }
                 .actionBarStyle(prominent: true)
-                .confirmationDialog(
-                    LobbyContent.startConfirm(model.groupedCars) ?? "", isPresented: $confirmStart, titleVisibility: .visible
-                ) {
+                // An alert, not a dialog: on iOS 26 a confirmation dialog is a small popover with no Cancel (#362).
+                .alert(LobbyContent.startConfirm(model.groupedCars) ?? "", isPresented: $confirmStart) {
                     Button("Start anyway") { startTrip() }
                     Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(LobbyContent.startConfirmMessage)
                 }
             }
             .sheetActionBar(lift: barLift)
@@ -561,12 +562,12 @@ struct LobbyView: View {
     @ViewBuilder private func tripRows(_ trip: Trip) -> some View {
         sectionLabel("Trip").lobbyRow(top: Spacing.m)
         VStack(spacing: 0) {
-            tripRow("Name", value: trip.name, tappable: canEdit, id: "lobby.rename") {
+            tripRow("Name", value: trip.name, tappable: canEdit, id: "lobby.rename", hint: "Rename") {
                 renameText = trip.name
                 renaming = true
             }
             RowDivider()
-            tripRow("Destination", value: trip.destination.name, tappable: canChangeDestination, id: "lobby.destination") {
+            tripRow("Destination", value: trip.destination.name, tappable: canChangeDestination, id: "lobby.destination", hint: "Change destination") {
                 showChangeDestination = true
             }
         }
@@ -574,7 +575,7 @@ struct LobbyView: View {
         .lobbyRow()
     }
 
-    @ViewBuilder private func tripRow(_ title: String, value: String, tappable: Bool, id: String, action: @escaping () -> Void) -> some View {
+    @ViewBuilder private func tripRow(_ title: String, value: String, tappable: Bool, id: String, hint: String = "", action: @escaping () -> Void) -> some View {
         let content = HStack(spacing: Spacing.s) {
             Text(title)
             Spacer(minLength: Spacing.s)
@@ -591,6 +592,7 @@ struct LobbyView: View {
             Button(action: action) { content }
                 .buttonStyle(.plain)
                 .disabled(isWorking)
+                .accessibilityHint(hint)
                 .accessibilityIdentifier(id)
         } else {
             content.accessibilityElement(children: .combine)
@@ -781,7 +783,7 @@ struct LobbyView: View {
         } else if session.membershipLost && model.trip != nil {
             exitBanner("You’re no longer in this trip", systemImage: "person.fill.xmark")
         } else if isStarted {
-            // Trip in progress and since when are the header now (`lobbySubtitle`).
+            // Trip in progress and since when are the header now (the sheet's header).
             EmptyView()
         } else if session.isTracking && !session.isPaused {
             Label("Sharing location", systemImage: "location.fill")
@@ -898,7 +900,7 @@ private struct OwnWayTaskKey: Equatable {
     var meeting: Bool
 }
 
-/// The code's QR behind Show QR code: big enough to scan from another phone.
+/// The code's QR behind QR code: big enough to scan from another phone.
 private struct QRCodeSheet: View {
     var code: String
     @Environment(\.dismiss) private var dismiss

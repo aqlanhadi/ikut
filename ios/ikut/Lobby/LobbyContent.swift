@@ -41,7 +41,8 @@ enum LobbyContent {
     }
 
     /// How a car meets the convoy, from what its own doc says (no position): no route of its own means it is on the
-    /// main route, at its start or part-way along. Nil before the car's tracker has worked it out.
+    /// main route, at its start or part-way along. Nil before the car's tracker has worked it out. The "never meets"
+    /// case needs the route's geometry, so it is left for piece 3 (join towns).
     static func join(of car: Car) -> OwnWayJoin? {
         if let route = car.route, !route.isEmpty { return .merges(offset: car.mergeOffset ?? 0) }
         guard let offset = car.mergeOffset else { return nil }
@@ -86,15 +87,18 @@ enum LobbyContent {
         }
     }
 
-    /// What tapping Start trip asks first: "Siti’s Bezza isn’t sharing yet. Start anyway?"; nil when it needn't ask.
+    /// The title of what tapping Start trip asks first ("Siti’s Bezza isn’t sharing yet", then `startConfirmMessage`); nil
+    /// when it needn't ask.
     static func startConfirm(_ cars: [LobbyCar]) -> String? {
         let waiting = notSharing(cars)
         switch waiting.count {
         case 0: return nil
-        case 1: return "\(waiting[0].car.name) isn’t sharing yet. Start anyway?"
-        default: return "\(waiting.count) cars aren’t sharing yet. Start anyway?"
+        case 1: return "\(waiting[0].car.name) isn’t sharing yet"
+        default: return "\(waiting.count) cars aren’t sharing yet"
         }
     }
+
+    static let startConfirmMessage = "Start anyway?"
 
     // MARK: Stops
 

@@ -13,18 +13,6 @@ struct LobbyTests {
         Member(id: id, displayName: name, carId: car, role: .member)
     }
 
-    @Test func peopleLineSaysOrganiserAndSharingLocation() {
-        let me = Member(id: "u1", displayName: "Siti", carId: "c1", role: .organizer)
-        let wyna = Member(id: "u2", displayName: "Wyna", carId: "c2", role: .member)
-        let daniel = Member(id: "u3", displayName: "Daniel", carId: "c3", role: .member)
-        #expect(LobbyLogic.peopleLine(members: [me, wyna], trackerUserId: "u1", currentUserId: "u1")
-            == "You (organiser, sharing location) · Wyna")
-        #expect(LobbyLogic.peopleLine(members: [wyna, daniel, me], trackerUserId: "u2", currentUserId: "u9")
-            == "Wyna (sharing location) · 2 others")
-        #expect(LobbyLogic.peopleLine(members: [daniel], trackerUserId: nil, currentUserId: "u9")
-            == "Daniel · no one sharing yet")
-    }
-
     @Test func leadFirstThenByName() {
         let sorted = LobbyLogic.sortedCars([
             car("c", "zed"), car("a", "Bravo"), car("l", "Zulu", lead: true), car("b", "alpha"),

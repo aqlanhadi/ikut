@@ -82,10 +82,10 @@ struct LobbyContentTests {
         #expect(LobbyContent.startConfirm(ready) == nil)
         let one = ready + [car("Siti’s Bezza", tracker: nil)]
         #expect(LobbyContent.waitingLine(one) == "Waiting for Siti’s Bezza to share location. You can start anyway.")
-        #expect(LobbyContent.startConfirm(one) == "Siti’s Bezza isn’t sharing yet. Start anyway?")
+        #expect(LobbyContent.startConfirm(one) == "Siti’s Bezza isn’t sharing yet")
         let two = one + [car("Faiz’s Alza", tracker: nil)]
         #expect(LobbyContent.waitingLine(two) == "Waiting for 2 cars to share location. You can start anyway.")
-        #expect(LobbyContent.startConfirm(two) == "2 cars aren’t sharing yet. Start anyway?")
+        #expect(LobbyContent.startConfirm(two) == "2 cars aren’t sharing yet")
     }
 
     // MARK: Stops
