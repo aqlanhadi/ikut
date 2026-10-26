@@ -124,6 +124,53 @@ enum LobbyStopsDemo {
     }
 }
 
+/// Add a stop on KL to Ipoh (AddStop.dc.html): four R&Rs along the route, in the lobby's own sheet.
+extension LobbyStopsDemo {
+    enum AddScene { case list, picked, results, searchedPlace, meetingPoint }
+
+    private static func rnr(_ id: String, _ name: String, _ lat: Double, _ lng: Double) -> PlaceAlong {
+        let at = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let offset = RouteLine(route).project(at)?.offset ?? 0
+        return PlaceAlong(
+            id: id, kind: .services, name: name, coordinate: at, ring: nil, facilities: [.fuel, .food, .toilets], brands: [],
+            offset: offset, distance: 40, side: .left, carriageway: .ours, ours: true, entrance: at, slipEntrance: false, routeOffset: offset)
+    }
+
+    static func addStop(_ scene: AddScene) -> LobbyView {
+        let planner = StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in })
+        let trip = LobbyModel.sample(started: false, seconds: 2 * 3600 + 40 * 60, stops: [], route: route)
+        planner.sync(trip: trip.trip, stops: trip.stops)
+        let candidates = [
+            rnr("demo/gopeng", "Gopeng R&R", 4.45, 101.12), rnr("demo/sungai-buloh", "Sungai Buloh R&R", 3.2, 101.64),
+            rnr("demo/tapah", "Tapah R&R", 4.2, 101.25), rnr("demo/behrang", "Behrang R&R", 3.8, 101.33),
+        ]
+        let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
+        let model = AddStopModel(line: RouteLine(route), routeSeconds: 2 * 3600 + 40 * 60,
+                                 along: AlongRoute(coordinates: route, seconds: 2 * 3600 + 40 * 60),
+                                 canMeet: scene == .meetingPoint, canAdd: true, candidates: candidates)
+        let place = DestinationResult(name: "Petronas Sungai Buloh", subtitle: "Selangor", coordinate: .init(latitude: 3.2, longitude: 101.58),
+                                      category: MKPointOfInterestCategory.gasStation.rawValue)
+        switch scene {
+        case .list: break
+        case .picked: model.select("demo/tapah")
+        case .results:
+            model.search.showForDemo(query: "petrol station", results: [
+                place,
+                DestinationResult(name: "Petronas Tapah Road", subtitle: "Perak", coordinate: .init(latitude: 4.17, longitude: 101.3), category: MKPointOfInterestCategory.gasStation.rawValue),
+                DestinationResult(name: "Shell Taiping", subtitle: "Perak", coordinate: .init(latitude: 4.85, longitude: 100.74), category: MKPointOfInterestCategory.gasStation.rawValue),
+            ], origin: kl, originName: "Kuala Lumpur")
+        case .searchedPlace:
+            model.pick(place)
+            model.searchedMinutes = 20
+        case .meetingPoint:
+            model.pick(place)
+            model.kind = .meet
+            model.meetClock = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date())
+        }
+        return LobbyView(sample: trip, planner: planner, organizer: true, adding: model)
+    }
+}
+
 /// The Suggest stops sheet on KL to Ipoh (SuggestStops.dc.html): one R&R on our side of the route.
 @MainActor
 enum SuggestStopsDemo {
@@ -158,20 +205,6 @@ enum DemoScreens {
         }
         func home(_ state: String) -> AnyView {
             AnyView(HomePickedDemo.view(state).environment(AuthModel()))
-        }
-        func sheet(query: String, picked: DestinationResult?, kind: PlannedStopKind, minutes: Int?, canMeet: Bool, meet: Bool = false) -> AnyView {
-            let model = CreateTripModel()
-            model.along = AlongRoute(
-                coordinates: LobbyStopsDemo.route, seconds: 2 * 3600 + 40 * 60)
-            let results = [
-                DestinationResult(name: "R&R Tapah (northbound)", subtitle: "Perak", coordinate: .init(latitude: 4.2, longitude: 101.25), category: MKPointOfInterestCategory.restroom.rawValue),
-                DestinationResult(name: "Tapah", subtitle: "Perak", coordinate: .init(latitude: 4.19, longitude: 101.26)),
-                DestinationResult(name: "Petronas Tapah Road", subtitle: "Perak", coordinate: .init(latitude: 4.17, longitude: 101.3), category: MKPointOfInterestCategory.gasStation.rawValue),
-            ]
-            model.showForDemo(query: query, results: results, origin: .init(latitude: 3.139, longitude: 101.687), originName: "Kuala Lumpur")
-            return AnyView(AddStopSheet(demoModel: model, picked: picked, kind: kind, minutes: minutes, canMeet: canMeet,
-                                        meetClock: meet ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) : nil)
-                .environment(LocationPermission()))
         }
         let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
         func search(_ model: CreateTripModel) -> AnyView { nav(CreateTripView(model: model) { _ in }) }
@@ -219,19 +252,7 @@ enum DemoScreens {
             let model = CreateTripModel()
             model.showForDemo(query: "zxqv", results: [], origin: kl, originName: "Kuala Lumpur")
             return search(model)
-        case "search-stop-results":
-            let model = CreateTripModel()
-            model.along = AlongRoute(coordinates: LobbyStopsDemo.route, seconds: 2 * 3600 + 40 * 60)
-            model.showForDemo(
-                query: "petrol station",
-                results: [
-                    petrol("Petronas Sungai Buloh", "Selangor", 3.2, 101.58),
-                    petrol("Petronas Tapah Road", "Perak", 4.17, 101.3),
-                    petrol("Shell Taiping", "Perak", 4.85, 100.74),
-                    petrol("Petronas Genting Highlands", "Pahang", 3.42, 101.79),
-                ], origin: kl, originName: "Kuala Lumpur")
-            return AnyView(AddStopSheet(demoModel: model, picked: nil, kind: .fuel, minutes: nil, canMeet: false)
-                .environment(LocationPermission()))
+        case "search-stop-results": return nav(LobbyStopsDemo.addStop(.results))
         case "lobby-organizer": return nav(LobbyStopsDemo.lobby(.organizer))
         case "lobby-tall": return nav(LobbyStopsDemo.lobby(.tall))
         case "lobby-not-ready": return nav(LobbyStopsDemo.lobby(.notReady))
@@ -309,14 +330,12 @@ enum DemoScreens {
                 return AnyView(RecapMapView(recap: recap, snapshot: snapshot, onClose: {}))
             }
             return AnyView(Color.clear)
-        case "add-search":
-            return sheet(query: "Tapah", picked: nil, kind: .fuel, minutes: nil, canMeet: false)
-        case "add-details":
-            let place = DestinationResult(name: "R&R Tapah (northbound)", subtitle: "Perak", coordinate: .init(latitude: 4.2, longitude: 101.25), category: MKPointOfInterestCategory.restroom.rawValue)
-            return sheet(query: "", picked: place, kind: .fuel, minutes: 20, canMeet: false)
-        case "add-meet":
-            let place = DestinationResult(name: "Petronas Sungai Buloh", subtitle: "Selangor", coordinate: .init(latitude: 3.2, longitude: 101.58), category: MKPointOfInterestCategory.gasStation.rawValue)
-            return sheet(query: "", picked: place, kind: .meet, minutes: nil, canMeet: true, meet: true)
+        // Add a stop over the map (B6, D51): the R&Rs in order, one chosen, and a searched place that isn't an R&R.
+        case "lobby-add-stop": return nav(LobbyStopsDemo.addStop(.list))
+        case "lobby-add-stop-picked": return nav(LobbyStopsDemo.addStop(.picked))
+        case "add-search": return nav(LobbyStopsDemo.addStop(.results))
+        case "add-details": return nav(LobbyStopsDemo.addStop(.searchedPlace))
+        case "add-meet": return nav(LobbyStopsDemo.addStop(.meetingPoint))
         // Home's sheet (D32): the list short and tall, and a picked trip short, tall, on a stop, loading, failed.
         case "home-compact": return home("list")
         case "home-tall": return home("list-tall")
