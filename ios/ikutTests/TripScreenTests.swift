@@ -74,13 +74,13 @@ struct TripScreenTests {
         #expect(sheet.touchableUpThrough == .height(470))
     }
 
-    @Test func drivingsSheetIsTheConvoyPanelsThreeHeightsTheMapTouchableThroughout() {
-        let heights = PanelSheet.Heights(short: 282, tall: 520, full: 760)
+    @Test func drivingsSheetIsTheConvoyPanelsShortAndTallTheMapTouchableThroughout() {
+        let heights = PanelSheet.Heights(short: 282, tall: 520)
         let sheet = TripScreenLogic.Sheet.driving(heights)
         #expect(sheet.mode == .driving)
-        #expect(sheet.detents == [.height(282), .height(520), .height(760)])
-        // #402: the map, pill, banners and round buttons answer (undimmed) at every height, pulled up included.
-        #expect(sheet.touchableUpThrough == .height(760))
+        #expect(sheet.detents == [.height(282), .height(520)])
+        // #402: the map, pill, banners and round buttons answer (undimmed) at both heights; tall is the highest (#409).
+        #expect(sheet.touchableUpThrough == .height(520))
     }
 
     @Test func drivingIsNotAPushSoItNoLongerCoversTheLobbysSheet() {

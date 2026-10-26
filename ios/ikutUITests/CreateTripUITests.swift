@@ -53,8 +53,9 @@ final class CreateTripUITests: ConvoyUITestCase {
 
     /// The sheets hand over to each other: lobby Back to Home (Home's sheet is back and its controls are hittable),
     /// Home's row to the lobby (the lobby's sheet and bar), Start to driving, a Pit stop card opened and closed, the
-    /// convoy sheet pulled up to the lobby below it and down again, twice (there is no Back to the lobby, D53), then
-    /// End trip from the pulled-up sheet: Cancel brings the sheet back pulled up, confirming opens the recap.
+    /// convoy sheet raised to tall with the lobby's rows below it and down again, twice (there is no Back to the lobby,
+    /// D53), a swipe at tall that scrolls and keeps the height, then End trip from the rows: Cancel leaves the sheet at
+    /// tall, confirming opens the recap.
     func testLobbyAndHomeSheetsHandOver() throws {
         app = XCUIApplication()
         allowPermissionPrompts()
@@ -87,7 +88,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Didn't reach the map")
 
-        // Pit stop's card over the convoy sheet, closed, then the sheet pulled up: one sheet, no card left behind.
+        // Pit stop's card over the convoy sheet, closed, then the sheet raised to tall: one sheet, no card left behind.
         let pitStop = app.buttons["stop.button"]
         XCTAssertTrue(pitStop.waitForExistence(timeout: 10), "No Pit stop button")
         pitStop.tap()
@@ -96,42 +97,44 @@ final class CreateTripUITests: ConvoyUITestCase {
         close.tap()
         XCTAssertTrue(waitForGone(close, timeout: 5), "Pit stop's card stayed up after Close")
 
-        // At tall, a swipe up on the convoy list scrolls it and never pulls the sheet up (#402); the header still folds.
-        app.expandConvoy.tap()
-        let collapse = app.buttons["Collapse convoy list"]
-        XCTAssertTrue(collapse.waitForExistence(timeout: 5), "A tap on the header didn't unfold the list")
-        app.scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch.swipeUp()
-        // Known (D53 fix round 3): on the iOS 27 simulator the system sheet still grows on a content swipe whose list
-        // fits, despite `.presentationContentInteraction(.scrolls)`. Non-strict, so it passes once the sheet obeys.
-        XCTExpectFailure("#402: a swipe on a list that fits still pulls the sheet up", options: {
-            let options = XCTExpectedFailure.Options()
-            options.isStrict = false
-            return options
-        }()) {
-            XCTAssertFalse(app.pulledUpSheet.waitForExistence(timeout: 3), "A swipe on the list pulled the sheet up")
-        }
-        // Back to tall by the grabber if it did grow, so the header step below starts where it should.
-        if app.pulledUpSheet.exists { app.pullDownTripSheet() }
-        if !collapse.isHittable { app.scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch.swipeDown() }
-        collapse.tap()
-        XCTAssertTrue(app.expandConvoy.waitForExistence(timeout: 5), "A tap on the header didn't fold the sheet")
-
-        // Two round trips: pulled up, the lobby continues below the convoy; down twice, the list is folded again.
+        // Two round trips: at tall the lobby's rows are below the convoy; down by the grabber, the list folds.
         for round in 1...2 {
-            XCTAssertTrue(app.pullUpTripSheet(), "Round \(round): pulling the sheet up didn't show the lobby below the convoy")
-            XCTAssertTrue(app.buttons["lobby.copyCode"].exists, "Round \(round): no trip code card when pulled up")
-            XCTAssertFalse(app.buttons["Close"].exists, "Round \(round): a card is stuck over the pulled-up sheet")
-            XCTAssertEqual(app.otherElements.matching(identifier: "trip.pulledUp").count, 1,
-                           "Round \(round): the pulled-up lobby shows more than once")
-            app.pullDownTripSheet()
-            XCTAssertTrue(waitForGone(app.pulledUpSheet, timeout: 5), "Round \(round): pulling down left the lobby below the convoy")
-            app.pullDownTripSheet()
+            XCTAssertTrue(app.raiseTripSheet(), "Round \(round): at tall the lobby's rows aren't below the convoy")
+            XCTAssertTrue(app.buttons["lobby.copyCode"].exists, "Round \(round): no trip code card at tall")
+            XCTAssertFalse(app.buttons["Close"].exists, "Round \(round): a card is stuck over the sheet")
+            XCTAssertEqual(app.otherElements.matching(identifier: "trip.lobbyRows").count, 1,
+                           "Round \(round): the lobby's rows show more than once")
+            app.lowerTripSheet()
+            XCTAssertTrue(waitForGone(app.lobbyRows, timeout: 5), "Round \(round): folding left the lobby's rows")
             XCTAssertTrue(app.expandConvoy.waitForExistence(timeout: 5), "Round \(round): the convoy list didn't fold")
             XCTAssertTrue(app.drivingReport.isHittable, "Round \(round): Report isn't hittable on the folded sheet")
         }
 
-        // End trip from the pulled-up sheet, Cancel: the sheet is still pulled up.
-        XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row with the convoy sheet pulled up")
+        // At tall, a swipe up on the convoy list scrolls: the sheet keeps its height and the Journey comes into view
+        // (#402, #409). Then a tap on the header still folds it.
+        app.expandConvoy.tap()
+        XCTAssertTrue(app.lobbyRows.waitForExistence(timeout: 5), "A tap on the header didn't bring the sheet to tall")
+        sleep(1)  // the sheet's move to tall settles
+        let tallTop = app.sheetGrabber.frame.minY
+        let journey = app.staticTexts["Journey"]
+        var swipes = 0
+        // A little at a time, so it stops on the Journey rather than flinging past it.
+        while !journey.isHittable, swipes < 8 {
+            app.scrollDrivingSheet(by: 60)
+            swipes += 1
+        }
+        XCTAssertTrue(journey.isHittable, "A swipe up on the list didn't scroll the Journey into view")
+        XCTAssertEqual(app.sheetGrabber.frame.minY, tallTop, accuracy: 2, "A swipe on the list changed the sheet's height")
+        swipes = 0
+        while !app.collapseConvoy.isHittable, swipes < 6 {
+            app.drivingSheetScroll.swipeDown()
+            swipes += 1
+        }
+        app.collapseConvoy.tap()
+        XCTAssertTrue(app.expandConvoy.waitForExistence(timeout: 5), "A tap on the header didn't fold the sheet")
+
+        // End trip from the lobby's rows at tall, Cancel: the sheet is still at tall with them.
+        XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row with the convoy sheet at tall")
         let endTitle = app.staticTexts["End the trip for everyone?"]
         XCTAssertTrue(endTitle.waitForExistence(timeout: 10), "End trip didn't ask to confirm")
         let cancel = app.buttons["Cancel"]
@@ -141,7 +144,7 @@ final class CreateTripUITests: ConvoyUITestCase {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
         }
         XCTAssertTrue(waitForGone(endTitle, timeout: 5), "The End trip confirmation stayed up after Cancel")
-        XCTAssertTrue(app.pulledUpSheet.waitForExistence(timeout: 10), "After Cancel the sheet isn't pulled up")
+        XCTAssertTrue(app.lobbyRows.waitForExistence(timeout: 10), "After Cancel the sheet isn't at tall")
 
         // End trip again and confirm: the recap opens.
         XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row the second time")

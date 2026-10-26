@@ -37,23 +37,22 @@ enum LobbySheet {
     }
 
     /// Driving, the convoy sheet steps aside only for what is pushed or presented over the screen: Change destination,
-    /// the Always sheet, or the lobby not on screen. Leave, End and rename present from inside the pulled-up sheet.
+    /// the Always sheet, or the lobby not on screen. Leave, End and rename present from inside the convoy sheet.
     static func drivingCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
         !lobbyOnScreen || cover.changeDestination || cover.suggestStops || cover.alwaysExplainer
     }
 
-    /// The asks presented from inside the pulled-up driving sheet.
-    struct PulledUpAsks: Equatable {
+    /// The asks presented from inside the driving sheet's lobby rows.
+    struct DrivingAsks: Equatable {
         var confirmLeave = false
         var confirmEnd = false
         var renaming = false
         var showQR = false
     }
 
-    /// The pulled-up sheet's asks once its continuation is gone (a fold by the grabber, the header, a stop request or a
-    /// hazard approach): torn down with it, so cleared, never shown untapped at the next pull-up; kept while it shows.
-    static func pulledUpAsks(_ asks: PulledUpAsks, continuationShown: Bool) -> PulledUpAsks {
-        continuationShown ? asks : PulledUpAsks()
+    /// The asks once the lobby's rows are gone (a fold to short by the grabber, the header or a hazard approach): torn down with it, so cleared, never shown untapped at the next pull-up; kept while it shows.
+    static func drivingAsks(_ asks: DrivingAsks, continuationShown: Bool) -> DrivingAsks {
+        continuationShown ? asks : DrivingAsks()
     }
 
     /// Whether the sheet is away: anything above is up, or the lobby itself is not on screen (popped).

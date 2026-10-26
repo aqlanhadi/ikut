@@ -4,46 +4,53 @@ extension XCUIApplication {
     /// The driving mode's Report button, by identifier: it is there once Start or Show map has switched the trip screen
     /// to driving (the same screen, no push, D53).
     var drivingReport: XCUIElement { buttons["convoy.report"] }
-    /// What continues below the convoy when the driving sheet is pulled up (the journey, code, trip, options, Leave or
-    /// End), by identifier. There is no Back to the lobby any more (D53).
-    var pulledUpSheet: XCUIElement { otherElements["trip.pulledUp"] }
-    /// The convoy panel's header button when the list is folded.
+    /// The lobby's rows below the convoy when the driving sheet is at tall (the journey, code, trip, options, Leave or
+    /// End), by identifier; they are in the sheet's one scroll view, reached by scrolling down (D53, #409).
+    var lobbyRows: XCUIElement { otherElements["trip.lobbyRows"] }
+    /// The convoy panel's header button when the list is folded, and when it is unfolded.
     var expandConvoy: XCUIElement { buttons["Expand convoy list"] }
+    var collapseConvoy: XCUIElement { buttons["Collapse convoy list"] }
+    /// The driving sheet's own scroll view (its middle is on screen, unlike a row far down it).
+    var drivingSheetScroll: XCUIElement { scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch }
+    var sheetGrabber: XCUIElement { descendants(matching: .any)["Sheet Grabber"].firstMatch }
 
-    /// Drags the convoy sheet up by its grabber until the lobby continues below the convoy; true once it does.
+    /// Brings the convoy sheet to tall, its highest, by its grabber; true once the lobby's rows are below the convoy.
     @discardableResult
-    func pullUpTripSheet() -> Bool {
-        for _ in 0..<4 {
-            if pulledUpSheet.exists { return true }
-            let grabber = descendants(matching: .any)["Sheet Grabber"].firstMatch
-            guard grabber.waitForExistence(timeout: 5) else { return false }
-            grabber.swipeUp()
-            _ = pulledUpSheet.waitForExistence(timeout: 2)
+    func raiseTripSheet() -> Bool {
+        for _ in 0..<3 {
+            if lobbyRows.exists { return true }
+            guard sheetGrabber.waitForExistence(timeout: 5) else { return false }
+            sheetGrabber.swipeUp()
+            _ = lobbyRows.waitForExistence(timeout: 2)
         }
-        return pulledUpSheet.exists
+        return lobbyRows.exists
     }
 
-    /// Drags the convoy sheet down by its grabber, slowly and by about a third of the screen, so it settles one
-    /// height lower (pulled up to tall, or tall to short); a quick swipe from tall to short would spring back.
-    func pullDownTripSheet() {
-        let grabber = descendants(matching: .any)["Sheet Grabber"].firstMatch
-        guard grabber.waitForExistence(timeout: 5) else { return }
-        let start = grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    /// Drags the convoy sheet down by its grabber, slowly and by about a third of the screen, from tall to short; a
+    /// quick swipe would spring back.
+    func lowerTripSheet() {
+        guard sheetGrabber.waitForExistence(timeout: 5) else { return }
+        let start = sheetGrabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
     }
 
-    /// Pulls the convoy sheet up, scrolls it to the row with identifier `id` (lobby.endTrip, lobby.leaveTrip,
-    /// lobby.pause) and taps it; false when it never became hittable.
+    /// Scrolls the driving sheet's content down by about `points`: a slow drag held at its end (no fling), started
+    /// above the bottom bar, which the scroll view runs under.
+    func scrollDrivingSheet(by points: CGFloat) {
+        let from = drivingSheetScroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -points)),
+                   withVelocity: .slow, thenHoldForDuration: 0.3)
+    }
+
+    /// Brings the convoy sheet to tall, scrolls it down to the row with identifier `id` (lobby.endTrip,
+    /// lobby.leaveTrip, lobby.pause) and taps it; false when it never became hittable.
     @discardableResult
     func tapPulledUpRow(_ id: String) -> Bool {
-        guard pullUpTripSheet() else { return false }
+        guard raiseTripSheet() else { return false }
         let row = buttons[id]
         var scrolls = 0
-        // Swipe inside the sheet's own scroll view, whose middle is on screen (the pulled-up rows' middle may not be);
-        // a swipe on the content scrolls it and never resizes the sheet.
-        let sheet = scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch
-        while !(row.exists && row.isHittable), scrolls < 8, sheet.exists {
-            sheet.swipeUp()
+        while !(row.exists && row.isHittable), scrolls < 15, drivingSheetScroll.exists {
+            scrollDrivingSheet(by: 150)
             scrolls += 1
         }
         guard row.exists, row.isHittable else { return false }

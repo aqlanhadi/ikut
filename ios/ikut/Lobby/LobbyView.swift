@@ -6,9 +6,9 @@ import SwiftUI
 /// QR and share, and the live list of cars. It is the trip screen's lobby layer over the one map (`TripScreenHost`), and
 /// holds the trip's session; Start trip and Show map switch the screen to driving (`TripMapView`, the driving layer)
 /// without a new screen. While driving, the lobby's journey, code, trip, options and Leave or End continue below the
-/// convoy when its sheet is pulled up (`pulledUpContent`).
+/// convoy at its tall height (`drivingLobbyRows`), reached by scrolling down.
 struct LobbyView: View {
-    /// In a sample lobby: the driving layer Start switches to, handed what continues below its convoy when pulled up
+    /// In a sample lobby: the driving layer Start switches to, handed what continues below its convoy at tall
     /// and the banner on top of its sheet.
     typealias SampleDriving = (_ continuation: @escaping (LobbyContent.JourneyHere?) -> AnyView, _ topBanner: AnyView?) -> AnyView
 
@@ -72,7 +72,7 @@ struct LobbyView: View {
     /// The car colour a sample participant's own route is drawn in.
     private let sampleCarColor = "#D9480F"
     /// In a sample lobby: the driving layer Start switches to (a demo map; nil, the live one), handed what continues
-    /// below its convoy when pulled up.
+    /// below its convoy at tall.
     private var sampleDriving: LobbyView.SampleDriving?
     /// In a sample lobby: this phone shares its location (the header says so, and Pause sharing shows).
     private var sampleSharing = false
@@ -319,10 +319,10 @@ struct LobbyView: View {
                 lobbyLayer
             case .driving:
                 if let sampleDriving {
-                    sampleDriving({ AnyView(pulledUpContent(here: $0)) }, drivingBanner)
+                    sampleDriving({ AnyView(drivingLobbyRows(here: $0)) }, drivingBanner)
                 } else {
                     TripMapView(
-                        session: session, continuation: { AnyView(pulledUpContent(here: $0)) },
+                        session: session, continuation: { AnyView(drivingLobbyRows(here: $0)) },
                         topBanner: drivingBanner, lobbyWants: LobbySheet.drivingCovered(cover, lobbyOnScreen: onScreen),
                         onEnded: { onEnded(model.tripId) })
                 }
@@ -331,15 +331,15 @@ struct LobbyView: View {
         // The trip started from another phone: no more stop edits.
         .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
         // One listener set at a time (`TripScreenLogic.lobbyListens`): driving, the lobby listens only while the
-        // convoy sheet is pulled up and shows the lobby below the convoy.
+        // convoy sheet is at tall and shows the lobby's rows below the convoy.
         .onChange(of: stage.mode) { _, _ in updateListening() }
-        .onChange(of: stage.pulledUp) { _, pulledUp in
+        .onChange(of: stage.lobbyRowsShown) { _, rowsShown in
             updateListening()
-            // The asks inside the pulled-up sheet went with it (a fold, a stop request, a hazard): none comes back by
-            // itself at the next pull-up.
-            let asks = LobbySheet.pulledUpAsks(
+            // The asks inside the lobby's rows went with them (a fold to short by the grabber, the header or a hazard):
+            // none comes back by itself at the next tall.
+            let asks = LobbySheet.drivingAsks(
                 .init(confirmLeave: confirmLeave, confirmEnd: confirmEnd, renaming: renaming, showQR: showQR),
-                continuationShown: pulledUp || stage.mode == .lobby)
+                continuationShown: rowsShown || stage.mode == .lobby)
             confirmLeave = asks.confirmLeave
             confirmEnd = asks.confirmEnd
             renaming = asks.renaming
@@ -395,8 +395,8 @@ struct LobbyView: View {
                 meetingPoint: TripSessionLogic.meetingPoint(in: model.stops), routeSeconds: trip.routeSeconds,
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
-        // In the lobby's mode its asks present here, once its sheet has stepped aside; driving, the pulled-up sheet
-        // presents them itself (`pulledUpContent`).
+        // In the lobby's mode its asks present here, once its sheet has stepped aside; driving, the convoy sheet
+        // presents them itself (`drivingLobbyRows`).
         .alert("Trip name", isPresented: Binding(
             get: { inLobby && BottomSheet.presents(wanted: renaming, sheetUp: sheetsUp) }, set: { renaming = $0 })) {
             renameActions
@@ -434,7 +434,7 @@ struct LobbyView: View {
     private func leaveTrip() { run { try await session.leave(); onExit() } }
     private func endTrip() { run { try await session.endTrip() } }
 
-    /// Rename's field and buttons, in the lobby's alert and the pulled-up sheet's.
+    /// Rename's field and buttons, in the lobby's alert and the driving sheet's.
     @ViewBuilder private var renameActions: some View {
         TextField("Trip name", text: $renameText)
             .textInputAutocapitalization(.words)
@@ -450,7 +450,7 @@ struct LobbyView: View {
     /// own mode shows. What was last read stays on screen while they rest.
     private func updateListening() {
         guard !isSample else { return }
-        if TripScreenLogic.lobbyListens(onScreen: onScreen, mode: stage.mode, pulledUp: stage.pulledUp) {
+        if TripScreenLogic.lobbyListens(onScreen: onScreen, mode: stage.mode, lobbyRowsShown: stage.lobbyRowsShown) {
             model.start()
         } else {
             model.stop()
@@ -933,15 +933,15 @@ struct LobbyView: View {
         }
     }
 
-    // MARK: Driving, pulled up (canvas row L)
+    // MARK: Driving, below the convoy at tall (canvas row L, #409)
 
-    /// What continues below the convoy when the driving sheet is pulled up: the journey, the code, the trip, the
-    /// options and Leave or End (`LobbyContent.pulledUp`). The same rows as the lobby's, with the same asks, which the
-    /// convoy sheet steps aside for (`lobbyWants`).
-    @ViewBuilder private func pulledUpContent(here: LobbyContent.JourneyHere?) -> some View {
+    /// What continues below the convoy when the driving sheet is at tall: the journey, the code, the trip, the
+    /// options and Leave or End (`LobbyContent.drivingSections`). The same rows as the lobby's; Leave, End and rename
+    /// present from inside the convoy sheet.
+    @ViewBuilder private func drivingLobbyRows(here: LobbyContent.JourneyHere?) -> some View {
         if let trip = model.trip {
             VStack(spacing: 0) {
-                ForEach(LobbyContent.pulledUp(rows), id: \.self) { section in
+                ForEach(LobbyContent.drivingSections(rows), id: \.self) { section in
                     switch section {
                     case .journey: journeyRows(trip, here: here).padding(.top, Spacing.section)
                     case .code: codeCard(trip.code).padding(.top, Spacing.section)
@@ -959,11 +959,11 @@ struct LobbyView: View {
             .padding(.horizontal, Spacing.l)
             .padding(.bottom, Spacing.l)
             .sheet(isPresented: $showQR) { QRCodeSheet(code: trip.code) }
-            // Presented from inside the convoy sheet, which stays up pulled up: Cancel leaves it where it was.
+            // Presented from inside the convoy sheet, which stays up at tall: Cancel leaves it where it was.
             .tripExitDialogs(confirmLeave: $confirmLeave, confirmEnd: $confirmEnd, leave: leaveTrip, end: endTrip)
             .alert("Trip name", isPresented: $renaming) { renameActions }
             .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("trip.pulledUp")
+            .accessibilityIdentifier("trip.lobbyRows")
         }
     }
 

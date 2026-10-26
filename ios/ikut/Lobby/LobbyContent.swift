@@ -184,7 +184,7 @@ enum LobbyContent {
         }
     }
 
-    /// The journey while driving, pulled up (canvas row L): the stops still ahead, numbered as on the map, and the part
+    /// The journey while driving, below the convoy at tall (canvas row L): the stops still ahead, numbered as on the map, and the part
     /// already driven folded into one line, so the list starts with what is still ahead.
     struct Journey: Equatable {
         /// "Passed R&R Bidor · 8:31 PM" (the last stop left or driven past), "Left Petronas · 7:42 PM" (the meeting
@@ -256,13 +256,13 @@ enum LobbyContent {
         var ownWay: Bool
     }
 
-    /// What continues below the convoy when the driving sheet is pulled up, in this order.
-    enum PulledUpSection: Equatable { case journey, code, trip, options, exit }
+    /// What continues below the convoy when the driving sheet is at tall, in this order.
+    enum DrivingSection: Equatable { case journey, code, trip, options, exit }
 
-    /// The pulled-up sections for this person, from the lobby's own `rows` (which also decide the rows inside them):
+    /// The driving sections for this person, from the lobby's own `rows` (which also decide the rows inside them):
     /// Keep screen on is everyone's, so the options are always there; Leave or End only when this person can.
-    static func pulledUp(_ rows: Rows) -> [PulledUpSection] {
-        var sections: [PulledUpSection] = [.journey, .code, .trip, .options]
+    static func drivingSections(_ rows: Rows) -> [DrivingSection] {
+        var sections: [DrivingSection] = [.journey, .code, .trip, .options]
         if rows.canEnd || rows.canLeave { sections.append(.exit) }
         return sections
     }

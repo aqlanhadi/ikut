@@ -8,19 +8,21 @@ import SwiftUI
 /// The trip screen's driving layer (D53): it draws its chrome over the host's one map (`TripScreenHost`), tells the map
 /// what to draw (`TripMapSpec`) and moves its camera, and fills the one sheet with the convoy panel. The lobby puts it
 /// on screen with its own session (never a second one). The Stop button opens the request sheet, and an open stop
-/// request shows as a card above the panel. Pulled up to its tallest, the convoy sheet continues with the lobby's
-/// journey, code, trip, options and Leave or End (`continuation`, canvas row L): there is no Back.
+/// request shows as a card above the panel. At tall the convoy sheet continues, by scrolling down, with the lobby's
+/// journey, code, trip, options and Leave or End (`continuation`, canvas row L, #409): there is no Back.
 struct TripMapView: View {
     let session: TripSession
-    /// What continues below the convoy when the sheet is pulled up: the lobby's, which owns its rows and their asks.
+    /// What continues below the convoy at tall: the lobby's rows, which own their asks.
     /// It is handed where my car is, for the journey's stops ahead.
     private var continuation: ((LobbyContent.JourneyHere?) -> AnyView)?
     /// On top of the convoy sheet at every height: the lobby's "You're no longer in this trip" with Back to trips.
     private var topBanner: AnyView?
     /// The lobby asks for something that takes the whole screen (Change destination, the Always sheet, a screen pushed
     /// over the trip): the sheet steps aside for it (`LobbySheet.drivingCovered`). Leave, End and rename present from
-    /// inside the pulled-up sheet, which stays up.
+    /// inside the sheet, which stays up.
     private var lobbyWants = false
+    /// The demo opens at tall, scrolled down to the lobby's Journey.
+    private var demoJourney = false
     /// The trip ended (organizer or server): the owner shows the recap.
     var onEnded: () -> Void = {}
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
@@ -136,7 +138,7 @@ struct TripMapView: View {
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
         stopService: any StopServing = StopService(),
-        demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil
+        demoJourney: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil
     ) {
         _alerts = State(initialValue: alerts)
         self.session = session
@@ -151,7 +153,8 @@ struct TripMapView: View {
             _reportContext = State(initialValue: .demo)
             _showReport = State(initialValue: true)
         }
-        _sheetShown = State(initialValue: demoPulledUp ? .pulledUp : demoExpanded ? .unfolded : .folded)
+        _sheetShown = State(initialValue: demoJourney || demoExpanded ? .unfolded : .folded)
+        self.demoJourney = demoJourney
         _approach = State(initialValue: demoApproach)
         _passedText = State(initialValue: demoPassed)
         _toast = State(initialValue: demoToast ?? ReportToastModel(service: DemoReportService()))
@@ -618,16 +621,17 @@ struct TripMapView: View {
 
     private var shownNow: PanelSheet.Shown { sheetShown }
 
-    /// The top of the convoy sheet's scrolling content.
+    /// The top of the convoy sheet's scrolling content, and where the lobby's rows start in it.
     private static let sheetTop = "sheet.top"
+    private static let lobbyRowsTop = "sheet.lobbyRows"
 
-    /// Where my car is on the main route and its pace, for the pulled-up journey; nil while it is still joining.
+    /// Where my car is on the main route and its pace, for the journey; nil while it is still joining.
     private var journeyHere: LobbyContent.JourneyHere? {
         model.convoy.myEntry.map { LobbyContent.JourneyHere(offset: $0.convoyOffset, pace: model.stopPace()) }
     }
 
-    /// The lobby continues below the convoy now (`PanelSheet.showsContinuation`).
-    private var continuationShown: Bool { continuation != nil && PanelSheet.showsContinuation(sheetShown, in: sheetHeights) }
+    /// The lobby's rows continue below the convoy now (`PanelSheet.showsLobbyRows`).
+    private var continuationShown: Bool { continuation != nil && PanelSheet.showsLobbyRows(sheetShown) }
 
     /// The card sheet's detent: its content's height, up to the room under the pills.
     private var cardHeight: CGFloat { PanelSheet.cardHeight(content: cardContent, room: sheetRoom) }
@@ -690,7 +694,7 @@ struct TripMapView: View {
         resettle()
     }
 
-    /// Steps aside for the trip ending (the recap), the lobby's Always sheet and what the pulled-up lobby asks for.
+    /// Steps aside for the trip ending (the recap), the lobby's Always sheet and what the lobby puts over the screen.
     private var panelCovered: Bool {
         PanelSheet.isCovered(
             ended: session.isEnded,
@@ -715,7 +719,8 @@ struct TripMapView: View {
     private var panelSheet: some View {
         let shown = shownNow
         let heights = sheetHeights
-        // Pulled up, the lobby continues below the unfolded panel, which stays where it was (canvas row L).
+        // At tall the lobby's rows continue below the unfolded panel; the content is then taller than the sheet, so a
+        // swipe scrolls and never resizes it (canvas row L, #409).
         return ScrollViewReader { scroller in ScrollView {
             VStack(spacing: 0) {
                 Color.clear.frame(height: 0).id(Self.sheetTop)
@@ -727,14 +732,18 @@ struct TripMapView: View {
                 }
                 panel
                 if continuationShown, let continuation {
+                    Color.clear.frame(height: 0).id(Self.lobbyRowsTop)
                     continuation(journeyHere).transition(.opacity)
                 }
             }
         }
-
-        // The lobby below the convoy went (the grabber, the header, a stop request, a hazard): the sheet starts at the
-        // convoy's header again, not partway down.
+        // Folded to short (the grabber, the header, a hazard): the sheet starts at the convoy's header again.
         .onChange(of: continuationShown) { _, shown in if !shown { scroller.scrollTo(Self.sheetTop, anchor: .top) } }
+        .task {
+            guard demoJourney else { return }
+            try? await Task.sleep(for: .milliseconds(400))
+            scroller.scrollTo(Self.lobbyRowsTop, anchor: .top)
+        }
         }
         .scrollBounceBehavior(.basedOnSize)
             .sheetBottomBar { actionBar }
@@ -753,19 +762,12 @@ struct TripMapView: View {
                 setShown(chosen)
             }))
         .onChange(of: measuredHeights, initial: true) { resettle() }
-        .onChange(of: continuationShown, initial: true) { _, shown in stage.pulledUp = shown }
-        .onChange(of: cardNow, initial: true) { _, want in
-            syncCard(want)
-            if want != nil { setShown(PanelSheet.shown(after: .stopAsks, from: sheetShown)) }
-        }
-        // A stop request's pill asks for an answer: a pulled-up sheet comes back to tall so it isn't behind the lobby.
-        .onChange(of: stopPill?.id) { _, id in
-            if id != nil { setShown(PanelSheet.shown(after: .stopAsks, from: sheetShown)) }
-        }
+        .onChange(of: continuationShown, initial: true) { _, shown in stage.lobbyRowsShown = shown }
+        .onChange(of: cardNow, initial: true) { _, want in syncCard(want) }
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: TripScreenLogic.Sheet.driving(heights).touchableUpThrough))
-        // Swipes on the content scroll it and never resize the sheet: the height changes by the grabber, or a tap on
-        // the convoy's header (#402).
+        // Swipes on the content scroll it rather than resize the sheet: tall is the highest, and there the content is
+        // taller than the sheet (#402, #409). The height changes by the grabber, or a tap on the convoy's header.
         .presentationContentInteraction(.scrolls)
         .interactiveDismissDisabled()
         .sheet(item: Binding(get: { presentedCard }, set: cardSetByTheSystem), onDismiss: cardDismissed) { _ in
@@ -798,7 +800,7 @@ struct TripMapView: View {
         moveSheet { sheetShown = value }
     }
 
-    /// The header's fold and unfold: unfolding a pulled-up sheet leaves it pulled up.
+    /// The header's fold and unfold.
     private func setExpanded(_ value: Bool) {
         guard value != panelExpanded else { return }
         setShown(value ? .unfolded : .folded)
@@ -1094,7 +1096,7 @@ struct TripMapView: View {
     private func disappear() {
         // Popped, or another screen pushed over the trip: no convoy sheet any more.
         session.mapSheetUp = false
-        stage.pulledUp = false
+        stage.lobbyRowsShown = false
         onScreen = false
         ask = nil
         session.askShowing = false

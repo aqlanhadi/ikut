@@ -35,8 +35,8 @@ enum LobbyStopsDemo {
         case notReady
         /// The organiser's lobby before the start with this phone sharing: "Sharing" leads the subtitle (#394).
         case sharing
-        /// Driving, the organiser's convoy sheet pulled up with R&R Bidor passed (D53, canvas row L).
-        case pulledUp
+        /// Driving, the organiser's convoy sheet at tall, scrolled down to the Journey, R&R Bidor passed (D53, #409).
+        case tallJourney
         /// Driving, a participant no longer in the trip: the banner with Back to trips on the folded sheet (#403).
         case drivingLost
     }
@@ -114,7 +114,7 @@ enum LobbyStopsDemo {
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(
                 sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns, sharing: true)
-        case .pulledUp, .drivingLost:
+        case .tallJourney, .drivingLost:
             let lost = scene == .drivingLost
             // The first stop along the way (R&R Bidor) left 20 minutes ago; the others still ahead.
             var stops = stopsOnRoute
@@ -128,7 +128,7 @@ enum LobbyStopsDemo {
                     map.mode = TripScreenLogic.drivingEntryMode
                     return AnyView(TripMapView(
                         session: TripSession(tripId: "demo", userId: "u-c1"), model: map, stopService: DemoStopService(),
-                        demoPulledUp: !lost, continuation: continuation, topBanner: banner))
+                        demoJourney: !lost, continuation: continuation, topBanner: banner))
                 })
         case .started:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
@@ -324,8 +324,8 @@ enum DemoScreens {
         case "lobby-started": return trip(LobbyStopsDemo.lobby(.started))
         // The lobby, then Start trip after 2 s: the sheet becomes the convoy's and the camera flies to my car (D53).
         case "trip-start-swap": return trip(TripStartSwapDemo())
-        // Driving with the convoy sheet pulled up: the journey (R&R Bidor passed), code, trip, options, End (D53).
-        case "road-pulled-up": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.pulledUp) })
+        // Driving, the convoy sheet at tall scrolled to the Journey (R&R Bidor passed), code, trip, options, End (D53).
+        case "road-tall-journey": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.tallJourney) })
         // The organiser's lobby before the start while this phone shares: "➤ Sharing" leads the subtitle (#394).
         case "lobby-sharing": return trip(LobbyStopsDemo.lobby(.sharing))
         // Driving, no longer in the trip: "You’re no longer in this trip" and Back to trips on top of the sheet (#403).
