@@ -91,9 +91,10 @@ enum PanelSheet {
         min(content ?? cardEstimate, max(room ?? .greatestFiniteMagnitude, minimumHeight)).rounded()
     }
 
-    /// The height of the map the sheets cover: the convoy sheet's, or the card's when it is the taller.
+    /// The height of the map the sheets cover, for the camera: the convoy sheet's, or the card's when it is the taller.
+    /// Pulled up counts as tall: the lobby is read over the map then, and pulling up never moves the camera under it.
     static func covered(shown: Shown, in heights: Heights, card: CGFloat?) -> CGFloat {
-        max(height(shown, in: heights), card ?? 0)
+        max(height(shown == .pulledUp ? .unfolded : shown, in: heights), card ?? 0)
     }
 
     static func height(_ shown: Shown, in heights: Heights) -> CGFloat {

@@ -428,7 +428,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             let resume = app.buttons["Resume"]
             XCTAssertTrue(resume.waitForExistence(timeout: 5), "paused banner has no Resume")
             resume.tap()
-            // A started trip's lobby says "Trip in progress", not "Sharing location"; A checks the car is live.
+            // Resumed: the paused banner and its Resume go; A checks the car is live.
             try waitFor("sharing again", timeout: 30) {
                 !labelled("label CONTAINS %@", "Sharing paused").exists && !app.buttons["Resume"].exists
             }

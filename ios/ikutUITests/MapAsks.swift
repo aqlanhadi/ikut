@@ -15,7 +15,7 @@ extension XCUIApplication {
     func pullUpTripSheet() -> Bool {
         for _ in 0..<4 {
             if pulledUpSheet.exists { return true }
-            let grabber = otherElements["Sheet Grabber"].firstMatch
+            let grabber = descendants(matching: .any)["Sheet Grabber"].firstMatch
             guard grabber.waitForExistence(timeout: 5) else { return false }
             grabber.swipeUp()
             _ = pulledUpSheet.waitForExistence(timeout: 2)
@@ -23,10 +23,13 @@ extension XCUIApplication {
         return pulledUpSheet.exists
     }
 
-    /// Drags the convoy sheet down by its grabber once (pulled up to tall, or tall to short).
+    /// Drags the convoy sheet down by its grabber, slowly and by about a third of the screen, so it settles one
+    /// height lower (pulled up to tall, or tall to short); a quick swipe from tall to short would spring back.
     func pullDownTripSheet() {
-        let grabber = otherElements["Sheet Grabber"].firstMatch
-        if grabber.waitForExistence(timeout: 5) { grabber.swipeDown() }
+        let grabber = descendants(matching: .any)["Sheet Grabber"].firstMatch
+        guard grabber.waitForExistence(timeout: 5) else { return }
+        let start = grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
     }
 
     /// Pulls the convoy sheet up, scrolls it to the row with identifier `id` (lobby.endTrip, lobby.leaveTrip,

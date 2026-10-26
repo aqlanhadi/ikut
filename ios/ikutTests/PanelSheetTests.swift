@@ -168,6 +168,8 @@ struct PanelSheetTests {
         #expect(PanelSheet.covered(shown: .folded, in: h, card: nil) == 300)
         #expect(PanelSheet.covered(shown: .folded, in: h, card: 340) == 340)
         #expect(PanelSheet.covered(shown: .unfolded, in: h, card: 340) == 480)
+        // Pulled up, the camera keeps the room it had at tall: the map under the lobby doesn't move.
+        #expect(PanelSheet.covered(shown: .pulledUp, in: h, card: nil) == 480)
     }
 
     @Test func aDraggedSheetUnfoldsTheListOnlyAtTheTallDetent() {
