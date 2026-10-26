@@ -28,7 +28,7 @@ struct DemoRoads: LegRouting {
 @MainActor
 enum LobbyStopsDemo {
     enum Scene: String {
-        case organizer, organizerEmpty, member, meetAndFailure, turnBack, suggestAdded
+        case organizer, organizerEmpty, member, meetAndFailure, turnBack, suggestAdded, started
     }
 
     /// KL to Ipoh, about 190 km.
@@ -51,8 +51,8 @@ enum LobbyStopsDemo {
 
     static func lobby(_ scene: Scene) -> LobbyView {
         let planner = StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in })
-        func model(_ stops: [PlannedStop]) -> LobbyModel {
-            let model = LobbyModel.sample(started: false, seconds: 2 * 3600 + 40 * 60, stops: stops, route: route)
+        func model(_ stops: [PlannedStop], started: Bool = false) -> LobbyModel {
+            let model = LobbyModel.sample(started: started, seconds: 2 * 3600 + 40 * 60, stops: stops, route: route)
             planner.sync(trip: model.trip, stops: model.stops)
             return model
         }
@@ -69,6 +69,9 @@ enum LobbyStopsDemo {
             return LobbyView(sample: model(tapah), planner: planner, organizer: true)
         case .member:
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false)
+        case .started:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            return LobbyView(sample: model(stopsOnRoute, started: true), planner: planner, organizer: true)
         case .turnBack:
             let items = stopsOnRoute.map(StopDraft.init)
             planner.showForDemo(items: items, turnBacks: ["s1": 6_000])
@@ -209,6 +212,8 @@ enum DemoScreens {
         case "lobby-waiting": return nav(LobbyStopsDemo.lobby(.member))
         case "lobby-turnback": return nav(LobbyStopsDemo.lobby(.turnBack))
         case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
+        // lobby-started: the organiser back in the lobby after Start trip, the convoy on the move.
+        case "lobby-started": return nav(LobbyStopsDemo.lobby(.started))
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))
         case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "road-markers": return AnyView(MapMarkersDemo())
