@@ -24,6 +24,21 @@ enum LobbyContent {
         return parts.joined(separator: " · ")
     }
 
+    /// The phone shares its location before the start (#394): the subtitle leads with "Sharing" in green, where a
+    /// floating capsule used to sit above the cars. Paused, the paused banner says so and the subtitle drops it.
+    static func subtitleSharing(tracking: Bool, paused: Bool, started: Bool, ended: Bool) -> Bool {
+        tracking && !paused && !started && !ended
+    }
+
+    /// The subtitle's words with "Sharing" in front when it shares ("Sharing · To Ipoh · code K7M 2QX"); the view
+    /// draws the arrow before them and colours "Sharing".
+    static func subtitleWords(_ subtitle: String?, sharing: Bool) -> String? {
+        guard sharing else { return subtitle }
+        return [sharingWord, subtitle].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static let sharingWord = "Sharing"
+
     // MARK: Cars
 
     /// "Cars · 4 of 5 ready"; just "Cars" with none yet.
@@ -169,6 +184,33 @@ enum LobbyContent {
         }
     }
 
+    /// The journey while driving, pulled up (canvas row L): the stops still ahead, numbered as on the map, and the part
+    /// already driven folded into one line, so the list starts with what is still ahead.
+    struct Journey: Equatable {
+        /// "Passed R&R Bidor · 12:31" (the last stop left), "Left Petronas · 12:05" (the meeting point), or "Left 12:05"
+        /// with none passed yet; nil when not even the start time is known.
+        var behind: String?
+        var ahead: [StopText]
+    }
+
+    /// `stops` in any order; numbers count every non-meeting stop in order, passed and skipped ones too, so a stop
+    /// keeps its pin's number. A stop is ahead while it is open (not left, not skipped).
+    static func journey(
+        _ stops: [PlannedStop], routeLength: Double?, routeSeconds: Double?, departedAt: Date?, timeZone: TimeZone = .current
+    ) -> Journey {
+        let ordered = stops.sorted { $0.order < $1.order }
+        let texts = stopTexts(ordered.map(StopDraft.init), routeLength: routeLength, routeSeconds: routeSeconds, timeZone: timeZone)
+        let ahead = zip(ordered, texts).filter { $0.0.isOpen }.map(\.1)
+        let behind: String?
+        if let last = ordered.last(where: \.isLeft) {
+            let words = "\(last.isMeeting ? "Left" : "Passed") \(last.name)"
+            behind = last.leftAt.map { "\(words) · \(StopFormat.clock($0, timeZone: timeZone))" } ?? words
+        } else {
+            behind = departedAt.map { "Left \(StopFormat.clock($0, timeZone: timeZone))" }
+        }
+        return Journey(behind: behind, ahead: ahead)
+    }
+
     /// "After about 1 h 30 min", under Suggest stops: where the first suggestion would fall (`SuggestAfter`).
     static func suggestCaption(routeSeconds: Double?) -> String? {
         routeSeconds.map { "After about \(ConvoyFormat.duration(SuggestAfter.defaultSeconds(routeSeconds: $0)))" }
@@ -187,6 +229,28 @@ enum LobbyContent {
         var canEnd: Bool
         /// A participant has their own way in (D26) under the header.
         var ownWay: Bool
+    }
+
+    /// What continues below the convoy when the driving sheet is pulled up, in this order.
+    enum PulledUpSection: Equatable { case journey, code, trip, options, exit }
+
+    struct PulledUp: Equatable {
+        var sections: [PulledUpSection]
+        /// Destination opens Change destination (the organiser; mid-trip it rebuilds the route from where they are).
+        var changeDestination: Bool
+        var pause: Bool
+        var end: Bool
+        var leave: Bool
+    }
+
+    /// The pulled-up rows for this person, from the lobby's own `rows`: Keep screen on is everyone's, so the options
+    /// are always there; Leave and End only when this person can.
+    static func pulledUp(_ rows: Rows) -> PulledUp {
+        var sections: [PulledUpSection] = [.journey, .code, .trip, .options]
+        if rows.canEnd || rows.canLeave { sections.append(.exit) }
+        return PulledUp(
+            sections: sections, changeDestination: rows.canChangeDestination, pause: rows.canPause,
+            end: rows.canEnd, leave: rows.canLeave)
     }
 
     /// `trackingOrPaused`: this phone is broadcasting (or paused while it was).

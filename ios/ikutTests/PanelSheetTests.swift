@@ -80,9 +80,10 @@ struct PanelSheetTests {
         #expect(PanelSheet.room(mapHeight: 874, reserved: 74) == 800)
     }
 
-    @Test func detentsAreTheShortAndTallOne() {
+    @Test func detentsAreTheShortTallAndPulledUpOne() {
         let h = heights()
-        #expect(PanelSheet.detents(in: h) == [.height(300), .height(480)])
+        #expect(PanelSheet.detents(in: h) == [.height(300), .height(480), .height(700)])
+        #expect(PanelSheet.detent(.pulledUp, in: h) == .height(700))
         #expect(PanelSheet.detent(.folded, in: h) == .height(300))
         #expect(PanelSheet.detent(.unfolded, in: h) == .height(480))
     }
@@ -118,9 +119,40 @@ struct PanelSheetTests {
         #expect(PanelSheet.cardDismissFallback > 0)
     }
 
-    @Test func theShownStateFollowsTheFold() {
-        #expect(PanelSheet.shown(expanded: false) == .folded)
-        #expect(PanelSheet.shown(expanded: true) == .unfolded)
+    @Test func theListIsUnfoldedAtTallAndPulledUp() {
+        #expect(!PanelSheet.Shown.folded.listUnfolded)
+        #expect(PanelSheet.Shown.unfolded.listUnfolded)
+        #expect(PanelSheet.Shown.pulledUp.listUnfolded)
+    }
+
+    // MARK: Pulled up (D53, canvas row L)
+
+    @Test func pulledUpIsTheTallestTheRoomAllows() {
+        let h = heights(bar: 62, room: 700)
+        #expect(h.tall == 542)
+        #expect(h.full == 700)
+        #expect(PanelSheet.height(.pulledUp, in: h) == 700)
+        // No room measured yet: tall plus an estimate of what continues below it.
+        let open = heights(bar: 62, room: nil)
+        #expect(open.full == open.tall + PanelSheet.continuationEstimate)
+    }
+
+    @Test func pullingUpOnlyAddsBelowSoTheConvoyKeepsItsPlace() {
+        // The same panel, unfolded, is on top at tall and at pulled up; the rest follows it.
+        let h = heights()
+        #expect(PanelSheet.showsContinuation(.pulledUp, in: h))
+        #expect(!PanelSheet.showsContinuation(.unfolded, in: h))
+        #expect(!PanelSheet.showsContinuation(.folded, in: h))
+    }
+
+    @Test func aConvoyAlreadyAsTallAsTheRoomContinuesAtTall() {
+        // Tall is capped at the room: there is no taller detent, so the continuation scrolls on below the list.
+        let h = heights(folded: 300, unfolded: 900, bar: 62, room: 600)
+        #expect(h.tall == 600)
+        #expect(h.full == 600)
+        #expect(PanelSheet.detents(in: h) == [.height(362), .height(600)])
+        #expect(PanelSheet.showsContinuation(.unfolded, in: h))
+        #expect(PanelSheet.choice(.height(600), in: h) == .pulledUp)
     }
 
     @Test func aCardSheetIsAsTallAsItsContentUpToTheRoom() {
@@ -140,11 +172,12 @@ struct PanelSheetTests {
 
     @Test func aDraggedSheetUnfoldsTheListOnlyAtTheTallDetent() {
         let h = heights()
-        #expect(PanelSheet.choice(.height(480), in: h) == true)
-        #expect(PanelSheet.choice(.height(300), in: h) == false)
+        #expect(PanelSheet.choice(.height(480), in: h) == .unfolded)
+        #expect(PanelSheet.choice(.height(300), in: h) == .folded)
+        #expect(PanelSheet.choice(.height(700), in: h) == .pulledUp)
         // Nothing to unfold when the two are one height: that height is the folded one.
         let same = heights(folded: 300, unfolded: 300)
-        #expect(PanelSheet.choice(.height(300), in: same) == false)
+        #expect(PanelSheet.choice(.height(300), in: same) == .folded)
     }
 
     @Test func aHeightThatChangesWhileTallIsNotTheDriverFoldingTheList() {
@@ -152,7 +185,7 @@ struct PanelSheetTests {
         let now = heights(unfolded: 446)
         #expect(now.tall == 446)
         #expect(PanelSheet.choice(.height(480), in: now) == nil)
-        #expect(PanelSheet.choice(.height(446), in: now) == true)
+        #expect(PanelSheet.choice(.height(446), in: now) == .unfolded)
         // Likewise a short that moved under a folded sheet.
         #expect(PanelSheet.choice(.height(300), in: heights(folded: 280)) == nil)
     }
@@ -165,45 +198,6 @@ struct PanelSheetTests {
         #expect(PanelSheet.sideGap == Spacing.l)
     }
 
-    @Test func anExitWaitsForTheSheetOnlyWhileItIsUp() {
-        #expect(PanelSheet.exit(sheetUp: true) == .afterDismissal)
-        #expect(PanelSheet.exit(sheetUp: false) == .now)
-    }
-    @Test func exitWaitRunsOnceWhenDismissalReported() {
-        var wait = PanelSheet.ExitWait()
-        wait.arm()
-        let first = wait.fire()
-        let second = wait.fire()
-        #expect(first)
-        #expect(!second)
-    }
-
-    @Test func exitWaitRunsOnFallbackWhenNeverReported() {
-        var wait = PanelSheet.ExitWait()
-        wait.arm()
-        #expect(PanelSheet.exitFallback > 0)
-        #expect(wait.waiting)
-        let fallback = wait.fire()
-        #expect(fallback)
-    }
-
-    @Test func exitWaitNotRunAgainWhenReportedAfterFallback() {
-        var wait = PanelSheet.ExitWait()
-        wait.arm()
-        let fallback = wait.fire()
-        let report = wait.fire()
-        #expect(fallback)
-        #expect(!report)
-        #expect(!wait.waiting)
-    }
-
-    @Test func exitWaitNeverArmedRunsNothing() {
-        var wait = PanelSheet.ExitWait()
-        let ran = wait.fire()
-        #expect(!ran)
-    }
-
-
     @Test func theMapInsetFollowsTheDetentOnShow() {
         let h = heights()
         #expect(PanelSheet.height(.folded, in: h) == 300)
@@ -211,10 +205,11 @@ struct PanelSheetTests {
     }
 
     @Test func theSheetStepsAsideForEachThingThatTakesTheScreen() {
-        #expect(!PanelSheet.isCovered(ended: false, leaving: false, explainerWants: false))
-        #expect(PanelSheet.isCovered(ended: true, leaving: false, explainerWants: false))
-        #expect(PanelSheet.isCovered(ended: false, leaving: true, explainerWants: false))
-        #expect(PanelSheet.isCovered(ended: false, leaving: false, explainerWants: true))
+        #expect(!PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: false))
+        #expect(PanelSheet.isCovered(ended: true, explainerWants: false, lobbyWants: false))
+        #expect(PanelSheet.isCovered(ended: false, explainerWants: true, lobbyWants: false))
+        // What the pulled-up lobby asks for (Leave, End, rename, Change destination) takes the screen too.
+        #expect(PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: true))
     }
 
     @Test func theLobbysAlwaysSheetWaitsForTheConvoySheetToGo() {

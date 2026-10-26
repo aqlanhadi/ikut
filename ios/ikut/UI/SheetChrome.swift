@@ -137,6 +137,8 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
     /// What VoiceOver reads for the title when it should say more than the title.
     var titleLabel: String?
     var subtitleIdentifier: String?
+    /// A subtitle with parts in colour (the lobby's "Sharing", #394), drawn instead of `subtitle`'s plain words.
+    var styledSubtitle: Text?
     @ViewBuilder var leading: Leading
     @ViewBuilder var trailing: Trailing
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -152,8 +154,8 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
                     .truncationMode(.middle)
                     .accessibilityLabel(titleLabel ?? title)
                     .accessibilityAddTraits(.isHeader)
-                if let subtitle {
-                    Text(subtitle)
+                if let line = styledSubtitle ?? subtitle.map({ Text($0) }) {
+                    line
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
                         .lineLimit(2)

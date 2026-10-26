@@ -221,7 +221,7 @@ final class DemoOrganizerUITests: DemoBase {
 
     /// --end-trip, and always against production: the organizer ends the trip from the lobby's End trip row.
     func endTrip() {
-        guard app.backToLobby.exists else { note("Back to lobby to end the trip", false, core: true); return }
+        guard app.drivingReport.exists else { note("the driving sheet to end the trip from", false, core: true); return }
         endTripFromLobby()
         confirm("End trip")
         soft("the trip ended and phone 1 shows the recap", timeout: 30, core: true) { app.buttons["Share recap"].exists }

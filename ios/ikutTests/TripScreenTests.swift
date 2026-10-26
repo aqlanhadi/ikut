@@ -13,13 +13,9 @@ struct TripScreenTests {
         #expect(TripScreenLogic.mode(after: .showMap, from: .lobby) == .driving)
     }
 
-    @Test func backSwitchesDrivingToTheLobby() {
-        #expect(TripScreenLogic.mode(after: .back, from: .driving) == .lobby)
-    }
-
     @Test func aSwitchToTheModeAlreadyOnIsNoChange() {
         #expect(TripScreenLogic.mode(after: .showMap, from: .driving) == .driving)
-        #expect(TripScreenLogic.mode(after: .back, from: .lobby) == .lobby)
+        #expect(TripScreenLogic.mode(after: .start, from: .driving) == .driving)
     }
 
     // MARK: Who draws
@@ -79,16 +75,16 @@ struct TripScreenTests {
     }
 
     @Test func drivingsSheetIsTheConvoyPanelsShortAndTallTheMapTouchableThroughout() {
-        let heights = PanelSheet.Heights(short: 282, tall: 520)
+        let heights = PanelSheet.Heights(short: 282, tall: 520, full: 760)
         let sheet = TripScreenLogic.Sheet.driving(heights)
         #expect(sheet.mode == .driving)
-        #expect(sheet.detents == [.height(282), .height(520)])
+        #expect(sheet.detents == [.height(282), .height(520), .height(760)])
         #expect(sheet.touchableUpThrough == .height(520))
     }
 
     @Test func drivingIsNotAPushSoItNoLongerCoversTheLobbysSheet() {
         // The cover rule has nothing for the map any more: the sheet stays up and changes its content.
         #expect(!LobbySheet.isCovered(.init(), lobbyOnScreen: true))
-        #expect(!PanelSheet.isCovered(ended: false, leaving: false, explainerWants: false))
+        #expect(!PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: false))
     }
 }

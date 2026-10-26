@@ -52,7 +52,8 @@ final class CreateTripUITests: ConvoyUITestCase {
     }
 
     /// The sheets hand over to each other: lobby Back to Home (Home's sheet is back and its controls are hittable),
-    /// Home's row to the lobby (the lobby's sheet and bar), Start to the map and Back to the lobby again.
+    /// Home's row to the lobby (the lobby's sheet and bar), Start to driving, a Pit stop card opened and closed, and the
+    /// convoy sheet pulled up to the lobby below it and down again, twice (there is no Back to the lobby, D53).
     func testLobbyAndHomeSheetsHandOver() throws {
         app = XCUIApplication()
         allowPermissionPrompts()
@@ -80,13 +81,37 @@ final class CreateTripUITests: ConvoyUITestCase {
         row.tap()
         XCTAssertTrue(waitForLobby(timeout: 30), "Home row to the lobby: no lobby sheet")
 
-        // Start trip to the map, Back: the lobby's sheet is back.
+        // Start trip: the same screen in driving mode, the lobby's sheet now the convoy's.
         lobbyActionButton.tap()
         app.dismissMapAsks(first: 3)
-        let back = app.backToLobby
-        XCTAssertTrue(back.waitForExistence(timeout: 30), "Didn't reach the map")
-        back.tap()
-        XCTAssertTrue(waitForLobby(timeout: 20), "Back from the map: the lobby's sheet didn't come back")
-        XCTAssertTrue(lobbyActionButton.label == "Show map", "The trip should be under way")
+        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Didn't reach the map")
+
+        // Pit stop's card over the convoy sheet, closed, then the sheet pulled up: one sheet, no card left behind.
+        let pitStop = app.buttons["stop.button"]
+        XCTAssertTrue(pitStop.waitForExistence(timeout: 10), "No Pit stop button")
+        pitStop.tap()
+        let close = app.buttons["Close"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "Pit stop didn't open its card")
+        close.tap()
+        XCTAssertTrue(waitForGone(close, timeout: 5), "Pit stop's card stayed up after Close")
+
+        // Two round trips: pulled up, the lobby continues below the convoy; down twice, the list is folded again.
+        for round in 1...2 {
+            XCTAssertTrue(app.pullUpTripSheet(), "Round \(round): pulling the sheet up didn't show the lobby below the convoy")
+            XCTAssertTrue(app.buttons["lobby.copyCode"].exists, "Round \(round): no trip code card when pulled up")
+            XCTAssertFalse(app.buttons["Close"].exists, "Round \(round): a card is stuck over the pulled-up sheet")
+            XCTAssertEqual(app.otherElements.matching(identifier: "trip.pulledUp").count, 1,
+                           "Round \(round): the pulled-up lobby shows more than once")
+            app.pullDownTripSheet()
+            XCTAssertTrue(waitForGone(app.pulledUpSheet, timeout: 5), "Round \(round): pulling down left the lobby below the convoy")
+            app.pullDownTripSheet()
+            XCTAssertTrue(app.expandConvoy.waitForExistence(timeout: 5), "Round \(round): the convoy list didn't fold")
+            XCTAssertTrue(app.drivingReport.isHittable, "Round \(round): Report isn't hittable on the folded sheet")
+        }
+    }
+
+    private func waitForGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
+        return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
     }
 }

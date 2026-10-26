@@ -188,6 +188,7 @@
 		A832D47DD7426CC3658296CC /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = CA192F79FB2F9166FBD454E4 /* README.md */; };
 		A889D2AE7ED65EDEDDACD020 /* OwnWayDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD4FAF0956DC812EFB12371 /* OwnWayDemo.swift */; };
 		A8EA53549F4BF60CC688242A /* CarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1252A60E6727550F035DB2EA /* CarRow.swift */; };
+		AB001DF51B13F800F9ECF236 /* TripPullUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */; };
 		AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
 		ABBE74F1269488DABBAE4BAD /* MapTypeColourTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E42A483FA023EFB82518B91 /* MapTypeColourTests.swift */; };
@@ -494,6 +495,7 @@
 		CA192F79FB2F9166FBD454E4 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportOption.swift; sourceTree = "<group>"; };
 		CBAB9007352FC219EF36852D /* README-places.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README-places.md"; sourceTree = "<group>"; };
+		CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPullUpTests.swift; sourceTree = "<group>"; };
 		CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripView.swift; sourceTree = "<group>"; };
 		CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachMonitor.swift; sourceTree = "<group>"; };
 		CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameEntryView.swift; sourceTree = "<group>"; };
@@ -964,6 +966,7 @@
 				29D417D8CDD8A80CCF181936 /* TrackingTests.swift */,
 				66FF5396649ED8B58EC123A7 /* TripAskTests.swift */,
 				94110B44C36ABA8B33885499 /* TripMapContentTests.swift */,
+				CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */,
 				4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */,
 				A9B60214D010449BFA91F229 /* TripServiceTests.swift */,
 				39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */,
@@ -1477,6 +1480,7 @@
 				D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */,
 				178973148E0EE42B411C79AC /* TripAskTests.swift in Sources */,
 				5A4D6B4B863E8EC2FA5727C3 /* TripMapContentTests.swift in Sources */,
+				AB001DF51B13F800F9ECF236 /* TripPullUpTests.swift in Sources */,
 				B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */,
 				5A3DA96314D84E3905601EC8 /* TripServiceTests.swift in Sources */,
 				C2B70671091C8C289A2A2D00 /* TypeSizeTests.swift in Sources */,

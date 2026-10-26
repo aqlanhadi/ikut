@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The trip screen's two modes over its one map (D53): the lobby (the whole route, the lobby's sheet) and driving
 /// (following your car, the pill, the banners and the convoy sheet). Start trip and Show map are a camera move and a
-/// sheet change, not a new screen.
+/// sheet change, not a new screen. There is no way back to the lobby's mode: while driving, the lobby continues below
+/// the convoy when its sheet is pulled up (canvas row L).
 enum TripScreenMode: Equatable {
     case lobby, driving
 }
@@ -16,14 +17,23 @@ enum TripScreenLogic {
         case start
         /// A trip already under way: Show map.
         case showMap
-        /// The driving screen's Back (until the sheet is pulled up for the lobby instead, piece 3).
-        case back
     }
 
     static func mode(after event: Event, from mode: TripScreenMode) -> TripScreenMode {
         switch event {
         case .start, .showMap: .driving
-        case .back: .lobby
+        }
+    }
+
+    /// Whether the lobby's own listeners (the trip, cars, members and stops: `LobbyModel`) run: while the trip screen
+    /// is on screen, in the lobby's mode, or while driving with the convoy sheet pulled up, where the lobby continues
+    /// below the convoy. Short or tall, the convoy has its own listeners and the lobby's rest, so the trip is read by
+    /// one listener set at a time; what the lobby last read stays on screen until it listens again.
+    static func lobbyListens(onScreen: Bool, mode: TripScreenMode, pulledUp: Bool) -> Bool {
+        guard onScreen else { return false }
+        switch mode {
+        case .lobby: return true
+        case .driving: return pulledUp
         }
     }
 
@@ -133,6 +143,8 @@ final class TripMapStage {
     var reading: TripCameraReading?
     /// The map's frame on screen (it runs under the status bar and the home indicator).
     var mapFrame: CGRect = .zero
+    /// Driving: the convoy sheet is pulled up and the lobby continues below the convoy (`PanelSheet.showsContinuation`).
+    var pulledUp = false
 
     init(mode: TripScreenMode = .lobby) { self.mode = mode }
 

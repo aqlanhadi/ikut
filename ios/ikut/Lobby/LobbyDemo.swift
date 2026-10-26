@@ -33,6 +33,10 @@ enum LobbyStopsDemo {
         case tall
         /// B4: a meeting point, five cars, the last one not sharing yet.
         case notReady
+        /// The organiser's lobby before the start with this phone sharing: "Sharing" leads the subtitle (#394).
+        case sharing
+        /// Driving, the organiser's convoy sheet pulled up with R&R Bidor passed (D53, canvas row L).
+        case pulledUp
     }
 
     /// KL to Ipoh, about 190 km.
@@ -53,7 +57,7 @@ enum LobbyStopsDemo {
         stop("s3", "Kopitiam Gopeng", 4.45, 101.12, .food, nil, 2),
     ].sorted { $0.routeOffset < $1.routeOffset }.enumerated().map { var s = $1; s.order = $0; return s }
 
-    static func lobby(_ scene: Scene, driving: ((@escaping () -> Void) -> AnyView)? = nil) -> LobbyView {
+    static func lobby(_ scene: Scene, driving: ((AnyView) -> AnyView)? = nil) -> LobbyView {
         let planner = StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in })
         func model(_ stops: [PlannedStop], started: Bool = false) -> LobbyModel {
             let model = LobbyModel.sample(started: started, seconds: 2 * 3600 + 40 * 60, stops: stops, route: route)
@@ -104,6 +108,25 @@ enum LobbyStopsDemo {
             return LobbyView(sample: model(tapah), planner: planner, organizer: true)
         case .member:
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false)
+        case .sharing:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            return LobbyView(
+                sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns, sharing: true)
+        case .pulledUp:
+            // The first stop along the way (R&R Bidor) left 20 minutes ago; the others still ahead.
+            var stops = stopsOnRoute
+            stops[0].arrivedAt = Date().addingTimeInterval(-35 * 60)
+            stops[0].leftAt = Date().addingTimeInterval(-20 * 60)
+            stops[0].leftBy = "u1"
+            return LobbyView(
+                sample: model(stops, started: true), planner: planner, organizer: true, sharing: true,
+                driving: { continuation in
+                    let map = MapDemo.model()
+                    map.mode = TripScreenLogic.drivingEntryMode
+                    return AnyView(TripMapView(
+                        session: TripSession(tripId: "demo", userId: "u-c1"), model: map, stopService: DemoStopService(),
+                        demoPulledUp: true, continuation: continuation))
+                })
         case .started:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(sample: model(stopsOnRoute, started: true), planner: planner, organizer: true)
@@ -202,12 +225,12 @@ struct DemoGeocoder: ReverseGeocoding {
 struct TripStartSwapDemo: View {
     @Environment(TripMapStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let lobby = LobbyStopsDemo.lobby(.organizer, driving: { onBack in
+    private let lobby = LobbyStopsDemo.lobby(.organizer, driving: { continuation in
         let model = MapDemo.model()
         model.mode = TripScreenLogic.drivingEntryMode
         return AnyView(TripMapView(
             session: TripSession(tripId: "demo", userId: "u-c1"), model: model, stopService: DemoStopService(),
-            onBack: onBack))
+            continuation: continuation))
     })
 
     var body: some View {
@@ -298,6 +321,10 @@ enum DemoScreens {
         case "lobby-started": return trip(LobbyStopsDemo.lobby(.started))
         // The lobby, then Start trip after 2 s: the sheet becomes the convoy's and the camera flies to my car (D53).
         case "trip-start-swap": return trip(TripStartSwapDemo())
+        // Driving with the convoy sheet pulled up: the journey (R&R Bidor passed), code, trip, options, End (D53).
+        case "road-pulled-up": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.pulledUp) })
+        // The organiser's lobby before the start while this phone shares: "➤ Sharing" leads the subtitle (#394).
+        case "lobby-sharing": return trip(LobbyStopsDemo.lobby(.sharing))
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))
         case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "road-markers": return AnyView(MapMarkersDemo())
