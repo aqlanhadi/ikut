@@ -228,40 +228,10 @@ struct TripMapView: View {
 
     private var map: some View {
         Map(position: $camera) {
-            if model.mainRouteCoordinates.count > 1 {
-                MapPolyline(coordinates: model.mainRouteCoordinates)
-                    .stroke(MapPalette.routeCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
-                MapPolyline(coordinates: model.mainRouteCoordinates)
-                    .stroke(MapPalette.route, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
-            }
-            ForEach(model.overlays) { overlay in
-                let path = overlay.path.map(\.clCoordinate)
-                MapPolyline(coordinates: path)
-                    .stroke(.white, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
-                MapPolyline(coordinates: path)
-                    .stroke(
-                        Color.car(hex: overlay.colorHex),
-                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [6, 6]))
-                if let merge = overlay.merge {
-                    Annotation("Join point", coordinate: merge.clCoordinate, anchor: .center) {
-                        MergePointView(colorHex: overlay.colorHex, containerWidth: mapMaxX)
-                    }
-                    .annotationTitles(.hidden)
-                }
-            }
-            ForEach(model.hazards.markers) { hazard in
-                Annotation(hazard.label, coordinate: hazard.coordinate, anchor: .center) {
-                    HazardMapContent(marker: hazard, pinging: hazard.id == approach?.eventId)
-                        .accessibilityIdentifier("hazard.marker")
-                }
-                .annotationTitles(.hidden)
-            }
-            ForEach(model.markers) { marker in
-                Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
-                    MapMarkerView(marker: marker, cameraHeading: cameraHeading, containerWidth: mapMaxX)
-                }
-                .annotationTitles(.hidden)
-            }
+            TripMapContent(
+                input: .driving(route: model.mainRouteCoordinates, overlays: model.overlays,
+                                hazards: model.hazards.markers, cars: model.markers),
+                style: TripMapStyle(cameraHeading: cameraHeading, containerWidth: mapMaxX, pingingEventId: approach?.eventId))
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
         // MapKit centers the camera, and fits regions, inside the safe area; `cameraRoom` does the

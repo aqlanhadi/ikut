@@ -186,24 +186,9 @@ struct LobbyMapView: View {
 
     var body: some View {
         Map(position: $camera) {
-            UserAnnotation()
-            if route.count > 1 {
-                MapPolyline(coordinates: route)
-                    .stroke(.white, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
-                MapPolyline(coordinates: route)
-                    .stroke(Color.ikutAccent, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-            }
-            if ownRoute.count > 1 {
-                MapPolyline(coordinates: ownRoute)
-                    .stroke(Color.car(hex: ownColorHex), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-            }
-            // The chosen R&R is drawn last, so it is on top.
-            ForEach(pins.sorted { !$0.isSelectedCandidate && $1.isSelectedCandidate }) { pin in
-                Annotation("", coordinate: pin.coordinate, anchor: .bottom) {
-                    LobbyPinView(pin: pin, colorHex: ownColorHex)
-                        .onTapGesture { if case .candidate = pin.kind { onCandidateTap(pin.id) } }
-                }
-            }
+            TripMapContent(
+                input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),
+                style: TripMapStyle(onCandidateTap: onCandidateTap))
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
