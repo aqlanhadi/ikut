@@ -30,6 +30,11 @@ struct StopPillView: View {
         }
     }
 
+    /// The OK capsule's height, and the banner's corner radius concentric with it: the capsule's radius plus the
+    /// padding between them (64 / 2 + 12 = 44 pt).
+    static let okHeight: CGFloat = 64
+    static let questionRadius: CGFloat = okHeight / 2 + Spacing.m
+
     private func question(eventId: String, symbol: String, title: String, detail: String) -> some View {
         VStack(spacing: Spacing.m) {
             HStack(spacing: Spacing.m) {
@@ -46,7 +51,7 @@ struct StopPillView: View {
                 Text("OK")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 64)
+                    .frame(maxWidth: .infinity, minHeight: Self.okHeight)
                     .background(Color.ikutOK, in: Capsule())
                     .contentShape(Capsule())
             }
@@ -54,7 +59,7 @@ struct StopPillView: View {
             .accessibilityIdentifier("stop.pill.button")
         }
         .padding(Spacing.m)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Self.questionRadius, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stop.pill")
     }

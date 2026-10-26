@@ -71,14 +71,6 @@ struct ReportOptionTests {
         #expect(ReportOption.events[4].toastName == "stopped car")
     }
 
-    @Test func pinDetailText() {
-        let now = snapshot.capturedAt.addingTimeInterval(75)
-        let here = CLLocationCoordinate2D(latitude: 3, longitude: 101.0027) // about 300 m east
-        let text = ReportSheet.pinDetail(pinned: snapshot, now: now, current: here)
-        #expect(text.hasPrefix("1 min 15 s ago · 3"))
-        #expect(text.hasSuffix(" m behind you now"))
-        #expect(ReportSheet.pinDetail(pinned: snapshot, now: snapshot.capturedAt.addingTimeInterval(4), current: nil) == "4 s ago")
-    }
 }
 
 @MainActor

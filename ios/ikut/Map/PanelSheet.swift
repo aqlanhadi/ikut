@@ -19,8 +19,8 @@ enum PanelSheet {
     /// How far the buttons hang down into the sheet's bottom safe area (the home indicator's) so the gap under them
     /// equals `sideGap`. Never negative, so a sheet without a safe area (an iPhone with a home button) keeps them
     /// where the layout puts them; never more than leaves the indicator's own strip (`indicatorClearance`) free.
-    static func barLift(safeBottom: CGFloat) -> CGFloat {
-        max(0, min(safeBottom - sideGap, safeBottom - indicatorClearance))
+    static func barLift(safeBottom: CGFloat, gap: CGFloat = sideGap) -> CGFloat {
+        max(0, min(safeBottom - gap, safeBottom - indicatorClearance))
     }
     /// The strip at the very bottom the home indicator draws in; the buttons stay above it.
     static let indicatorClearance: CGFloat = 14
@@ -182,6 +182,16 @@ enum PanelSheet {
     /// The room for the sheet: the map's full height less what the pills and banners need above it.
     static func room(mapHeight: CGFloat, reserved: CGFloat) -> CGFloat? {
         mapHeight > 0 ? mapHeight - reserved : nil
+    }
+}
+
+private struct CardActionLiftKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
+
+extension EnvironmentValues {
+    /// How far a card sheet's buttons hang into its bottom safe area (`PanelSheet.barLift`, with the card's 20 pt gap).
+    var cardActionLift: CGFloat {
+        get { self[CardActionLiftKey.self] }
+        set { self[CardActionLiftKey.self] = newValue }
     }
 }
 

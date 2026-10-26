@@ -81,6 +81,8 @@ struct TripMapView: View {
     /// The heights the sheet uses (`PanelSheet.settled`); nil until the first measurement.
     @State private var appliedHeights: PanelSheet.Heights?
     @State private var sheetSafeBottom: CGFloat = 34
+    /// The card sheet's own bottom safe area, which its buttons hang into.
+    @State private var cardSafeBottom: CGFloat = 34
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
     @State private var mapWidth: CGFloat = 0
@@ -883,6 +885,9 @@ struct TripMapView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .environment(\.inPanelSheet, true)
+        // The gap under the buttons equals the gap beside them (the card's 20 pt), as on the convoy sheet's bar.
+        .environment(\.cardActionLift, PanelSheet.barLift(safeBottom: cardSafeBottom, gap: Spacing.block))
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { cardSafeBottom = $0 }
         .presentationDetents([.height(cardHeight)])
         .presentationDragIndicator(.hidden)
         .presentationBackgroundInteraction(.enabled)

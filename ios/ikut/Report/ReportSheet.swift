@@ -20,9 +20,12 @@ struct ReportSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.cozy) {
-            header
-            pinCard
+        // The same frame, sheet and tiles as the stop cards (title, close button, 20 pt padding, the message tile's
+        // fill); the grid needs no cap, so it never scrolls inside one.
+        CardSheetFrame(
+            title: "What’s on the road?", bodyCap: .infinity, closeIdentifier: "sheet.close",
+            containerIdentifier: "report.card", onClose: { dismiss() }
+        ) {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap) {
                 ForEach(ReportOption.events) { option in
                     eventButton(option)
@@ -35,46 +38,8 @@ struct ReportSheet: View {
                 }
             }
         }
-        .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.m)
-        .padding(.bottom, Spacing.block)
-    }
-
-    private var header: some View {
-        SheetHeader(
-            title: "What’s on the road?",
-            subtitle: "Pinned where you tapped Report, not where you send it. Cars behind you get an alert.",
-            onClose: { dismiss() })
-    }
-
-    private var pinCard: some View {
-        HStack(spacing: Spacing.gap) {
-            Image(systemName: pinned == nil ? "location.slash.fill" : "mappin.circle.fill")
-                .font(.title3)
-                .foregroundStyle(pinned == nil ? Color.secondary : Color.red)
-            VStack(alignment: .leading, spacing: 1) {
-                if let pinned {
-                    Text("Pinned where you tapped").font(.subheadline.weight(.semibold))
-                    TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                        Text(Self.pinDetail(pinned: pinned, now: timeline.date, current: context.snapshot()?.coordinate))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                } else {
-                    Text("Waiting for your location").font(.subheadline.weight(.semibold))
-                    Text("You can report once your phone finds where you are.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(Spacing.cozy)
-        .ikutTile()
-        .accessibilityElement(children: .combine)
         .task(id: pinned == nil) {
-            // No fix when the sheet opened: pin to the first one that arrives.
+            // No fix when the sheet opened: pin to the first one that arrives. The buttons wait for it.
             while pinned == nil, !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
                 pinned = context.snapshot()
@@ -97,7 +62,7 @@ struct ReportSheet: View {
             }
             .padding(.horizontal, Spacing.m)
             .frame(maxWidth: .infinity, minHeight: 72)
-            .ikutTile()
+            .surfaceTile()
             .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -111,7 +76,7 @@ struct ReportSheet: View {
                 .font(.subheadline.weight(.semibold))
                 .wrapsAtAccessibilitySizes(lines: 2)
                 .frame(maxWidth: .infinity, minHeight: 60)
-                .ikutSurface(.quaternary, radius: Radius.tile)
+                .surfaceTile()
                 .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -124,16 +89,6 @@ struct ReportSheet: View {
         toast.submit(option, context: context, snapshot: pinned)
         onReported(option.type)
         dismiss()
-    }
-
-    /// "12 s ago · 320 m behind you now".
-    nonisolated static func pinDetail(pinned: ReportSnapshot, now: Date, current: CLLocationCoordinate2D?) -> String {
-        let seconds = max(0, Int(now.timeIntervalSince(pinned.capturedAt)))
-        let ago = seconds < 60 ? "\(seconds) s" : "\(seconds / 60) min \(String(format: "%02d", seconds % 60)) s"
-        guard let current else { return "\(ago) ago" }
-        let meters = Int(RouteLine.haversine(pinned.coordinate, current).rounded())
-        let distance = meters < 1000 ? "\(meters) m" : String(format: "%.1f km", Double(meters) / 1000)
-        return "\(ago) ago · \(distance) behind you now"
     }
 }
 

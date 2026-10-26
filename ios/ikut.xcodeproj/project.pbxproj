@@ -200,6 +200,7 @@
 		C2B70671091C8C289A2A2D00 /* TypeSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */; };
 		C44829D343D51C669D1496DC /* PlacesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180A672BC06876630D529E06 /* PlacesLoader.swift */; };
 		C70FB1E27983828B0CCE5EF8 /* Car.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151766B65971D28EC0EDCE60 /* Car.swift */; };
+		C8E8AF333911A888C78785A4 /* CardSheetFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD7A72DF2101C9BDF361B74 /* CardSheetFrame.swift */; };
 		C9E76ED13687B373DD99ADF5 /* PastTripsMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A21A541DABA60F6378B1D9 /* PastTripsMapTests.swift */; };
 		C9EBB30503561CC0D3A77FD9 /* PickedTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322ED2F251FFDF594FC7D83E /* PickedTrip.swift */; };
 		CF16B7E5CA6C18AB25129F71 /* CarSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CDB4BA1EF0FC2607680E93 /* CarSelection.swift */; };
@@ -342,6 +343,7 @@
 		3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswerTests.swift; sourceTree = "<group>"; };
 		3EA475AFBE5E8DF067171FDC /* Member.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Member.swift; sourceTree = "<group>"; };
 		3F6CFFB42E42435BAB445863 /* JoinTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTripView.swift; sourceTree = "<group>"; };
+		3FD7A72DF2101C9BDF361B74 /* CardSheetFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSheetFrame.swift; sourceTree = "<group>"; };
 		409F2A2E1542D39038AFC98D /* AlwaysLocationExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysLocationExplainerView.swift; sourceTree = "<group>"; };
 		423FF6822F3DBBDDFF5571D9 /* NextStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextStopTests.swift; sourceTree = "<group>"; };
 		4310BE369727B65548BADA52 /* ConvoyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyPanel.swift; sourceTree = "<group>"; };
@@ -831,6 +833,7 @@
 			children = (
 				259104081FD2BD54F7BCE87D /* BottomSheet.swift */,
 				A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */,
+				3FD7A72DF2101C9BDF361B74 /* CardSheetFrame.swift */,
 				4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */,
 				52C0A56BCBBB39D114D5E659 /* Motion.swift */,
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
@@ -1192,6 +1195,7 @@
 				80D285211412E053AE968E46 /* CarRouteService.swift in Sources */,
 				A8EA53549F4BF60CC688242A /* CarRow.swift in Sources */,
 				CF16B7E5CA6C18AB25129F71 /* CarSelection.swift in Sources */,
+				C8E8AF333911A888C78785A4 /* CardSheetFrame.swift in Sources */,
 				D53034881D28E618144A5117 /* CatchUpHeadsUp.swift in Sources */,
 				543F159C6474EEE812A787EF /* ContentView.swift in Sources */,
 				95EC198723C3BA9E48C96F02 /* ConvoyFormat.swift in Sources */,
