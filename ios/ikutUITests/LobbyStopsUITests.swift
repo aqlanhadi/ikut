@@ -77,4 +77,38 @@ final class LobbyStopsUITests: XCTestCase {
         XCTAssertTrue(start.exists, "Start trip is gone after Cancel")
         XCTAssertFalse(app.buttons["Report"].exists, "the map opened after Cancel")
     }
+
+    /// Add a stop is the lobby's own sheet (B6): Back returns to the lobby with the stops as they were.
+    func testAddAStopOpensInTheSheetAndBackReturns() {
+        launchLobby()
+        let add = app.buttons["stops.add"]
+        var scrolls = 0
+        while !add.isHittable, scrolls < 8 {
+            app.collectionViews.firstMatch.swipeUp()
+            scrolls += 1
+        }
+        add.tap()
+        let back = app.buttons["addStop.back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "Add a stop did not open in the sheet")
+        XCTAssertTrue(app.textFields["addStop.search"].exists, "no search field")
+        back.tap()
+        XCTAssertTrue(app.buttons["Start trip"].waitForExistence(timeout: 10), "the lobby did not come back")
+        XCTAssertTrue(row("R&R Tapah").exists)
+    }
+
+    /// An R&R chosen in the list and added lands in the stop list.
+    func testAddingTheChosenRnRPutsItInTheList() {
+        app = XCUIApplication()
+        app.launchEnvironment["IKUT_SCREEN"] = "lobby-add-stop-picked"
+        app.launch()
+        let add = app.buttons["addStop.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10), "no Add button with Tapah R&R chosen")
+        XCTAssertEqual(add.label, "Add Tapah R&R")
+        app.buttons["addStop.longer"].tap()
+        XCTAssertEqual(app.staticTexts["addStop.stay"].label, "30 min")
+        add.tap()
+        XCTAssertTrue(app.buttons["Start trip"].waitForExistence(timeout: 10), "the lobby did not come back")
+        app.collectionViews.firstMatch.swipeUp()
+        XCTAssertTrue(row("Tapah R&R").waitForExistence(timeout: 10), "Tapah R&R is not in the stop list: \(app.debugDescription)")
+    }
 }
