@@ -36,6 +36,25 @@ enum LobbySheet {
         var confirmEnd = false
     }
 
+    /// Driving, the convoy sheet steps aside only for what is pushed or presented over the screen: Change destination,
+    /// the Always sheet, or the lobby not on screen. Leave, End and rename present from inside the convoy sheet.
+    static func drivingCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
+        !lobbyOnScreen || cover.changeDestination || cover.suggestStops || cover.alwaysExplainer
+    }
+
+    /// The asks presented from inside the driving sheet's lobby rows.
+    struct DrivingAsks: Equatable {
+        var confirmLeave = false
+        var confirmEnd = false
+        var renaming = false
+        var showQR = false
+    }
+
+    /// The asks once the lobby's rows are gone (a fold to short by the grabber, the header or a hazard approach): torn down with it, so cleared, never shown untapped at the next pull-up; kept while it shows.
+    static func drivingAsks(_ asks: DrivingAsks, continuationShown: Bool) -> DrivingAsks {
+        continuationShown ? asks : DrivingAsks()
+    }
+
     /// Whether the sheet is away: anything above is up, or the lobby itself is not on screen (popped).
     static func isCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
         !lobbyOnScreen || cover.changeDestination || cover.suggestStops
@@ -179,6 +198,7 @@ struct LobbyMapLayer: View {
 
     @Environment(TripMapStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var roundSide = SheetButtonSize.round
     @State private var mapHeight: CGFloat = 0
     /// The map's top safe area: the status bar (the lobby has no navigation bar).
     @State private var safeTop: CGFloat = 0
@@ -208,7 +228,7 @@ struct LobbyMapLayer: View {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .frame(width: 56, height: 56)
+                        .frame(width: roundSide, height: roundSide)
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)

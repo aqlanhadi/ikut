@@ -4,10 +4,15 @@ import SwiftUI
 /// The sheet is Apple's own (`.sheet`, always up, the map above it stays touchable): short shows today's
 /// folded panel, tall the unfolded one. A card (Report, Pit stop, who is here) is a sheet of its own over it, as
 /// tall as its content (`cardHeight`). Heights are the panel's own measured height, so the text size is followed; until a layout has been
-/// seen once, an estimate stands in. Neither ever passes the room under the pills and banners.
+/// seen once, an estimate stands in. Neither ever passes the room under the pills and banners. At tall the lobby's
+/// rows continue below the unfolded panel in the same scroll view (D53, #409), reached by scrolling down.
 enum PanelSheet {
-    /// What the sheet is showing now.
-    enum Shown: Equatable { case folded, unfolded }
+    /// What the sheet is showing now: the folded panel (short), or the unfolded one with the lobby's rows below it (tall).
+    enum Shown: Equatable {
+        case folded, unfolded
+
+        var listUnfolded: Bool { self == .unfolded }
+    }
 
     /// The panel's content heights before they are measured (folded, then unfolded), without the bar.
     static let foldedEstimate: CGFloat = 220
@@ -39,48 +44,29 @@ enum PanelSheet {
     /// at `room`, the map's height under the pills and banners (nil before the map is measured). No home-indicator strip is added: a presented sheet already keeps its content out of the bottom safe
     /// area, so adding it again (as Home's formula does for its own header) left about 34 pt of empty space.
     /// When the content is taller than the cap, the list scrolls under the bar and the bar stays in view.
-    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, room: CGFloat?) -> Heights {
+    /// `top`: what sits above the panel at every height (the "no longer in this trip" banner), measured.
+    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, top: CGFloat = 0, room: CGFloat?) -> Heights {
         let cap = max(room ?? .greatestFiniteMagnitude, minimumHeight)
         let barHeight = bar ?? barEstimate
         func fit(_ content: CGFloat?, _ estimate: CGFloat, bar: CGFloat = 0) -> CGFloat {
-            min((content ?? estimate) + bar, cap).rounded()
+            min((content ?? estimate) + top + bar, cap).rounded()
         }
         let short = fit(folded, foldedEstimate, bar: barHeight)
         return Heights(short: short, tall: max(short, fit(unfolded, unfoldedEstimate, bar: barHeight)))
     }
 
-    /// What a detent the sheet reports means for the panel: tall (true) or short (false) when it is one of the
-    /// two it has now, nothing for any other value. A measured height that changes under an open tall sheet
-    /// reports its old detent for a moment; that is not the driver folding the list.
-    static func choice(_ detent: PresentationDetent, in heights: Heights) -> Bool? {
-        if detent == .height(heights.short) { return false }
-        if detent == .height(heights.tall) { return true }
+    /// What a detent the sheet reports means for the panel: folded or unfolded when it is one of the two heights it
+    /// has now, nothing for any other value. A measured height that changes under an open tall sheet reports its old
+    /// detent for a moment; that is not the driver folding the list.
+    static func choice(_ detent: PresentationDetent, in heights: Heights) -> Shown? {
+        if detent == .height(heights.short) { return .folded }
+        if detent == .height(heights.tall) { return .unfolded }
         return nil
     }
 
-    /// Whether an action waits for the sheet to go (it is up, and its own dismissal runs the action) or runs
-    /// at once (the sheet is already gone, so no dismissal will come).
-    enum ExitTiming: Equatable { case afterDismissal, now }
-
-    static func exit(sheetUp: Bool) -> ExitTiming { sheetUp ? .afterDismissal : .now }
-
-    /// An action waiting for the convoy sheet's dismissal (Back to lobby, Leave). Its dismissal report runs it, or, if
-    /// the report never comes, the fallback `exitFallback` later does; whichever is first runs it, the other finds
-    /// nothing to run.
-    struct ExitWait: Equatable {
-        private(set) var waiting = false
-        mutating func arm() { waiting = true }
-        /// True once, to the first caller (the report or the fallback) while armed.
-        mutating func fire() -> Bool {
-            defer { waiting = false }
-            return waiting
-        }
-    }
-
-    /// How long the convoy sheet's dismissal may go unreported before the waiting action runs anyway.
-    static let exitFallback: TimeInterval = 1
-
-    static func shown(expanded: Bool) -> Shown { expanded ? .unfolded : .folded }
+    /// Whether the lobby's rows continue below the panel: at tall, where the content is then always taller than the
+    /// sheet, so a swipe scrolls it and never resizes the sheet (#409).
+    static func showsLobbyRows(_ shown: Shown) -> Bool { shown == .unfolded }
 
     /// The card sheet's one detent: its content's measured height (nil until seen), capped at `room` like the
     /// convoy sheet and never under `minimumHeight`.
@@ -133,7 +119,7 @@ enum PanelSheet {
     /// How long a dismissal may go unreported before the next card opens anyway.
     static let cardDismissFallback: TimeInterval = 1
 
-    /// The convoy sheet's two detents: short (folded) and tall (unfolded).
+    /// The convoy sheet's two detents: short (folded) and tall (unfolded); tall is the highest it goes while driving.
     static func detents(in heights: Heights) -> Set<PresentationDetent> { [.height(heights.short), .height(heights.tall)] }
 
     static func detent(_ shown: Shown, in heights: Heights) -> PresentationDetent { .height(height(shown, in: heights)) }
@@ -163,20 +149,24 @@ enum PanelSheet {
             tall: take(applied.tall, measured.tall, hold: moving))
     }
 
-    /// The moments of a hazard approach that touch the convoy list.
-    enum HazardMoment: Equatable { case approaching, passed, gaveUp }
+    /// The moments of a hazard approach that touch the sheet.
+    enum Moment: Equatable { case approaching, passed, gaveUp }
 
-    /// Whether the list is unfolded after `moment`, from `expanded` now. The approach folds it, so my car and the hazard
-    /// have the room; passing the hazard (or giving up on it) leaves it as it is: the owner's choice (#344), since the
-    /// unfolded list covers more than half the map while the car is moving.
-    static func expanded(_ expanded: Bool, after moment: HazardMoment) -> Bool {
-        moment == .approaching ? false : expanded
+    /// What the sheet shows after `moment`, from `shown` now. The approach folds it, so my car and the hazard have the
+    /// room; passing the hazard (or giving up on it) leaves it as it is: the owner's choice (#344), since the unfolded
+    /// list covers more than half the map while the car is moving. A stop request leaves the sheet as it is.
+    static func shown(after moment: Moment, from shown: Shown) -> Shown {
+        switch moment {
+        case .approaching: .folded
+        case .passed, .gaveUp: shown
+        }
     }
 
     /// The sheet steps aside for everything that is pushed or presented from under it: the trip ending (the
-    /// recap), leaving the screen, and the Always location sheet that the lobby presents.
-    static func isCovered(ended: Bool, leaving: Bool, explainerWants: Bool) -> Bool {
-        ended || leaving || explainerWants
+    /// recap), the Always location sheet that the lobby presents, and what the lobby puts over the whole screen
+    /// (`lobbyWants`: Change destination, or another screen pushed over the trip).
+    static func isCovered(ended: Bool, explainerWants: Bool, lobbyWants: Bool) -> Bool {
+        ended || explainerWants || lobbyWants
     }
 
     /// The room for the sheet: the map's full height less what the pills and banners need above it.

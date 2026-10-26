@@ -75,16 +75,8 @@ struct AddStopContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
-            SheetTopRow(title: "Add a stop", subtitle: nil) {
-                RoundGlassIconButton(systemImage: "chevron.backward", label: model.picked == nil ? "Back to the trip" : "Back to the list") {
-                    searchFocused = false
-                    if !model.back() { onBack() }
-                }
-                .accessibilityIdentifier("addStop.back")
-            } trailing: { Color.clear }
-            .padding(.horizontal, Spacing.l)
-            .padding(.bottom, Spacing.xs)
+        // The header stays put and the rows fade out under it, as they do above the Add bar.
+        Group {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: Spacing.cozy) {
@@ -102,6 +94,17 @@ struct AddStopContent: View {
                 }
             }
             .sheetBottomBar { addBar }
+        }
+        .sheetTopBar {
+            SheetTopRow(title: "Add a stop", subtitle: nil) {
+                RoundGlassIconButton(systemImage: "chevron.backward", label: model.picked == nil ? "Back to the trip" : "Back to the list") {
+                    searchFocused = false
+                    if !model.back() { onBack() }
+                }
+                .accessibilityIdentifier("addStop.back")
+            } trailing: { Color.clear }
+            .padding(.horizontal, Spacing.l)
+            .padding(.bottom, Spacing.xs)
         }
         .task { await model.load() }
     }
@@ -202,10 +205,10 @@ struct AddStopContent: View {
             Text(StopFormat.length(minutes: model.stay)).font(.body.weight(.semibold)).monospacedDigit()
                 .accessibilityIdentifier("addStop.stay")
             HStack(spacing: Spacing.xs) {
-                Button { model.step(-1) } label: { Image(systemName: "minus").frame(width: 36, height: 36) }
+                Button { model.step(-1) } label: { Image(systemName: "minus").inlineRoundLabel() }
                     .disabled(!AddStopLogic.canStep(model.stay, by: -1))
                     .accessibilityLabel("Shorter").accessibilityIdentifier("addStop.shorter")
-                Button { model.step(1) } label: { Image(systemName: "plus").frame(width: 36, height: 36) }
+                Button { model.step(1) } label: { Image(systemName: "plus").inlineRoundLabel() }
                     .disabled(!AddStopLogic.canStep(model.stay, by: 1))
                     .accessibilityLabel("Longer").accessibilityIdentifier("addStop.longer")
             }
@@ -225,7 +228,7 @@ struct AddStopContent: View {
                 if model.picked == nil, model.selected != nil { stayRow }
                 Button {
                     if let draft = model.take() { onAdd(draft) }
-                } label: { Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, minHeight: 50) }
+                } label: { Text(title).lineLimit(1).minimumScaleFactor(0.8).barActionLabel() }
                     .actionButton(.primary, onGlass: true)
                     .disabled(model.draft == nil)
                     .accessibilityIdentifier("addStop.add")

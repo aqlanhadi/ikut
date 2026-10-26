@@ -370,8 +370,7 @@ struct ConvoyActionBar: View {
         return layout {
             Button(action: onReport) {
                 Label("Report", systemImage: "exclamationmark.triangle")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .barActionLabel()
             }
             .actionBarStyle(prominent: true)
             .disabled(!canReport)
@@ -381,12 +380,12 @@ struct ConvoyActionBar: View {
                 // An open stop shows its reason's icon and how it stands; the label never wraps, the
                 // button widens over Report instead.
                 Label(stopButton.label, systemImage: stopButton.symbol)
-                    .font(.headline)
                     .lineLimit(stacked ? 2 : 1)
                     .minimumScaleFactor(0.7)
                     .fixedSize(horizontal: !stacked, vertical: false)
                     .padding(.horizontal, Spacing.l)
-                    .frame(minWidth: stacked ? nil : 146, maxWidth: stacked ? .infinity : nil, minHeight: 50)
+                    .frame(minWidth: stacked ? nil : 146)
+                    .barActionLabel(fullWidth: stacked)
                     .overlay(alignment: .topTrailing) {
                         if stopButton.badge > 0 {
                             Text("\(stopButton.badge)")

@@ -18,6 +18,7 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
     @ViewBuilder var actions: Actions
 
     @State private var contentHeight: CGFloat = 0
+    @State private var actionsHeight: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.inPanelSheet) private var inSheet
     /// How far the actions hang down into the sheet's bottom safe area (`PanelSheet.barLift`).
@@ -26,6 +27,14 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
 
     /// A little taller at accessibility sizes, where a row is tall: the last row is not left half cut.
     private var cap: CGFloat { typeSize.isAccessibilitySize ? bodyCap + 40 : bodyCap }
+
+    @ViewBuilder private func actionArea(top: CGFloat) -> some View {
+        if hasActions {
+            VStack(spacing: Spacing.xs) { actions }
+                .padding(.top, top)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { actionsHeight = $0 }
+        }
+    }
 
     private func body(of content: Content) -> some View {
         VStack(alignment: .leading, spacing: Spacing.gap) { content }
@@ -48,24 +57,17 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
             let natural = body(of: content)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             if contentHeight > cap {
-                ScrollView { natural.padding(.bottom, GlassSurface.active ? 14 : 24) }
-                    .frame(maxHeight: cap)
+                // The actions are the scroll view's bottom bar: the last rows fade out under them with the system's
+                // soft edge, as on every sheet's bottom bar (no hand-made gradient).
+                ScrollView { natural }
+                    .frame(maxHeight: cap + (hasActions ? actionsHeight : 0))
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
-                    // The last rows fade out above the actions instead of being cut.
-                    .mask(
-                        VStack(spacing: 0) {
-                            Color.black
-                            // Shorter and not quite clear on glass, so a half-shown row stays readable.
-                            LinearGradient(
-                                colors: [.black, GlassSurface.active ? .black.opacity(0.4) : .clear],
-                                startPoint: .top, endPoint: .bottom)
-                                .frame(height: GlassSurface.active ? 14 : 24)
-                        })
+                    .sheetBottomBar { actionArea(top: Spacing.cozy) }
             } else {
                 natural
+                actionArea(top: 0)
             }
-            if hasActions { VStack(spacing: Spacing.xs) { actions } }
         }
         // 20 pt on every edge: 16 would put the title inside the 38 pt corner curve. The same surface as the
         // convoy panel. No grabber and no swipe down to close: the body scrolls, so a swipe is for

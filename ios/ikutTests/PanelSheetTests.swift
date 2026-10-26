@@ -80,7 +80,7 @@ struct PanelSheetTests {
         #expect(PanelSheet.room(mapHeight: 874, reserved: 74) == 800)
     }
 
-    @Test func detentsAreTheShortAndTallOne() {
+    @Test func detentsAreTheShortAndTallOneTallIsTheHighest() {
         let h = heights()
         #expect(PanelSheet.detents(in: h) == [.height(300), .height(480)])
         #expect(PanelSheet.detent(.folded, in: h) == .height(300))
@@ -118,9 +118,12 @@ struct PanelSheetTests {
         #expect(PanelSheet.cardDismissFallback > 0)
     }
 
-    @Test func theShownStateFollowsTheFold() {
-        #expect(PanelSheet.shown(expanded: false) == .folded)
-        #expect(PanelSheet.shown(expanded: true) == .unfolded)
+    @Test func theLobbysRowsContinueBelowTheConvoyOnlyAtTall() {
+        // #409: no third height; at tall the lobby's rows follow the unfolded list in the same scroll view.
+        #expect(PanelSheet.showsLobbyRows(.unfolded))
+        #expect(!PanelSheet.showsLobbyRows(.folded))
+        #expect(PanelSheet.Shown.unfolded.listUnfolded)
+        #expect(!PanelSheet.Shown.folded.listUnfolded)
     }
 
     @Test func aCardSheetIsAsTallAsItsContentUpToTheRoom() {
@@ -140,11 +143,13 @@ struct PanelSheetTests {
 
     @Test func aDraggedSheetUnfoldsTheListOnlyAtTheTallDetent() {
         let h = heights()
-        #expect(PanelSheet.choice(.height(480), in: h) == true)
-        #expect(PanelSheet.choice(.height(300), in: h) == false)
+        #expect(PanelSheet.choice(.height(480), in: h) == .unfolded)
+        #expect(PanelSheet.choice(.height(300), in: h) == .folded)
+        // The room's height is no detent of the sheet's.
+        #expect(PanelSheet.choice(.height(700), in: h) == nil)
         // Nothing to unfold when the two are one height: that height is the folded one.
         let same = heights(folded: 300, unfolded: 300)
-        #expect(PanelSheet.choice(.height(300), in: same) == false)
+        #expect(PanelSheet.choice(.height(300), in: same) == .folded)
     }
 
     @Test func aHeightThatChangesWhileTallIsNotTheDriverFoldingTheList() {
@@ -152,7 +157,7 @@ struct PanelSheetTests {
         let now = heights(unfolded: 446)
         #expect(now.tall == 446)
         #expect(PanelSheet.choice(.height(480), in: now) == nil)
-        #expect(PanelSheet.choice(.height(446), in: now) == true)
+        #expect(PanelSheet.choice(.height(446), in: now) == .unfolded)
         // Likewise a short that moved under a folded sheet.
         #expect(PanelSheet.choice(.height(300), in: heights(folded: 280)) == nil)
     }
@@ -165,45 +170,6 @@ struct PanelSheetTests {
         #expect(PanelSheet.sideGap == Spacing.l)
     }
 
-    @Test func anExitWaitsForTheSheetOnlyWhileItIsUp() {
-        #expect(PanelSheet.exit(sheetUp: true) == .afterDismissal)
-        #expect(PanelSheet.exit(sheetUp: false) == .now)
-    }
-    @Test func exitWaitRunsOnceWhenDismissalReported() {
-        var wait = PanelSheet.ExitWait()
-        wait.arm()
-        let first = wait.fire()
-        let second = wait.fire()
-        #expect(first)
-        #expect(!second)
-    }
-
-    @Test func exitWaitRunsOnFallbackWhenNeverReported() {
-        var wait = PanelSheet.ExitWait()
-        wait.arm()
-        #expect(PanelSheet.exitFallback > 0)
-        #expect(wait.waiting)
-        let fallback = wait.fire()
-        #expect(fallback)
-    }
-
-    @Test func exitWaitNotRunAgainWhenReportedAfterFallback() {
-        var wait = PanelSheet.ExitWait()
-        wait.arm()
-        let fallback = wait.fire()
-        let report = wait.fire()
-        #expect(fallback)
-        #expect(!report)
-        #expect(!wait.waiting)
-    }
-
-    @Test func exitWaitNeverArmedRunsNothing() {
-        var wait = PanelSheet.ExitWait()
-        let ran = wait.fire()
-        #expect(!ran)
-    }
-
-
     @Test func theMapInsetFollowsTheDetentOnShow() {
         let h = heights()
         #expect(PanelSheet.height(.folded, in: h) == 300)
@@ -211,10 +177,11 @@ struct PanelSheetTests {
     }
 
     @Test func theSheetStepsAsideForEachThingThatTakesTheScreen() {
-        #expect(!PanelSheet.isCovered(ended: false, leaving: false, explainerWants: false))
-        #expect(PanelSheet.isCovered(ended: true, leaving: false, explainerWants: false))
-        #expect(PanelSheet.isCovered(ended: false, leaving: true, explainerWants: false))
-        #expect(PanelSheet.isCovered(ended: false, leaving: false, explainerWants: true))
+        #expect(!PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: false))
+        #expect(PanelSheet.isCovered(ended: true, explainerWants: false, lobbyWants: false))
+        #expect(PanelSheet.isCovered(ended: false, explainerWants: true, lobbyWants: false))
+        // What the lobby puts over the whole screen (Change destination, a pushed screen) takes it too.
+        #expect(PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: true))
     }
 
     @Test func theLobbysAlwaysSheetWaitsForTheConvoySheetToGo() {
@@ -247,11 +214,19 @@ struct PanelSheetTests {
 
     @Test func aHazardApproachFoldsTheListAndPassingItLeavesItFolded() {
         // A3 and #344: the approach folds; passing the hazard (or giving up on it) never unfolds it.
-        #expect(PanelSheet.expanded(true, after: .approaching) == false)
-        #expect(PanelSheet.expanded(false, after: .approaching) == false)
-        #expect(PanelSheet.expanded(false, after: .passed) == false)
-        #expect(PanelSheet.expanded(false, after: .gaveUp) == false)
+        #expect(PanelSheet.shown(after: .approaching, from: .unfolded) == .folded)
+        #expect(PanelSheet.shown(after: .approaching, from: .folded) == .folded)
+        #expect(PanelSheet.shown(after: .passed, from: .folded) == .folded)
+        #expect(PanelSheet.shown(after: .gaveUp, from: .folded) == .folded)
         // Unfolded by the driver during the approach: stays as the driver left it.
-        #expect(PanelSheet.expanded(true, after: .passed) == true)
+        #expect(PanelSheet.shown(after: .passed, from: .unfolded) == .unfolded)
+    }
+
+    @Test func aBannerOnTopOfThePanelAddsToEveryHeightUpToTheRoom() {
+        // "You're no longer in this trip" sits above the panel at every height.
+        let h = PanelSheet.heights(folded: 300, unfolded: 480, bar: 62, top: 120, room: 700)
+        #expect(h.short == 482)
+        #expect(h.tall == 662)
+        #expect(PanelSheet.heights(folded: 300, unfolded: 480, bar: 62, top: 120, room: 600).tall == 600)
     }
 }

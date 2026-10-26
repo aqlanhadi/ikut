@@ -174,10 +174,10 @@ struct SuggestStopsSheet: View {
         HStack(spacing: Spacing.m) {
             Text(SuggestStopsModel.stepperText(model.after)).font(.body).accessibilityIdentifier("suggest.after")
             Spacer(minLength: Spacing.s)
-            Button { model.step(-1) } label: { Image(systemName: "minus").frame(width: 36, height: 36) }
+            Button { model.step(-1) } label: { Image(systemName: "minus").inlineRoundLabel() }
                 .disabled(!SuggestAfter.canStep(model.after, by: -1))
                 .accessibilityLabel("Earlier").accessibilityIdentifier("suggest.earlier")
-            Button { model.step(1) } label: { Image(systemName: "plus").frame(width: 36, height: 36) }
+            Button { model.step(1) } label: { Image(systemName: "plus").inlineRoundLabel() }
                 .disabled(!SuggestAfter.canStep(model.after, by: 1))
                 .accessibilityLabel("Later").accessibilityIdentifier("suggest.later")
         }
@@ -198,13 +198,13 @@ struct SuggestStopsSheet: View {
                 }
             }
             HStack(spacing: Spacing.s) {
-                Button { dismiss() } label: { Text("Not now").frame(maxWidth: .infinity) }
+                Button { dismiss() } label: { Text("Not now").inlineActionLabel() }
                     .actionButton(.secondary)
                 Button {
                     guard model.markAdded(pick) else { return }
                     onAdd(model.draft(for: pick))
                     if model.allAdded { dismiss() }
-                } label: { Text("Add").frame(maxWidth: .infinity) }
+                } label: { Text("Add").inlineActionLabel() }
                     .actionButton(.primary)
                     .disabled(added || !canAdd())
                     .accessibilityIdentifier("suggest.add")

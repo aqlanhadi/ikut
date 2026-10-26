@@ -179,7 +179,7 @@ struct StopCard: View {
                 model.screen = StopCardGate.needsPassengerCheck(driving: driving, session: model.session)
                     ? .passengerCheck : .message
             }
-            StopActionButton(title: "Back", style: .ghost, height: 44, id: "stop.back") { ask.clearReason() }
+            StopActionButton(title: "Back", style: .ghost, id: "stop.back") { ask.clearReason() }
         }
     }
 
@@ -210,11 +210,11 @@ struct StopCard: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("stop.passengerCheck")
         } actions: {
-            StopActionButton(title: "I’m a passenger", style: .primary, height: big ? 72 : 50, id: "stop.passenger") {
+            StopActionButton(title: "I’m a passenger", style: .primary, height: big ? 72 : nil, id: "stop.passenger") {
                 model.session.confirmPassenger()
                 model.screen = .message
             }
-            StopActionButton(title: "I’m driving", style: .secondary, height: big ? 56 : 50, id: "stop.driving") {
+            StopActionButton(title: "I’m driving", style: .secondary, height: big ? 56 : nil, id: "stop.driving") {
                 model.session.confirmDriving()
                 model.backHome()
             }
@@ -242,7 +242,7 @@ struct StopCard: View {
                 model.backHome()
             }
             if !ask.message.isEmpty {
-                StopActionButton(title: "No message", style: .ghost, height: 44, id: "stop.messageClear") {
+                StopActionButton(title: "No message", style: .ghost, id: "stop.messageClear") {
                     ask.message = ""
                     messageFocused = false
                     model.backHome()

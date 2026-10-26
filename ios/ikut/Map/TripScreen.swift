@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The trip screen's two modes over its one map (D53): the lobby (the whole route, the lobby's sheet) and driving
 /// (following your car, the pill, the banners and the convoy sheet). Start trip and Show map are a camera move and a
-/// sheet change, not a new screen.
+/// sheet change, not a new screen. There is no way back to the lobby's mode: while driving, the lobby's rows continue
+/// below the convoy at the sheet's tall height (canvas row L, #409).
 enum TripScreenMode: Equatable {
     case lobby, driving
 }
@@ -16,14 +17,23 @@ enum TripScreenLogic {
         case start
         /// A trip already under way: Show map.
         case showMap
-        /// The driving screen's Back (until the sheet is pulled up for the lobby instead, piece 3).
-        case back
     }
 
     static func mode(after event: Event, from mode: TripScreenMode) -> TripScreenMode {
         switch event {
         case .start, .showMap: .driving
-        case .back: .lobby
+        }
+    }
+
+    /// Whether the lobby's own listeners (the trip, cars, members and stops: `LobbyModel`) run: while the trip screen
+    /// is on screen, in the lobby's mode, or while driving with the convoy sheet at tall, where the lobby's rows
+    /// continue below the convoy. Short, only the convoy's own listeners run; what the lobby last read stays on screen
+    /// until it listens again.
+    static func lobbyListens(onScreen: Bool, mode: TripScreenMode, lobbyRowsShown: Bool) -> Bool {
+        guard onScreen else { return false }
+        switch mode {
+        case .lobby: return true
+        case .driving: return lobbyRowsShown
         }
     }
 
@@ -79,7 +89,8 @@ enum TripScreenLogic {
             }
         }
 
-        /// The map stays touchable with the sheet up to this detent: the lobby's medium, the convoy's tall.
+        /// The map stays touchable (and undimmed) with the sheet up to this detent: the lobby's medium; the convoy's
+        /// tall, its highest, so the map, the pill, the banners and the round buttons answer at both heights (#402).
         var touchableUpThrough: PresentationDetent {
             switch self {
             case .lobby(let compact): LobbySheet.medium(compact)
@@ -133,6 +144,8 @@ final class TripMapStage {
     var reading: TripCameraReading?
     /// The map's frame on screen (it runs under the status bar and the home indicator).
     var mapFrame: CGRect = .zero
+    /// Driving: the convoy sheet is at tall and the lobby's rows continue below the convoy (`PanelSheet.showsLobbyRows`).
+    var lobbyRowsShown = false
 
     init(mode: TripScreenMode = .lobby) { self.mode = mode }
 

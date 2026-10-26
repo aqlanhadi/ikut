@@ -24,6 +24,21 @@ enum LobbyContent {
         return parts.joined(separator: " · ")
     }
 
+    /// The phone shares its location before the start (#394): the subtitle leads with "Sharing" in green, where a
+    /// floating capsule used to sit above the cars. Paused, the paused banner says so and the subtitle drops it.
+    static func subtitleSharing(tracking: Bool, paused: Bool, started: Bool, ended: Bool) -> Bool {
+        tracking && !paused && !started && !ended
+    }
+
+    /// The subtitle's words with "Sharing" in front when it shares ("Sharing · To Ipoh · code K7M 2QX"); the view
+    /// draws the arrow before them and colours "Sharing".
+    static func subtitleWords(_ subtitle: String?, sharing: Bool) -> String? {
+        guard sharing else { return subtitle }
+        return [sharingWord, subtitle].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static let sharingWord = "Sharing"
+
     // MARK: Cars
 
     /// "Cars · 4 of 5 ready"; just "Cars" with none yet.
@@ -169,6 +184,58 @@ enum LobbyContent {
         }
     }
 
+    /// The journey while driving, below the convoy at tall (canvas row L): the stops still ahead, numbered as on the map, and the part
+    /// already driven folded into one line, so the list starts with what is still ahead.
+    struct Journey: Equatable {
+        /// "Passed R&R Bidor · 8:31 PM" (the last stop left or driven past), "Left Petronas · 7:42 PM" (the meeting
+        /// point), or "Left 7:42 PM" with none passed yet; nil when not even the start time is known.
+        var behind: String?
+        var ahead: [StopText]
+    }
+
+    /// Where my car is on the main route, and its pace there (`NextStop.pace`, seconds per meter), for the journey.
+    struct JourneyHere: Equatable {
+        var offset: Double
+        var pace: Double?
+    }
+
+    /// `stops` in any order; numbers count every non-meeting stop in order, passed and skipped ones too, so a stop
+    /// keeps its pin's number. A stop is ahead while it is open (not left, not skipped) and, with `here`, my car has
+    /// not driven past it by more than `NextStop.hereRadius`; with `here` it reads the distance and time from my car,
+    /// as Next stop does ("18 km · 12 min · stay 20 min", "Here"). The fold line names the last stop left or driven
+    /// past, with the time of the Leave when someone tapped it.
+    static func journey(
+        _ stops: [PlannedStop], routeLength: Double?, routeSeconds: Double?, departedAt: Date?, here: JourneyHere? = nil,
+        locale: Locale = .current, timeZone: TimeZone = .current
+    ) -> Journey {
+        let ordered = stops.sorted { $0.order < $1.order }
+        let texts = stopTexts(ordered.map(StopDraft.init), routeLength: routeLength, routeSeconds: routeSeconds, timeZone: timeZone)
+        func drivenPast(_ stop: PlannedStop) -> Bool {
+            guard let here else { return false }
+            return stop.routeOffset < here.offset - NextStop.hereRadius
+        }
+        let ahead = zip(ordered, texts).filter { $0.0.isOpen && !drivenPast($0.0) }.map { stop, text in
+            guard let here else { return text }
+            var text = text
+            let cell = NextStop.cell(stops: [stop], offset: here.offset, pace: here.pace)
+            if let cell, !stop.isMeeting {
+                text.detail = [cell.detail, stop.minutes.map { "stay \(StopFormat.length(minutes: $0))" }]
+                    .compactMap { $0 }.joined(separator: " · ")
+            } else if let cell {
+                text.detail = cell.detail
+            }
+            return text
+        }
+        let behind: String?
+        if let last = ordered.last(where: { $0.isLeft || ($0.isActive && drivenPast($0)) }) {
+            let words = "\(last.isMeeting ? "Left" : "Passed") \(last.name)"
+            behind = last.leftAt.map { "\(words) · \(ConvoyFormat.clock($0, locale: locale, timeZone: timeZone))" } ?? words
+        } else {
+            behind = departedAt.map { "Left \(ConvoyFormat.clock($0, locale: locale, timeZone: timeZone))" }
+        }
+        return Journey(behind: behind, ahead: ahead)
+    }
+
     /// "After about 1 h 30 min", under Suggest stops: where the first suggestion would fall (`SuggestAfter`).
     static func suggestCaption(routeSeconds: Double?) -> String? {
         routeSeconds.map { "After about \(ConvoyFormat.duration(SuggestAfter.defaultSeconds(routeSeconds: $0)))" }
@@ -187,6 +254,33 @@ enum LobbyContent {
         var canEnd: Bool
         /// A participant has their own way in (D26) under the header.
         var ownWay: Bool
+    }
+
+    /// What continues below the convoy when the driving sheet is at tall, in this order.
+    enum DrivingSection: Equatable { case journey, code, trip, options, exit }
+
+    /// The driving sections for this person, from the lobby's own `rows` (which also decide the rows inside them):
+    /// Keep screen on is everyone's, so the options are always there; Leave or End only when this person can.
+    static func drivingSections(_ rows: Rows) -> [DrivingSection] {
+        var sections: [DrivingSection] = [.journey, .code, .trip, .options]
+        if rows.canEnd || rows.canLeave { sections.append(.exit) }
+        return sections
+    }
+
+    /// The banner that ends the lobby's usefulness: the trip ended, or this person is no longer in it. Driving, only
+    /// the second shows (the end opens the recap); it sits on top of the convoy sheet at every height, with Back to
+    /// trips, since there is no other way Home mid-trip (#403).
+    enum ExitBanner: Equatable { case ended, noLongerInTrip }
+
+    static func exitBanner(ended: Bool, membershipLost: Bool, tripLoaded: Bool) -> ExitBanner? {
+        if ended { return .ended }
+        if membershipLost && tripLoaded { return .noLongerInTrip }
+        return nil
+    }
+
+    static func drivingBanner(ended: Bool, membershipLost: Bool, tripLoaded: Bool) -> ExitBanner? {
+        let banner = exitBanner(ended: ended, membershipLost: membershipLost, tripLoaded: tripLoaded)
+        return banner == .noLongerInTrip ? banner : nil
     }
 
     /// `trackingOrPaused`: this phone is broadcasting (or paused while it was).
