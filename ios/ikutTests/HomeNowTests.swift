@@ -95,4 +95,28 @@ extension HomeNowTests {
         #expect(parts.now.isEmpty)
         #expect(parts.past.map(\.id) == ["t"])
     }
+
+    // MARK: Gone (D54)
+
+    @Test func aRefusedOrMissingTripIsGoneButNoSignalIsNot() {
+        let refused = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.permissionDenied.rawValue)
+        let missing = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.notFound.rawValue)
+        let offline = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.unavailable.rawValue)
+        #expect(HomeNow.isGone(refused))
+        #expect(HomeNow.isGone(missing))
+        #expect(!HomeNow.isGone(offline))
+        #expect(!HomeNow.isGone(NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)))
+        #expect(!HomeNow.isGone(nil))
+    }
+
+    @Test func anEndedOrGoneTripMovesToPastTrips() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let ended = Date(timeIntervalSince1970: 1_000)
+        #expect(HomeNow.movesToPast(.init(line: "Ended", endedAt: ended), signedIn: true, now: now) == ended)
+        #expect(HomeNow.movesToPast(.init(line: "In progress", gone: true), signedIn: true, now: now) == now)
+        // Signed out, every read is refused: that says nothing about the trip.
+        #expect(HomeNow.movesToPast(.init(line: "In progress", gone: true), signedIn: false, now: now) == nil)
+        #expect(HomeNow.movesToPast(.init(line: "In progress"), signedIn: true, now: now) == nil)
+        #expect(HomeNow.movesToPast(.init(line: "On the move", started: true), signedIn: true, now: now) == nil)
+    }
 }

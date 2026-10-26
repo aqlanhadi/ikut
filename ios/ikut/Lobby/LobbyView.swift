@@ -313,6 +313,9 @@ struct LobbyView: View {
         let inLobby = stage.mode == .lobby
         return ZStack {
             switch TripScreenLogic.layer(in: stage.mode) {
+            case .home:
+                // The trip is closing: Home takes the map in the same motion.
+                EmptyView()
             case .lobby:
                 lobbyLayer
             case .driving:

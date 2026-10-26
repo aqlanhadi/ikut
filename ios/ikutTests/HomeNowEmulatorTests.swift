@@ -12,13 +12,20 @@ struct HomeNowEmulatorTests {
         let read = await HomeNow.load(tripId: trip.tripId)
         #expect(read.line == "Gathering · 1 of 1 cars ready")
         #expect(read.endedAt == nil)
+        #expect(!read.gone)
+        #expect(!read.started)
     }
 
     @Test func someoneWhoIsNotAMemberAndAnUnknownTripGetInProgress() async throws {
         let trip = try await EmulatorTrip.make(name: "Now")
         try Auth.auth().signOut()
         try await Auth.auth().signInAnonymously()
-        #expect(await HomeNow.load(tripId: trip.tripId).line == "In progress")
-        #expect(await HomeNow.load(tripId: "no-such-trip").line == "In progress")
+        let notMine = await HomeNow.load(tripId: trip.tripId)
+        #expect(notMine.line == "In progress")
+        // Refused: this phone is no longer in it (D54), so Home moves it to Past trips and the app won't open into it.
+        #expect(notMine.gone)
+        let unknown = await HomeNow.load(tripId: "no-such-trip")
+        #expect(unknown.line == "In progress")
+        #expect(unknown.gone)
     }
 }

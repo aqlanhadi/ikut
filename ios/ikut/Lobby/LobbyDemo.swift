@@ -255,7 +255,8 @@ enum DemoScreens {
         /// A lobby is the trip screen's lobby mode, over the screen's one map.
         func trip<V: View>(_ view: V) -> AnyView { nav(TripScreenHost { view }) }
         func home(_ state: String) -> AnyView {
-            AnyView(HomePickedDemo.view(state).environment(AuthModel()))
+            // Home is the Home mode of the app's one map (D54).
+            AnyView(TripScreenHost(mode: .home) { HomePickedDemo.view(state) }.environment(AuthModel()))
         }
         let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
         func search(_ model: CreateTripModel) -> AnyView { nav(CreateTripView(model: model) { _ in }) }

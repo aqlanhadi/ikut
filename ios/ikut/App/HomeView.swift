@@ -1,16 +1,20 @@
 import SwiftUI
 
-/// Root navigation: the welcome screen until "Get Started", then Home (`TripsHomeView`).
+/// Root navigation: the welcome screen until "Get Started", then the app's one map (`TripScreenHost`, D54) with Home
+/// (`TripsHomeView`) or a trip (`LobbyView`: its lobby or the driving map) over it. Opening a trip and leaving it are a
+/// camera move and a sheet change on that map; Join and the recap are pushed over it.
 /// Signed-out visitors give a name (sheet) before Create or Join.
-/// Gets location access good enough for a trip before opening Create Trip or Join.
+/// Gets location access good enough for a trip before opening Create Trip, Join or a trip.
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(LocationPermission.self) private var location
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Route: Hashable {
         case create
         case join(code: String?)
-        case lobby(tripId: String)
+        /// A trip opened on the map (never pushed): its lobby, or driving when it has started.
+        case trip(tripId: String, started: Bool)
         case recap(tripId: String)
     }
 
@@ -18,6 +22,8 @@ struct HomeView: View {
     @Binding var pendingJoinCode: String?
 
     @State private var path: [Route] = []
+    /// The one map's mode, camera and open trip, shared by Home and the trip (D54).
+    @State private var stage = TripMapStage(mode: .home)
     /// New trip's gates are through: Home's sheet becomes Where to? over its own map (no pushed screen).
     @State private var creating = false
     @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
@@ -47,16 +53,7 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             Group {
                 if hasSeenWelcome {
-                    TripsHomeView(
-                        onNewTrip: { begin(.create) },
-                        onJoin: { begin(.join(code: nil)) },
-                        // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
-                        onOpenTrip: { entry in begin(.lobby(tripId: entry.id)) },
-                        covered: homeSheetCovered,
-                        sheetUp: $homeSheetUp,
-                        creating: $creating,
-                        onCreated: { tripId in path = [.lobby(tripId: tripId)] }
-                    )
+                    TripScreenHost(stage: stage) { layer }
                 } else {
                     WelcomeView(
                         onGetStarted: { hasSeenWelcome = true },
@@ -86,13 +83,13 @@ struct HomeView: View {
                     EmptyView()
                 case .join(let code):
                     JoinTripView(initialCode: code) { tripId, _ in
-                        path = [.lobby(tripId: tripId)]
+                        // Join pops back to the one map, which opens the trip: not a second trip screen.
+                        path = []
+                        openTrip(tripId, started: false)
                     }
-                case .lobby(let tripId):
-                    // One trip screen: the lobby and driving are modes over its one map (D53).
-                    TripScreenHost {
-                        LobbyView(tripId: tripId, onExit: { path = [] }, onEnded: { path = [.recap(tripId: $0)] })
-                    }
+                case .trip:
+                    // Never pushed: a trip opens on the one map (see `openTrip`).
+                    EmptyView()
                 case .recap(let tripId):
                     RecapView(tripId: tripId, onDone: { path = [] })
                 }
@@ -124,7 +121,10 @@ struct HomeView: View {
             .onChange(of: auth.state) { old, new in
                 // The server dropped this user mid-trip (AuthModel signed them out): back to Home, where the
                 // next Start or Join asks for a name again.
-                if old == .signedIn, new == .signedOut { path = [] }
+                if old == .signedIn, new == .signedOut {
+                    path = []
+                    if stage.tripId != nil { stage.exit() }
+                }
             }
             .onChange(of: pendingJoinCode, initial: true) {
                 guard let code = pendingJoinCode else { return }
@@ -132,10 +132,46 @@ struct HomeView: View {
                 // A name comes first when signed out; the join carries on afterwards.
                 if auth.state != .signedIn { begin(.join(code: code)); return }
                 // Don't pull someone out of a trip they're already in.
-                if path.contains(where: { if case .lobby = $0 { true } else { false } }) { return }
+                if stage.tripId != nil { return }
                 Task { await open(.join(code: code), replacing: true) }
             }
         }
+    }
+
+    /// Home, or the trip open on the map: one layer at a time over the one map, each publishing what the map draws and
+    /// the sheet's content (`TripMapSpec`, `TripSheetSpec`).
+    @ViewBuilder private var layer: some View {
+        if let tripId = stage.tripId {
+            LobbyView(tripId: tripId, onExit: exitTrip, onEnded: { tripId in
+                // The recap is its own screen; behind it the map is back on Home's list, where Done returns.
+                path = [.recap(tripId: tripId)]
+                exitTrip()
+            })
+            // A different trip is a new session, model and planner.
+            .id(tripId)
+        } else {
+            TripsHomeView(
+                onNewTrip: { begin(.create) },
+                onJoin: { begin(.join(code: nil)) },
+                // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
+                onOpenTrip: { entry, started in begin(.trip(tripId: entry.id, started: started)) },
+                covered: homeSheetCovered,
+                sheetUp: $homeSheetUp,
+                creating: $creating,
+                onCreated: { tripId in openTrip(tripId, started: false) }
+            )
+        }
+    }
+
+    /// The trip takes over the one map: Home's sheet becomes the lobby's (or the convoy's) and the camera flies to it.
+    private func openTrip(_ tripId: String, started: Bool) {
+        creating = false
+        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
+    }
+
+    /// Leave, End or Back to trips: the trip's sheet becomes Home's list and the camera flies back to it.
+    private func exitTrip() {
+        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.exit() }
     }
 
     /// Signed in: go straight to the route. Signed out: ask for a name first.
@@ -167,6 +203,7 @@ struct HomeView: View {
                 return
             case .ready, .showAlwaysExplainer:
                 if case .create = route { creating = true; return }
+                if case .trip(let tripId, let started) = route { openTrip(tripId, started: started); return }
                 if replacing { path = [route] } else { path.append(route) }
                 return
             }

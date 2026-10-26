@@ -4,12 +4,17 @@ import SwiftUI
 
 /// Home after the welcome screen, as in Home.dc.html: a map of where you are and the routes of
 /// your past trips, under Apple's own sheet with Where to?, Join with a code, the trips now running and past trips.
+/// It is the Home layer over the app's one map (`TripScreenHost`, D54): it hands the map what to draw (`TripMapSpec`)
+/// and the one sheet its content (`TripSheetSpec`), and moves the shared camera, so opening a trip is a camera move and
+/// a sheet change on the same map.
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
+    @Environment(TripMapStage.self) private var stage
     var onNewTrip: () -> Void
     var onJoin: () -> Void
-    /// A trip that hasn't ended opens its lobby; an ended one is picked on this map instead.
-    var onOpenTrip: (PastTrips.Entry) -> Void = { _ in }
+    /// A trip that hasn't ended opens on the same map: its lobby, or driving when Home has read that it started. An
+    /// ended one is picked on this map instead.
+    var onOpenTrip: (PastTrips.Entry, _ started: Bool) -> Void = { _, _ in }
     /// A pushed screen or a sheet of the parent is up: Home's sheet steps aside (a sheet is presented
     /// over Home, so it would sit over them) and comes back when this is false again.
     var covered = false
@@ -38,11 +43,10 @@ struct TripsHomeView: View {
     @State private var nowStatus: [String: String] = [:]
     /// Routes of the newest ended trips, drawn on the map (newest first).
     @State private var routes: [PastTripRoute] = []
-    @State private var camera: MapCameraPosition
-    @State private var mapHeight: CGFloat = 0
-    /// The camera as it last moved, to tell whether a late refit would only nudge it (not state: it changes every
-    /// frame of a glide).
-    @State private var cameraBox = CameraBox()
+    /// Where the list puts the camera when Home comes on screen: the cached past routes, or where you are.
+    @State private var listCamera: MapCameraPosition
+    /// The trips in Now that Home read as started: a tap opens them on the driving map.
+    @State private var nowStarted: Set<String> = []
     /// The past trip picked on the map, whose recap fills the sheet.
     @State private var picked: PickedTrip?
     /// Its route when it is older than the 12 drawn and the recap hasn't loaded yet.
@@ -63,7 +67,7 @@ struct TripsHomeView: View {
     #endif
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
-         onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }, covered: Bool = false,
+         onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, covered: Bool = false,
          sheetUp: Binding<Bool> = .constant(false), creating: Binding<Bool> = .constant(false),
          onCreated: @escaping (String) -> Void = { _ in }) {
         self.covered = covered
@@ -79,10 +83,10 @@ struct TripsHomeView: View {
         let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
         let insets = Self.obscured(mapHeight: 0)
         if let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top) {
-            _camera = State(initialValue: .region(region))
+            _listCamera = State(initialValue: .region(region))
             _routes = State(initialValue: cached)
         } else {
-            _camera = State(initialValue: .userLocation(fallback: .region(Self.fallback)))
+            _listCamera = State(initialValue: .userLocation(fallback: .region(Self.fallback)))
         }
     }
 
@@ -99,7 +103,7 @@ struct TripsHomeView: View {
                 mapHeight: 0, sheet: HomeSheet.height(HomeSheet.mode(flow: createFlow), compact: HomeSheet.compactHeight),
                 compact: HomeSheet.compactHeight)
             if let region = createFlow.region(bottomObscured: insets.bottom, topObscured: insets.top) {
-                _camera = State(initialValue: .region(region))
+                _listCamera = State(initialValue: .region(region))
             }
         }
         _isDemo = State(initialValue: true)
@@ -116,13 +120,13 @@ struct TripsHomeView: View {
             _fetchedRoute = State(initialValue: route)
             let insets = Self.obscured(mapHeight: 0)
             if let c = picked.selectedItem?.coordinate {
-                _camera = State(initialValue: .region(PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)))
+                _listCamera = State(initialValue: .region(PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)))
             } else if let route, let r = PickedTripLogic.fit(route, bottomObscured: insets.bottom, topObscured: insets.top) {
-                _camera = State(initialValue: .region(r))
+                _listCamera = State(initialValue: .region(r))
             }
         } else if let r = PastTripsMapLogic.region(fitting: routes, bottomObscured: Self.obscured(mapHeight: 0).bottom,
                                                    topObscured: Self.obscured(mapHeight: 0).top) {
-            _camera = State(initialValue: .region(r))
+            _listCamera = State(initialValue: .region(r))
         }
     }
     #endif
@@ -132,10 +136,30 @@ struct TripsHomeView: View {
         center: CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687),
         span: MKCoordinateSpan(latitudeDelta: 1.2, longitudeDelta: 1.2))
 
+    /// The map's height on screen (it runs under the status bar and the home indicator).
+    private var mapHeight: CGFloat { stage.mapFrame.height }
+
     var body: some View {
-        ZStack {
-            map
-        }
+        Color.clear
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+            .preference(key: TripMapSpecKey.self, value: mapSpec)
+            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(
+                presented: !covered, onDismiss: { sheetUp.wrappedValue = false },
+                content: AnyView(sheetContent
+                    .onAppear { sheetUp.wrappedValue = true }
+                    // The content changing to a trip's is not a dismissal: Home's sheet is gone all the same.
+                    .onDisappear { sheetUp.wrappedValue = false })))
+            // Coming back from a trip the camera flies from it to the list; the app's first frame just places it.
+            .onAppear {
+                if TripScreenLogic.entryCamera(.home) == .homeList {
+                    move(to: listCamera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
+                }
+            }
+            .onChange(of: mapHeight) { _, _ in
+                // Refit for the real height while the camera is still ours.
+                if flow != nil { refocusCreate(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) }
+            }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
         #if DEBUG
@@ -168,11 +192,8 @@ struct TripsHomeView: View {
             // The recap arrived, perhaps from Try again: its route is the full one and the dots come with it.
             guard let picked, !isDemo,
                   PickedTripLogic.shouldRefit(hadSnapshot: was, hasSnapshot: has, itemSelected: picked.selectedItem != nil,
-                                              cameraMovedByUser: camera.positionedByUser) else { return }
+                                              cameraMovedByUser: stage.camera.positionedByUser) else { return }
             refocus(animated: true, settling: true)
-        }
-        .sheet(isPresented: Binding(get: { !covered }, set: { _ in }), onDismiss: { sheetUp.wrappedValue = false }) {
-            sheetContent.onAppear { sheetUp.wrappedValue = true }
         }
         // The name alert belongs to the sheet; when the sheet steps aside it must not come back on its own later.
         .onChange(of: covered) { _, now in
@@ -190,150 +211,48 @@ struct TripsHomeView: View {
 
     // MARK: Map
 
-    /// Where you are, plus the routes of your past trips. The newest is drawn in the accent with
-    /// its name; older ones are fainter. Tapping a destination opens that trip's recap.
-    private var map: some View {
-        Map(position: $camera) {
-            if let flow {
-                NewTripMapContent.content(flow)
-            } else if let picked {
-                pickedContent(picked)
-            } else {
-                UserAnnotation()
-                // Oldest first so the newest draws on top.
-                ForEach(Array(routes.enumerated().reversed()), id: \.element.id) { index, route in
-                    routeContent(route, latest: index == 0)
-                }
-            }
+    /// What Home asks the one map to draw: the create flow's pins and route, a picked trip, or where you are plus the
+    /// routes of your past trips (the newest in the accent with its name, older ones fainter; tapping a destination
+    /// picks that trip). A tap on the map away from a picked trip's route goes back to the list.
+    private var mapSpec: TripMapSpec {
+        let input: TripMapInput
+        if let flow {
+            input = .newTrip(places: flow.pins, focusedId: flow.focusTarget?.id,
+                             route: flow.ready.map { Polyline.decode($0.route.polyline) } ?? [])
+        } else if let picked {
+            input = .picked(route: pickedRoute(picked), dots: PickedTripLogic.markers(picked.model.recap),
+                            selectedId: picked.selectedItemId)
+        } else {
+            input = .home(routes: routes, names: Dictionary(past.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a }))
         }
-        // Tapping the map away from the route goes back to the list.
-        .onTapGesture { if picked != nil { closePicked() } }
-        .mapStyle(.standard(pointsOfInterest: .excludingAll))
-        .mapControlVisibility(.hidden)
-        .onMapCameraChange(frequency: .continuous) { cameraBox.record($0.camera, latitudeDelta: $0.region.span.latitudeDelta) }
-        // The logo and Legal ride 10 pt above the short sheet instead of under it, from the first frame, and stay
-        // there when the sheet is pulled up (it covers them, as in Apple Maps; owner 2026-10-25, #343). The padding
-        // goes on the Map itself, before it ignores the safe area, as on the driving map.
-        .safeAreaPadding(.bottom, HomeSheet.legalInset(compact: compact))
-        .ignoresSafeArea()
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-            guard height != mapHeight else { return }
-            mapHeight = height
-            // Refit for the real height while the camera is still ours.
-            if flow != nil { refocusCreate(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
-        }
+        return TripMapSpec(
+            input: input,
+            style: TripMapStyle(
+                onPastTripTap: { id in if let entry = past.first(where: { $0.id == id }) { open(entry) } },
+                onRecapDotTap: { id in
+                    if let item = picked?.model.recap?.timeline.first(where: { $0.id == id }) { selectItem(item) }
+                }),
+            // The logo and Legal ride 10 pt above the short sheet instead of under it, from the first frame, and stay
+            // there when the sheet is pulled up (it covers them, as in Apple Maps; owner 2026-10-25, #343).
+            bottomPadding: HomeSheet.legalInset(compact: compact),
+            hidesControls: true,
+            onTap: picked != nil ? { closePicked() } : nil)
     }
 
-    @MapContentBuilder
-    private func routeContent(_ route: PastTripRoute, latest: Bool) -> some MapContent {
-        let line = route.coordinates
-        if line.count > 1 {
-            MapPolyline(coordinates: line)
-                .stroke(.white.opacity(latest ? 0.9 : 0.6),
-                        style: StrokeStyle(lineWidth: latest ? 9 : 6, lineCap: .round, lineJoin: .round))
-            MapPolyline(coordinates: line)
-                .stroke(Color.ikutAccent.opacity(latest ? 1 : 0.45),
-                        style: StrokeStyle(lineWidth: latest ? 5 : 3, lineCap: .round, lineJoin: .round))
-        }
-        if let start = route.start {
-            Annotation("", coordinate: start, anchor: .center) {
-                Circle().fill(.white).frame(width: latest ? 12 : 9, height: latest ? 12 : 9)
-                    .overlay(Circle().stroke(Color.ikutAccent.opacity(latest ? 1 : 0.6), lineWidth: latest ? 3 : 2))
-                    .accessibilityHidden(true)
-            }
-            .annotationTitles(.hidden)
-        }
-        Annotation(displayName(route), coordinate: route.destination, anchor: .center) {
-            Button { open(route) } label: {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: latest ? 13 : 10, weight: .bold))
-                    .foregroundStyle(latest ? .white : Color.ikutAccent)
-                    .frame(width: latest ? 30 : 22, height: latest ? 30 : 22)
-                    .background(latest ? Color.ikutAccent : Color.white, in: Circle())
-                    .overlay(Circle().stroke(latest ? Color.white : Color.ikutAccent.opacity(0.6), lineWidth: 2))
-                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(displayName(route)), to \(route.destinationName)")
-            .accessibilityHint("Shows the trip on the map")
-        }
-        .annotationTitles(latest ? .automatic : .hidden)
-    }
-
-    /// The name Home lists for the trip (it may have been renamed since the route was cached).
-    private func displayName(_ route: PastTripRoute) -> String {
-        past.first(where: { $0.id == route.id })?.name ?? route.name
-    }
-
-    private func open(_ route: PastTripRoute) {
-        if let entry = past.first(where: { $0.id == route.id }) { open(entry) }
-    }
-
-    /// An ended trip is picked here, on the map; one still running opens its lobby.
+    /// An ended trip is picked here, on the map; one still running opens on the same map.
     private func open(_ entry: PastTrips.Entry) {
-        guard entry.endedAt != nil else { onOpenTrip(entry); return }
+        guard entry.endedAt != nil else { onOpenTrip(entry, nowStarted.contains(entry.id)); return }
         pick(entry)
     }
 
     // MARK: Picked trip
-
-    /// Only the picked trip's route, with its stops and road reports, and a flag at the destination.
-    @MapContentBuilder
-    private func pickedContent(_ picked: PickedTrip) -> some MapContent {
-        if let route = pickedRoute(picked) {
-            let line = route.coordinates
-            if line.count > 1 {
-                MapPolyline(coordinates: line)
-                    .stroke(.white.opacity(0.9), style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
-                MapPolyline(coordinates: line)
-                    .stroke(Color.ikutAccent, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-            }
-            if let start = route.start {
-                Annotation("", coordinate: start, anchor: .center) {
-                    Circle().fill(.white).frame(width: 12, height: 12)
-                        .overlay(Circle().stroke(Color.ikutAccent, lineWidth: 3))
-                        .accessibilityHidden(true)
-                }
-                .annotationTitles(.hidden)
-            }
-            Annotation(route.destinationName, coordinate: route.destination, anchor: .center) {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(Color.ikutAccent, in: Circle())
-                    .overlay(Circle().stroke(.white, lineWidth: 2))
-                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
-                    .accessibilityHidden(true)
-            }
-            .annotationTitles(.visible)
-        }
-        ForEach(PickedTripLogic.markers(picked.model.recap)) { item in
-            let selected = picked.selectedItemId == item.id
-            Annotation(PickedTripLogic.pinLabel(item), coordinate: item.coordinate!, anchor: .center) {
-                // A tap selects it like its timeline row (and doesn't fall through to the map's tap-away).
-                Button { selectItem(item) } label: {
-                    RecapEventDot(kind: item.kind, symbol: item.symbol, size: selected ? 30 : 22, selected: selected)
-                        .overlay(Circle().stroke(.white, lineWidth: 2))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(PickedTripLogic.pinLabel(item))
-                .accessibilityHint("Shows it on the map")
-            }
-            .annotationTitles(selected ? .visible : .hidden)
-        }
-    }
 
     private func pickedRoute(_ picked: PickedTrip) -> PastTripRoute? {
         PickedTripLogic.route(for: picked.entry, snapshot: picked.model.snapshot, drawn: routes, fetched: fetchedRoute)
     }
 
     private func pick(_ entry: PastTrips.Entry) {
-        cameraBeforePick = camera
+        cameraBeforePick = stage.camera
         fetchedRoute = nil
         withAnimation(sheetMotion) {
             expanded = false
@@ -382,7 +301,7 @@ struct TripsHomeView: View {
     /// Every camera move on Home goes through here: the same motion as the sheet's content change, and a jump
     /// with Reduce Motion.
     private func move(to position: MapCameraPosition, animated: Bool) {
-        if animated, !reduceMotion { withAnimation(sheetMotion) { camera = position } } else { camera = position }
+        if animated, !reduceMotion { withAnimation(sheetMotion) { stage.camera = position } } else { stage.camera = position }
     }
 
     /// Camera for the picked trip: the selected item's spot, else the whole route, above the short sheet.
@@ -400,7 +319,7 @@ struct TripsHomeView: View {
             region = nil
         }
         guard let region else { return }
-        if settling, let seen = cameraBox.seen,
+        if settling, let seen = stage.cameraBox.seen,
            PickedTripLogic.nearlyShown(centerLatitude: seen.camera.centerCoordinate.latitude,
                                        centerLongitude: seen.camera.centerCoordinate.longitude,
                                        latitudeSpan: seen.latitudeDelta, target: region) { return }
@@ -471,7 +390,7 @@ struct TripsHomeView: View {
     /// New trip's gates are through: Where to? takes over the sheet and the map.
     private func beginCreate() {
         guard flow == nil else { return }
-        cameraBeforeCreate = camera
+        cameraBeforeCreate = stage.camera
         if picked != nil { closePicked() }
         withAnimation(sheetMotion) {
             expanded = false
@@ -657,13 +576,15 @@ struct TripsHomeView: View {
             for entry in parts.now {
                 let read = await HomeNow.load(tripId: entry.id)
                 if Task.isCancelled { return }
-                if let endedAt = read.endedAt {
-                    // It ended while this phone wasn't in it: remember that, and it moves to Past trips.
+                if let moved = HomeNow.movesToPast(read, signedIn: auth.state == .signedIn) {
+                    // It ended while this phone wasn't in it, or this phone left or was removed: remember that, and it
+                    // moves to Past trips.
                     PastTrips.record(tripId: entry.id, name: read.name ?? entry.name,
-                                     destination: read.destination ?? entry.destination, endedAt: endedAt)
+                                     destination: read.destination ?? entry.destination, endedAt: moved)
                     past = PastTrips.all()
                 } else {
                     nowStatus[entry.id] = read.line
+                    if read.started { nowStarted.insert(entry.id) } else { nowStarted.remove(entry.id) }
                 }
             }
         }
@@ -765,7 +686,7 @@ struct TripsHomeView: View {
 
 #Preview {
     Backend.configure()
-    return TripsHomeView(onNewTrip: {}, onJoin: {})
+    return TripScreenHost(mode: .home) { TripsHomeView(onNewTrip: {}, onJoin: {}) }
         .environment(AuthModel())
 }
 
@@ -779,7 +700,7 @@ struct TripsHomeView: View {
                      endedAt: Date().addingTimeInterval(-9 * day), others: nil, now: Date().addingTimeInterval(-9 * day))
     PastTrips.record(tripId: "sample-1", name: "Balik kampung raya", destination: "Ipoh",
                      endedAt: Date().addingTimeInterval(-day), others: ["Wyna", "Hafiz", "Daniel"])
-    return TripsHomeView(onNewTrip: {}, onJoin: {})
+    return TripScreenHost(mode: .home) { TripsHomeView(onNewTrip: {}, onJoin: {}) }
         .environment(AuthModel())
 }
 

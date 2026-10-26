@@ -135,6 +135,7 @@
 		7555E494FCA3E97B96F8F4C8 /* StopPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE38EDF4446EB6024A65E6A /* StopPillView.swift */; };
 		7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */; };
 		76B843F8B3A574B935D96CC7 /* PlaceSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091A73560C6A3A87AF053698 /* PlaceSide.swift */; };
+		76C148E268AE2ACA0726EA9B /* HomeMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B86DD84637F94BD8CD6C9 /* HomeMapContent.swift */; };
 		7942FF1B470903985D10313B /* YouStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5055B23595FC815A408187BC /* YouStatus.swift */; };
 		79EE97E9F7D463AF192C5156 /* places.json in Resources */ = {isa = PBXBuildFile; fileRef = AC38E523FC312DCBB9D08A3B /* places.json */; };
 		7B2B2622524DCA230BA33FC3 /* DeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */; };
@@ -339,6 +340,7 @@
 		29D417D8CDD8A80CCF181936 /* TrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTests.swift; sourceTree = "<group>"; };
 		2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		2AEFFFA195297151E2DEE401 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
+		2B2B86DD84637F94BD8CD6C9 /* HomeMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeMapContent.swift; sourceTree = "<group>"; };
 		2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAllTests.swift; sourceTree = "<group>"; };
 		2B8C14340A84BE731690F0DA /* MotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionTests.swift; sourceTree = "<group>"; };
 		2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachTests.swift; sourceTree = "<group>"; };
@@ -563,6 +565,7 @@
 			children = (
 				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
 				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
+				2B2B86DD84637F94BD8CD6C9 /* HomeMapContent.swift */,
 				84D5E973FCE988F061DA7D83 /* HomeNow.swift */,
 				F56D59AA9467F430D986EC9F /* HomeSheet.swift */,
 				2519810884A2F43AD0A1C337 /* HomeView.swift */,
@@ -1273,6 +1276,7 @@
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
 				27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */,
 				5626212E868D041FB840F37F /* HazardRegionMonitor.swift in Sources */,
+				76C148E268AE2ACA0726EA9B /* HomeMapContent.swift in Sources */,
 				ECFB40507E2C0ED0F4BEDE8E /* HomeNow.swift in Sources */,
 				BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */,
 				F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */,
