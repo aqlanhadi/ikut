@@ -71,6 +71,7 @@ struct TripMapView: View {
     @State private var barContent: CGFloat?
     /// The banner on top of the panel (`topBanner`), measured; 0 without one.
     @State private var topContent: CGFloat = 0
+
     /// One sheet motion at a time (D42): while a fold or a drag's release runs, the heights hold
     /// (`PanelSheet.settled`).
     @State private var sheetMoving = false
@@ -617,6 +618,9 @@ struct TripMapView: View {
 
     private var shownNow: PanelSheet.Shown { sheetShown }
 
+    /// The top of the convoy sheet's scrolling content.
+    private static let sheetTop = "sheet.top"
+
     /// Where my car is on the main route and its pace, for the pulled-up journey; nil while it is still joining.
     private var journeyHere: LobbyContent.JourneyHere? {
         model.convoy.myEntry.map { LobbyContent.JourneyHere(offset: $0.convoyOffset, pace: model.stopPace()) }
@@ -712,8 +716,9 @@ struct TripMapView: View {
         let shown = shownNow
         let heights = sheetHeights
         // Pulled up, the lobby continues below the unfolded panel, which stays where it was (canvas row L).
-        return ScrollView {
+        return ScrollViewReader { scroller in ScrollView {
             VStack(spacing: 0) {
+                Color.clear.frame(height: 0).id(Self.sheetTop)
                 if let topBanner {
                     topBanner
                         .padding(.horizontal, Spacing.l)
@@ -726,10 +731,12 @@ struct TripMapView: View {
                 }
             }
         }
+
+        // The lobby below the convoy went (the grabber, the header, a stop request, a hazard): the sheet starts at the
+        // convoy's header again, not partway down.
+        .onChange(of: continuationShown) { _, shown in if !shown { scroller.scrollTo(Self.sheetTop, anchor: .top) } }
+        }
         .scrollBounceBehavior(.basedOnSize)
-        // Swipes on the content scroll it and never resize the sheet: the height changes by the grabber, or a tap on
-        // the convoy's header (#402).
-        .presentationContentInteraction(.scrolls)
             .sheetBottomBar { actionBar }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -757,6 +764,9 @@ struct TripMapView: View {
         }
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: TripScreenLogic.Sheet.driving(heights).touchableUpThrough))
+        // Swipes on the content scroll it and never resize the sheet: the height changes by the grabber, or a tap on
+        // the convoy's header (#402).
+        .presentationContentInteraction(.scrolls)
         .interactiveDismissDisabled()
         .sheet(item: Binding(get: { presentedCard }, set: cardSetByTheSystem), onDismiss: cardDismissed) { _ in
             cardSheet

@@ -96,6 +96,26 @@ final class CreateTripUITests: ConvoyUITestCase {
         close.tap()
         XCTAssertTrue(waitForGone(close, timeout: 5), "Pit stop's card stayed up after Close")
 
+        // At tall, a swipe up on the convoy list scrolls it and never pulls the sheet up (#402); the header still folds.
+        app.expandConvoy.tap()
+        let collapse = app.buttons["Collapse convoy list"]
+        XCTAssertTrue(collapse.waitForExistence(timeout: 5), "A tap on the header didn't unfold the list")
+        app.scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch.swipeUp()
+        // Known (D53 fix round 3): on the iOS 27 simulator the system sheet still grows on a content swipe whose list
+        // fits, despite `.presentationContentInteraction(.scrolls)`. Non-strict, so it passes once the sheet obeys.
+        XCTExpectFailure("#402: a swipe on a list that fits still pulls the sheet up", options: {
+            let options = XCTExpectedFailure.Options()
+            options.isStrict = false
+            return options
+        }()) {
+            XCTAssertFalse(app.pulledUpSheet.waitForExistence(timeout: 3), "A swipe on the list pulled the sheet up")
+        }
+        // Back to tall by the grabber if it did grow, so the header step below starts where it should.
+        if app.pulledUpSheet.exists { app.pullDownTripSheet() }
+        if !collapse.isHittable { app.scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch.swipeDown() }
+        collapse.tap()
+        XCTAssertTrue(app.expandConvoy.waitForExistence(timeout: 5), "A tap on the header didn't fold the sheet")
+
         // Two round trips: pulled up, the lobby continues below the convoy; down twice, the list is folded again.
         for round in 1...2 {
             XCTAssertTrue(app.pullUpTripSheet(), "Round \(round): pulling the sheet up didn't show the lobby below the convoy")

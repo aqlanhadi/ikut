@@ -153,6 +153,14 @@ struct TripPullUpTests {
         #expect(!LobbySheet.drivingCovered(LobbySheet.Cover(), lobbyOnScreen: true))
     }
 
+    @Test func theAsksInsideThePulledUpSheetGoWithItAndNeverComeBackUntapped() {
+        let up = LobbySheet.PulledUpAsks(confirmLeave: true, confirmEnd: true, renaming: true, showQR: true)
+        // Still pulled up: kept.
+        #expect(LobbySheet.pulledUpAsks(up, continuationShown: true) == up)
+        // Folded by the grabber, the header, a stop request or a hazard: all cleared.
+        #expect(LobbySheet.pulledUpAsks(up, continuationShown: false) == LobbySheet.PulledUpAsks())
+    }
+
     // MARK: No longer in the trip, driving (#403)
 
     @Test func drivingTheNoLongerInTheTripBannerShowsAndTheEndOpensTheRecapInstead() {

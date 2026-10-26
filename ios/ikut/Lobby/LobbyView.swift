@@ -8,6 +8,10 @@ import SwiftUI
 /// without a new screen. While driving, the lobby's journey, code, trip, options and Leave or End continue below the
 /// convoy when its sheet is pulled up (`pulledUpContent`).
 struct LobbyView: View {
+    /// In a sample lobby: the driving layer Start switches to, handed what continues below its convoy when pulled up
+    /// and the banner on top of its sheet.
+    typealias SampleDriving = (_ continuation: @escaping (LobbyContent.JourneyHere?) -> AnyView, _ topBanner: AnyView?) -> AnyView
+
     let onExit: () -> Void
     /// The trip ended (by the organizer or the server): show the recap.
     var onEnded: (String) -> Void = { _ in }
@@ -69,7 +73,7 @@ struct LobbyView: View {
     private let sampleCarColor = "#D9480F"
     /// In a sample lobby: the driving layer Start switches to (a demo map; nil, the live one), handed what continues
     /// below its convoy when pulled up.
-    private var sampleDriving: ((@escaping (LobbyContent.JourneyHere?) -> AnyView) -> AnyView)?
+    private var sampleDriving: LobbyView.SampleDriving?
     /// In a sample lobby: this phone shares its location (the header says so, and Pause sharing shows).
     private var sampleSharing = false
     /// In a sample lobby: this person is no longer in the trip.
@@ -101,7 +105,7 @@ struct LobbyView: View {
     init(
         sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false,
         joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil, sharing: Bool = false, lost: Bool = false,
-        driving: ((@escaping (LobbyContent.JourneyHere?) -> AnyView) -> AnyView)? = nil
+        driving: LobbyView.SampleDriving? = nil
     ) {
         self.init(sample: model)
         sampleDriving = driving
@@ -315,7 +319,7 @@ struct LobbyView: View {
                 lobbyLayer
             case .driving:
                 if let sampleDriving {
-                    sampleDriving { AnyView(pulledUpContent(here: $0)) }
+                    sampleDriving({ AnyView(pulledUpContent(here: $0)) }, drivingBanner)
                 } else {
                     TripMapView(
                         session: session, continuation: { AnyView(pulledUpContent(here: $0)) },
@@ -329,7 +333,18 @@ struct LobbyView: View {
         // One listener set at a time (`TripScreenLogic.lobbyListens`): driving, the lobby listens only while the
         // convoy sheet is pulled up and shows the lobby below the convoy.
         .onChange(of: stage.mode) { _, _ in updateListening() }
-        .onChange(of: stage.pulledUp) { _, _ in updateListening() }
+        .onChange(of: stage.pulledUp) { _, pulledUp in
+            updateListening()
+            // The asks inside the pulled-up sheet went with it (a fold, a stop request, a hazard): none comes back by
+            // itself at the next pull-up.
+            let asks = LobbySheet.pulledUpAsks(
+                .init(confirmLeave: confirmLeave, confirmEnd: confirmEnd, renaming: renaming, showQR: showQR),
+                continuationShown: pulledUp || stage.mode == .lobby)
+            confirmLeave = asks.confirmLeave
+            confirmEnd = asks.confirmEnd
+            renaming = asks.renaming
+            showQR = asks.showQR
+        }
         .navigationDestination(isPresented: $showChangeDestination) {
             CreateTripView(
                 changingTripId: model.trip?.id, keepingStops: planner.items,

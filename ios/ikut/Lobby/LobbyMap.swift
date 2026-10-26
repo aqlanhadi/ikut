@@ -42,6 +42,20 @@ enum LobbySheet {
         !lobbyOnScreen || cover.changeDestination || cover.suggestStops || cover.alwaysExplainer
     }
 
+    /// The asks presented from inside the pulled-up driving sheet.
+    struct PulledUpAsks: Equatable {
+        var confirmLeave = false
+        var confirmEnd = false
+        var renaming = false
+        var showQR = false
+    }
+
+    /// The pulled-up sheet's asks once its continuation is gone (a fold by the grabber, the header, a stop request or a
+    /// hazard approach): torn down with it, so cleared, never shown untapped at the next pull-up; kept while it shows.
+    static func pulledUpAsks(_ asks: PulledUpAsks, continuationShown: Bool) -> PulledUpAsks {
+        continuationShown ? asks : PulledUpAsks()
+    }
+
     /// Whether the sheet is away: anything above is up, or the lobby itself is not on screen (popped).
     static func isCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
         !lobbyOnScreen || cover.changeDestination || cover.suggestStops

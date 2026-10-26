@@ -59,7 +59,7 @@ enum LobbyStopsDemo {
         stop("s3", "Kopitiam Gopeng", 4.45, 101.12, .food, nil, 2),
     ].sorted { $0.routeOffset < $1.routeOffset }.enumerated().map { var s = $1; s.order = $0; return s }
 
-    static func lobby(_ scene: Scene, driving: ((@escaping (LobbyContent.JourneyHere?) -> AnyView) -> AnyView)? = nil) -> LobbyView {
+    static func lobby(_ scene: Scene, driving: LobbyView.SampleDriving? = nil) -> LobbyView {
         let planner = StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in })
         func model(_ stops: [PlannedStop], started: Bool = false) -> LobbyModel {
             let model = LobbyModel.sample(started: started, seconds: 2 * 3600 + 40 * 60, stops: stops, route: route)
@@ -123,12 +123,12 @@ enum LobbyStopsDemo {
             stops[0].leftBy = "u1"
             return LobbyView(
                 sample: model(stops, started: true), planner: planner, organizer: !lost, sharing: !lost, lost: lost,
-                driving: { continuation in
+                driving: { continuation, banner in
                     let map = MapDemo.model()
                     map.mode = TripScreenLogic.drivingEntryMode
                     return AnyView(TripMapView(
                         session: TripSession(tripId: "demo", userId: "u-c1"), model: map, stopService: DemoStopService(),
-                        demoPulledUp: !lost, continuation: continuation))
+                        demoPulledUp: !lost, continuation: continuation, topBanner: banner))
                 })
         case .started:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
@@ -228,12 +228,12 @@ struct DemoGeocoder: ReverseGeocoding {
 struct TripStartSwapDemo: View {
     @Environment(TripMapStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let lobby = LobbyStopsDemo.lobby(.organizer, driving: { continuation in
+    private let lobby = LobbyStopsDemo.lobby(.organizer, driving: { continuation, banner in
         let model = MapDemo.model()
         model.mode = TripScreenLogic.drivingEntryMode
         return AnyView(TripMapView(
             session: TripSession(tripId: "demo", userId: "u-c1"), model: model, stopService: DemoStopService(),
-            continuation: continuation))
+            continuation: continuation, topBanner: banner))
     })
 
     var body: some View {
