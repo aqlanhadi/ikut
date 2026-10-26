@@ -21,6 +21,9 @@ struct LobbyView: View {
     @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
     /// A participant's own trip: their start, where they join, their distance and drive time (D26).
     @State private var ownWay = OwnWayInfo()
+    /// The main route as a line (for each car's join), and the towns the other cars join near.
+    @State private var mainLine: RouteLine?
+    @State private var joinTowns = JoinTowns()
     @State private var planner: StopPlanner
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showAddStop = false
@@ -78,8 +81,13 @@ struct LobbyView: View {
 
     /// A lobby on sample data with the planner in a given state, for previews and screenshots: `organizer` shows the
     /// organizer's card (editable) rather than a member's.
-    init(sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false) {
+    init(
+        sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false,
+        joinTowns: JoinTowns? = nil
+    ) {
         self.init(sample: model)
+        // A sample lobby never looks a town up unless the demo gives it a geocoder.
+        _joinTowns = State(initialValue: joinTowns ?? JoinTowns(place: { _ in nil }))
         _expanded = State(initialValue: tall)
         _planner = State(initialValue: planner)
         sampleOrganizer = organizer
@@ -300,9 +308,12 @@ struct LobbyView: View {
                 onAdd: { addStop($0) })
         }
         .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
+        .onChange(of: joinTownsKey, initial: true) { _, _ in askJoinTowns() }
         .task(id: model.trip?.route) {
             guard let trip = model.trip else { return }
-            routeLength = RouteLine(Polyline.decode(trip.route)).length
+            let line = RouteLine(Polyline.decode(trip.route))
+            mainLine = line
+            routeLength = line.length
             await routeInfo.load(
                 route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty, ownTrip: !isOrganizer)
         }
@@ -447,6 +458,20 @@ struct LobbyView: View {
 
     // MARK: Cars
 
+    /// What decides the join towns: the main route, whether it starts at a meeting point, and each car's route and offset.
+    private var joinTownsKey: String {
+        let meeting = TripSessionLogic.meetingPoint(in: model.stops) != nil
+        let cars = model.groupedCars.map { "\($0.car.id ?? "")/\($0.hasTracker)/\($0.car.route?.count ?? 0)/\($0.car.mergeOffset ?? -1)" }
+        return "\(mainLine?.length ?? 0)|\(meeting)|" + cars.joined(separator: ",")
+    }
+
+    private func askJoinTowns() {
+        guard let mainLine else { return }
+        joinTowns.request(
+            cars: model.groupedCars.filter { !isMine($0) }, main: mainLine,
+            hasMeetingPoint: TripSessionLogic.meetingPoint(in: model.stops) != nil)
+    }
+
     private func isMine(_ item: LobbyCar) -> Bool {
         if isSample { return item.car.id == (isOrganizer ? "c1" : "c2") }
         guard let currentUserId else { return false }
@@ -463,8 +488,13 @@ struct LobbyView: View {
             ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { RowDivider() }
                 let mine = isMine(item)
+                let join = LobbyContent.join(
+                    of: item.car, main: mainLine,
+                    hasMeetingPoint: TripSessionLogic.meetingPoint(in: model.stops) != nil)
                 let text = LobbyContent.carText(
-                    item, mine: mine, viewerLeavesFromTheStart: isOrganizer || ownWay.join == .startsWithConvoy)
+                    item, mine: mine, viewerLeavesFromTheStart: isOrganizer || ownWay.join == .startsWithConvoy,
+                    joinPlace: item.car.id.flatMap { joinTowns.town(carId: $0, join: join) }, join: join,
+                    destination: model.trip?.destination.name)
                 let row = CarRow(text: text, number: item.car.number ?? index + 1, colorHex: item.car.color)
                 if mine, !isOrganizer, ownWay.joinCoordinate != nil {
                     Button { flyTo("join") } label: { row }
