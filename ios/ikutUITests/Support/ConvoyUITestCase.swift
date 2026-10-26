@@ -273,17 +273,9 @@ class ConvoyUITestCase: XCTestCase {
         return code
     }
 
-    /// A phone that still holds an earlier trip opens in its lobby or map, not Home: say so instead of
-    /// letting the next step report a field it cannot find.
-    func failIfAlreadyInATrip() {
-        if lobbyPresence.waitForExistence(timeout: 3) {
-            XCTFail("This phone is already in a trip (its lobby or map is open) and should start from Home: it holds an earlier session. Uninstall the app first (qa/run-convoy2.mjs does).")
-        }
-    }
-
     /// Welcome or Home to the join form with `code` typed in (the name sheet comes first when signed out).
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
-        failIfAlreadyInATrip()
+        returnHomeFromAnOpenTrip()
         // Home's row, or Welcome's link on a fresh install.
         let joinButton = app.buttons
             .matching(NSPredicate(format: "identifier IN %@", ["homeJoin", "welcomeJoin"])).firstMatch
