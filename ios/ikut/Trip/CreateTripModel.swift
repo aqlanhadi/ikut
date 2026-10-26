@@ -36,6 +36,8 @@ final class CreateTripModel {
     @ObservationIgnored private var source: SuggestionSource?
     @ObservationIgnored private let makeSource: @MainActor () -> SuggestionSource
     @ObservationIgnored private let places: PlaceSearching
+    /// Builds the route from the phone to a place (MapKit); a test swaps it.
+    @ObservationIgnored private let buildRoute: @MainActor (CLLocationCoordinate2D) async throws -> BuiltRoute
     /// The text a query search ran for, so setting the field to it does not go back to suggestions.
     @ObservationIgnored private var searchedText = ""
 
@@ -47,8 +49,10 @@ final class CreateTripModel {
 
     init(
         suggestions: (@MainActor () -> SuggestionSource)? = nil, places: PlaceSearching = MapKitPlaceSearch(),
-        geocoder: ReverseGeocoding = CLReverseGeocoder()
+        geocoder: ReverseGeocoding = CLReverseGeocoder(),
+        route: @escaping @MainActor (CLLocationCoordinate2D) async throws -> BuiltRoute = { try await RouteBuilder.buildRoute(to: $0) }
     ) {
+        buildRoute = route
         makeSource = suggestions ?? { MapKitSuggestionSource() }
         self.places = places
         self.geocoder = geocoder
@@ -213,14 +217,49 @@ final class CreateTripModel {
         along?.rowText(for: result.coordinate)
     }
 
-    /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.
-    func use(_ result: DestinationResult, finish: (BuiltRoute) async throws -> Void) async -> Bool {
-        guard working == nil else { return false }
+    @ObservationIgnored private var previewGeneration = 0
+    @ObservationIgnored private var previewTask: Task<BuiltRoute, Error>?
+
+    /// Builds the route to `result` and nothing else: the preview before a trip is made. Nil (with a message) on
+    /// failure, and nil with no message when `cancelPreview` was called while it built.
+    func preview(_ result: DestinationResult) async -> BuiltRoute? {
+        guard working == nil else { return nil }
         working = result.id
         errorMessage = nil
+        previewGeneration += 1
+        let generation = previewGeneration
+        let build = buildRoute
+        let task = Task { try await build(result.coordinate) }
+        previewTask = task
+        defer {
+            if generation == previewGeneration {
+                working = nil
+                previewTask = nil
+            }
+        }
+        do {
+            let route = try await task.value
+            return generation == previewGeneration ? route : nil
+        } catch {
+            if generation == previewGeneration { errorMessage = error.localizedDescription }
+            return nil
+        }
+    }
+
+    /// Drops a route that is still being built (Cancel or Close): its answer is ignored and the search is free again.
+    func cancelPreview() {
+        previewGeneration += 1
+        previewTask?.cancel()
+        previewTask = nil
+        working = nil
+    }
+
+    /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.
+    func use(_ result: DestinationResult, finish: (BuiltRoute) async throws -> Void) async -> Bool {
+        guard let route = await preview(result) else { return false }
+        working = result.id
         defer { working = nil }
         do {
-            let route = try await RouteBuilder.buildRoute(to: result.coordinate)
             try await finish(route)
             return true
         } catch {

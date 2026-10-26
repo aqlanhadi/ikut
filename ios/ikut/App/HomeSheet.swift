@@ -30,6 +30,56 @@ enum HomeSheet {
     /// when the sheet is pulled up or down (owner 2026-10-25, #343).
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
+    /// What Home's sheet shows: its list, or one of the two steps of making a trip over the same map (MapFirst B2, B3).
+    enum Mode: Equatable { case list, whereTo, newTrip }
+
+    /// Where to? with the keyboard up (B2), and New trip with the route drawn (B3).
+    static let whereToHeight: CGFloat = 560
+    static let newTripHeight: CGFloat = 420
+
+    @MainActor static func mode(flow: NewTripFlow?) -> Mode {
+        guard let flow else { return .list }
+        return flow.ready == nil ? .whereTo : .newTrip
+    }
+
+    /// The short detent's height for `mode`.
+    static func height(_ mode: Mode, compact: CGFloat) -> CGFloat {
+        switch mode {
+        case .list: compact
+        case .whereTo: whereToHeight
+        case .newTrip: newTripHeight
+        }
+    }
+
+    static func detents(_ mode: Mode, compact: CGFloat) -> Set<PresentationDetent> {
+        [short(height(mode, compact: compact)), tall]
+    }
+
+    static func detent(expanded: Bool, mode: Mode, compact: CGFloat) -> PresentationDetent {
+        expanded ? tall : short(height(mode, compact: compact))
+    }
+
+    /// Room kept between the camera's content and the sheet's top edge when making a trip.
+    static let createMargin: CGFloat = 24
+    /// Status bar plus room for a pin drawn above its coordinate.
+    static let createTopRoom: CGFloat = 110
+
+    /// What the camera keeps clear for Where to? and New trip, as fractions of the part of the map the camera frames.
+    /// MapKit frames the map above its bottom safe area (`legalInset`, fixed at the list's inset), so the fractions
+    /// are of that part, not of the whole screen: the sheet covers only the part of itself above the padding.
+    static func createInsets(mapHeight: CGFloat, sheet: CGFloat, compact: CGFloat) -> (top: Double, bottom: Double) {
+        let padding = legalInset(compact: compact)
+        let full = mapHeight > sheet + createTopRoom ? mapHeight : 874
+        let area = max(1, full - padding)
+        return (Double(createTopRoom / area), Double(max(0, sheet - padding + createMargin) / area))
+    }
+
+    /// A sheet pulled up for one step does not stay tall for the next: New trip opens at its own height.
+    static func expanded(_ was: Bool, from old: Mode, to new: Mode) -> Bool { old == new ? was : false }
+
+    /// Past routes are drawn only with the list; making a trip shows its own pins and route.
+    static func drawsPastRoutes(_ mode: Mode) -> Bool { mode == .list }
+
     static func short(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
     static let tall = PresentationDetent.large
 

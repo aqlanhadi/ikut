@@ -220,6 +220,7 @@ struct PlaceSearchResults: View {
     var onPick: (DestinationResult) -> Void
 
     @State private var choosingOnMap = false
+    @Environment(\.inPanelSheet) private var inSheet
 
     private var busy: Bool { model.isWorking || model.resolving != nil }
     private var hasRows: Bool { model.pastedPin || model.showingResults || model.isSearching || !model.suggestions.isEmpty }
@@ -239,7 +240,8 @@ struct PlaceSearchResults: View {
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
-        .ikutCard()
+        .scrollTargetLayout()
+        .tileOrCard(inSheet)
         .padding(.top, hasRows ? 0 : Spacing.m)
         .fullScreenCover(isPresented: $choosingOnMap) {
             MapPickView(origin: model.origin, along: model.along, geocoder: model.geocoder) { place in
@@ -267,9 +269,13 @@ struct PlaceSearchResults: View {
                     .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.section)
             }
         }
+        // One view per result, so a scroll position can name it (Where to? follows the list with its camera).
         ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
-            if index > 0 { RowDivider() }
-            resultRow(result)
+            VStack(spacing: 0) {
+                if index > 0 { RowDivider() }
+                resultRow(result)
+            }
+            .id(result.id)
         }
     }
 
@@ -327,5 +333,12 @@ struct PlaceSearchResults: View {
                 .monospacedDigit()
                 .foregroundStyle(.primary)
         }
+    }
+}
+
+private extension View {
+    /// Grouped rows: the sheet's own tile on the convoy-style glass sheet, the grouped card on a plain screen.
+    @ViewBuilder func tileOrCard(_ inSheet: Bool) -> some View {
+        if inSheet { surfaceTile() } else { ikutCard() }
     }
 }
