@@ -34,11 +34,18 @@ extension XCUIApplication {
         start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
     }
 
-    /// Scrolls the driving sheet's content down by about `points`: a slow drag held at its end (no fling), started
-    /// above the bottom bar, which the scroll view runs under.
+    /// Scrolls the driving sheet's content down by about `points`: a slow drag held at its end (no fling), on the
+    /// rows between the sheet's top and its bottom bar, which the scroll view runs under.
     func scrollDrivingSheet(by points: CGFloat) {
-        let from = drivingSheetScroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
-        from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -points)),
+        // From just above the bottom bar, and never past the sheet's top, so the drag stays on the rows.
+        let sheet = drivingSheetScroll.frame
+        let barTop = drivingReport.exists ? drivingReport.frame.minY : sheet.maxY - 70
+        let startY = barTop - 12
+        let distance = min(points, startY - sheet.minY - 24)
+        guard distance > 10 else { return }
+        let origin = coordinate(withNormalizedOffset: .zero)
+        let from = origin.withOffset(CGVector(dx: sheet.midX, dy: startY))
+        from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -distance)),
                    withVelocity: .slow, thenHoldForDuration: 0.3)
     }
 

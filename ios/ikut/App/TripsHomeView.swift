@@ -546,12 +546,8 @@ struct TripsHomeView: View {
                 .id(flow.ready == nil ? "create-search" : "create-ready")
                 .transition(.opacity)
             } else {
-            VStack(alignment: .leading, spacing: 0) {
-                if let picked {
-                    PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
-                } else {
-                    header
-                }
+            // The header stays put and the rows fade out under it (the system's soft top edge).
+            Group {
                 ScrollView {
                     if let picked {
                         PickedTripBody(picked: picked, onSelect: selectItem)
@@ -562,6 +558,13 @@ struct TripsHomeView: View {
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
+            }
+            .sheetTopBar {
+                if let picked {
+                    PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
+                } else {
+                    header
+                }
             }
             .id(picked?.entry.id ?? "")
             .transition(.opacity)
