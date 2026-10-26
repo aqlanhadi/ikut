@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// One button in the card's action area. `.primary` is the main action (50 pt, or `height` when the
-/// driver needs a huge one), `.secondary` a gray capsule, `.positive` the chosen answer, `.ghost` plain text.
+/// One button in the card's action area. `.primary` is the main action (`SheetButtonSize.bar`, as every sheet's bottom
+/// bar, or `height` when the driver needs a huge one), `.secondary` a gray capsule, `.positive` the chosen answer,
+/// `.ghost` plain text (`SheetButtonSize.inline`).
 struct StopActionButton: View {
     enum Style { case primary, secondary, positive, ghost, destructive }
 
@@ -9,12 +10,15 @@ struct StopActionButton: View {
     /// A small second line under the title ("Hafiz is 3 min away").
     var subtitle: String?
     var style: Style = .secondary
-    var height: CGFloat = 50
+    /// Nil: the shared size for the style (bar, or inline for `.ghost`), growing with the text size.
+    var height: CGFloat?
     var disabled = false
     var id: String
     var action: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .headline) private var barHeight = SheetButtonSize.bar
+    @ScaledMetric(relativeTo: .body) private var inlineHeight = SheetButtonSize.inline
 
     var body: some View {
         // At accessibility sizes a long title wraps to two lines and the button grows, not truncates.
@@ -32,7 +36,7 @@ struct StopActionButton: View {
                 .multilineTextAlignment(.center)
                 .padding(.vertical, large ? Spacing.s : 0)
                 .padding(.horizontal, large ? Spacing.l : 0)
-                .frame(maxWidth: .infinity, minHeight: height)
+                .frame(maxWidth: .infinity, minHeight: height ?? (style == .ghost ? inlineHeight : barHeight))
         }
         .surfaceButton(role, fill: background, foreground: foreground)
         .disabled(disabled)
@@ -156,7 +160,7 @@ struct StopVoterRow: View {
         StopActionButton(title: "Tell the convoy", style: .primary, disabled: true, id: "p-off") {}
         StopActionButton(title: "Cancel request", id: "s") {}
         StopActionButton(title: "You said OK", style: .positive, id: "y") {}
-        StopActionButton(title: "Back", style: .ghost, height: 44, id: "g") {}
+        StopActionButton(title: "Back", style: .ghost, id: "g") {}
         HStack(spacing: Spacing.m) {
             StopReasonIcon(symbol: "fuelpump.fill")
             StopReasonIcon(symbol: "fork.knife", size: 40)
@@ -192,7 +196,7 @@ struct StopVoterRow: View {
         CardSheetFrame(title: "Wyna needs fuel", subtitle: nil, onClose: {}) {
             ForEach(1...8, id: \.self) { StopMessageTile(text: "Line \($0)") }
         } actions: {
-            StopActionButton(title: "Back", style: .ghost, height: 44, id: "back") {}
+            StopActionButton(title: "Back", style: .ghost, id: "back") {}
         }
     }
     .padding(Spacing.s)

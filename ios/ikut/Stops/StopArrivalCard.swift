@@ -147,12 +147,12 @@ struct StopArrivalCard: View {
                         .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skip.retry")
                 }
                 if mineSkipping {
-                    StopActionButton(title: "We’ll stop after all", style: .secondary, height: 52, id: "stop.skip.undo") {
+                    StopActionButton(title: "We’ll stop after all", style: .secondary, id: "stop.skip.undo") {
                         sendSkip(stop, skipping: false)
                     }
                     .disabled(skipping)
                 } else {
-                    StopActionButton(title: stop.isMeeting ? "We’ll meet you along the way" : "We’ll skip this stop", style: .secondary, height: 52, id: "stop.skip") {
+                    StopActionButton(title: stop.isMeeting ? "We’ll meet you along the way" : "We’ll skip this stop", style: .secondary, id: "stop.skip") {
                         sendSkip(stop, skipping: true)
                     }
                     .disabled(skipping)
@@ -178,16 +178,16 @@ struct StopArrivalCard: View {
                     Text(StopSkipAll.confirmSentence(stop: stop))
                         .font(.subheadline).multilineTextAlignment(.center).frame(maxWidth: .infinity)
                         .accessibilityIdentifier("stop.skipAll.confirm.text")
-                    StopActionButton(title: "Skip this stop", style: .destructive, height: 52, id: "stop.skipAll.confirm") {
+                    StopActionButton(title: "Skip this stop", style: .destructive, id: "stop.skipAll.confirm") {
                         sendSkipAll(stop)
                     }
                     .disabled(skippingAll)
-                    StopActionButton(title: "Not now", style: .ghost, height: 44, id: "stop.skipAll.cancel") {
+                    StopActionButton(title: "Not now", style: .ghost, id: "stop.skipAll.cancel") {
                         confirmingSkipAll = false
                     }
                 } else {
                     VStack(spacing: Spacing.xs) {
-                        StopActionButton(title: "Skip this stop", style: .destructive, height: 50, id: "stop.skipAll") {
+                        StopActionButton(title: "Skip this stop", style: .destructive, id: "stop.skipAll") {
                             couldNotSkipAll = false
                             confirmingSkipAll = true
                         }
@@ -258,13 +258,13 @@ struct StopArrivalCard: View {
                     Text(StopLeave.confirmSentence(stop: stop, waiting: waiting))
                         .font(.subheadline).multilineTextAlignment(.center).frame(maxWidth: .infinity)
                         .accessibilityIdentifier("stop.leave.confirm.text")
-                    StopActionButton(title: "Leave", style: .primary, height: 52, id: "stop.leave.confirm") { send(stop) }
+                    StopActionButton(title: "Leave", style: .primary, id: "stop.leave.confirm") { send(stop) }
                         .disabled(leaving)
-                    StopActionButton(title: "Not yet, we’ll wait", style: .ghost, height: 44, id: "stop.leave.cancel") {
+                    StopActionButton(title: "Not yet, we’ll wait", style: .ghost, id: "stop.leave.cancel") {
                         confirming = false
                     }
                 } else {
-                    StopActionButton(title: "Leave", subtitle: waiting, style: .primary, height: 56, id: "stop.leave") {
+                    StopActionButton(title: "Leave", subtitle: waiting, style: .primary, id: "stop.leave") {
                         couldNotLeave = false
                         confirming = true
                     }
@@ -272,8 +272,8 @@ struct StopArrivalCard: View {
             }
         } else if model.tripStarted {
             Text(StopLeave.waitingForLead(leadCar: model.cars.first { $0.isLead }))
-                .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-                .frame(maxWidth: .infinity, minHeight: 50)
+                .foregroundStyle(Color.surfaceSecondary)
+                .barActionLabel(font: .subheadline)
                 .background(Color(.tertiarySystemFill), in: Capsule())
                 .accessibilityIdentifier("stop.leave.waiting")
         }

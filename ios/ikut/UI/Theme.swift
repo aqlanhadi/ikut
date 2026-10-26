@@ -179,6 +179,7 @@ struct RowDivider: View {
 /// The round "x" at the top trailing corner of a sheet, 44 pt to tap.
 struct SheetCloseButton: View {
     var action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
     /// A Liquid Glass button (iOS 26), for a close button on a glass surface.
     var onGlass = false
 
@@ -190,7 +191,7 @@ struct SheetCloseButton: View {
                 Image(systemName: "xmark")
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
+                    .frame(width: side, height: side)
                     .background(.quaternary, in: Circle())
             }
             .accessibilityLabel("Close")

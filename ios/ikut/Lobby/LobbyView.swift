@@ -152,12 +152,10 @@ struct LobbyView: View {
             EmptyView()
         case .waiting:
             Text(bar.label)
-                .font(.subheadline)
                 .foregroundStyle(Color.surfaceSecondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
                 .padding(.horizontal, Spacing.l)
-                .frame(minHeight: 50)
+                .barActionLabel(font: .subheadline)
                 // On a surface that hides the rows scrolling under the bar: a blurred material under the glass capsule.
                 .background(.regularMaterial, in: Capsule())
                 .glassSurface(.pill)
@@ -183,7 +181,7 @@ struct LobbyView: View {
                         switchMode(.showMap)
                     }
                 } label: {
-                    Text(bar.label).font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                    Text(bar.label).barActionLabel()
                 }
                 .actionBarStyle(prominent: true)
                 // An alert, not a dialog: on iOS 26 a confirmation dialog is a small popover with no Cancel (#362).
@@ -512,8 +510,8 @@ struct LobbyView: View {
     }
 
     private var lobbyContent: some View {
-        VStack(spacing: 0) {
-            sheetHeader
+        // The header stays put and the rows fade out under it, as they do above the bottom bar.
+        Group {
             List {
                 statusBanner
                     .lobbyRow()
@@ -550,6 +548,7 @@ struct LobbyView: View {
             .contentMargins(.bottom, Spacing.l, for: .scrollContent)
             .sheetBottomBar { bottomBar }
         }
+        .sheetTopBar { sheetHeader }
     }
 
     // MARK: Header
@@ -712,14 +711,14 @@ struct LobbyView: View {
                 } label: {
                     Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .inlineActionLabel()
                 }
                 .actionButton(.secondary, onGlass: true)
                 .sensoryFeedback(.success, trigger: copiedCount)
                 .accessibilityIdentifier("lobby.copyCode")
                 Button { showQR = true } label: {
                     Label("QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .inlineActionLabel()
                 }
                 .actionButton(.secondary, onGlass: true)
                 .accessibilityIdentifier("lobby.showQR")

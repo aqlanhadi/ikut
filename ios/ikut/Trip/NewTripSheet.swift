@@ -14,7 +14,26 @@ struct WhereToSheet: View {
 
     var body: some View {
         @Bindable var model = flow.search
-        VStack(alignment: .leading, spacing: 0) {
+        // The search row stays put and the results fade out under it (the system's soft top edge).
+        Group {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let message = model.errorMessage {
+                        InlineNote(message, tone: .alert)
+                            .padding(.top, Spacing.m)
+                            .accessibilityIdentifier("createTripError")
+                    }
+                    PlaceSearchResults(model: model, distance: .fromYou, workingLabel: "Finding the route") { place in
+                        searchFocused = false
+                        Task { await flow.pick(place) }
+                    }
+                }
+                .padding(.bottom, Spacing.l)
+            }
+            .scrollPosition(id: $flow.topResultID, anchor: .top)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .sheetTopBar {
             HStack(spacing: Spacing.gap) {
                 SheetSearchField(clear: model.query.isEmpty ? nil : {
                     model.query = ""
@@ -34,23 +53,6 @@ struct WhereToSheet: View {
                 glassCapsule("Cancel", action: onClose)
             }
             .padding(.top, Spacing.xs)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let message = model.errorMessage {
-                        InlineNote(message, tone: .alert)
-                            .padding(.top, Spacing.m)
-                            .accessibilityIdentifier("createTripError")
-                    }
-                    PlaceSearchResults(model: model, distance: .fromYou, workingLabel: "Finding the route") { place in
-                        searchFocused = false
-                        Task { await flow.pick(place) }
-                    }
-                }
-                .padding(.bottom, Spacing.l)
-            }
-            .scrollPosition(id: $flow.topResultID, anchor: .top)
-            .scrollDismissesKeyboard(.interactively)
         }
         .environment(\.inPanelSheet, true)
         .task {
@@ -122,14 +124,17 @@ struct NewTripSheet: View {
                 Group {
                     if flow.isCreating { ProgressView().accessibilityLabel("Creating trip") } else { Text("Create trip") }
                 }
-                .font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 50)
+                .barActionLabel()
             }
             .actionBarStyle(prominent: true)
             .disabled(flow.isCreating)
-            .padding(.top, Spacing.s)
-            .padding(.bottom, Spacing.s)
+            // The same bar as every sheet's: as tall, and as far above the sheet's bottom edge as from its sides
+            // (`PanelSheet.sideGap`, what `barLift` gives the other bars). Home's sheet gives the side insets; the bar
+            // runs into the home indicator's strip rather than measuring it, which looped the layout.
+            .sheetActionBar(sides: false)
+            .padding(.bottom, PanelSheet.sideGap)
         }
+        .ignoresSafeArea(.container, edges: .bottom)
         .environment(\.inPanelSheet, true)
     }
 

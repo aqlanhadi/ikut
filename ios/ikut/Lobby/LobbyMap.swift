@@ -198,6 +198,7 @@ struct LobbyMapLayer: View {
 
     @Environment(TripMapStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var roundSide = SheetButtonSize.round
     @State private var mapHeight: CGFloat = 0
     /// The map's top safe area: the status bar (the lobby has no navigation bar).
     @State private var safeTop: CGFloat = 0
@@ -227,7 +228,7 @@ struct LobbyMapLayer: View {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .frame(width: 56, height: 56)
+                        .frame(width: roundSide, height: roundSide)
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)

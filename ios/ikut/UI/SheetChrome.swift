@@ -8,8 +8,9 @@ extension View {
     /// the buttons, and the buttons hanging `lift` down into the sheet's bottom safe area (`PanelSheet.barLift`) so
     /// the gap under them equals the gap beside them. The bar's layout height stops above the safe area, so
     /// detents stay content + bar. Put it on the bar's content inside a bottom `safeAreaInset`.
-    func sheetActionBar(lift: CGFloat = 0) -> some View {
-        padding(.horizontal, PanelSheet.sideGap)
+    /// `sides` false: the sheet already insets its content by `PanelSheet.sideGap` (Home's sheet, New trip).
+    func sheetActionBar(lift: CGFloat = 0, sides: Bool = true) -> some View {
+        padding(.horizontal, sides ? PanelSheet.sideGap : 0)
             .padding(.top, Spacing.m)
             .padding(.bottom, -lift)
     }
@@ -25,6 +26,36 @@ extension View {
             safeAreaInset(edge: .bottom, spacing: 0) { bar() }
         }
     }
+
+    /// The sheet's top bar: a header that stays put over scrolling content (the lobby's, Add a stop's). On iOS 26 a
+    /// `safeAreaBar`, so the rows scrolling up under it fade out with the system's soft top edge, as they do above
+    /// the bottom bar; before that the header simply sits above the content, as it always has.
+    @ViewBuilder func sheetTopBar<Bar: View>(@ViewBuilder _ bar: () -> Bar) -> some View {
+        if #available(iOS 26, *) {
+            safeAreaBar(edge: .top, spacing: 0) { bar() }
+                .scrollEdgeEffectStyle(.soft, for: .top)
+        } else {
+            VStack(spacing: 0) {
+                bar()
+                self
+            }
+        }
+    }
+
+    /// The label of a full-width bottom-bar action (Start trip, Show map, Create trip, Add <place>, Report, Pit stop,
+    /// a card's main button): headline, as wide as the bar, `SheetButtonSize.bar` tall, growing with the text size.
+    /// With `actionBarStyle` (or `actionButton`, `surfaceButton`) and inside `sheetActionBar`, every bar is one shape.
+    /// `font`: the lobby's waiting line keeps its quieter text in the same shape.
+    func barActionLabel(fullWidth: Bool = true, font: Font = .headline) -> some View {
+        modifier(BarActionLabel(fullWidth: fullWidth, font: font))
+    }
+
+    /// The label of a button inside the content (Copy, QR code, the steppers, Suggest's Not now and Add):
+    /// `SheetButtonSize.inline` tall, growing with the text size.
+    func inlineActionLabel(fullWidth: Bool = true) -> some View { modifier(InlineActionLabel(fullWidth: fullWidth)) }
+
+    /// A round icon face inside the content (the steppers' minus and plus): `SheetButtonSize.inline` across.
+    func inlineRoundLabel() -> some View { modifier(InlineRoundLabel()) }
 
     /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): the main action prominent
     /// and tinted with the accent, the quieter one clear (`GlassSurface.useGlass` is the switch). Before iOS 26,
@@ -56,19 +87,55 @@ extension View {
     }
 }
 
-/// A round button for the top corners of a sheet (44 pt to tap by default): Liquid Glass on iOS 26, else a quiet
+/// The three button sizes of the sheets (owner, D53), each read through `@ScaledMetric` so it grows with the text
+/// size. Bar: the full-width bottom-bar actions, the height most of them already had. Inline: buttons inside the
+/// content. Round: the round icon buttons, which is also the search bar's height, so Home's avatar matches it.
+enum SheetButtonSize {
+    static let bar: CGFloat = 50
+    static let inline: CGFloat = 44
+    static let round: CGFloat = 48
+}
+
+private struct BarActionLabel: ViewModifier {
+    var fullWidth: Bool
+    var font: Font
+    @ScaledMetric(relativeTo: .headline) private var height = SheetButtonSize.bar
+
+    func body(content: Content) -> some View {
+        content.font(font).frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
+    }
+}
+
+private struct InlineActionLabel: ViewModifier {
+    var fullWidth: Bool
+    @ScaledMetric(relativeTo: .body) private var height = SheetButtonSize.inline
+
+    func body(content: Content) -> some View {
+        content.frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
+    }
+}
+
+private struct InlineRoundLabel: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.inline
+
+    func body(content: Content) -> some View { content.frame(width: side, height: side) }
+}
+
+/// A round button for the top corners of a sheet (`SheetButtonSize.round` across by default): Liquid Glass on iOS 26, else a quiet
 /// filled circle. Its face is an SF Symbol (the close "x", Back, Share) or a short text (the name's initial).
 struct RoundGlassIconButton: View {
     private enum Face { case symbol(String), text(String) }
     private var face: Face
     var label: String
-    var size: CGFloat = 44
+    /// Nil: `SheetButtonSize.round`, scaled.
+    var size: CGFloat?
+    @ScaledMetric(relativeTo: .body) private var roundSize = SheetButtonSize.round
     /// The circle is exactly `size` across (Home's name button, which must match the search bar's height as it
     /// grows with the text size), glass included, whatever padding the glass style would add around the face.
     var exact = false
     var action: () -> Void
 
-    init(systemImage: String, label: String, size: CGFloat = 44, exact: Bool = false, action: @escaping () -> Void) {
+    init(systemImage: String, label: String, size: CGFloat? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
         self.label = label
         self.size = size
@@ -77,7 +144,7 @@ struct RoundGlassIconButton: View {
     }
 
     /// A text face, such as the person's initial: .primary and semibold, shrinking to fit the circle.
-    init(text: String, label: String, size: CGFloat = 44, exact: Bool = false, action: @escaping () -> Void) {
+    init(text: String, label: String, size: CGFloat? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .text(text)
         self.label = label
         self.size = size
@@ -93,6 +160,7 @@ struct RoundGlassIconButton: View {
     }
 
     var body: some View {
+        let size = size ?? roundSize
         if GlassSurface.useGlass, #available(iOS 26, *) {
             if exact {
                 Button(action: action) {
@@ -127,7 +195,7 @@ struct RoundGlassIconButton: View {
 }
 
 /// The top row of a sheet over the map: [leading round button] [title over subtitle] [trailing round button], with the
-/// title block centred between them as Apple's inline sheet titles are. Each side reserves a button's width (44 pt)
+/// title block centred between them as Apple's inline sheet titles are. Each side reserves a round button's width (`SheetButtonSize.round`)
 /// even with no button, so the block stays truly centred, and it keeps `Spacing.m` from each button. The title is one line
 /// (semibold title3; two at accessibility sizes), the subtitle up to two (footnote), truncating in the middle. Give it
 /// the sheet's side insets (`Spacing.l`) where it is used.
@@ -141,12 +209,13 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
     var styledSubtitle: Text?
     @ViewBuilder var leading: Leading
     @ViewBuilder var trailing: Trailing
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let lines = typeSize.isAccessibilitySize ? 2 : 1
         HStack(spacing: 0) {
-            leading.frame(width: 44, height: 44)
+            leading.frame(width: side, height: side)
             VStack(spacing: Spacing.xxs) {
                 Text(title)
                     .font(.title3.weight(.semibold))
@@ -166,7 +235,7 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, Spacing.m)
-            trailing.frame(width: 44, height: 44)
+            trailing.frame(width: side, height: side)
         }
         .frame(minHeight: 48)
     }
@@ -176,17 +245,18 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
 struct RoundGlassShareLink: View {
     var item: String
     var label = "Share invite"
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
 
     var body: some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
-            ShareLink(item: item) { face.frame(width: 44, height: 44) }
+            ShareLink(item: item) { face.frame(width: side, height: side) }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
                 .tint(.primary)
                 .accessibilityLabel(label)
         } else {
             ShareLink(item: item) {
-                face.foregroundStyle(.secondary).frame(width: 44, height: 44).background(.quaternary, in: Circle())
+                face.foregroundStyle(.secondary).frame(width: side, height: side).background(.quaternary, in: Circle())
             }
             .accessibilityLabel(label)
         }
@@ -210,7 +280,8 @@ extension View {
 }
 
 enum SheetSearch {
-    static let height: CGFloat = 48
+    /// The round buttons' size, so Home's avatar beside the bar is the same number.
+    static let height: CGFloat = SheetButtonSize.round
     /// A capsule at the bar's height.
     static let radius: CGFloat = height / 2
 }
