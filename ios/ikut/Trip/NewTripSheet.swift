@@ -76,24 +76,16 @@ struct NewTripSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            SheetTopRow(
+                title: ready.place.name, subtitle: NewTripFlow.detailLine(place: ready.place, route: ready.route),
+                titleLabel: "New trip to \(ready.place.name)"
+            ) {
                 backButton
-                Spacer()
-                Text("New trip").font(.headline).accessibilityAddTraits(.isHeader)
-                Spacer()
+            } trailing: {
                 RoundGlassIconButton(systemImage: "xmark", label: "Close", action: onClose)
                     .accessibilityIdentifier("sheet.close").disabled(flow.isCreating)
             }
             .padding(.top, Spacing.xs)
-
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(ready.place.name).font(.largeTitle.bold()).minimumScaleFactor(0.7).lineLimit(2)
-                Text(NewTripFlow.detailLine(place: ready.place, route: ready.route))
-                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-            }
-            .padding(.horizontal, Spacing.xs)
-            .padding(.top, Spacing.xs)
-            .accessibilityElement(children: .combine)
 
             HStack(spacing: Spacing.m) {
                 Text("Name")

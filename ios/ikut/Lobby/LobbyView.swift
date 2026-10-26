@@ -420,39 +420,25 @@ struct LobbyView: View {
     private var sheetHeader: some View {
         let trip = model.trip
         let ended = session.isEnded
-        return VStack(alignment: .leading, spacing: Spacing.xxs) {
-            HStack {
-                RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: onExit)
-                    .accessibilityIdentifier("lobby.back")
-                Spacer()
-                if let trip {
-                    RoundGlassShareLink(item: LobbyLogic.shareText(code: trip.code))
-                        .accessibilityIdentifier("lobby.share")
-                }
-            }
-            .padding(.horizontal, Spacing.m)
+        let subtitle = trip.flatMap { trip in
+            LobbyContent.subtitle(
+                destination: trip.destination.name,
+                meetAt: TripSessionLogic.meetingPoint(in: model.stops) != nil ? shownStops.first(where: \.isMeeting)?.meetAt : nil,
+                code: trip.code, started: isStarted, ended: ended, startedAt: trip.startedAt ?? trip.createdAt)
+        }
+        return SheetTopRow(
+            title: trip.map { LobbyContent.headerTitle(tripName: $0.name, started: isStarted, ended: ended) } ?? "",
+            subtitle: subtitle, subtitleIdentifier: "lobby.subtitle"
+        ) {
+            RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: onExit)
+                .accessibilityIdentifier("lobby.back")
+        } trailing: {
             if let trip {
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(LobbyContent.headerTitle(tripName: trip.name, started: isStarted, ended: ended))
-                        .font(.title.weight(.bold))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                        .accessibilityAddTraits(.isHeader)
-                    if let line = LobbyContent.subtitle(
-                        destination: trip.destination.name,
-                        meetAt: TripSessionLogic.meetingPoint(in: model.stops) != nil ? shownStops.first(where: \.isMeeting)?.meetAt : nil,
-                        code: trip.code, started: isStarted, ended: ended,
-                        startedAt: trip.startedAt ?? trip.createdAt)
-                    {
-                        Text(line)
-                            .font(.subheadline)
-                            .foregroundStyle(Color.surfaceSecondary)
-                            .accessibilityIdentifier("lobby.subtitle")
-                    }
-                }
-                .padding(.horizontal, Spacing.l)
+                RoundGlassShareLink(item: LobbyLogic.shareText(code: trip.code))
+                    .accessibilityIdentifier("lobby.share")
             }
         }
+        .padding(.horizontal, Spacing.m)
         .padding(.bottom, Spacing.xs)
     }
 

@@ -110,6 +110,44 @@ struct RoundGlassIconButton: View {
     private var isText: Bool { if case .text = face { true } else { false } }
 }
 
+/// The top row of a sheet over the map: [leading round button] [title over subtitle] [trailing round button(s)], as
+/// Apple Maps' place sheet. The title block starts right after the leading button, so a long name has the room a
+/// centred title wouldn't. One line each (the title semibold title3, the subtitle footnote); two at accessibility sizes.
+struct SheetTopRow<Leading: View, Trailing: View>: View {
+    var title: String
+    var subtitle: String?
+    /// What VoiceOver reads for the title when it should say more than the title.
+    var titleLabel: String?
+    var subtitleIdentifier: String?
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let lines = typeSize.isAccessibilitySize ? 2 : 1
+        HStack(spacing: Spacing.s) {
+            leading
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .lineLimit(lines)
+                    .accessibilityLabel(titleLabel ?? title)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(Color.surfaceSecondary)
+                        .lineLimit(lines)
+                        .accessibilityIdentifier(subtitleIdentifier ?? "")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing
+        }
+        .frame(minHeight: 48)
+    }
+}
+
 /// The same round button for the system share sheet (a `ShareLink`, which isn't a `Button` to wrap).
 struct RoundGlassShareLink: View {
     var item: String
