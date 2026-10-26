@@ -17,8 +17,6 @@ struct ConvoyPanel: View {
     @Binding var expanded: Bool
     /// Tapping the Next stop cell: opens that stop's card (D25 piece 3b).
     var onNextStop: (String) -> Void = { _ in }
-    /// The car tapped on the map (D34 7b): its row is highlighted and scrolled into view.
-    var selectedCar: String?
     /// The panel's own height as laid out (folded or unfolded), for the sheet's detents.
     var onHeight: (CGFloat) -> Void = { _ in }
     /// A hidden copy that only measures the other layout, so the sheet knows both heights before it is asked to
@@ -328,14 +326,12 @@ struct ConvoyPanel: View {
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 { Divider().padding(.leading, 44) }
-                ConvoyRowView(row: row, youOnline: model.youOnline, selected: row.id == selectedCar)
-                    .id(CarSelection.rowId(row.id))
+                ConvoyRowView(row: row, youOnline: model.youOnline)
             }
             // Joining cars follow in the same list; their dashed badges set them apart.
             ForEach(Array(convoy.joiningRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 || !convoy.convoyRows.isEmpty { Divider().padding(.leading, 44) }
-                JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline, selected: row.id == selectedCar)
-                    .id(CarSelection.rowId(row.id))
+                JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline)
             }
         }
         .padding(.top, Spacing.tight)

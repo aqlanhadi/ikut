@@ -10,7 +10,6 @@ struct MapMarkerView: View {
     /// Width of the map, so the chip can flip to the left near the right edge.
     var containerWidth: CGFloat = 0
     /// The driver tapped this car: a ring in the accent around the badge.
-    var selected = false
 
     @State private var markerX: CGFloat?
     @State private var chipWidth: CGFloat = 120
@@ -40,11 +39,6 @@ struct MapMarkerView: View {
                     .background(Color.car(hex: marker.colorHex), in: Circle())
                     .overlay(Circle().strokeBorder(.white, lineWidth: 3))
                     .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-                    .overlay {
-                        if selected {
-                            Circle().strokeBorder(MapPalette.accent, lineWidth: 3.5 * scale).padding(-5 * scale)
-                        }
-                    }
                     .overlay(alignment: .bottomTrailing) {
                         if marker.hasArrived {
                             glyph("checkmark", weight: .heavy, size: 15, fill: Color.ikutPositive, ring: 1.5)
@@ -92,7 +86,6 @@ struct MapMarkerView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var side: MapChipPlacement.Side {
@@ -111,7 +104,6 @@ struct MapMarkerView: View {
 
     private var accessibilityText: String {
         var text = marker.name
-        if selected { text += ", selected" }
         if marker.isMine { text += ", " + YouOnline.spoken(online: marker.youOnline) }
         if marker.hasArrived { text += ", arrived" }
         if marker.isLead { text += ", lead" }

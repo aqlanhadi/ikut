@@ -66,7 +66,6 @@ private struct RowBadge: View {
 struct ConvoyRowView: View {
     var row: ConvoyRowText
     var youOnline = true
-    var selected = false
 
     var body: some View {
         HStack(spacing: Spacing.m) {
@@ -100,10 +99,8 @@ struct ConvoyRowView: View {
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
-        .background(selected ? MapPalette.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
@@ -127,7 +124,6 @@ struct JoiningRowView: View {
     var row: JoiningRowText
     var mine = false
     var youOnline = true
-    var selected = false
 
     var body: some View {
         HStack(spacing: Spacing.m) {
@@ -146,10 +142,8 @@ struct JoiningRowView: View {
         }
         .frame(minHeight: 54)
         .padding(.horizontal, Spacing.xs)
-        .background(selected ? MapPalette.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
     }
 }
