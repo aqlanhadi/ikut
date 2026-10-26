@@ -49,7 +49,9 @@ extension XCUIApplication {
         guard raiseTripSheet() else { return false }
         let row = buttons[id]
         var scrolls = 0
-        while !(row.exists && row.isHittable), scrolls < 15, drivingSheetScroll.exists {
+        while !(row.exists && row.isHittable), scrolls < 20, drivingSheetScroll.exists {
+            // A hazard approach folds the sheet to short (and back to the top) while driving: raise it again.
+            if !lobbyRows.exists, !raiseTripSheet() { return false }
             scrollDrivingSheet(by: 150)
             scrolls += 1
         }

@@ -737,6 +737,10 @@ struct TripMapView: View {
                 }
             }
         }
+        .scrollBounceBehavior(.basedOnSize)
+        // On the scroll view itself: around the ScrollViewReader the bar did not inset the content, so the last rows
+        // (Leave trip, End trip) stayed under it.
+        .sheetBottomBar { actionBar }
         // Folded to short (the grabber, the header, a hazard): the sheet starts at the convoy's header again.
         .onChange(of: continuationShown) { _, shown in if !shown { scroller.scrollTo(Self.sheetTop, anchor: .top) } }
         .task {
@@ -745,8 +749,6 @@ struct TripMapView: View {
             scroller.scrollTo(Self.lobbyRowsTop, anchor: .top)
         }
         }
-        .scrollBounceBehavior(.basedOnSize)
-            .sheetBottomBar { actionBar }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
@@ -847,8 +849,8 @@ struct TripMapView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .environment(\.inPanelSheet, true)
-        // The gap under the buttons equals the gap beside them (the card's 20 pt), as on the convoy sheet's bar.
-        .environment(\.cardActionLift, PanelSheet.barLift(safeBottom: cardSafeBottom, gap: Spacing.block))
+        // The buttons sit as far above the sheet's bottom edge as every sheet's bottom bar (`PanelSheet.sideGap`).
+        .environment(\.cardActionLift, PanelSheet.barLift(safeBottom: cardSafeBottom))
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { cardSafeBottom = $0 }
         .presentationDetents([.height(cardHeight)])
         .presentationDragIndicator(.hidden)

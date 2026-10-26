@@ -158,4 +158,5 @@ final class CreateTripUITests: ConvoyUITestCase {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
         return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
     }
+
 }
