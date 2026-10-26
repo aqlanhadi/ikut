@@ -100,7 +100,7 @@ struct HomeView: View {
                     // Never pushed: a trip opens on the one map (see `openTrip`).
                     EmptyView()
                 case .recap(let tripId):
-                    RecapView(tripId: tripId, onDone: { path = [] })
+                    RecapView(tripId: tripId, onDone: closeRecap)
                 }
             }
             .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showName, sheetUp: homeSheetUp) },
@@ -192,10 +192,11 @@ struct HomeView: View {
     /// the sheet's content (`TripMapSpec`, `TripSheetSpec`).
     @ViewBuilder private var layer: some View {
         if let tripId = stage.tripId {
-            LobbyView(tripId: tripId, onExit: exitTrip, onEnded: { tripId in
-                // The recap is its own screen; behind it the map is back on Home's list, where Done returns.
-                path = [.recap(tripId: tripId)]
-                exitTrip()
+            LobbyView(tripId: tripId, onExit: exitTrip, onEnded: { ended in
+                // The recap is its own screen, pushed over the trip; its Done returns to Home's list (`closeRecap`).
+                // The lobby and the driving map both report the end, and may again when the recap is closed: once.
+                guard ended == stage.tripId, !path.contains(.recap(tripId: ended)) else { return }
+                path = [.recap(tripId: ended)]
             })
             // A different trip is a new session, model and planner.
             .id(tripId)
@@ -222,6 +223,13 @@ struct HomeView: View {
     /// Leave, End or Back to trips: the trip's sheet becomes Home's list and the camera flies back to it.
     private func exitTrip() {
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.exit() }
+    }
+
+    /// Done on the recap: back to the one map, which is Home's list again (the ended trip's lobby or map closes in the
+    /// same step, so it never shows again under the pop).
+    private func closeRecap() {
+        path = []
+        if stage.tripId != nil { stage.exit() }
     }
 
     /// Signed in: go straight to the route. Signed out: ask for a name first.

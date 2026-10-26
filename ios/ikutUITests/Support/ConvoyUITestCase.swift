@@ -183,8 +183,67 @@ class ConvoyUITestCase: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
     }
 
-    /// Welcome (first run) or Home to the name sheet and on: taps the Where to? row.
+    /// The app opens straight into a trip this phone is still in (#401, D54), so a run that left one behind starts
+    /// there: from the lobby, Back to trips; from the driving map, End trip (the organiser) or Leave trip from the rows
+    /// below the convoy, then Done on the recap. Returns once Welcome, Home or neither shows (a fresh install).
+    func returnHomeFromAnOpenTrip(timeout: TimeInterval = 15) {
+        let back = app.buttons["lobby.back"]
+        let home = app.buttons["homeWhereTo"]
+        let welcome = app.buttons["Get started"]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if home.exists || welcome.exists { return }
+            if app.drivingReport.exists || back.exists { break }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        if app.drivingReport.exists {
+            app.dismissMapAsks(first: 2)
+            guard app.raiseTripSheet() else { return }
+            let end = app.buttons["lobby.endTrip"]
+            let leave = app.buttons["lobby.leaveTrip"]
+            var scrolls = 0
+            while !(end.exists && end.isHittable), !(leave.exists && leave.isHittable), scrolls < 20 {
+                if !app.lobbyRows.exists, !app.raiseTripSheet() { return }
+                app.scrollDrivingSheet(by: 150)
+                scrolls += 1
+            }
+            let label = end.exists && end.isHittable ? "End trip" : "Leave trip"
+            (label == "End trip" ? end : leave).tap()
+            let confirm = app.buttons.matching(NSPredicate(format: "label == %@", label))
+            _ = confirm.element(boundBy: 1).waitForExistence(timeout: 10)
+            confirm.element(boundBy: confirm.count - 1).tap()
+            if label == "End trip" { closeRecap() }
+        } else if back.exists {
+            dismissAlwaysExplainerIfShown()
+            back.tap()
+        }
+        if !home.waitForExistence(timeout: 15) {
+            print("QA: no Home after closing the open trip:\n\(app.debugDescription)")
+        }
+    }
+
+    /// The recap, which ending a trip opens: its Done is at the bottom of a long page, so scroll to it; the navigation
+    /// bar's Back (Trips) does the same if it can't be reached.
+    func closeRecap() {
+        let done = app.buttons["Done"]
+        guard done.waitForExistence(timeout: 30) else { print("QA: no Done on the recap"); return }
+        let recap = app.scrollViews["recap"]
+        var swipes = 0
+        while !done.isHittable, recap.exists, swipes < 6 {
+            recap.swipeUp()
+            swipes += 1
+        }
+        if done.isHittable {
+            done.tap()
+        } else {
+            app.navigationBars.buttons["BackButton"].firstMatch.tap()
+        }
+    }
+
+    /// Welcome (first run) or Home to the name sheet and on: taps the Where to? row. A trip left open by an earlier
+    /// run is closed first (`returnHomeFromAnOpenTrip`).
     func startNewTrip(as name: String, homeTimeout: TimeInterval = 20) {
+        returnHomeFromAnOpenTrip()
         let getStarted = app.buttons["Get started"]
         if getStarted.waitForExistence(timeout: 5) { getStarted.tap() }
         let newTrip = app.buttons["homeWhereTo"]
