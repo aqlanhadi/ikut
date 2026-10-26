@@ -103,7 +103,10 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
     func checkLobbyHasFourCars() throws {
         // The cars sit below the fold of the sheet at medium.
         pullLobbySheetUp()
-        try waitFor("lobby shows 4 of 4 ready", timeout: 90) { labelled("label CONTAINS %@", "4 of 4 ready").exists }
+        try waitFor("lobby shows 4 of 4 ready", timeout: 90) {
+            dismissAlwaysExplainerIfShown()
+            return labelled("label CONTAINS %@", "4 of 4 ready").exists
+        }
         // ("Wyna" only: typing an apostrophe may come out curly with smart punctuation.)
         for car in ["Wyna", "Hafiz’s Hilux", "Daniel’s City"] {
             XCTAssertTrue(labelled("label CONTAINS %@", car).exists, "lobby is missing \(car)")
