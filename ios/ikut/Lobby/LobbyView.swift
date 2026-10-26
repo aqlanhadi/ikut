@@ -114,8 +114,9 @@ struct LobbyView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, Spacing.l)
                 .frame(minHeight: 50)
-                // On a surface of its own: the list scrolls under the bar, and a bare line read over the rows.
-                .surfaceTile(radius: 25)
+                // On a surface that hides the rows scrolling under the bar: a blurred material under the glass capsule.
+                .background(.regularMaterial, in: Capsule())
+                .glassSurface(.pill)
                 .accessibilityIdentifier("lobbyWaiting")
                 .sheetActionBar(lift: barLift)
                 .transition(.opacity)

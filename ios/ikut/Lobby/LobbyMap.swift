@@ -185,11 +185,6 @@ struct LobbyMapView: View {
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
-        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
-            guard top != safeTop else { return }
-            safeTop = top
-            refitIfOurs(animated: false)
-        }
         // The logo and Legal ride above the medium sheet from the first frame, and stay when it is pulled up.
         .safeAreaPadding(.bottom, LobbySheet.legalInset(compact: sheetCompact))
         .ignoresSafeArea()
@@ -215,6 +210,13 @@ struct LobbyMapView: View {
             .padding(.top, safeTop + Spacing.xs)
             .accessibilityLabel("Show the whole trip")
             .accessibilityIdentifier("lobby.wholeTrip")
+        }
+        // Measured here, outside the map's ignoresSafeArea (inside it the insets read zero): the top safe area is the
+        // status bar and the navigation bar, as the layout has them.
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
+            guard top != safeTop else { return }
+            safeTop = top
+            refitIfOurs(animated: false)
         }
     }
 
