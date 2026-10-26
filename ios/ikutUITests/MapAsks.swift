@@ -39,8 +39,11 @@ extension XCUIApplication {
         guard pullUpTripSheet() else { return false }
         let row = buttons[id]
         var scrolls = 0
-        while !(row.exists && row.isHittable), scrolls < 8 {
-            pulledUpSheet.swipeUp()
+        // Swipe inside the sheet's own scroll view, whose middle is on screen (the pulled-up rows' middle may not be);
+        // a swipe on the content scrolls it and never resizes the sheet.
+        let sheet = scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch
+        while !(row.exists && row.isHittable), scrolls < 8, sheet.exists {
+            sheet.swipeUp()
             scrolls += 1
         }
         guard row.exists, row.isHittable else { return false }

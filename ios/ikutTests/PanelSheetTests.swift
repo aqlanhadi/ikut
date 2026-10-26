@@ -243,12 +243,30 @@ struct PanelSheetTests {
     }
 
     @Test func aHazardApproachFoldsTheListAndPassingItLeavesItFolded() {
-        // A3 and #344: the approach folds; passing the hazard (or giving up on it) never unfolds it.
-        #expect(PanelSheet.expanded(true, after: .approaching) == false)
-        #expect(PanelSheet.expanded(false, after: .approaching) == false)
-        #expect(PanelSheet.expanded(false, after: .passed) == false)
-        #expect(PanelSheet.expanded(false, after: .gaveUp) == false)
-        // Unfolded by the driver during the approach: stays as the driver left it.
-        #expect(PanelSheet.expanded(true, after: .passed) == true)
+        // A3 and #344: the approach folds, pulled up too; passing the hazard (or giving up on it) never unfolds it.
+        #expect(PanelSheet.shown(after: .approaching, from: .unfolded) == .folded)
+        #expect(PanelSheet.shown(after: .approaching, from: .pulledUp) == .folded)
+        #expect(PanelSheet.shown(after: .approaching, from: .folded) == .folded)
+        #expect(PanelSheet.shown(after: .passed, from: .folded) == .folded)
+        #expect(PanelSheet.shown(after: .gaveUp, from: .folded) == .folded)
+        // Unfolded or pulled up by the driver during the approach: stays as the driver left it.
+        #expect(PanelSheet.shown(after: .passed, from: .unfolded) == .unfolded)
+        #expect(PanelSheet.shown(after: .passed, from: .pulledUp) == .pulledUp)
+    }
+
+    @Test func aStopAskingBringsAPulledUpSheetBackToTallAndLeavesTheOthers() {
+        // #402: the pill and the card must not be behind the lobby; folded or tall the sheet stays as it is.
+        #expect(PanelSheet.shown(after: .stopAsks, from: .pulledUp) == .unfolded)
+        #expect(PanelSheet.shown(after: .stopAsks, from: .unfolded) == .unfolded)
+        #expect(PanelSheet.shown(after: .stopAsks, from: .folded) == .folded)
+    }
+
+    @Test func aBannerOnTopOfThePanelAddsToEveryHeightUpToTheRoom() {
+        // "You're no longer in this trip" sits above the panel at every height.
+        let h = PanelSheet.heights(folded: 300, unfolded: 480, bar: 62, top: 120, room: 700)
+        #expect(h.short == 482)
+        #expect(h.tall == 662)
+        #expect(h.full == 700)
+        #expect(PanelSheet.heights(folded: 300, unfolded: 480, bar: 62, top: 120, room: 600).tall == 600)
     }
 }

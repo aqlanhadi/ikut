@@ -89,11 +89,12 @@ enum TripScreenLogic {
             }
         }
 
-        /// The map stays touchable with the sheet up to this detent: the lobby's medium, the convoy's tall.
+        /// The map stays touchable (and undimmed) with the sheet up to this detent: the lobby's medium; the convoy's
+        /// tallest, so the map, the pill, the banners and the round buttons answer at every height (#402).
         var touchableUpThrough: PresentationDetent {
             switch self {
             case .lobby(let compact): LobbySheet.medium(compact)
-            case .driving(let heights): .height(heights.tall)
+            case .driving(let heights): .height(heights.full)
             }
         }
     }

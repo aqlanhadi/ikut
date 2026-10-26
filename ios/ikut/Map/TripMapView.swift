@@ -13,9 +13,13 @@ import SwiftUI
 struct TripMapView: View {
     let session: TripSession
     /// What continues below the convoy when the sheet is pulled up: the lobby's, which owns its rows and their asks.
-    private var continuation: AnyView?
-    /// The pulled-up lobby asks for something that takes the screen (a confirmation, rename, Change destination): the
-    /// sheet steps aside for it, as the lobby's own does.
+    /// It is handed where my car is, for the journey's stops ahead.
+    private var continuation: ((LobbyContent.JourneyHere?) -> AnyView)?
+    /// On top of the convoy sheet at every height: the lobby's "You're no longer in this trip" with Back to trips.
+    private var topBanner: AnyView?
+    /// The lobby asks for something that takes the whole screen (Change destination, the Always sheet, a screen pushed
+    /// over the trip): the sheet steps aside for it (`LobbySheet.drivingCovered`). Leave, End and rename present from
+    /// inside the pulled-up sheet, which stays up.
     private var lobbyWants = false
     /// The trip ended (organizer or server): the owner shows the recap.
     var onEnded: () -> Void = {}
@@ -65,6 +69,8 @@ struct TripMapView: View {
     @State private var cardContent: CGFloat?
     /// The pinned bar's own height and the sheet's bottom safe area (the home indicator's), measured.
     @State private var barContent: CGFloat?
+    /// The banner on top of the panel (`topBanner`), measured; 0 without one.
+    @State private var topContent: CGFloat = 0
     /// One sheet motion at a time (D42): while a fold or a drag's release runs, the heights hold
     /// (`PanelSheet.settled`).
     @State private var sheetMoving = false
@@ -108,9 +114,13 @@ struct TripMapView: View {
     /// What was asked on the last trip (`TripAskMemory`), so leaving the map and coming back doesn't nag.
     @AppStorage("ikut.map.askedTrip") private var askedTrip = ""
 
-    init(session: TripSession, continuation: AnyView? = nil, lobbyWants: Bool = false, onEnded: @escaping () -> Void = {}) {
+    init(
+        session: TripSession, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil,
+        lobbyWants: Bool = false, onEnded: @escaping () -> Void = {}
+    ) {
         self.session = session
         self.continuation = continuation
+        self.topBanner = topBanner
         self.lobbyWants = lobbyWants
         self.onEnded = onEnded
         liveServices = true
@@ -125,11 +135,12 @@ struct TripMapView: View {
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
         stopService: any StopServing = StopService(),
-        demoPulledUp: Bool = false, continuation: AnyView? = nil
+        demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil
     ) {
         _alerts = State(initialValue: alerts)
         self.session = session
         self.continuation = continuation
+        self.topBanner = topBanner
         liveServices = false
         self.stopService = stopService
         demoScreen = demoCard
@@ -370,14 +381,14 @@ struct TripMapView: View {
     private func focusHazard(_ eventId: String) {
         if case .hazard = model.mode {} else { modeBeforeApproach = model.mode }
         model.mode = .hazard(id: eventId)
-        if !PanelSheet.expanded(panelExpanded, after: .approaching) { setShown(.folded) }
+        setShown(PanelSheet.shown(after: .approaching, from: sheetShown))
     }
 
     /// Back to the mode from before the alert, unless the driver has picked another mode since. The list stays as
     /// it is (#344): it does not unfold again by itself while the car is moving.
-    private func endHazardFocus(_ moment: PanelSheet.HazardMoment) {
+    private func endHazardFocus(_ moment: PanelSheet.Moment) {
         if case .hazard = model.mode { model.mode = modeBeforeApproach }
-        if !PanelSheet.expanded(panelExpanded, after: moment) { setShown(.folded) }
+        setShown(PanelSheet.shown(after: moment, from: sheetShown))
     }
 
     /// Keeps the pill until the hazard is behind, then says so briefly. Gives up after a few
@@ -606,6 +617,11 @@ struct TripMapView: View {
 
     private var shownNow: PanelSheet.Shown { sheetShown }
 
+    /// Where my car is on the main route and its pace, for the pulled-up journey; nil while it is still joining.
+    private var journeyHere: LobbyContent.JourneyHere? {
+        model.convoy.myEntry.map { LobbyContent.JourneyHere(offset: $0.convoyOffset, pace: model.stopPace()) }
+    }
+
     /// The lobby continues below the convoy now (`PanelSheet.showsContinuation`).
     private var continuationShown: Bool { continuation != nil && PanelSheet.showsContinuation(sheetShown, in: sheetHeights) }
 
@@ -622,7 +638,7 @@ struct TripMapView: View {
     /// What the layouts measure now.
     private var measuredHeights: PanelSheet.Heights {
         PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, bar: barContent,
-                           room: sheetRoom)
+                           top: topBanner == nil ? 0 : topContent, room: sheetRoom)
     }
 
     /// What the sheet uses: the measured heights, held while it moves (`PanelSheet.settled`).
@@ -698,13 +714,22 @@ struct TripMapView: View {
         // Pulled up, the lobby continues below the unfolded panel, which stays where it was (canvas row L).
         return ScrollView {
             VStack(spacing: 0) {
+                if let topBanner {
+                    topBanner
+                        .padding(.horizontal, Spacing.l)
+                        .padding(.top, Spacing.xs + BottomSheet.indicatorRoom)
+                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { topContent = $0 }
+                }
                 panel
                 if continuationShown, let continuation {
-                    continuation.transition(.opacity)
+                    continuation(journeyHere).transition(.opacity)
                 }
             }
         }
         .scrollBounceBehavior(.basedOnSize)
+        // Swipes on the content scroll it and never resize the sheet: the height changes by the grabber, or a tap on
+        // the convoy's header (#402).
+        .presentationContentInteraction(.scrolls)
             .sheetBottomBar { actionBar }
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -722,7 +747,14 @@ struct TripMapView: View {
             }))
         .onChange(of: measuredHeights, initial: true) { resettle() }
         .onChange(of: continuationShown, initial: true) { _, shown in stage.pulledUp = shown }
-        .onChange(of: cardNow, initial: true) { _, want in syncCard(want) }
+        .onChange(of: cardNow, initial: true) { _, want in
+            syncCard(want)
+            if want != nil { setShown(PanelSheet.shown(after: .stopAsks, from: sheetShown)) }
+        }
+        // A stop request's pill asks for an answer: a pulled-up sheet comes back to tall so it isn't behind the lobby.
+        .onChange(of: stopPill?.id) { _, id in
+            if id != nil { setShown(PanelSheet.shown(after: .stopAsks, from: sheetShown)) }
+        }
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: TripScreenLogic.Sheet.driving(heights).touchableUpThrough))
         .interactiveDismissDisabled()

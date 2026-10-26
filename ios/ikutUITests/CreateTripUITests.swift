@@ -52,8 +52,9 @@ final class CreateTripUITests: ConvoyUITestCase {
     }
 
     /// The sheets hand over to each other: lobby Back to Home (Home's sheet is back and its controls are hittable),
-    /// Home's row to the lobby (the lobby's sheet and bar), Start to driving, a Pit stop card opened and closed, and the
-    /// convoy sheet pulled up to the lobby below it and down again, twice (there is no Back to the lobby, D53).
+    /// Home's row to the lobby (the lobby's sheet and bar), Start to driving, a Pit stop card opened and closed, the
+    /// convoy sheet pulled up to the lobby below it and down again, twice (there is no Back to the lobby, D53), then
+    /// End trip from the pulled-up sheet: Cancel brings the sheet back pulled up, confirming opens the recap.
     func testLobbyAndHomeSheetsHandOver() throws {
         app = XCUIApplication()
         allowPermissionPrompts()
@@ -108,6 +109,26 @@ final class CreateTripUITests: ConvoyUITestCase {
             XCTAssertTrue(app.expandConvoy.waitForExistence(timeout: 5), "Round \(round): the convoy list didn't fold")
             XCTAssertTrue(app.drivingReport.isHittable, "Round \(round): Report isn't hittable on the folded sheet")
         }
+
+        // End trip from the pulled-up sheet, Cancel: the sheet is still pulled up.
+        XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row with the convoy sheet pulled up")
+        let endTitle = app.staticTexts["End the trip for everyone?"]
+        XCTAssertTrue(endTitle.waitForExistence(timeout: 10), "End trip didn't ask to confirm")
+        let cancel = app.buttons["Cancel"]
+        // On iOS 26 the dialog is a popover with no Cancel: a tap outside it closes it.
+        let outside = app.descendants(matching: .any)["PopoverDismissRegion"].firstMatch
+        if cancel.exists { cancel.tap() } else if outside.exists { outside.tap() } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+        }
+        XCTAssertTrue(waitForGone(endTitle, timeout: 5), "The End trip confirmation stayed up after Cancel")
+        XCTAssertTrue(app.pulledUpSheet.waitForExistence(timeout: 10), "After Cancel the sheet isn't pulled up")
+
+        // End trip again and confirm: the recap opens.
+        XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row the second time")
+        XCTAssertTrue(endTitle.waitForExistence(timeout: 10), "End trip didn't ask to confirm the second time")
+        let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "End trip"))
+        confirm.element(boundBy: confirm.count - 1).tap()
+        XCTAssertTrue(app.buttons["Share recap"].waitForExistence(timeout: 30), "Ending the trip didn't open the recap")
     }
 
     private func waitForGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {

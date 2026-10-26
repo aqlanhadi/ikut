@@ -69,9 +69,11 @@ struct LobbyView: View {
     private let sampleCarColor = "#D9480F"
     /// In a sample lobby: the driving layer Start switches to (a demo map; nil, the live one), handed what continues
     /// below its convoy when pulled up.
-    private var sampleDriving: ((AnyView) -> AnyView)?
+    private var sampleDriving: ((@escaping (LobbyContent.JourneyHere?) -> AnyView) -> AnyView)?
     /// In a sample lobby: this phone shares its location (the header says so, and Pause sharing shows).
     private var sampleSharing = false
+    /// In a sample lobby: this person is no longer in the trip.
+    private var sampleLost = false
 
     init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
@@ -98,12 +100,13 @@ struct LobbyView: View {
     /// organizer's card (editable) rather than a member's.
     init(
         sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false,
-        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil, sharing: Bool = false,
-        driving: ((AnyView) -> AnyView)? = nil
+        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil, sharing: Bool = false, lost: Bool = false,
+        driving: ((@escaping (LobbyContent.JourneyHere?) -> AnyView) -> AnyView)? = nil
     ) {
         self.init(sample: model)
         sampleDriving = driving
         sampleSharing = sharing
+        sampleLost = lost
         // A sample lobby never looks a town up unless the demo gives it a geocoder.
         if let joinTowns { _joinTowns = State(initialValue: joinTowns) }
         _expanded = State(initialValue: tall)
@@ -270,8 +273,6 @@ struct LobbyView: View {
             confirmLeave: confirmLeave, confirmEnd: confirmEnd)
     }
     private var sheetCovered: Bool { LobbySheet.isCovered(cover, lobbyOnScreen: onScreen) }
-    /// Either mode's sheet is up (the lobby's, or the convoy's while driving): what the lobby presents waits for it to go.
-    private var anySheetUp: Bool { sheetUp || session.mapSheetUp }
     private var compact: CGFloat { LobbySheet.compact(scaled: mediumHeight) }
 
     /// What the sheet's content change runs on, and what a stop tap's camera flight uses.
@@ -306,16 +307,19 @@ struct LobbyView: View {
     }
 
     var body: some View {
-        ZStack {
+        let sheetsUp = sheetUp
+        let inLobby = stage.mode == .lobby
+        return ZStack {
             switch TripScreenLogic.layer(in: stage.mode) {
             case .lobby:
                 lobbyLayer
             case .driving:
                 if let sampleDriving {
-                    sampleDriving(AnyView(pulledUpContent))
+                    sampleDriving { AnyView(pulledUpContent(here: $0)) }
                 } else {
                     TripMapView(
-                        session: session, continuation: AnyView(pulledUpContent), lobbyWants: sheetCovered,
+                        session: session, continuation: { AnyView(pulledUpContent(here: $0)) },
+                        topBanner: drivingBanner, lobbyWants: LobbySheet.drivingCovered(cover, lobbyOnScreen: onScreen),
                         onEnded: { onEnded(model.tripId) })
                 }
             }
@@ -376,16 +380,11 @@ struct LobbyView: View {
                 meetingPoint: TripSessionLogic.meetingPoint(in: model.stops), routeSeconds: trip.routeSeconds,
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
+        // In the lobby's mode its asks present here, once its sheet has stepped aside; driving, the pulled-up sheet
+        // presents them itself (`pulledUpContent`).
         .alert("Trip name", isPresented: Binding(
-            get: { BottomSheet.presents(wanted: renaming, sheetUp: anySheetUp) }, set: { renaming = $0 })) {
-            TextField("Trip name", text: $renameText)
-                .textInputAutocapitalization(.words)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !name.isEmpty, let id = model.trip?.id else { return }
-                run { try await TripService.rename(tripId: id, to: name) }
-            }
+            get: { inLobby && BottomSheet.presents(wanted: renaming, sheetUp: sheetsUp) }, set: { renaming = $0 })) {
+            renameActions
         }
         .onAppear {
             onScreen = true
@@ -412,10 +411,24 @@ struct LobbyView: View {
             AlwaysLocationExplainerView(permission: location) { _ in session.alwaysExplainerShowing = false }
         }
         .tripExitDialogs(
-            confirmLeave: Binding(get: { BottomSheet.presents(wanted: confirmLeave, sheetUp: anySheetUp) }, set: { confirmLeave = $0 }),
-            confirmEnd: Binding(get: { BottomSheet.presents(wanted: confirmEnd, sheetUp: anySheetUp) }, set: { confirmEnd = $0 }),
-            leave: { run { try await session.leave(); onExit() } },
-            end: { run { try await session.endTrip() } })
+            confirmLeave: Binding(get: { inLobby && BottomSheet.presents(wanted: confirmLeave, sheetUp: sheetsUp) }, set: { confirmLeave = $0 }),
+            confirmEnd: Binding(get: { inLobby && BottomSheet.presents(wanted: confirmEnd, sheetUp: sheetsUp) }, set: { confirmEnd = $0 }),
+            leave: leaveTrip, end: endTrip)
+    }
+
+    private func leaveTrip() { run { try await session.leave(); onExit() } }
+    private func endTrip() { run { try await session.endTrip() } }
+
+    /// Rename's field and buttons, in the lobby's alert and the pulled-up sheet's.
+    @ViewBuilder private var renameActions: some View {
+        TextField("Trip name", text: $renameText)
+            .textInputAutocapitalization(.words)
+        Button("Cancel", role: .cancel) {}
+        Button("Save") {
+            let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, let id = model.trip?.id else { return }
+            run { try await TripService.rename(tripId: id, to: name) }
+        }
     }
 
     /// Starts or rests the lobby's listeners (`TripScreenLogic.lobbyListens`) and the join towns, which only the lobby's
@@ -910,16 +923,20 @@ struct LobbyView: View {
     /// What continues below the convoy when the driving sheet is pulled up: the journey, the code, the trip, the
     /// options and Leave or End (`LobbyContent.pulledUp`). The same rows as the lobby's, with the same asks, which the
     /// convoy sheet steps aside for (`lobbyWants`).
-    @ViewBuilder private var pulledUpContent: some View {
+    @ViewBuilder private func pulledUpContent(here: LobbyContent.JourneyHere?) -> some View {
         if let trip = model.trip {
-            let up = LobbyContent.pulledUp(rows)
             VStack(spacing: 0) {
-                ForEach(up.sections, id: \.self) { section in
+                ForEach(LobbyContent.pulledUp(rows), id: \.self) { section in
                     switch section {
-                    case .journey: journeyRows(trip).padding(.top, Spacing.section)
+                    case .journey: journeyRows(trip, here: here).padding(.top, Spacing.section)
                     case .code: codeCard(trip.code).padding(.top, Spacing.section)
                     case .trip: VStack(spacing: 0) { tripRows(trip) }.padding(.top, Spacing.m)
-                    case .options: optionsTile.padding(.top, Spacing.section)
+                    case .options:
+                        // A Pause, Resume, Leave or End that didn't go through says so here, above the rows.
+                        if let actionError {
+                            InlineNote(actionError, tone: .alert).padding(.top, Spacing.section)
+                        }
+                        optionsTile.padding(.top, actionError == nil ? Spacing.section : Spacing.m)
                     case .exit: exitTile.padding(.top, Spacing.m)
                     }
                 }
@@ -927,6 +944,9 @@ struct LobbyView: View {
             .padding(.horizontal, Spacing.l)
             .padding(.bottom, Spacing.l)
             .sheet(isPresented: $showQR) { QRCodeSheet(code: trip.code) }
+            // Presented from inside the convoy sheet, which stays up pulled up: Cancel leaves it where it was.
+            .tripExitDialogs(confirmLeave: $confirmLeave, confirmEnd: $confirmEnd, leave: leaveTrip, end: endTrip)
+            .alert("Trip name", isPresented: $renaming) { renameActions }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("trip.pulledUp")
         }
@@ -934,10 +954,10 @@ struct LobbyView: View {
 
     /// The stops still ahead, numbered as on the map with "About … in", under one line for what is already driven
     /// ("Passed R&R Bidor · 12:31", "Left 12:05").
-    private func journeyRows(_ trip: Trip) -> some View {
+    private func journeyRows(_ trip: Trip, here: LobbyContent.JourneyHere?) -> some View {
         let journey = LobbyContent.journey(
             model.stops, routeLength: routeLength, routeSeconds: trip.routeSeconds ?? routeInfo.travelTime,
-            departedAt: trip.startedAt ?? trip.createdAt)
+            departedAt: trip.startedAt ?? trip.createdAt, here: here)
         let stops = model.stops.map(StopDraft.init)
         return VStack(spacing: 0) {
             sectionLabel("Journey")
@@ -995,12 +1015,24 @@ struct LobbyView: View {
 
     @ViewBuilder
     private var statusBanner: some View {
-        if session.isEnded {
-            exitBanner("Trip ended", systemImage: "flag.checkered")
-        } else if session.membershipLost && model.trip != nil {
-            exitBanner("You’re no longer in this trip", systemImage: "person.fill.xmark")
+        switch LobbyContent.exitBanner(ended: session.isEnded, membershipLost: session.membershipLost, tripLoaded: model.trip != nil) {
+        case .ended: exitBanner("Trip ended", systemImage: "flag.checkered")
+        case .noLongerInTrip: noLongerInTripBanner
+        case nil: EmptyView()
         }
         // Trip in progress and since when, and this phone sharing before the start (#394), are the header's subtitle.
+    }
+
+    private var noLongerInTripBanner: some View {
+        exitBanner("You’re no longer in this trip", systemImage: "person.fill.xmark")
+    }
+
+    /// Driving with this person no longer in the trip: the same banner, with Back to trips, on top of the convoy sheet
+    /// (there is no other way Home mid-trip, #403).
+    private var drivingBanner: AnyView? {
+        LobbyContent.drivingBanner(
+            ended: session.isEnded, membershipLost: session.membershipLost || sampleLost, tripLoaded: model.trip != nil)
+            .map { _ in AnyView(noLongerInTripBanner) }
     }
 
     private func exitBanner(_ title: String, systemImage: String) -> some View {

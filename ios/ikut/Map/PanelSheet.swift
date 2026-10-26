@@ -57,11 +57,12 @@ enum PanelSheet {
     /// at `room`, the map's height under the pills and banners (nil before the map is measured). No home-indicator strip is added: a presented sheet already keeps its content out of the bottom safe
     /// area, so adding it again (as Home's formula does for its own header) left about 34 pt of empty space.
     /// When the content is taller than the cap, the list scrolls under the bar and the bar stays in view.
-    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, room: CGFloat?) -> Heights {
+    /// `top`: what sits above the panel at every height (the "no longer in this trip" banner), measured.
+    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, top: CGFloat = 0, room: CGFloat?) -> Heights {
         let cap = max(room ?? .greatestFiniteMagnitude, minimumHeight)
         let barHeight = bar ?? barEstimate
         func fit(_ content: CGFloat?, _ estimate: CGFloat, bar: CGFloat = 0) -> CGFloat {
-            min((content ?? estimate) + bar, cap).rounded()
+            min((content ?? estimate) + top + bar, cap).rounded()
         }
         let short = fit(folded, foldedEstimate, bar: barHeight)
         let tall = max(short, fit(unfolded, unfoldedEstimate, bar: barHeight))
@@ -171,19 +172,25 @@ enum PanelSheet {
             full: take(applied.full, measured.full, hold: moving))
     }
 
-    /// The moments of a hazard approach that touch the convoy list.
-    enum HazardMoment: Equatable { case approaching, passed, gaveUp }
+    /// The moments that touch the sheet by themselves: a hazard approach and its end, and a stop request that needs an
+    /// answer (its pill, or a card over the sheet).
+    enum Moment: Equatable { case approaching, passed, gaveUp, stopAsks }
 
-    /// Whether the list is unfolded after `moment`, from `expanded` now. The approach folds it, so my car and the hazard
-    /// have the room; passing the hazard (or giving up on it) leaves it as it is: the owner's choice (#344), since the
-    /// unfolded list covers more than half the map while the car is moving.
-    static func expanded(_ expanded: Bool, after moment: HazardMoment) -> Bool {
-        moment == .approaching ? false : expanded
+    /// What the sheet shows after `moment`, from `shown` now. The approach folds it, so my car and the hazard have the
+    /// room; passing the hazard (or giving up on it) leaves it as it is: the owner's choice (#344), since the unfolded
+    /// list covers more than half the map while the car is moving. A stop asking brings a pulled-up sheet back to tall,
+    /// so the pill and the card are not behind the lobby; folded or tall it stays (#402).
+    static func shown(after moment: Moment, from shown: Shown) -> Shown {
+        switch moment {
+        case .approaching: .folded
+        case .passed, .gaveUp: shown
+        case .stopAsks: shown == .pulledUp ? .unfolded : shown
+        }
     }
 
     /// The sheet steps aside for everything that is pushed or presented from under it: the trip ending (the
-    /// recap), the Always location sheet that the lobby presents, and what the pulled-up lobby asks for (`lobbyWants`:
-    /// the Leave and End confirmations, rename, Change destination, or another screen pushed over the trip).
+    /// recap), the Always location sheet that the lobby presents, and what the lobby puts over the whole screen
+    /// (`lobbyWants`: Change destination, or another screen pushed over the trip).
     static func isCovered(ended: Bool, explainerWants: Bool, lobbyWants: Bool) -> Bool {
         ended || explainerWants || lobbyWants
     }

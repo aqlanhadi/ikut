@@ -37,6 +37,8 @@ enum LobbyStopsDemo {
         case sharing
         /// Driving, the organiser's convoy sheet pulled up with R&R Bidor passed (D53, canvas row L).
         case pulledUp
+        /// Driving, a participant no longer in the trip: the banner with Back to trips on the folded sheet (#403).
+        case drivingLost
     }
 
     /// KL to Ipoh, about 190 km.
@@ -57,7 +59,7 @@ enum LobbyStopsDemo {
         stop("s3", "Kopitiam Gopeng", 4.45, 101.12, .food, nil, 2),
     ].sorted { $0.routeOffset < $1.routeOffset }.enumerated().map { var s = $1; s.order = $0; return s }
 
-    static func lobby(_ scene: Scene, driving: ((AnyView) -> AnyView)? = nil) -> LobbyView {
+    static func lobby(_ scene: Scene, driving: ((@escaping (LobbyContent.JourneyHere?) -> AnyView) -> AnyView)? = nil) -> LobbyView {
         let planner = StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in })
         func model(_ stops: [PlannedStop], started: Bool = false) -> LobbyModel {
             let model = LobbyModel.sample(started: started, seconds: 2 * 3600 + 40 * 60, stops: stops, route: route)
@@ -112,20 +114,21 @@ enum LobbyStopsDemo {
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(
                 sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns, sharing: true)
-        case .pulledUp:
+        case .pulledUp, .drivingLost:
+            let lost = scene == .drivingLost
             // The first stop along the way (R&R Bidor) left 20 minutes ago; the others still ahead.
             var stops = stopsOnRoute
             stops[0].arrivedAt = Date().addingTimeInterval(-35 * 60)
             stops[0].leftAt = Date().addingTimeInterval(-20 * 60)
             stops[0].leftBy = "u1"
             return LobbyView(
-                sample: model(stops, started: true), planner: planner, organizer: true, sharing: true,
+                sample: model(stops, started: true), planner: planner, organizer: !lost, sharing: !lost, lost: lost,
                 driving: { continuation in
                     let map = MapDemo.model()
                     map.mode = TripScreenLogic.drivingEntryMode
                     return AnyView(TripMapView(
                         session: TripSession(tripId: "demo", userId: "u-c1"), model: map, stopService: DemoStopService(),
-                        demoPulledUp: true, continuation: continuation))
+                        demoPulledUp: !lost, continuation: continuation))
                 })
         case .started:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
@@ -325,6 +328,8 @@ enum DemoScreens {
         case "road-pulled-up": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.pulledUp) })
         // The organiser's lobby before the start while this phone shares: "➤ Sharing" leads the subtitle (#394).
         case "lobby-sharing": return trip(LobbyStopsDemo.lobby(.sharing))
+        // Driving, no longer in the trip: "You’re no longer in this trip" and Back to trips on top of the sheet (#403).
+        case "road-no-longer-in-trip": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.drivingLost) })
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))
         case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "road-markers": return AnyView(MapMarkersDemo())

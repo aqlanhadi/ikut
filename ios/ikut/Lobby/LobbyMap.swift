@@ -36,6 +36,12 @@ enum LobbySheet {
         var confirmEnd = false
     }
 
+    /// Driving, the convoy sheet steps aside only for what is pushed or presented over the screen: Change destination,
+    /// the Always sheet, or the lobby not on screen. Leave, End and rename present from inside the pulled-up sheet.
+    static func drivingCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
+        !lobbyOnScreen || cover.changeDestination || cover.suggestStops || cover.alwaysExplainer
+    }
+
     /// Whether the sheet is away: anything above is up, or the lobby itself is not on screen (popped).
     static func isCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
         !lobbyOnScreen || cover.changeDestination || cover.suggestStops
