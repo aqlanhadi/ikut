@@ -219,7 +219,7 @@ final class DemoOrganizerUITests: DemoBase {
         finish()
     }
 
-    /// --end-trip, and always against production: the organizer ends the trip from the lobby's Trip options menu.
+    /// --end-trip, and always against production: the organizer ends the trip from the lobby's End trip row.
     func endTrip() {
         guard app.buttons["Back to lobby"].exists else { note("Back to lobby to end the trip", false, core: true); return }
         endTripFromLobby()

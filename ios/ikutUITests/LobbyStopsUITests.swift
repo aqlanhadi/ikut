@@ -9,10 +9,10 @@ final class LobbyStopsUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Opens the organizer's lobby on sample data; each test starts its own app, as the other UI tests do.
+    /// Opens the organizer's lobby on sample data, pulled up to the tall height where the stops are; each test starts its own app, as the other UI tests do.
     private func launchLobby() {
         app = XCUIApplication()
-        app.launchEnvironment["IKUT_SCREEN"] = "lobby-organizer"
+        app.launchEnvironment["IKUT_SCREEN"] = "lobby-tall"
         app.launch()
     }
 
@@ -20,10 +20,21 @@ final class LobbyStopsUITests: XCTestCase {
         app.cells.containing(NSPredicate(format: "label CONTAINS %@", name)).firstMatch
     }
 
+    /// The stops sit below the cars, the code and the trip rows: scroll the list until the stop is on screen.
+    @discardableResult private func reveal(_ name: String) -> XCUIElement {
+        let target = row(name)
+        XCTAssertTrue(target.waitForExistence(timeout: 10), "no row for \(name)")
+        var scrolls = 0
+        while !target.isHittable, scrolls < 8 {
+            app.collectionViews.firstMatch.swipeUp()
+            scrolls += 1
+        }
+        return target
+    }
+
     func testSwipeRemovesAStop() {
         launchLobby()
-        let bidor = row("R&R Bidor")
-        XCTAssertTrue(bidor.waitForExistence(timeout: 10))
+        let bidor = reveal("R&R Bidor")
         bidor.swipeLeft()
         let remove = app.buttons["Remove"]
         XCTAssertTrue(remove.waitForExistence(timeout: 3), "No Remove after swiping")
@@ -37,8 +48,7 @@ final class LobbyStopsUITests: XCTestCase {
     func testDragReordersStops() {
         launchLobby()
         // The list is in driving order: Bidor, Tapah, Gopeng.
-        let bidor = row("R&R Bidor")
-        XCTAssertTrue(bidor.waitForExistence(timeout: 10))
+        let bidor = reveal("R&R Bidor")
         let before = bidor.frame.minY
         let tapah = row("R&R Tapah")
         let from = bidor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))

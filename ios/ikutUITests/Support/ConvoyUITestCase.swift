@@ -197,11 +197,11 @@ class ConvoyUITestCase: XCTestCase {
         }
     }
 
-    /// The organizer's lobby: the six-letter join code from the "Join code ..." label.
+    /// The organizer's lobby: the six-letter join code from the header's "To Ipoh · code K7M 2QX" line.
     func readJoinCode() -> String {
-        let codeLabel = labelled("label BEGINSWITH %@", "Join code ")
-        XCTAssertTrue(codeLabel.waitForExistence(timeout: 15), "Lobby shows no join code")
-        let code = codeLabel.label.replacingOccurrences(of: "Join code ", with: "").replacingOccurrences(of: " ", with: "")
+        let line = labelled("label CONTAINS %@", " · code ")
+        XCTAssertTrue(line.waitForExistence(timeout: 15), "Lobby shows no join code")
+        let code = (line.label.components(separatedBy: "code ").last ?? "").replacingOccurrences(of: " ", with: "")
         XCTAssertEqual(code.count, 6, "code: \(code)")
         return code
     }

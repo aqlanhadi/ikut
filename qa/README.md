@@ -298,7 +298,7 @@ Handshake: the phones' tests and the script take turns through marker files in `
 `cars.joined`, `report.a`/`report.b`, `stop.b`, `agree`, `arrive`, `end`, `abort`). The tests hold the map until `end` and
 never fail the demo over cosmetic checks: those print `QA CHECK: NOTE`, a failed core step prints `QA CHECK: FAIL` and
 fails that test after the demo has played out. Ctrl-C / SIGTERM kill the xcodebuilds and clear the simulators' locations.
-The trip stays active afterwards unless `--end-trip` (the organizer phone ends it from the lobby's Trip options menu).
+The trip stays active afterwards unless `--end-trip` (the organizer phone ends it from the lobby's End trip row).
 
 Machine-readable contract (for `qa/dashboard/`): `node <demo>.mjs --describe` prints one JSON object (id, title, summary,
 phones, cast, durationSeconds, timeline) and exits 0 without Firebase or simulators. During a run, besides the human
