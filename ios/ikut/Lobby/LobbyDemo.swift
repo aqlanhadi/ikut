@@ -291,6 +291,10 @@ enum DemoScreens {
         case "home-picked-item": return home("item")
         case "home-picked-loading": return home("loading")
         // The create flow over Home's map (D48): Where to? with results as pins, and New trip with the route drawn.
+        // Home with a trip in Now (D49): gathering, on the move, one that couldn't be read. "home-compact" has none.
+        case "home-now": return home("now")
+        case "home-now-started": return home("now-started")
+        case "home-now-failed": return home("now-failed")
         case "home-where-to": return home("where-to")
         case "home-new-trip": return home("new-trip")
         case "home-picked-failed": return home("failed")

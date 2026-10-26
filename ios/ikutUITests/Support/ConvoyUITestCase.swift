@@ -175,12 +175,12 @@ class ConvoyUITestCase: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
     }
 
-    /// Welcome (first run) or Home to the name sheet and on: taps New trip.
+    /// Welcome (first run) or Home to the name sheet and on: taps the Where to? row.
     func startNewTrip(as name: String, homeTimeout: TimeInterval = 20) {
         let getStarted = app.buttons["Get started"]
         if getStarted.waitForExistence(timeout: 5) { getStarted.tap() }
-        let newTrip = app.buttons["New trip"]
-        XCTAssertTrue(newTrip.waitForExistence(timeout: homeTimeout), "Home didn’t show New trip")
+        let newTrip = app.buttons["homeWhereTo"]
+        XCTAssertTrue(newTrip.waitForExistence(timeout: homeTimeout), "Home didn’t show Where to?")
         newTrip.tap()
         enterNameIfAsked(name)
     }
@@ -217,8 +217,9 @@ class ConvoyUITestCase: XCTestCase {
     /// Welcome or Home to the join form with `code` typed in (the name sheet comes first when signed out).
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
         failIfAlreadyInATrip()
+        // Home's row, or Welcome's link on a fresh install.
         let joinButton = app.buttons
-            .matching(NSPredicate(format: "label IN %@", ["Join with a code", "Join trip"])).firstMatch
+            .matching(NSPredicate(format: "identifier IN %@", ["homeJoin", "welcomeJoin"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn’t show Join trip")
         joinButton.tap()
         enterNameIfAsked(name)

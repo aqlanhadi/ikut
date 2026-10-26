@@ -65,16 +65,17 @@ struct HomeView: View {
                             begin(.join(code: nil))
                         }
                     )
-                    .overlay(alignment: .topTrailing) {
-                        #if DEBUG
-                        Text(Backend.current.label)
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, Spacing.m)
-                            .accessibilityHidden(true)
-                        #endif
-                    }
                 }
+            }
+            // Debug builds say which backend they talk to (emulator or production), on Welcome and on Home's map.
+            .overlay(alignment: .topTrailing) {
+                #if DEBUG
+                Text(Backend.current.label)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Spacing.m)
+                    .accessibilityHidden(true)
+                #endif
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationTitle("Trips") // only the pushed pages' Back label; this page has no bar

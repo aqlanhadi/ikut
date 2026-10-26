@@ -3,7 +3,7 @@ import MapKit
 import SwiftUI
 
 /// Home after the welcome screen, as in Home.dc.html: a map of where you are and the routes of
-/// your past trips, under Apple's own sheet with New trip, Join trip and past trips.
+/// your past trips, under Apple's own sheet with Where to?, Join with a code, the trips now running and past trips.
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     var onNewTrip: () -> Void
@@ -34,6 +34,8 @@ struct TripsHomeView: View {
     /// The sheet is at its tall detent (the detent selection reads and writes it).
     @State private var expanded = false
     @State private var past: [PastTrips.Entry] = []
+    /// The status line of each trip in Now (one read when the list appears), by trip id.
+    @State private var nowStatus: [String: String] = [:]
     /// Routes of the newest ended trips, drawn on the map (newest first).
     @State private var routes: [PastTripRoute] = []
     @State private var camera: MapCameraPosition
@@ -89,7 +91,7 @@ struct TripsHomeView: View {
     /// picked (its route from `routes`), pulled up if `expanded`.
     init(demo past: [PastTrips.Entry], routes: [PastTripRoute], picked: PickedTrip? = nil,
          selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false,
-         creating createFlow: NewTripFlow? = nil) {
+         creating createFlow: NewTripFlow? = nil, nowStatus: [String: String] = [:]) {
         self.init(onNewTrip: {}, onJoin: {})
         if let createFlow {
             _flow = State(initialValue: createFlow)
@@ -101,6 +103,7 @@ struct TripsHomeView: View {
             }
         }
         _isDemo = State(initialValue: true)
+        _nowStatus = State(initialValue: nowStatus)
         _demoModel = State(initialValue: tappable)
         _tour = State(initialValue: tour)
         _past = State(initialValue: past)
@@ -590,102 +593,146 @@ struct TripsHomeView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // The title row, with the profile button at its top right as in Apple Maps.
-            HStack(alignment: .center, spacing: Spacing.s) {
-                Text("Trips")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, Spacing.xs)
-                    .accessibilityAddTraits(.isHeader)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            // Apple Maps' top row: the search bar and the name's avatar. Tapping the bar starts the same flow, in
+            // Where to?, where the bar becomes editable.
+            HStack(spacing: Spacing.gap) {
+                SheetSearchButton(placeholder: "Where to?", action: onNewTrip)
+                    .accessibilityIdentifier("homeWhereTo")
                 profileButton
             }
-            .frame(minHeight: 44)
+            .padding(.top, Spacing.xs)
 
-            HStack(spacing: Spacing.gap) {
-                Button(action: onNewTrip) {
-                    Label("New trip", systemImage: "plus").frame(maxWidth: .infinity)
+            Button(action: onJoin) {
+                HStack(spacing: Spacing.m) {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color(.label).opacity(0.9), in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
+                        .accessibilityHidden(true)
+                    Text("Join with a code").font(.body.weight(.medium)).foregroundStyle(.primary)
+                    Spacer(minLength: Spacing.s)
+                    Text("or scan").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
                 }
-                .actionButton(.primary, onGlass: true)
-                Button(action: onJoin) {
-                    Label("Join trip", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
-                }
-                .actionButton(.secondary, onGlass: true)
+                .padding(.horizontal, Spacing.m)
+                .frame(minHeight: 50)
+                .contentShape(Rectangle())
+                .surfaceTile(radius: Radius.control)
             }
-            .padding(.top, Spacing.m)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("homeJoin")
         }
     }
 
+    /// "Now" (only when a trip hasn't ended) and "Past trips", each a group of rows on a tile.
     private var pastTrips: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Past trips", top: Spacing.sectionLarge)
-            if past.isEmpty {
+        let parts = HomeNow.split(past)
+        return VStack(alignment: .leading, spacing: 0) {
+            if !parts.now.isEmpty {
+                sectionTitle("Now")
+                group(parts.now) { nowRow($0) }
+            }
+            sectionTitle("Past trips")
+            if parts.past.isEmpty {
                 // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
                 EmptyRow("Trips you start or join will show here.")
-                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                    .foregroundStyle(Color.surfaceSecondary)
+                    .surfaceTile(radius: Radius.control)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(past.enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { RowDivider() }
-                        Button { open(entry) } label: { pastRow(entry) }
-                            .buttonStyle(.plain)
-                    }
-                }
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                group(parts.past) { pastRow($0) }
             }
         }
         .onAppear { if !isDemo { past = PastTrips.all() } }
+        // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
+        .task(id: parts.now.map(\.id)) {
+            guard !isDemo else { return }
+            for entry in parts.now {
+                let read = await HomeNow.load(tripId: entry.id)
+                if Task.isCancelled { return }
+                if let endedAt = read.endedAt {
+                    // It ended while this phone wasn't in it: remember that, and it moves to Past trips.
+                    PastTrips.record(tripId: entry.id, name: read.name ?? entry.name,
+                                     destination: read.destination ?? entry.destination, endedAt: endedAt)
+                    past = PastTrips.all()
+                } else {
+                    nowStatus[entry.id] = read.line
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.surfaceSecondary)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.m)
+            .padding(.bottom, Spacing.xs)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func group(_ entries: [PastTrips.Entry], row: @escaping (PastTrips.Entry) -> some View) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 { RowDivider() }
+                Button { open(entry) } label: { row(entry) }
+                    .buttonStyle(.plain)
+            }
+        }
+        .surfaceTile(radius: Radius.control)
+    }
+
+    private func nowRow(_ entry: PastTrips.Entry) -> some View {
+        HStack(spacing: Spacing.m) {
+            Image(systemName: "flag.checkered")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                Text(nowStatus[entry.id] ?? HomeNow.fallbackStatus)
+                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
+            }
+            Spacer(minLength: Spacing.s)
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
+        }
+        .padding(.horizontal, Spacing.m)
+        .frame(minHeight: 56)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens the trip")
     }
 
     private func pastRow(_ entry: PastTrips.Entry) -> some View {
         HStack(spacing: Spacing.m) {
-            Image(systemName: entry.endedAt == nil ? "car.fill" : "flag.checkered")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(entry.endedAt == nil ? Color.ikutPositive : Color.ikutAccent, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-                Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                Text(PastTrips.withPhrase(entry.others) ?? pastDetail(entry)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                Text(entry.name).font(.body.weight(.medium)).foregroundStyle(.primary)
+                Text(PastTrips.withPhrase(entry.others) ?? PickedTripLogic.subtitle(entry))
+                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(1)
             }
             Spacer(minLength: Spacing.s)
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            if let ended = entry.endedAt {
+                Text(ended.formatted(.dateTime.day().month(.abbreviated)))
+                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+            }
         }
-        .padding(.horizontal, Spacing.l)
-        .frame(minHeight: 58)
+        .padding(.horizontal, Spacing.m)
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint(entry.endedAt == nil ? "Opens the trip" : "Shows the trip on the map")
-    }
-
-    private func pastDetail(_ entry: PastTrips.Entry) -> String {
-        guard entry.endedAt != nil else { return "To \(entry.destination) · in progress" }
-        return PickedTripLogic.subtitle(entry)
+        .accessibilityHint("Shows the trip on the map")
     }
 
     @ViewBuilder
     private var profileButton: some View {
         if let name = profileName {
-            Menu {
-                Section(name) {
-                    Button("Change name", systemImage: "pencil") {
-                        newName = name
-                        renaming = true
-                    }
-                }
-                #if DEBUG
-                Section(Backend.current.label) {}
-                #endif
-            } label: {
-                Text(name.prefix(1).uppercased())
-                    .font(.system(.body, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-                    .background(Color(.tertiarySystemFill), in: Circle())
-                    .contentShape(Circle())
+            RoundGlassIconButton(text: name.prefix(1).uppercased(), label: "Your name and settings", size: SheetSearch.height) {
+                newName = name
+                renaming = true
             }
-            .tint(.primary)
-            .accessibilityLabel("Profile, \(name)")
         }
     }
 

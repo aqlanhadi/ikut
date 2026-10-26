@@ -431,7 +431,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             try waitMark("a.sawResumed", timeout: 150)
             openTripMenuItem("Trip options", "Leave trip")
             confirm("Leave trip")
-            let joinTrip = app.buttons["Join trip"]
+            let joinTrip = app.buttons["homeJoin"]
             XCTAssertTrue(joinTrip.waitForExistence(timeout: 30), "B didn't return Home after leaving")
             shot("14-left-home")
             mark("b.left")
