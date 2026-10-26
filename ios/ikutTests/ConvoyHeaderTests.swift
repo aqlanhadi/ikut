@@ -62,8 +62,8 @@ struct ConvoyHeaderTests {
     @Test func joiningLineForACarThatNeverMerges() throws {
         let line = try #require(ConvoyHeader.joining(
             .meetsAtDestination, place: nil, destination: "Ipoh", amount: .distance(160_000)))
-        #expect(line.line == "Meets the convoy in Ipoh · 160 km")
-        #expect(line.spoken == "meets the convoy in Ipoh, 160 km away")
+        #expect(line.line == "Meets the convoy at Ipoh · 160 km")
+        #expect(line.spoken == "meets the convoy at Ipoh, 160 km away")
     }
 
     @Test func noJoiningLineOnTheMainRouteOrBeforeTheRouteIsKnown() {
@@ -152,9 +152,9 @@ struct ConvoyHeaderTests {
             == "3 in convoy, from Shah Alam to Ipoh, arrive 3:40 PM")
         #expect(ConvoyHeader.label(title: "3 in convoy", text: inConvoy, destination: "Ipoh", arrive: nil)
             == "3 in convoy, from Shah Alam to Ipoh")
-        let never = ConvoyHeader.Text(from: "George Town", joinLine: "x", spokenJoin: "meets the convoy in Ipoh, 160 km away")
+        let never = ConvoyHeader.Text(from: "George Town", joinLine: "x", spokenJoin: "meets the convoy at Ipoh, 160 km away")
         #expect(ConvoyHeader.label(title: "3 in convoy", text: never, destination: "Ipoh", arrive: "3:40 PM")
-            == "3 in convoy, from George Town, meets the convoy in Ipoh, 160 km away, arrive 3:40 PM")
+            == "3 in convoy, from George Town, meets the convoy at Ipoh, 160 km away, arrive 3:40 PM")
     }
 
     // MARK: Never merges, by road

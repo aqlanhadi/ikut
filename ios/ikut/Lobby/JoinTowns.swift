@@ -57,14 +57,14 @@ final class JoinTowns {
     static func key(carId: String, offset: Double) -> String { "\(carId)|\(Int(offset.clamped(0...1e9).rounded()))" }
 
     /// Where along the main route (`length` meters) a car joins, when it does and when that isn't the start: a car
-    /// that starts with the convoy, never meets it, isn't known yet, or joins within `startsWithin` of the start (a
+    /// that starts with the convoy, is already on the main route (it has no route of its own, so a town would be where it is now), never meets it, isn't known yet, or joins within `startsWithin` of the start (a
     /// town there is the start's) has none, so nothing is looked up for it. A stored offset that isn't a number is
     /// none; a huge one is the route's end.
     static func joinOffset(_ join: OwnWayJoin?, length: Double) -> Double? {
         let raw: Double
         switch join {
-        case .merges(let offset), .onRoute(let offset): raw = offset
-        case .startsWithConvoy, .meetsAtDestination, nil: return nil
+        case .merges(let offset): raw = offset
+        case .onRoute, .startsWithConvoy, .meetsAtDestination, nil: return nil
         }
         guard raw.isFinite, !length.isNaN else { return nil }
         let offset = max(0, min(raw, length))

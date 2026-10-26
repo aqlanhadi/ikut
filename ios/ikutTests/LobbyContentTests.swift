@@ -61,7 +61,7 @@ struct LobbyContentTests {
         #expect(LobbyContent.carText(joiner, mine: false, viewerLeavesFromTheStart: true).line == "Joins the convoy")
         // The slot for the join towns.
         #expect(LobbyContent.carText(joiner, mine: false, viewerLeavesFromTheStart: true, joinPlace: "Rawang").line == "Joins near Rawang")
-        #expect(LobbyContent.carText(car("Hafiz’s Hilux", merge: 20_000), mine: false, viewerLeavesFromTheStart: true).line == "Joins the convoy")
+        #expect(LobbyContent.carText(car("Hafiz’s Hilux", merge: 20_000), mine: false, viewerLeavesFromTheStart: true).line == "Waiting on the route")
         #expect(LobbyContent.carText(car("Aisha’s Vios"), mine: false, viewerLeavesFromTheStart: true).line == "Sharing location")
     }
 
@@ -150,8 +150,14 @@ struct JoinTownsTests {
     /// A straight main route about 111 km long, due north.
     private let main = RouteLine([
         CLLocationCoordinate2D(latitude: 3.0, longitude: 101.0), CLLocationCoordinate2D(latitude: 4.0, longitude: 101.0)])
-    private func car(_ id: String, tracker: String? = "u", merge: Double? = nil, route: String? = nil) -> LobbyCar {
-        LobbyCar(car: Car(id: id, name: id, color: "#2563EB", trackerUserId: tracker, isLead: false,
+    /// A road that joins the main route part-way, for a car that merges.
+    private let joinRoute = Polyline.encode([
+        CLLocationCoordinate2D(latitude: 3.0, longitude: 100.9), CLLocationCoordinate2D(latitude: 3.2, longitude: 101.0),
+        CLLocationCoordinate2D(latitude: 4.0, longitude: 101.0)])
+    /// A car with a `merge` offset drives its own road to the main route, unless `onMain` (no route of its own).
+    private func car(_ id: String, tracker: String? = "u", merge: Double? = nil, route: String? = nil, onMain: Bool = false) -> LobbyCar {
+        let route = route ?? (merge != nil && !onMain ? joinRoute : nil)
+        return LobbyCar(car: Car(id: id, name: id, color: "#2563EB", trackerUserId: tracker, isLead: false,
                           route: route, mergeOffset: merge, state: .convoy, number: 1), members: [])
     }
     private func joins(_ cars: [LobbyCar], meeting: Bool = false) -> [String: LobbyContent.CarJoin] {
@@ -194,7 +200,8 @@ struct JoinTownsTests {
         #expect(place == "Rawang")
         #expect(LobbyContent.carText(joiner, mine: false, viewerLeavesFromTheStart: true, joinPlace: place, join: join).line
             == "Joins near Rawang")
-        #expect(abs(fake.calls[0].latitude - 3.45) < 0.01)
+        #expect(fake.calls.count == 1)
+        #expect(abs((fake.calls.first?.latitude ?? 0) - 3.45) < 0.01)
     }
 
     @Test func aFailedLookupKeepsJoinsTheConvoyAndIsAskedOnceMoreOnALaterOpenOnly() async {
@@ -239,7 +246,7 @@ struct JoinTownsTests {
     @Test func carsThatStartWithTheConvoyOrAreNotSharingAreNeverLookedUp() async {
         let fake = Fake(["x", "y", "z"])
         let towns = towns(fake)
-        let startsWith = car("A", merge: 100)
+        let startsWith = car("A", merge: 100, onMain: true)
         await ask(towns, [startsWith, car("B", tracker: nil, merge: 50_000), car("C")])
         #expect(fake.calls.isEmpty)
         #expect(LobbyContent.carText(startsWith, mine: false, viewerLeavesFromTheStart: true).line == "Leaves with you")
@@ -249,6 +256,18 @@ struct JoinTownsTests {
     private var farRoute: String {
         Polyline.encode([
             CLLocationCoordinate2D(latitude: 3.0, longitude: 102.0), CLLocationCoordinate2D(latitude: 4.0, longitude: 102.0)])
+    }
+
+    @Test func aCarAlreadyOnTheMainRouteWaitsOnTheRouteWithNoTownLookedUp() async {
+        // No route of its own and an offset along the main one: its join point is where it is now.
+        let parked = car("Hafiz", merge: 50_000, onMain: true)
+        let join = LobbyContent.join(of: parked.car, main: main, hasMeetingPoint: false)
+        #expect(join == .onRoute(offset: 50_000))
+        #expect(LobbyContent.carText(parked, mine: false, viewerLeavesFromTheStart: true, joinPlace: "Rawang", join: join).line
+            == "Waiting on the route")
+        let fake = Fake(["Rawang"])
+        await ask(towns(fake), [parked])
+        #expect(fake.calls.isEmpty)
     }
 
     @Test func aCarWhoseRouteNeverMeetsTheMainOneMeetsAtTheDestination() {
@@ -292,9 +311,9 @@ struct JoinTownsTests {
         }
         // Not a number: nothing to look up. Huge: the end of the route.
         #expect(JoinTowns.joinOffset(.merges(offset: .nan), length: 1000) == nil)
-        #expect(JoinTowns.joinOffset(.onRoute(offset: .infinity), length: 5000) == nil)
-        #expect(JoinTowns.joinOffset(.onRoute(offset: 1e300), length: 5000) == 5000)
-        #expect(JoinTowns.joinOffset(.onRoute(offset: -.infinity), length: 5000) == nil)
+        #expect(JoinTowns.joinOffset(.merges(offset: .infinity), length: 5000) == nil)
+        #expect(JoinTowns.joinOffset(.merges(offset: 1e300), length: 5000) == 5000)
+        #expect(JoinTowns.joinOffset(.merges(offset: -.infinity), length: 5000) == nil)
     }
 
     @Test func cancellingStopsTheLookupsAndALaterRequestAsksAgain() async {

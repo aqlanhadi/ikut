@@ -92,7 +92,8 @@ enum LobbyContent {
             switch known ?? join(of: item.car) {
             case .merges where meeting != nil: line = "Meets \(who) at \(meeting!)"
             case .startsWithConvoy: line = viewerLeavesFromTheStart ? "Leaves with you" : "Leaves with the convoy"
-            case .onRoute, .merges: line = joinPlace.map { "Joins near \($0)" } ?? "Joins the convoy"
+            case .onRoute: line = "Waiting on the route"
+            case .merges: line = joinPlace.map { "Joins near \($0)" } ?? "Joins the convoy"
             case .meetsAtDestination:
                 line = destination.map { "Meets \(who) at \($0)" } ?? "Meets the convoy at the end"
             case nil: line = "Sharing location"

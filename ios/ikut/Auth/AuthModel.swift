@@ -42,7 +42,10 @@ final class AuthModel {
     static func dropMissingUser() async -> Bool {
         guard let current = Auth.auth().currentUser else { return false }
         nonisolated(unsafe) let user = current
-        return await dropIfMissing(reload: { try await user.reload() }, signOut: { try? Auth.auth().signOut() })
+        return await dropIfMissing(reload: { try await user.reload() }, signOut: {
+            try? Auth.auth().signOut()
+            JoinTowns.forgetAll()
+        })
     }
 
     /// The decision on its own, so a test can feed it errors: only "user gone" errors sign out;
