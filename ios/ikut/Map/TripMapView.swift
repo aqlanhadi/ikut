@@ -879,7 +879,7 @@ struct TripMapView: View {
     /// own), as tall as its content up to the room under the pills, with the map above it still touchable.
     private var cardSheet: some View {
         let card = cardNow ?? lastCard
-        let sheet = ScrollView {
+        return ScrollView {
             cardView(card)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
         }
@@ -893,10 +893,6 @@ struct TripMapView: View {
         .presentationBackgroundInteraction(.enabled)
         // The stop cards have no swipe down (#123): their body scrolls, and Close is the way out.
         .interactiveDismissDisabled(card != .report)
-        // Report sits on the same material as the stop pill's question banner; the stop cards keep the sheet's own.
-        return Group {
-            if card == .report { sheet.presentationBackground(.regularMaterial) } else { sheet }
-        }
     }
 
     @ViewBuilder private func cardView(_ card: MapCard?) -> some View {

@@ -20,8 +20,8 @@ struct ReportSheet: View {
     }
 
     var body: some View {
-        // The same frame as the stop cards (title, close button, 20 pt padding); the grid needs no cap, so it never
-        // scrolls inside one.
+        // The same frame, sheet and tiles as the stop cards (title, close button, 20 pt padding, the message tile's
+        // fill); the grid needs no cap, so it never scrolls inside one.
         CardSheetFrame(
             title: "What’s on the road?", bodyCap: .infinity, closeIdentifier: "sheet.close",
             containerIdentifier: "report.card", onClose: { dismiss() }
@@ -65,7 +65,7 @@ struct ReportSheet: View {
             Spacer(minLength: 0)
         }
         .padding(Spacing.cozy)
-        .ikutTile()
+        .surfaceTile()
         .accessibilityElement(children: .combine)
         .task(id: pinned == nil) {
             // No fix when the sheet opened: pin to the first one that arrives.
@@ -91,7 +91,7 @@ struct ReportSheet: View {
             }
             .padding(.horizontal, Spacing.m)
             .frame(maxWidth: .infinity, minHeight: 72)
-            .ikutTile()
+            .surfaceTile()
             .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -105,7 +105,7 @@ struct ReportSheet: View {
                 .font(.subheadline.weight(.semibold))
                 .wrapsAtAccessibilitySizes(lines: 2)
                 .frame(maxWidth: .infinity, minHeight: 60)
-                .ikutSurface(.quaternary, radius: Radius.tile)
+                .surfaceTile()
                 .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         }
         .buttonStyle(.plain)
