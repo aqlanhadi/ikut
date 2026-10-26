@@ -25,7 +25,8 @@ final class LobbyStopsUITests: XCTestCase {
         let target = row(name)
         XCTAssertTrue(target.waitForExistence(timeout: 10), "no row for \(name)")
         var scrolls = 0
-        while !target.isHittable, scrolls < 8 {
+        // Clear of the bottom bar too (the bar's Start trip sits over the last 150 pt).
+        while !(target.isHittable && target.frame.maxY < app.frame.height - 200), scrolls < 8 {
             app.collectionViews.firstMatch.swipeUp()
             scrolls += 1
         }

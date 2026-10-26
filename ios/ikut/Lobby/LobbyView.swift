@@ -532,7 +532,8 @@ struct LobbyView: View {
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
             HStack(spacing: Spacing.s) {
                 Button { showQR = true } label: {
-                    Label("Show QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
+                    Label("Show QR code", systemImage: "qrcode").font(.footnote.weight(.semibold))
+                        .lineLimit(1).minimumScaleFactor(0.75)
                         .frame(maxWidth: .infinity, minHeight: 36)
                 }
                 .actionButton(.secondary, onGlass: true)
