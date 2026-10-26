@@ -105,10 +105,9 @@ struct LobbyMapTests {
         #expect(clear.span.latitudeDelta > plain.span.latitudeDelta)
     }
 
-    @Test func obscuredFractionsFallBackToATypicalPhoneBeforeTheMapIsMeasured() {
-        let unmeasured = LobbyMapLogic.obscured(mapHeight: 0, sheet: 470, padding: 500)
-        #expect(unmeasured.top == Double(LobbyMapLogic.topObscured) / 874)
-        #expect(unmeasured.bottom == 0)
+    @Test func theTopFractionFallsBackToATypicalPhoneBeforeTheMapIsMeasured() {
+        #expect(LobbyMapLogic.topFraction(mapHeight: 0) == Double(LobbyMapLogic.topObscured) / 874)
+        #expect(LobbyMapLogic.topFraction(mapHeight: 1000) == Double(LobbyMapLogic.topObscured) / 1000)
     }
 
     @Test func aMovedCameraOrAStopViewIsNotRefitted() {

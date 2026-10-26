@@ -71,18 +71,6 @@ class DemoBase: TwoPhoneConvoyBase {
 
     // MARK: Flows
 
-    /// Waits for the lobby, dismissing the "Keep sharing while the screen is off" sheet (Not now) that covers it.
-    func waitForLobby(timeout: TimeInterval) -> Bool {
-        let start = lobbyPresence
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
-            if start.exists, start.isHittable { return true }
-            Thread.sleep(forTimeInterval: 0.5)
-        }
-        return false
-    }
-
     /// Lobby to the map (no "Fit whole convoy": the map keeps following the car).
     func openDemoMap() {
         let start = lobbyActionButton

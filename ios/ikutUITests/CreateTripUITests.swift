@@ -28,7 +28,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         tapCreateTrip()
 
         let startTrip = app.buttons["Start trip"]
-        if !startTrip.waitForExistence(timeout: 30) {
+        if !waitForLobby(timeout: 30) {
             let errors = app.staticTexts.matching(identifier: "createTripError")
             let message = errors.firstMatch.exists ? errors.firstMatch.label : "no error shown"
             add(XCTAttachment(screenshot: app.screenshot()))
@@ -49,5 +49,44 @@ final class CreateTripUITests: ConvoyUITestCase {
         if let hold = env["IKUT_HOLD_SECONDS"].flatMap(Double.init) {
             _ = app.buttons["Never shown"].waitForExistence(timeout: hold)
         }
+    }
+
+    /// The sheets hand over to each other: lobby Back to Home (Home's sheet is back and its controls are hittable),
+    /// Home's row to the lobby (the lobby's sheet and bar), Start to the map and Back to the lobby again.
+    func testLobbyAndHomeSheetsHandOver() throws {
+        app = XCUIApplication()
+        allowPermissionPrompts()
+        app.launch()
+        startNewTrip(as: "Organizer", homeTimeout: 15)
+        let search = app.textFields["Destination"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
+        search.tap()
+        search.typeText("Ipoh")
+        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
+        result.tap()
+        tapCreateTrip()
+        XCTAssertTrue(waitForLobby(timeout: 30), "New trip to the lobby: no lobby sheet")
+
+        // Lobby, Back: Home's sheet comes back.
+        app.navigationBars.buttons.firstMatch.tap()
+        let newTrip = app.buttons["New trip"]
+        XCTAssertTrue(newTrip.waitForExistence(timeout: 15), "Back from the lobby: Home's sheet didn't come back")
+        XCTAssertTrue(newTrip.isHittable, "Back from the lobby: Home's New trip isn't hittable")
+
+        // Home's row for the trip under way opens the lobby, sheet and all.
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Ipoh")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Home lists no row for the trip")
+        row.tap()
+        XCTAssertTrue(waitForLobby(timeout: 30), "Home row to the lobby: no lobby sheet")
+
+        // Start trip to the map, Back: the lobby's sheet is back.
+        lobbyActionButton.tap()
+        app.dismissMapAsks(first: 3)
+        let back = app.buttons["Back to lobby"]
+        XCTAssertTrue(back.waitForExistence(timeout: 30), "Didn't reach the map")
+        back.tap()
+        XCTAssertTrue(waitForLobby(timeout: 20), "Back from the map: the lobby's sheet didn't come back")
+        XCTAssertTrue(lobbyActionButton.label == "Show map", "The trip should be under way")
     }
 }

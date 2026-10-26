@@ -17,7 +17,6 @@ struct CardSlice: ViewModifier {
                 UnevenRoundedRectangle(
                     topLeadingRadius: top ? r : 0, bottomLeadingRadius: bottom ? r : 0,
                     bottomTrailingRadius: bottom ? r : 0, topTrailingRadius: top ? r : 0, style: .continuous
-                
                 ).fill(inSheet && GlassSurface.active ? Color.surfaceTileFill : Color.ikutCard))
     }
 }
@@ -178,7 +177,7 @@ struct RouteTotalLine: View {
         }
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+        .innerTile(radius: Radius.inner)
         .opacity(dimmed ? 0.5 : 1)
         .accessibilityElement(children: .combine)
     }

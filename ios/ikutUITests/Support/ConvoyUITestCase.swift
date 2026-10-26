@@ -15,6 +15,8 @@ class ConvoyUITestCase: XCTestCase {
     var pollInterval: TimeInterval { 1 }
     /// Put in front of every screenshot file name (the two-phone tests say which phone).
     var shotPrefix: String { "" }
+    /// `pullLobbySheetUp` has run in this test.
+    var lobbySheetPulled = false
 
     override func setUp() {
         continueAfterFailure = false
@@ -84,6 +86,33 @@ class ConvoyUITestCase: XCTestCase {
     var lobbyPresence: XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(
             format: "label IN %@ OR identifier == %@", ["Start trip", "Show map"], "lobbyWaiting")).firstMatch
+    }
+
+    /// Waits for the lobby's bottom bar (Start trip, Show map or the waiting line), answering "Not now" to the Always
+    /// explainer if it comes up meanwhile: the lobby's sheet, and its bar, step aside while the explainer is up.
+    func waitForLobby(timeout: TimeInterval) -> Bool {
+        let bar = lobbyPresence
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
+            if bar.exists, bar.isHittable { return true }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        return false
+    }
+
+    /// The lobby's sheet is up at medium; the cars list starts below it. One drag brings the sheet to tall (never
+    /// repeat it: another drag scrolls the list, and the cars header goes out of the tree). Does nothing the second time.
+    func pullLobbySheetUp() {
+        guard !lobbySheetPulled else { return }
+        lobbySheetPulled = true
+        let grabber = app.otherElements["Sheet Grabber"]
+        if grabber.exists {
+            grabber.swipeUp()
+        } else {
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            from.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)))
+        }
     }
 
     /// Badge numbers of the convoy rows, front of the convoy first (top of the list). Read from one snapshot of
@@ -211,8 +240,6 @@ class ConvoyUITestCase: XCTestCase {
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
         app.buttons["Join trip"].tap()
-        XCTAssertTrue(lobbyPresence.waitForExistence(timeout: 30), "Didn't reach the lobby")
-        let notNow = app.buttons["Not now"]
-        if notNow.waitForExistence(timeout: 4) { notNow.tap() }
+        XCTAssertTrue(waitForLobby(timeout: 30), "Didn't reach the lobby")
     }
 }

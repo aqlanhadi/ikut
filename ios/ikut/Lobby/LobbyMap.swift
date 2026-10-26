@@ -104,11 +104,11 @@ enum LobbyMapLogic {
         return result
     }
 
-    /// Fractions of the map's height kept clear: the bar and the room for a flag at the top, the part of the
-    /// medium sheet above the map's bottom safe area (`LobbySheet.legalInset`, already kept clear) at the bottom.
-    static func obscured(mapHeight: CGFloat, sheet: CGFloat, padding: CGFloat) -> (top: Double, bottom: Double) {
-        let height = mapHeight > sheet + topObscured ? mapHeight : 874
-        return (Double(topObscured / height), Double(max(0, sheet - padding) / height))
+    /// The fraction of the map's height kept clear at the top: the bar and room for a flag. The sheet needs none at
+    /// the bottom: the map's bottom safe area (`LobbySheet.legalInset`) already sits above the medium sheet, and
+    /// MapKit fits inside it. Before the map is measured a typical phone height stands in.
+    static func topFraction(mapHeight: CGFloat) -> Double {
+        Double(topObscured / (mapHeight > topObscured * 2 ? mapHeight : 874))
     }
 
     /// Navigation bar plus a destination flag drawn above its coordinate.
@@ -212,10 +212,8 @@ struct LobbyMapView: View {
     }
 
     private func go(_ target: LobbyMapTarget, animated: Bool) {
-        let padding = LobbySheet.legalInset(compact: sheetCompact)
-        let insets = LobbyMapLogic.obscured(mapHeight: mapHeight, sheet: sheetCompact, padding: padding)
-        guard let region = LobbyMapLogic.region(for: target, route: route, pins: pins,
-                                                bottomObscured: insets.bottom, topObscured: insets.top) else { return }
+        guard let region = LobbyMapLogic.region(for: target, route: route, pins: pins, bottomObscured: 0,
+                                                topObscured: LobbyMapLogic.topFraction(mapHeight: mapHeight)) else { return }
         onStop = target != .wholeTrip
         fitted = true
         let position = MapCameraPosition.region(region)

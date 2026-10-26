@@ -32,6 +32,18 @@ extension View {
     }
 }
 
+extension View {
+    /// A tile inside a tile (the lobby's route total inside its card): a faint darkening on glass, the screen colour
+    /// elsewhere.
+    @ViewBuilder func innerTile(radius: CGFloat = Radius.inner) -> some View {
+        if GlassSurface.active {
+            background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        } else {
+            ikutSurface(Color.ikutScreen, radius: radius)
+        }
+    }
+}
+
 /// A round icon button (44 pt to tap) for the top corners of a sheet: Liquid Glass on iOS 26, else a quiet
 /// filled circle. Any SF Symbol: the close "x", Back, Share.
 struct RoundGlassIconButton: View {
