@@ -14,9 +14,11 @@ struct WhereToSheet: View {
         @Bindable var model = flow.search
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Spacing.gap) {
-                HStack(spacing: Spacing.s) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-                    TextField("Search a town, place or address", text: $model.query)
+                SheetSearchField(clear: model.query.isEmpty ? nil : {
+                    model.query = ""
+                    searchFocused = true
+                }) {
+                    TextField("Search a town, place or address", text: $model.query, prompt: Text("Where to?").foregroundStyle(Color.surfaceSecondary))
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
                         .submitLabel(.search)
@@ -25,20 +27,7 @@ struct WhereToSheet: View {
                         .accessibilityLabel("Destination")
                         .onChange(of: model.query) { model.queryChanged() }
                         .onSubmit { model.submit() }
-                    if !model.query.isEmpty {
-                        Button {
-                            model.query = ""
-                            searchFocused = true
-                        } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary).frame(width: 32, height: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Clear search")
-                    }
                 }
-                .padding(.leading, Spacing.m)
-                .frame(minHeight: 44)
-                .surfaceTile(radius: 22)
                 glassCapsule("Cancel", action: onClose)
             }
             .padding(.top, Spacing.xs)

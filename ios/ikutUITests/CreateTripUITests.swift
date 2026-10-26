@@ -70,9 +70,9 @@ final class CreateTripUITests: ConvoyUITestCase {
 
         // Lobby, Back: Home's sheet comes back.
         app.navigationBars.buttons.firstMatch.tap()
-        let newTrip = app.buttons["New trip"]
+        let newTrip = app.buttons["homeWhereTo"]
         XCTAssertTrue(newTrip.waitForExistence(timeout: 15), "Back from the lobby: Home's sheet didn't come back")
-        XCTAssertTrue(newTrip.isHittable, "Back from the lobby: Home's New trip isn't hittable")
+        XCTAssertTrue(newTrip.isHittable, "Back from the lobby: Home's Where to? row isn't hittable")
 
         // Home's row for the trip under way opens the lobby, sheet and all.
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Ipoh")).firstMatch

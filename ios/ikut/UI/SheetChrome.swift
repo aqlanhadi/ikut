@@ -44,19 +44,41 @@ extension View {
     }
 }
 
-/// A round icon button (44 pt to tap) for the top corners of a sheet: Liquid Glass on iOS 26, else a quiet
-/// filled circle. Any SF Symbol: the close "x", Back, Share.
+/// A round button for the top corners of a sheet (44 pt to tap by default): Liquid Glass on iOS 26, else a quiet
+/// filled circle. Its face is an SF Symbol (the close "x", Back, Share) or a short text (the name's initial).
 struct RoundGlassIconButton: View {
-    var systemImage: String
+    private enum Face { case symbol(String), text(String) }
+    private var face: Face
     var label: String
+    var size: CGFloat = 44
     var action: () -> Void
+
+    init(systemImage: String, label: String, size: CGFloat = 44, action: @escaping () -> Void) {
+        face = .symbol(systemImage)
+        self.label = label
+        self.size = size
+        self.action = action
+    }
+
+    /// A text face, such as the person's initial: .primary and semibold.
+    init(text: String, label: String, size: CGFloat = 44, action: @escaping () -> Void) {
+        face = .text(text)
+        self.label = label
+        self.size = size
+        self.action = action
+    }
+
+    @ViewBuilder private var faceView: some View {
+        switch face {
+        case .symbol(let name): Image(systemName: name).font(.footnote.weight(.bold))
+        case .text(let text): Text(text).font(.body.weight(.semibold))
+        }
+    }
 
     var body: some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
             Button(action: action) {
-                Image(systemName: systemImage)
-                    .font(.footnote.weight(.bold))
-                    .frame(width: 44, height: 44)
+                faceView.frame(width: size, height: size)
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
@@ -64,13 +86,69 @@ struct RoundGlassIconButton: View {
             .accessibilityLabel(label)
         } else {
             Button(action: action) {
-                Image(systemName: systemImage)
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
+                faceView
+                    .foregroundStyle(isText ? Color.primary : Color.secondary)
+                    .frame(width: size, height: size)
                     .background(.quaternary, in: Circle())
             }
             .accessibilityLabel(label)
         }
+    }
+
+    private var isText: Bool { if case .text = face { true } else { false } }
+}
+
+/// The search bar of an Apple-Maps-style sheet (Home's Where to?, then the live search): a full-width capsule at
+/// least 48 pt tall on a light translucent fill with a hairline edge, a magnifier in .primary, then the text at the
+/// body size. Two forms with the same face: `SheetSearchButton` (a placeholder you tap) and `SheetSearchField`
+/// (a TextField you put inside it, with a clear button once there is text).
+enum SheetSearch {
+    static let height: CGFloat = 48
+    /// A capsule at the bar's height.
+    static let radius: CGFloat = height / 2
+}
+
+/// The TextField form. `clear` is the action of the clear button, shown when it isn't nil (pass it while there is text).
+struct SheetSearchField<Field: View>: View {
+    var clear: (() -> Void)?
+    @ViewBuilder var field: Field
+
+    var body: some View {
+        HStack(spacing: Spacing.s) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.primary).accessibilityHidden(true)
+            field.font(.body)
+            if let clear {
+                Button(action: clear) {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary).frame(width: 32, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.leading, Spacing.m)
+        .padding(.trailing, clear == nil ? Spacing.m : 0)
+        .frame(minHeight: SheetSearch.height)
+        .surfaceTile(radius: SheetSearch.radius)
+    }
+}
+
+/// The button form: the same bar with a placeholder, tapped to start the search.
+struct SheetSearchButton: View {
+    var placeholder: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.primary).accessibilityHidden(true)
+                Text(placeholder).font(.body).foregroundStyle(Color.surfaceSecondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Spacing.m)
+            .frame(minHeight: SheetSearch.height)
+            .contentShape(Capsule())
+            .surfaceTile(radius: SheetSearch.radius)
+        }
+        .buttonStyle(.plain)
     }
 }

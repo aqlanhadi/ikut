@@ -594,31 +594,14 @@ struct TripsHomeView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
-            // The title row, with the profile button at its top right as in Apple Maps.
-            HStack(alignment: .center, spacing: Spacing.s) {
-                Text("Trips")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, Spacing.xs)
-                    .accessibilityAddTraits(.isHeader)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // Apple Maps' top row: the search bar and the name's avatar. Tapping the bar starts the same flow, in
+            // Where to?, where the bar becomes editable.
+            HStack(spacing: Spacing.gap) {
+                SheetSearchButton(placeholder: "Where to?", action: onNewTrip)
+                    .accessibilityIdentifier("homeWhereTo")
                 profileButton
             }
-            .frame(minHeight: 44)
-
-            // Looks like NewTripSheet's search field; tapping it starts the same flow, in Where to?.
-            Button(action: onNewTrip) {
-                HStack(spacing: Spacing.s) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(Color.surfaceSecondary).accessibilityHidden(true)
-                    Text("Where to?").foregroundStyle(Color.surfaceSecondary)
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, Spacing.m)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-                .surfaceTile(radius: 22)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("homeWhereTo")
+            .padding(.top, Spacing.xs)
 
             Button(action: onJoin) {
                 HStack(spacing: Spacing.m) {
@@ -746,32 +729,12 @@ struct TripsHomeView: View {
     @ViewBuilder
     private var profileButton: some View {
         if let name = profileName {
-            avatar(name, button: Button {
+            RoundGlassIconButton(text: name.prefix(1).uppercased(), label: "Your name and settings", size: SheetSearch.height) {
                 newName = name
                 renaming = true
-            } label: { initial(name) })
-            .accessibilityLabel("Your name and settings")
+            }
         }
     }
-
-    /// The initial's face: the same glass circle as `SheetCloseButton(onGlass: true)`'s, a grey one off glass.
-    @ViewBuilder private func avatar(_ name: String, button: some View) -> some View {
-        if GlassSurface.useGlass, #available(iOS 26, *) {
-            button.buttonStyle(.glass).buttonBorderShape(.circle).tint(.primary)
-        } else {
-            button.tint(.primary)
-        }
-    }
-
-    private func initial(_ name: String) -> some View {
-        Text(name.prefix(1).uppercased())
-            .font(.system(.body, design: .rounded).weight(.semibold))
-            .frame(width: 44, height: 44)
-            .background { if !(GlassSurface.useGlass && isGlassOS) { Circle().fill(.quaternary) } }
-            .contentShape(Circle())
-    }
-
-    private var isGlassOS: Bool { if #available(iOS 26, *) { true } else { false } }
 
     /// Who the profile button shows: the signed-in name (a demo state shows a sample name).
     private var profileName: String? {
