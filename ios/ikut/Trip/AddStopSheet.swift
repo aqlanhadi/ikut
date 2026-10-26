@@ -163,6 +163,7 @@ struct AddStopContent: View {
 
     private func rnrRow(_ row: AddStopLogic.Row) -> some View {
         let selected = row.id == model.selectedId
+        let taken = row.alreadyStop
         return Button { onSelect(row.id) } label: {
             HStack(spacing: Spacing.m) {
                 Text("\(row.number)")
@@ -183,8 +184,10 @@ struct AddStopContent: View {
             .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
             .frame(minHeight: 56)
             .contentShape(Rectangle())
+            .opacity(taken ? 0.45 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(taken)
         .id(row.id)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -221,7 +224,7 @@ struct AddStopContent: View {
             VStack(spacing: Spacing.s) {
                 if model.picked == nil, model.selected != nil { stayRow }
                 Button {
-                    if let draft = model.draft { onAdd(draft) }
+                    if let draft = model.take() { onAdd(draft) }
                 } label: { Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, minHeight: 50) }
                     .actionButton(.primary, onGlass: true)
                     .disabled(model.draft == nil)

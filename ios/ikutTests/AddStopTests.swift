@@ -11,7 +11,9 @@ struct AddStopTests {
         let at = CLLocationCoordinate2D(latitude: 3 + offset / 100_000, longitude: 101.3)
         return PlaceAlong(
             id: id, kind: kind, name: name, coordinate: at, ring: nil, facilities: facilities, brands: [], offset: offset,
-            distance: 40, side: .left, carriageway: ours ? .ours : .opposite, ours: ours, entrance: at, slipEntrance: false,
+            distance: 40, side: .left, carriageway: ours ? .ours : .opposite, ours: ours,
+            // The gate on our slip road, a few hundred metres off the R&R's middle.
+            entrance: .init(latitude: at.latitude + 0.003, longitude: at.longitude + 0.002), slipEntrance: false,
             routeOffset: offset)
     }
 
@@ -40,11 +42,11 @@ struct AddStopTests {
         let model = AddStopModel(line: RouteLine([.init(latitude: 3, longitude: 101.3), .init(latitude: 4, longitude: 101.3)]),
                                  routeSeconds: seconds, along: nil, canMeet: false, canAdd: true, candidates: places)
         #expect(model.pins.map(\.id) == model.rows.map(\.id))
-        #expect(model.pins.map(\.kind) == [.candidate(number: 1, selected: false), .candidate(number: 2, selected: false),
-                                            .candidate(number: 3, selected: false)])
+        #expect(model.pins.map(\.kind) == [.candidate(number: 1, selected: false, taken: false), .candidate(number: 2, selected: false, taken: false),
+                                            .candidate(number: 3, selected: false, taken: false)])
         model.select("c")
-        #expect(model.pins.map(\.kind) == [.candidate(number: 1, selected: false), .candidate(number: 2, selected: false),
-                                            .candidate(number: 3, selected: true)])
+        #expect(model.pins.map(\.kind) == [.candidate(number: 1, selected: false, taken: false), .candidate(number: 2, selected: false, taken: false),
+                                            .candidate(number: 3, selected: true, taken: false)])
     }
 
     @Test func theMinutesInLinesAreAboutHowFarIntoTheDrive() {
@@ -86,6 +88,41 @@ struct AddStopTests {
         #expect(region.center.latitude > pin.latitude)
     }
 
+    @Test func anR_RAlreadyAStopIsMarkedAndCannotBeChosen() throws {
+        let existing = SuggestStopsModel.existingOffsets([StopDraft(
+            name: "Tapah R&R", coordinate: .init(latitude: 3.95, longitude: 101.3), kind: .rest, minutes: 20, routeOffset: 95_100)])
+        let model = AddStopModel(line: nil, routeSeconds: seconds, along: nil, canMeet: false, canAdd: true, existing: existing, candidates: places)
+        #expect(model.rows.map(\.alreadyStop) == [false, false, true])
+        #expect(AddStopLogic.detail(model.rows[2], selected: false) == "Already a stop")
+        model.select("c")
+        #expect(model.selected == nil && model.draft == nil)
+        #expect(model.pins.last?.kind == .candidate(number: 3, selected: false, taken: true))
+        model.select("b")
+        #expect(model.selected?.number == 2)
+        // The planned stop's own pin is left out, since the R&R's pin stands for it.
+        let stop = StopDraft(name: "Tapah R&R", coordinate: .init(latitude: 3.95, longitude: 101.3), kind: .rest, routeOffset: 95_100)
+        let other = StopDraft(name: "Kopitiam", coordinate: .init(latitude: 3.5, longitude: 101.3), kind: .food, routeOffset: 10_000)
+        let pins = LobbyMapLogic.pins(stops: [stop, other], destinationName: nil, destination: nil, isOrganizer: true, ownJoin: nil,
+                                      coveredByCandidate: { model.covers($0) })
+        #expect(pins.map(\.name) == ["Kopitiam"] && pins.first?.kind == .plannedStop)
+    }
+
+    @Test func addHandsTheDraftOverOnce() {
+        let model = model()
+        #expect(model.take() == nil)
+        model.select("c")
+        #expect(model.take()?.name == "Tapah R&R")
+        #expect(model.take() == nil)
+    }
+
+    @Test func choosingAnotherR_RKeepsTheStay() {
+        let model = model()
+        model.select("a")
+        model.step(1)
+        model.select("c")
+        #expect(model.stay == 30)
+    }
+
     // MARK: Stay
 
     @Test func stayStartsAtTwentyAndStepsThroughTheExistingDurationsHeldAtTheEnds() {
@@ -110,6 +147,10 @@ struct AddStopTests {
         #expect(model.addTitle == "Add Tapah R&R")
         let draft = try #require(model.draft)
         #expect(draft.name == "Tapah R&R" && draft.kind == .rest && draft.minutes == 30 && draft.routeOffset == 95_000)
+        // It goes in by our slip road, not the R&R's middle.
+        let tapah = try #require(places.first { $0.id == "c" })
+        #expect(draft.coordinate.latitude == tapah.entrance.latitude && draft.coordinate.longitude == tapah.entrance.longitude)
+        #expect(draft.latitude != tapah.coordinate.latitude)
     }
 
     @Test func aFullListCannotAdd() {

@@ -54,7 +54,9 @@ struct LobbyPin: Equatable, Identifiable {
         /// A participant's own join point (D26): theirs only.
         case join
         /// An R&R offered by Add a stop, numbered as its row; the chosen one is highlighted (B6).
-        case candidate(number: Int, selected: Bool)
+        case candidate(number: Int, selected: Bool, taken: Bool)
+        /// A planned stop while Add a stop is open: a small plain pin, so the only numbers are the R&R list's.
+        case plannedStop
     }
     var id: String
     var kind: Kind
@@ -62,7 +64,7 @@ struct LobbyPin: Equatable, Identifiable {
     var latitude: Double
     var longitude: Double
     var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
-    var isSelectedCandidate: Bool { if case .candidate(_, true) = kind { true } else { false } }
+    var isSelectedCandidate: Bool { if case .candidate(_, true, _) = kind { true } else { false } }
 }
 
 /// Where the lobby's camera is asked to go.
@@ -83,13 +85,21 @@ enum LobbyMapLogic {
     /// numbered 1, 2, … skipping it), the destination, and for a participant their own join point. The organiser has
     /// no join pin, and another car's start or join point is never drawn (#361, D26): there is no way to ask for one.
     static func pins(stops: [StopDraft], destinationName: String?, destination: CLLocationCoordinate2D?,
-                     isOrganizer: Bool, ownJoin: CLLocationCoordinate2D?) -> [LobbyPin] {
+                     isOrganizer: Bool, ownJoin: CLLocationCoordinate2D?,
+                     coveredByCandidate: ((StopDraft) -> Bool)? = nil) -> [LobbyPin] {
         var result: [LobbyPin] = []
         var number = 0
         for stop in stops {
             if stop.isMeeting {
                 result.append(LobbyPin(id: stop.id, kind: .meeting, name: stop.name,
                                        latitude: stop.latitude, longitude: stop.longitude))
+            } else if let coveredByCandidate {
+                // While Add a stop is open the numbers are the R&R list's: a planned stop is a small plain pin, and one
+                // that is an R&R in the list is left to that R&R's own pin.
+                if !coveredByCandidate(stop) {
+                    result.append(LobbyPin(id: stop.id, kind: .plannedStop, name: stop.name,
+                                           latitude: stop.latitude, longitude: stop.longitude))
+                }
             } else {
                 number += 1
                 result.append(LobbyPin(id: stop.id, kind: .stop(number: number), name: stop.name,
@@ -265,12 +275,13 @@ struct LobbyPinView: View {
         case .destination: Color(red: 0.11, green: 0.11, blue: 0.12)
         case .join: Color.car(hex: colorHex)
         // Grey until chosen, then the accent and a little larger with a halo, as in B6.
-        case .candidate(_, let selected): selected ? Color.ikutAccent : Color(red: 0.56, green: 0.56, blue: 0.58)
+        case .plannedStop: Color.ikutAccent
+        case .candidate(_, let selected, let taken): taken ? Color(red: 0.56, green: 0.56, blue: 0.58).opacity(0.5) : selected ? Color.ikutAccent : Color(red: 0.56, green: 0.56, blue: 0.58)
         }
     }
 
     /// The pin's side: the chosen R&R is 36 pt, every other 28.
-    private var side: CGFloat { pin.isSelectedCandidate ? 36 : 28 }
+    private var side: CGFloat { pin.kind == .plannedStop ? 16 : pin.isSelectedCandidate ? 36 : 28 }
 
     var body: some View {
         UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 3, bottomTrailingRadius: 14, topTrailingRadius: 14,
@@ -303,13 +314,14 @@ struct LobbyPinView: View {
 
     /// Every pin carries its name except a candidate R&R that isn't chosen (the numbers say which it is).
     private var labelled: Bool {
-        if case .candidate(_, let selected) = pin.kind { return selected }
-        return true
+        if case .candidate(_, let selected, _) = pin.kind { return selected }
+        return pin.kind != .plannedStop
     }
 
     @ViewBuilder private var glyph: some View {
         switch pin.kind {
-        case .stop(let number), .candidate(let number, _):
+        case .plannedStop: EmptyView()
+        case .stop(let number), .candidate(let number, _, _):
             Text("\(number)").font(.system(size: 12, weight: .bold, design: .rounded)).foregroundStyle(.white)
         case .meeting:
             Image(systemName: PlannedStopKind.meet.symbol).font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
@@ -326,7 +338,9 @@ struct LobbyPinView: View {
         case .meeting: "Meeting point, \(pin.name)"
         case .destination: "Destination, \(pin.name)"
         case .join: "Where you join"
-        case .candidate(let number, let selected): "R&R \(number), \(pin.name)\(selected ? ", chosen" : "")"
+        case .plannedStop: "Stop, \(pin.name)"
+        case .candidate(let number, let selected, let taken):
+            "\(number), \(pin.name)\(taken ? ", already a stop" : selected ? ", selected" : "")"
         }
     }
 }

@@ -262,7 +262,8 @@ struct LobbyView: View {
         let trip = model.trip
         return LobbyMapLogic.pins(
             stops: shownStops, destinationName: trip?.destination.name, destination: trip?.destination.coordinate.coordinate,
-            isOrganizer: isOrganizer, ownJoin: ownWay.joinCoordinate) + (adding?.pins ?? [])
+            isOrganizer: isOrganizer, ownJoin: ownWay.joinCoordinate,
+            coveredByCandidate: adding.map { model in { model.covers($0) } }) + (adding?.pins ?? [])
     }
 
     private func openAddStop() {
@@ -271,7 +272,8 @@ struct LobbyView: View {
             line: coordinates.count > 1 ? RouteLine(coordinates) : nil,
             routeSeconds: model.trip?.routeSeconds ?? routeInfo.travelTime,
             along: coordinates.count > 1 ? AlongRoute(coordinates: coordinates, seconds: routeInfo.travelTime) : nil,
-            canMeet: StopListLogic.canMeet(among: planner.items), canAdd: StopListLogic.canAdd(among: planner.items))
+            canMeet: StopListLogic.canMeet(among: planner.items), canAdd: StopListLogic.canAdd(among: planner.items),
+            existing: SuggestStopsModel.existingOffsets(planner.items))
     }
 
     /// Back to the lobby, the map back on the whole trip.
@@ -285,6 +287,8 @@ struct LobbyView: View {
             route: routeInfo.coordinates, pins: mapPins, ownRoute: isOrganizer ? [] : ownWay.ownRoute,
             ownColorHex: ownCarColor, sheetCompact: compact,
             onCandidateTap: { adding?.select($0) }, command: $mapCommand)
+            // The trip started from another phone: no more stop edits.
+            .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
             .onChange(of: adding?.selectedId, initial: true) { _, id in if let id { flyTo(id) } }
             .onAppear { onScreen = true }
             .onDisappear { onScreen = false }

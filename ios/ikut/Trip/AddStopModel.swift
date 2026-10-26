@@ -16,17 +16,25 @@ enum AddStopLogic {
         /// "fuel, food, toilets".
         var facilities: String
         var pinId: String { place.id }
+        /// Already one of the trip's stops: shown dimmed and not selectable.
+        var alreadyStop = false
     }
 
+    /// How close (meters along the route) a stop must be to an R&R to count as that R&R.
+    static let sameStop: Double = 500
+
     /// The R&Rs on our side of the route, nearest the start first, numbered from 1.
-    static func rows(from places: [PlaceAlong], routeLength: Double?, routeSeconds: Double?) -> [Row] {
+    /// `existing` are the route offsets of the stops already planned (`SuggestStopsModel.existingOffsets`): an R&R
+    /// within `sameStop` of one is marked.
+    static func rows(from places: [PlaceAlong], routeLength: Double?, routeSeconds: Double?, existing: [Double] = []) -> [Row] {
         var seen = Set<String>()
         let rnrs = places.filter { $0.ours && SuggestStops.isRnR($0) && seen.insert($0.id).inserted }
             .sorted { $0.routeOffset < $1.routeOffset }
         return rnrs.enumerated().map { index, place in
             Row(number: index + 1, place: place, name: RequestPlaces.name(place),
                 line: about(offset: place.routeOffset, routeLength: routeLength, routeSeconds: routeSeconds),
-                facilities: SuggestStops.facilityWords(place))
+                facilities: SuggestStops.facilityWords(place),
+                alreadyStop: existing.contains { abs($0 - place.routeOffset) <= sameStop })
         }
     }
 
@@ -40,7 +48,8 @@ enum AddStopLogic {
 
     /// The row's second line: the selected one adds what the place has.
     static func detail(_ row: Row, selected: Bool) -> String {
-        selected && !row.facilities.isEmpty ? "\(row.line) · \(row.facilities)" : row.line
+        if row.alreadyStop { return "Already a stop" }
+        return selected && !row.facilities.isEmpty ? "\(row.line) · \(row.facilities)" : row.line
     }
 
     /// The Stay stepper: the existing durations, one step at a time, held at both ends.
@@ -98,10 +107,14 @@ final class AddStopModel {
     private let routeSeconds: Double?
     private let sites: [PlaceSite]
     private let fuel: [FuelStation]
+    private let existing: [Double]
+    /// The draft was handed over: Add gives it once.
+    private var handedOver = false
 
     init(line: RouteLine?, routeSeconds: Double?, along: AlongRoute?, canMeet: Bool, canAdd: Bool,
          sites: [PlaceSite] = OurSide.bundledSites, fuel: [FuelStation] = OurSide.bundledFile?.fuel ?? [],
-         candidates: [PlaceAlong]? = nil) {
+         existing: [Double] = [], candidates: [PlaceAlong]? = nil) {
+        self.existing = existing
         self.line = line
         self.routeSeconds = routeSeconds
         self.canMeet = canMeet
@@ -122,15 +135,15 @@ final class AddStopModel {
     }
 
     private func apply(_ places: [PlaceAlong]) {
-        rows = AddStopLogic.rows(from: places, routeLength: line?.length, routeSeconds: routeSeconds)
+        rows = AddStopLogic.rows(from: places, routeLength: line?.length, routeSeconds: routeSeconds, existing: existing)
         loading = false
     }
 
     var selected: AddStopLogic.Row? { rows.first { $0.id == selectedId } }
 
-    /// A tap on a row or on its pin. Another place resets the stay to the usual 20 min.
+    /// A tap on a row or on its pin. Another place keeps the current stay; an R&R that is already a stop can't be chosen.
     func select(_ id: String) {
-        guard rows.contains(where: { $0.id == id }), selectedId != id else { return }
+        guard rows.contains(where: { $0.id == id && !$0.alreadyStop }), selectedId != id else { return }
         selectedId = id
     }
 
@@ -142,11 +155,24 @@ final class AddStopModel {
         return selected.map { AddStopLogic.addTitle($0.name) }
     }
 
+    /// A planned stop that is one of the listed R&Rs, which then has only its own (already-a-stop) pin.
+    func covers(_ stop: StopDraft) -> Bool {
+        guard let offset = stop.routeOffset else { return false }
+        return rows.contains { $0.alreadyStop && abs($0.place.routeOffset - offset) <= AddStopLogic.sameStop }
+    }
+
     /// The stop the Add button hands to the planner; nil with nothing chosen or when the list is full.
     var draft: StopDraft? {
         guard canAdd else { return nil }
         if let picked { return AddStopLogic.searchedDraft(picked, kind: kind, minutes: searchedMinutes, meetClock: meetClock) }
         return selected.map { AddStopLogic.draft($0, minutes: stay) }
+    }
+
+    /// The Add button's hand-over: the draft once, nil after that (a second tap adds nothing).
+    func take() -> StopDraft? {
+        guard !handedOver, let draft else { return nil }
+        handedOver = true
+        return draft
     }
 
     /// Back in the sheet: from a searched place's details to the list (true: the sheet stays), else out to the lobby
@@ -167,7 +193,7 @@ final class AddStopModel {
     /// What the pins on the map are: the rows' numbers, the selected one highlighted.
     var pins: [LobbyPin] {
         rows.map {
-            LobbyPin(id: $0.pinId, kind: .candidate(number: $0.number, selected: $0.id == selectedId), name: $0.name,
+            LobbyPin(id: $0.pinId, kind: .candidate(number: $0.number, selected: $0.id == selectedId, taken: $0.alreadyStop), name: $0.name,
                      latitude: $0.place.coordinate.latitude, longitude: $0.place.coordinate.longitude)
         }
     }
