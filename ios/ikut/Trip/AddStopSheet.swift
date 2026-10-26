@@ -58,125 +58,183 @@ extension PlaceKind {
     }
 }
 
-/// Add a stop (AddStop.dc.html): search like Where to?, then what it is and how long, then Add to the trip.
-struct AddStopSheet: View {
-    /// The route the stop is added to, for "62 km" and "40 min along".
-    var along: AlongRoute?
-    /// A meeting point can only be the first stop.
-    var canMeet: Bool
+
+/// Add a stop (B6, AddStop.dc.html): the lobby's own sheet turned into the stop chooser, over the map that shows the
+/// same numbered R&Rs. The R&Rs along the way in order, with Stay and "Add <place>" once one is selected; a search
+/// along the route for any other place, which then asks what it is. Back returns to the lobby with nothing changed.
+struct AddStopContent: View {
+    @Bindable var model: AddStopModel
+    /// How far the bottom bar's button hangs into the sheet's bottom safe area (`PanelSheet.barLift`).
+    var barLift: CGFloat = 0
+    var onSelect: (String) -> Void
+    var onExpand: () -> Void = {}
+    var onBack: () -> Void
     var onAdd: (StopDraft) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var model = CreateTripModel()
-    @State private var picked: DestinationResult?
-    @State private var kind: PlannedStopKind = .fuel
-    @State private var minutes: Int?
-    @State private var meetClock: Date?
     @FocusState private var searchFocused: Bool
-
-    init(along: AlongRoute?, canMeet: Bool, onAdd: @escaping (StopDraft) -> Void) {
-        self.along = along
-        self.canMeet = canMeet
-        self.onAdd = onAdd
-    }
-
-    #if DEBUG
-    /// A sheet already on a step, for previews and screenshots.
-    init(demoModel: CreateTripModel, picked: DestinationResult?, kind: PlannedStopKind, minutes: Int?, canMeet: Bool, meetClock: Date? = nil) {
-        along = demoModel.along
-        self.canMeet = canMeet
-        onAdd = { _ in }
-        _model = State(initialValue: demoModel)
-        _picked = State(initialValue: picked)
-        _kind = State(initialValue: kind)
-        _minutes = State(initialValue: minutes)
-        _meetClock = State(initialValue: meetClock)
-    }
-    #endif
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        NavigationStack {
-            page { search }
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-                .navigationDestination(isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } })) {
-                    // The place's details push with the system Back and the edge swipe.
-                    page { if let picked { details(picked) } }
+        VStack(spacing: 0) {
+            SheetTopRow(title: "Add a stop", subtitle: nil) {
+                RoundGlassIconButton(systemImage: "chevron.backward", label: model.picked == nil ? "Back to the trip" : "Back to the list") {
+                    searchFocused = false
+                    if !model.back() { onBack() }
                 }
-        }
-        .presentationDragIndicator(.visible)
-        .presentationDetents([.large])
-        .onAppear { model.along = along }
-    }
-
-    /// One step's scrolling page under the system bar (inline "Add a stop"), which stays put.
-    private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView {
-            VStack(spacing: Spacing.cozy) { content() }
-                .padding(.horizontal, Spacing.l)
-                .padding(.top, Spacing.s)
-                .padding(.bottom, Spacing.l)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .background(Color.ikutScreen)
-        .navigationTitle("Add a stop")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    // MARK: Step 1: search
-
-    private var search: some View {
-        @Bindable var model = model
-        return VStack(spacing: 0) {
-            HStack(spacing: Spacing.m) {
-                IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
-                VStack(alignment: .leading, spacing: 0) {
-                    StatCaption("Where?")
-                    TextField("Search a place or address", text: $model.query)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                        .focused($searchFocused)
-                        .accessibilityLabel("Stop")
-                        .accessibilityIdentifier("addStop.search")
-                        .onChange(of: model.query) { model.queryChanged() }
-                        .onSubmit { model.submit() }
-                }
-                if !model.query.isEmpty {
-                    Button {
-                        model.query = ""
-                        searchFocused = true
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 32, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
-                }
-            }
+                .accessibilityIdentifier("addStop.back")
+            } trailing: { Color.clear }
             .padding(.horizontal, Spacing.l)
-            .frame(minHeight: 54)
-            .ikutCard()
-
-            if let message = model.errorMessage {
-                InlineNote(message, tone: .alert).padding(.top, Spacing.m)
+            .padding(.bottom, Spacing.xs)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: Spacing.cozy) {
+                        if let place = model.picked { details(place) } else { chooser }
+                    }
+                    .padding(.horizontal, Spacing.l)
+                    .padding(.top, Spacing.xs)
+                    .padding(.bottom, Spacing.l)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                // A tap on a pin brings its row into view.
+                .onChange(of: model.selectedId) { _, id in
+                    guard let id else { return }
+                    withAnimation(Motion.quick(reduceMotion: reduceMotion)) { proxy.scrollTo(id, anchor: .center) }
+                }
             }
-            if model.showsList || searchFocused {
-                PlaceSearchResults(model: model, distance: .alongRoute, showsKind: true, onPick: pick)
-            }
+            .sheetBottomBar { addBar }
         }
-        .task { searchFocused = picked == nil }
+        .task { await model.load() }
     }
 
-    private func pick(_ result: DestinationResult) {
-        searchFocused = false
-        picked = result
-        kind = PlannedStopKind(guessing: result)
-        minutes = nil
-        meetClock = nil
+    // MARK: The list
+
+    @ViewBuilder private var chooser: some View {
+        @Bindable var search = model.search
+        SheetSearchField(clear: search.query.isEmpty ? nil : { search.query = ""; searchFocused = true }) {
+            TextField("Search along the route", text: $search.query)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($searchFocused)
+                .accessibilityIdentifier("addStop.search")
+                .onChange(of: search.query) { model.search.queryChanged() }
+                .onSubmit { model.search.submit() }
+        }
+        .onChange(of: searchFocused) { _, focused in if focused { onExpand() } }
+        if let message = model.search.errorMessage {
+            InlineNote(message, tone: .alert)
+        }
+        if model.search.showsList || searchFocused {
+            PlaceSearchResults(model: model.search, distance: .alongRoute, showsKind: true, onPick: { place in
+                searchFocused = false
+                model.pick(place)
+            })
+        } else {
+            rnrList
+        }
     }
 
-    // MARK: Step 2: what and how long
+    @ViewBuilder private var rnrList: some View {
+        Text("R&R along the way, in order")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.surfaceSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.m)
+            .padding(.top, Spacing.xs)
+            .accessibilityAddTraits(.isHeader)
+        if model.loading {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, Spacing.l).accessibilityLabel("Looking for R&Rs")
+        } else if model.rows.isEmpty {
+            Text("No R&R on our side of the road along this trip. Search for a place instead.")
+                .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Spacing.m)
+                .accessibilityIdentifier("addStop.none")
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(model.rows.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 { RowDivider() }
+                    rnrRow(row)
+                }
+            }
+            .surfaceTile(radius: Radius.card)
+        }
+    }
+
+    private func rnrRow(_ row: AddStopLogic.Row) -> some View {
+        let selected = row.id == model.selectedId
+        let taken = row.alreadyStop
+        return Button { onSelect(row.id) } label: {
+            HStack(spacing: Spacing.m) {
+                Text("\(row.number)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(selected ? Color.ikutAccent : Color(red: 0.56, green: 0.56, blue: 0.58), in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(.primary)
+                    Text(AddStopLogic.detail(row, selected: selected)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if selected {
+                    Image(systemName: "checkmark").font(.body.weight(.bold)).foregroundStyle(Color.ikutAccent).accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+            .opacity(taken ? 0.45 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(taken)
+        .id(row.id)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("addStop.rnr.\(row.number)")
+    }
+
+    /// On a material, not the tile fill: the rows scroll under it.
+    private var stayRow: some View {
+        HStack(spacing: Spacing.m) {
+            Text("Stay").font(.callout)
+            Spacer(minLength: Spacing.s)
+            Text(StopFormat.length(minutes: model.stay)).font(.body.weight(.semibold)).monospacedDigit()
+                .accessibilityIdentifier("addStop.stay")
+            HStack(spacing: Spacing.xs) {
+                Button { model.step(-1) } label: { Image(systemName: "minus").frame(width: 36, height: 36) }
+                    .disabled(!AddStopLogic.canStep(model.stay, by: -1))
+                    .accessibilityLabel("Shorter").accessibilityIdentifier("addStop.shorter")
+                Button { model.step(1) } label: { Image(systemName: "plus").frame(width: 36, height: 36) }
+                    .disabled(!AddStopLogic.canStep(model.stay, by: 1))
+                    .accessibilityLabel("Longer").accessibilityIdentifier("addStop.longer")
+            }
+            .buttonStyle(.bordered).buttonBorderShape(.circle).tint(Color.ikutAccent)
+        }
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+        .frame(minHeight: 50)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+    }
+
+    // MARK: Add
+
+    @ViewBuilder private var addBar: some View {
+        if let title = model.addTitle {
+            // Stay sits with the button, so it is in view whatever the list's length (an R&R only, not a searched place).
+            VStack(spacing: Spacing.s) {
+                if model.picked == nil, model.selected != nil { stayRow }
+                Button {
+                    if let draft = model.take() { onAdd(draft) }
+                } label: { Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, minHeight: 50) }
+                    .actionButton(.primary, onGlass: true)
+                    .disabled(model.draft == nil)
+                    .accessibilityIdentifier("addStop.add")
+            }
+            .sheetActionBar(lift: barLift)
+        }
+    }
+
+    // MARK: A searched place: what it is and how long
 
     private func details(_ place: DestinationResult) -> some View {
         VStack(spacing: Spacing.cozy) {
@@ -184,77 +242,72 @@ struct AddStopSheet: View {
                 IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(place.name).font(.body)
-                    Text(placeLine(place)).font(.footnote).foregroundStyle(.secondary)
+                    Text(placeLine(place)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
-            .ikutSurface(Color(.secondarySystemGroupedBackground), radius: Radius.row + 2)
+            .surfaceTile(radius: Radius.card)
             .accessibilityElement(children: .combine)
 
             VStack(alignment: .leading, spacing: Spacing.s) {
                 caption("What for?")
-                let kinds = (canMeet ? [PlannedStopKind.meet] : []) + [.fuel, .food, .rest, .toilet, .sight]
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 3), spacing: Spacing.s) {
-                    ForEach(kinds, id: \.self) { option in kindTile(option) }
+                    ForEach(AddStopLogic.kinds(canMeet: model.canMeet), id: \.self) { option in kindTile(option) }
                 }
             }
 
-            if kind == .meet {
+            if model.kind == .meet {
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     caption("Meet at (optional)")
                     meetTimeRow
                 }
                 Text("The trip starts here. Everyone drives to this spot first, and the lead car taps Leave when you’re all there.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(Color.surfaceSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Spacing.xs)
             } else {
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     caption("How long? (optional)")
                     HStack(spacing: Spacing.s) {
-                        chip("None", selected: minutes == nil) { minutes = nil }
+                        chip("None", selected: model.searchedMinutes == nil) { model.searchedMinutes = nil }
                         ForEach(PlannedStop.allowedMinutes, id: \.self) { value in
-                            chip(StopFormat.length(minutes: value), selected: minutes == value) { minutes = value }
+                            chip(StopFormat.length(minutes: value), selected: model.searchedMinutes == value) { model.searchedMinutes = value }
                         }
                     }
                 }
-                if !canMeet {
+                if !model.canMeet {
                     Text("A meeting point can only be the first stop.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, Spacing.xs)
                 }
             }
-
-            Button { add(place) } label: { Text("Add to the trip").frame(maxWidth: .infinity) }
-                .actionButton(.primary)
-                .padding(.top, Spacing.s)
-                .accessibilityIdentifier("addStop.add")
         }
     }
 
     private func placeLine(_ place: DestinationResult) -> String {
         let word = PlaceKind.word(for: place)
-        guard let along = along?.place(for: place.coordinate) else { return word }
+        guard let along = model.search.along?.place(for: place.coordinate) else { return word }
         return "\(word) · \(along)"
     }
 
     private func caption(_ text: String) -> some View {
-        Text(text.uppercased()).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, Spacing.xs)
+        Text(text.uppercased()).font(.footnote).foregroundStyle(Color.surfaceSecondary).padding(.horizontal, Spacing.xs)
             .accessibilityAddTraits(.isHeader)
     }
 
     private func kindTile(_ option: PlannedStopKind) -> some View {
-        let selected = kind == option
-        return Button { kind = option } label: {
+        let selected = model.kind == option
+        return Button { model.kind = option } label: {
             VStack(spacing: Spacing.tight) {
                 Image(systemName: option.symbol).font(.system(size: 20, weight: .semibold))
                 Text(StopFormat.kind(option)).font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(selected ? Color.white : Color.primary)
             .frame(maxWidth: .infinity, minHeight: 84)
-            .ikutSurface(selected ? AnyShapeStyle(option.tint) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)), radius: Radius.row + 2)
+            .background(selected ? AnyShapeStyle(option.tint) : AnyShapeStyle(Color.primary.opacity(0.06)),
+                        in: RoundedRectangle(cornerRadius: Radius.row + 2, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -269,7 +322,7 @@ struct AddStopSheet: View {
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(selected ? Color.white : Color.primary)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(selected ? AnyShapeStyle(Color.ikutAccent) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)), in: Capsule())
+                .background(selected ? AnyShapeStyle(Color.ikutAccent) : AnyShapeStyle(Color.primary.opacity(0.06)), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -279,38 +332,26 @@ struct AddStopSheet: View {
         HStack {
             Text("Time")
             Spacer()
-            if let clock = meetClock {
-                DatePicker("Time", selection: Binding(get: { clock }, set: { meetClock = $0 }), displayedComponents: .hourAndMinute)
+            if let clock = model.meetClock {
+                DatePicker("Time", selection: Binding(get: { clock }, set: { model.meetClock = $0 }), displayedComponents: .hourAndMinute)
                     .labelsHidden()
-                Button { meetClock = nil } label: {
+                Button { model.meetClock = nil } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary).frame(width: 32, height: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("No time")
             } else {
-                Button("Set a time") { meetClock = Self.defaultMeetClock() }
+                Button("Set a time") { model.meetClock = Self.defaultMeetClock() }
                     .font(.body.weight(.semibold))
             }
         }
         .padding(.horizontal, Spacing.cozy)
         .frame(minHeight: 50)
-        .ikutSurface(Color(.secondarySystemGroupedBackground), radius: Radius.row + 2)
+        .surfaceTile(radius: Radius.card)
     }
 
     /// 9:00 today, the starting point for the picker.
     private static func defaultMeetClock() -> Date {
         Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
-    }
-
-    private func add(_ place: DestinationResult) {
-        var meetAt: Date?
-        if kind == .meet, let clock = meetClock {
-            let parts = Calendar.current.dateComponents([.hour, .minute], from: clock)
-            meetAt = StopFormat.nextTime(hour: parts.hour ?? 9, minute: parts.minute ?? 0, after: Date())
-        }
-        onAdd(StopDraft(
-            name: place.name, coordinate: place.coordinate, kind: kind,
-            minutes: kind == .meet ? nil : minutes, meetAt: meetAt))
-        dismiss()
     }
 }

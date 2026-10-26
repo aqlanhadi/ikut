@@ -110,6 +110,8 @@
 		5D18041BA2CDBB3808121983 /* PlaceRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FE148B8C110122AD858B9D2 /* PlaceRules.swift */; };
 		5E0572F32C4E89743D919B29 /* AuthEmulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */; };
 		5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881F14A69E038A11FD750DD0 /* Theme.swift */; };
+		603229DBA878868CF3EDDB49 /* AddStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBAE5CE8B29F5659AA605AB /* AddStopTests.swift */; };
+		6062867CC5108F8969937695 /* AddStopModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0322844C0F9486635E0DB1C /* AddStopModel.swift */; };
 		61C105833954508E604F390C /* RecapLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E56E0C2FFCC41474FCCA759 /* RecapLogic.swift */; };
 		61D02EBF0CDB17DDAFA6BC46 /* ConvoyUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */; };
 		624C36070F91D462E710D239 /* MapMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE50F5D10052B6F1F9BB3997 /* MapMarkerView.swift */; };
@@ -395,6 +397,7 @@
 		698FEDDD6491F2113B929776 /* RecapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapService.swift; sourceTree = "<group>"; };
 		69F3CF9A6AAD541D8024D3F1 /* JoinTowns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTowns.swift; sourceTree = "<group>"; };
 		6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteTimeoutTests.swift; sourceTree = "<group>"; };
+		6BBAE5CE8B29F5659AA605AB /* AddStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopTests.swift; sourceTree = "<group>"; };
 		6CAD86226D34FC774F9DB35D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyScenarioUITests.swift; sourceTree = "<group>"; };
 		6E4D3D4F86031C4EEBEE0B86 /* ConvoyHeaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyHeaderTests.swift; sourceTree = "<group>"; };
@@ -515,6 +518,7 @@
 		EE50F5D10052B6F1F9BB3997 /* MapMarkerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapMarkerView.swift; sourceTree = "<group>"; };
 		EF0803549353B1CD91367C85 /* LobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyView.swift; sourceTree = "<group>"; };
 		EF960678563AF80F4392D216 /* PlaceResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceResultRow.swift; sourceTree = "<group>"; };
+		F0322844C0F9486635E0DB1C /* AddStopModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopModel.swift; sourceTree = "<group>"; };
 		F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportTests.swift; sourceTree = "<group>"; };
 		F56C3DA55D52C315FF1422E4 /* ConvoyOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyOrdering.swift; sourceTree = "<group>"; };
 		F56D59AA9467F430D986EC9F /* HomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSheet.swift; sourceTree = "<group>"; };
@@ -891,6 +895,7 @@
 		D7B8B479794B7C1CA1E5773F /* ikutTests */ = {
 			isa = PBXGroup;
 			children = (
+				6BBAE5CE8B29F5659AA605AB /* AddStopTests.swift */,
 				301CCB7DC568D10AFB1C2B1B /* AlertTests.swift */,
 				9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */,
 				D34759F3D28A64C5908B2C7D /* AuthTests.swift */,
@@ -972,6 +977,7 @@
 		DF2CE356C6016181B76B4D76 /* Trip */ = {
 			isa = PBXGroup;
 			children = (
+				F0322844C0F9486635E0DB1C /* AddStopModel.swift */,
 				031322A39B18B3872843D671 /* AddStopSheet.swift */,
 				D34924ABFFA93014C880E890 /* CreateTripModel.swift */,
 				CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */,
@@ -1206,6 +1212,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6062867CC5108F8969937695 /* AddStopModel.swift in Sources */,
 				0D9CB9A5B05A21CCD5F1B40E /* AddStopSheet.swift in Sources */,
 				E0DA5017D0F92CF49077EA02 /* AlertBannerView.swift in Sources */,
 				10D7571EF4F2BC7E905F5A3A /* AlertCenter.swift in Sources */,
@@ -1394,6 +1401,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				603229DBA878868CF3EDDB49 /* AddStopTests.swift in Sources */,
 				EE9B601663917D691533A6BA /* AlertTests.swift in Sources */,
 				5E0572F32C4E89743D919B29 /* AuthEmulatorTests.swift in Sources */,
 				BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */,

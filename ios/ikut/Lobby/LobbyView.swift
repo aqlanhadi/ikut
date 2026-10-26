@@ -28,7 +28,8 @@ struct LobbyView: View {
     @State private var joins: [String: LobbyContent.CarJoin] = [:]
     @State private var planner: StopPlanner
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showAddStop = false
+    /// Add a stop (B6): while it is set, the sheet's content is the stop chooser and the map shows its R&Rs.
+    @State private var adding: AddStopModel?
     @State private var showSuggestStops = false
     @State private var renaming = false
     @State private var renameText = ""
@@ -87,7 +88,7 @@ struct LobbyView: View {
     /// organizer's card (editable) rather than a member's.
     init(
         sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false,
-        joinTowns: JoinTowns? = nil
+        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil
     ) {
         self.init(sample: model)
         // A sample lobby never looks a town up unless the demo gives it a geocoder.
@@ -95,6 +96,7 @@ struct LobbyView: View {
         _expanded = State(initialValue: tall)
         _planner = State(initialValue: planner)
         sampleOrganizer = organizer
+        _adding = State(initialValue: adding)
         if let ownWay { _ownWay = State(initialValue: ownWay) }
     }
     #endif
@@ -242,7 +244,7 @@ struct LobbyView: View {
 
     private var cover: LobbySheet.Cover {
         LobbySheet.Cover(
-            tripMap: showMap, changeDestination: showChangeDestination, addStop: showAddStop,
+            tripMap: showMap, changeDestination: showChangeDestination,
             suggestStops: showSuggestStops, renaming: renaming, alwaysExplainer: session.alwaysExplainerShowing,
             confirmLeave: confirmLeave, confirmEnd: confirmEnd)
     }
@@ -260,13 +262,34 @@ struct LobbyView: View {
         let trip = model.trip
         return LobbyMapLogic.pins(
             stops: shownStops, destinationName: trip?.destination.name, destination: trip?.destination.coordinate.coordinate,
-            isOrganizer: isOrganizer, ownJoin: ownWay.joinCoordinate)
+            isOrganizer: isOrganizer, ownJoin: ownWay.joinCoordinate,
+            coveredByCandidate: adding.map { model in { model.covers($0) } }) + (adding?.pins ?? [])
+    }
+
+    private func openAddStop() {
+        let coordinates = routeInfo.coordinates
+        adding = AddStopModel(
+            line: coordinates.count > 1 ? RouteLine(coordinates) : nil,
+            routeSeconds: model.trip?.routeSeconds ?? routeInfo.travelTime,
+            along: coordinates.count > 1 ? AlongRoute(coordinates: coordinates, seconds: routeInfo.travelTime) : nil,
+            canMeet: StopListLogic.canMeet(among: planner.items), canAdd: StopListLogic.canAdd(among: planner.items),
+            existing: SuggestStopsModel.existingOffsets(planner.items))
+    }
+
+    /// Back to the lobby, the map back on the whole trip.
+    private func closeAddStop() {
+        adding = nil
+        mapCommand = mapCommand.asking(.wholeTrip)
     }
 
     var body: some View {
         LobbyMapView(
             route: routeInfo.coordinates, pins: mapPins, ownRoute: isOrganizer ? [] : ownWay.ownRoute,
-            ownColorHex: ownCarColor, sheetCompact: compact, command: $mapCommand)
+            ownColorHex: ownCarColor, sheetCompact: compact,
+            onCandidateTap: { adding?.select($0) }, command: $mapCommand)
+            // The trip started from another phone: no more stop edits.
+            .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
+            .onChange(of: adding?.selectedId, initial: true) { _, id in if let id { flyTo(id) } }
             .onAppear { onScreen = true }
             .onDisappear { onScreen = false }
             .sheet(isPresented: Binding(get: { !sheetCovered }, set: { _ in }), onDismiss: { sheetUp = false }) {
@@ -292,14 +315,6 @@ struct LobbyView: View {
             syncPlanner()
         }
         .onChange(of: model.stops) { _, _ in syncPlanner() }
-        .sheet(isPresented: Binding(
-            get: { BottomSheet.presents(wanted: showAddStop, sheetUp: sheetUp) }, set: { showAddStop = $0 })) {
-            AddStopSheet(
-                along: routeInfo.coordinates.count > 1
-                    ? AlongRoute(coordinates: routeInfo.coordinates, seconds: routeInfo.travelTime) : nil,
-                canMeet: StopListLogic.canMeet(among: planner.items),
-                onAdd: { addStop($0) })
-        }
         .sheet(isPresented: Binding(
             get: { BottomSheet.presents(wanted: showSuggestStops, sheetUp: sheetUp) }, set: { showSuggestStops = $0 })) {
             SuggestStopsSheet(
@@ -382,7 +397,37 @@ struct LobbyView: View {
     /// trip, the waiting line and Show map sit in its bottom bar at both heights.
     private var sheetContent: some View {
         let compact = compact
-        return VStack(spacing: 0) {
+        return Group {
+            if let adding {
+                AddStopContent(
+                    model: adding, barLift: barLift, onSelect: { adding.select($0) },
+                    onExpand: { withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { expanded = true } },
+                    onBack: closeAddStop,
+                    onAdd: { draft in
+                        addStop(draft)
+                        closeAddStop()
+                    })
+            } else {
+                lobbyContent
+            }
+        }
+        .environment(\.inPanelSheet, true)
+        .padding(.top, LobbySheet.indicatorRoom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
+        .sheet(isPresented: $showQR) {
+            if let code = model.trip?.code { QRCodeSheet(code: code) }
+        }
+        .presentationDetents(LobbySheet.detents(compact: compact), selection: Binding(
+            get: { LobbySheet.detent(expanded: expanded, compact: compact) },
+            set: { expanded = LobbySheet.isExpanded($0) }))
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: LobbySheet.medium(compact)))
+        .interactiveDismissDisabled()
+    }
+
+    private var lobbyContent: some View {
+        VStack(spacing: 0) {
             sheetHeader
             List {
                 statusBanner
@@ -420,19 +465,6 @@ struct LobbyView: View {
             .contentMargins(.bottom, Spacing.l, for: .scrollContent)
             .sheetBottomBar { bottomBar }
         }
-        .environment(\.inPanelSheet, true)
-        .padding(.top, LobbySheet.indicatorRoom)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
-        .sheet(isPresented: $showQR) {
-            if let code = model.trip?.code { QRCodeSheet(code: code) }
-        }
-        .presentationDetents(LobbySheet.detents(compact: compact), selection: Binding(
-            get: { LobbySheet.detent(expanded: expanded, compact: compact) },
-            set: { expanded = LobbySheet.isExpanded($0) }))
-        .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: LobbySheet.medium(compact)))
-        .interactiveDismissDisabled()
     }
 
     // MARK: Header
@@ -710,7 +742,7 @@ struct LobbyView: View {
                     .lobbyRow()
             }
             if canEditStops {
-                stopAction("Add a stop", systemImage: "plus", caption: nil, id: "stops.add") { showAddStop = true }
+                stopAction("Add a stop", systemImage: "plus", caption: nil, id: "stops.add") { openAddStop() }
                     .disabled(!StopListLogic.canAdd(among: stops))
                     .overlay(alignment: .top) { Divider() }
                     .cardSlice()

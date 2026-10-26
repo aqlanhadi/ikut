@@ -39,7 +39,7 @@ struct LobbyMapTests {
     }
 
     @Test(arguments: [
-        LobbySheet.Cover(tripMap: true), .init(changeDestination: true), .init(addStop: true), .init(suggestStops: true),
+        LobbySheet.Cover(tripMap: true), .init(changeDestination: true), .init(suggestStops: true),
         .init(renaming: true), .init(alwaysExplainer: true), .init(confirmLeave: true), .init(confirmEnd: true),
     ])
     func eachPushedOrPresentedThingCoversTheSheet(cover: LobbySheet.Cover) {
