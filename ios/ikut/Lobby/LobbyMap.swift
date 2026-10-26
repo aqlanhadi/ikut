@@ -26,9 +26,8 @@ enum LobbySheet {
     static func detent(expanded: Bool, compact: CGFloat) -> PresentationDetent { expanded ? tall : medium(compact) }
     static func isExpanded(_ detent: PresentationDetent) -> Bool { BottomSheet.isTall(detent, tall: tall) }
 
-    /// What is pushed or presented from the lobby: the sheet steps aside for each and comes back when they are gone.
+    /// What is pushed or presented from the lobby (the driving mode is not: it changes the sheet's content): the sheet steps aside for each and comes back when they are gone.
     struct Cover: Equatable {
-        var tripMap = false
         var changeDestination = false
         var suggestStops = false
         var renaming = false
@@ -39,7 +38,7 @@ enum LobbySheet {
 
     /// Whether the sheet is away: anything above is up, or the lobby itself is not on screen (popped).
     static func isCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
-        !lobbyOnScreen || cover.tripMap || cover.changeDestination || cover.suggestStops
+        !lobbyOnScreen || cover.changeDestination || cover.suggestStops
             || cover.renaming || cover.alwaysExplainer || cover.confirmLeave || cover.confirmEnd
     }
 }
@@ -164,8 +163,10 @@ enum LobbyMapLogic {
     static func shouldRefit(positionedByUser: Bool, onStop: Bool) -> Bool { !positionedByUser && !onStop }
 }
 
-/// The full-screen map behind the lobby's sheet: the route, the planned stops, the destination and your own position.
-struct LobbyMapView: View {
+/// The lobby's layer over the trip screen's one map (`TripScreenHost`): it asks the map for the route, the planned stops,
+/// the destination and your own position, keeps the camera on the whole trip (or a stop asked for) above the sheet,
+/// and draws the round "show the whole trip" button.
+struct LobbyMapLayer: View {
     var route: [CLLocationCoordinate2D]
     var pins: [LobbyPin]
     /// A participant's own way in, in their car's colour.
@@ -176,8 +177,8 @@ struct LobbyMapView: View {
     var onCandidateTap: (String) -> Void = { _ in }
     @Binding var command: LobbyMapCommand
 
+    @Environment(TripMapStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var camera: MapCameraPosition = .automatic
     @State private var mapHeight: CGFloat = 0
     /// The map's top safe area: the status bar (the lobby has no navigation bar).
     @State private var safeTop: CGFloat = 0
@@ -185,50 +186,55 @@ struct LobbyMapView: View {
     @State private var fitted = false
 
     var body: some View {
-        Map(position: $camera) {
-            TripMapContent(
-                input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),
-                style: TripMapStyle(onCandidateTap: onCandidateTap))
-        }
-        .mapStyle(.standard(pointsOfInterest: .excludingAll))
-        .mapControlVisibility(.hidden)
-        // The logo and Legal ride above the medium sheet from the first frame, and stay when it is pulled up.
-        .safeAreaPadding(.bottom, LobbySheet.legalInset(compact: sheetCompact))
-        .ignoresSafeArea()
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-            guard height != mapHeight else { return }
-            mapHeight = height
-            refitIfOurs(animated: false)
-        }
-        .onChange(of: route.count, initial: true) { _, _ in refitIfOurs(animated: fitted) }
-        .onChange(of: pins) { _, _ in refitIfOurs(animated: fitted) }
-        .onChange(of: command) { _, new in go(new.target, animated: true) }
-        .overlay(alignment: .topTrailing) {
-            Button { command = command.asking(.wholeTrip) } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 56, height: 56)
-                    .contentShape(Circle())
+        Color.clear
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+                guard height != mapHeight else { return }
+                mapHeight = height
+                refitIfOurs(animated: false)
             }
-            .buttonStyle(.plain)
-            .roundGlass()
-            .padding(.trailing, Spacing.m)
-            .padding(.top, safeTop + Spacing.xs)
-            .accessibilityLabel("Show the whole trip")
-            .accessibilityIdentifier("lobby.wholeTrip")
-        }
-        // Measured here, outside the map's ignoresSafeArea (inside it the insets read zero): the top safe area is the
-        // status bar, as the layout has it.
-        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
-            guard top != safeTop else { return }
-            safeTop = top
-            refitIfOurs(animated: false)
-        }
+            .onChange(of: route.count, initial: true) { _, _ in refitIfOurs(animated: fitted) }
+            .onChange(of: pins) { _, _ in refitIfOurs(animated: fitted) }
+            .onChange(of: command) { _, new in go(new.target, animated: true) }
+            // Coming back from driving: the camera flies from your car back to the whole trip, wherever it was left.
+            .onAppear {
+                if TripScreenLogic.entryCamera(.lobby) == .wholeTrip {
+                    go(.wholeTrip, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                Button { command = command.asking(.wholeTrip) } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 56, height: 56)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .roundGlass()
+                .padding(.trailing, Spacing.m)
+                .padding(.top, safeTop + Spacing.xs)
+                .accessibilityLabel("Show the whole trip")
+                .accessibilityIdentifier("lobby.wholeTrip")
+            }
+            // Measured here, outside the layer's ignoresSafeArea (inside it the insets read zero): the top safe area is
+            // the status bar, as the layout has it.
+            .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
+                guard top != safeTop else { return }
+                safeTop = top
+                refitIfOurs(animated: false)
+            }
+            .preference(key: TripMapSpecKey.self, value: TripMapSpec(
+                input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),
+                style: TripMapStyle(onCandidateTap: onCandidateTap),
+                // The logo and Legal ride above the medium sheet from the first frame, and stay when it is pulled up.
+                bottomPadding: LobbySheet.legalInset(compact: sheetCompact),
+                hidesControls: true))
     }
 
     private func refitIfOurs(animated: Bool) {
-        guard LobbyMapLogic.shouldRefit(positionedByUser: camera.positionedByUser, onStop: onStop) else { return }
+        guard LobbyMapLogic.shouldRefit(positionedByUser: stage.camera.positionedByUser, onStop: onStop) else { return }
         go(.wholeTrip, animated: animated)
     }
 
@@ -240,9 +246,9 @@ struct LobbyMapView: View {
         fitted = true
         let position = MapCameraPosition.region(region)
         if animated, let motion = Motion.camera(reduceMotion: reduceMotion) {
-            withAnimation(motion) { camera = position }
+            withAnimation(motion) { stage.camera = position }
         } else {
-            camera = position
+            stage.camera = position
         }
     }
 }

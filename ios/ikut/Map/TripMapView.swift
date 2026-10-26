@@ -5,12 +5,15 @@ import SwiftUI
 /// own routes dashed up to where they merge, a numbered marker per car, a trip pill at the top,
 /// mode controls on the right and the convoy panel (list, Joining, Report, Stop) at the bottom.
 ///
-/// Push it with the lobby's existing session (never a second one). The Stop button opens the
-/// request sheet, an open stop request shows as a card above the panel, and the pill's back button goes
-/// back to the lobby, where the trip is left or ended.
+/// The trip screen's driving layer (D53): it draws its chrome over the host's one map (`TripScreenHost`), tells the map
+/// what to draw (`TripMapSpec`) and moves its camera, and fills the one sheet with the convoy panel. The lobby puts it
+/// on screen with its own session (never a second one). The Stop button opens the request sheet, an open stop request
+/// shows as a card above the panel, and the back button switches the screen back to the lobby, where the trip is left
+/// or ended.
 struct TripMapView: View {
     let session: TripSession
-    var onExit: () -> Void
+    /// Back to the lobby: the same screen, the lobby's mode.
+    var onBack: () -> Void
     /// The trip ended (organizer or server): the owner shows the recap.
     var onEnded: () -> Void = {}
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
@@ -19,11 +22,10 @@ struct TripMapView: View {
     /// The demo can open the card on one of its screens (`IKUT_MAP_DEMO_CARD`); nil in the app.
     private var demoScreen: String?
 
+    @Environment(TripMapStage.self) private var stage
     @State private var model: TripMapModel
     @State private var alerts = AlertCenter()
     @State private var toast = ReportToastModel()
-    @State private var camera: MapCameraPosition = .automatic
-    @State private var cameraHeading = 0.0
     /// The convoy list starts folded on every arrival at the map; the driver opens it when they want it.
     @State private var panelExpanded = false
     @State private var reportContext: ReportContext?
@@ -47,17 +49,12 @@ struct TripMapView: View {
     @State private var pillNow = Date()
     @State private var driving = DrivingDetector()
     @State private var glanceError = GlanceError()
-    @State private var mapMaxX: CGFloat = 0
     @State private var mapHeight: CGFloat = 0
     /// The banner stack's height, for `mapInsets`; the sheet's own height comes from `sheetHeights`.
     @State private var topHeight: CGFloat = 0
-    /// Apple's convoy sheet: on screen (it reports its own appear and dismiss), stepping aside for an exit,
-    /// the action that waits for it to go, and the panel's measured heights (nil until each layout is seen).
+    /// Apple's convoy sheet: on screen (it reports its own appear and dismiss), and the panel's measured heights (nil
+    /// until each layout is seen).
     @State private var panelUp = false
-    @State private var visible = false
-    @State private var leaving = false
-    @State private var afterPanel: (() -> Void)?
-    @State private var exitWait = PanelSheet.ExitWait()
     @State private var foldedContent: CGFloat?
     @State private var unfoldedContent: CGFloat?
     @State private var cardContent: CGFloat?
@@ -105,14 +102,15 @@ struct TripMapView: View {
     private var keepAwakeOn: Bool { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) }
     /// What was asked on the last trip (`TripAskMemory`), so leaving the map and coming back doesn't nag.
     @AppStorage("ikut.map.askedTrip") private var askedTrip = ""
-    @Environment(\.dismiss) private var dismiss
 
-    init(session: TripSession, onExit: @escaping () -> Void = {}, onEnded: @escaping () -> Void = {}) {
+    init(session: TripSession, onBack: @escaping () -> Void = {}, onEnded: @escaping () -> Void = {}) {
         self.session = session
-        self.onExit = onExit
+        self.onBack = onBack
         self.onEnded = onEnded
         liveServices = true
-        _model = State(initialValue: TripMapModel(session: session))
+        let model = TripMapModel(session: session)
+        model.mode = TripScreenLogic.drivingEntryMode
+        _model = State(initialValue: model)
     }
 
     /// For the demo and previews: a model that is fed by hand and no live services.
@@ -121,11 +119,11 @@ struct TripMapView: View {
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
         stopService: any StopServing = StopService(),
-        onExit: @escaping () -> Void = {}
+        onBack: @escaping () -> Void = {}
     ) {
         _alerts = State(initialValue: alerts)
         self.session = session
-        self.onExit = onExit
+        self.onBack = onBack
         liveServices = false
         self.stopService = stopService
         demoScreen = demoCard
@@ -142,16 +140,16 @@ struct TripMapView: View {
         _driving = State(initialValue: DrivingDetector(isDriving: demoDriving))
         _stopBoard = State(initialValue: stopBoard)
         _model = State(initialValue: model)
-        _camera = State(initialValue: Self.position(for: model.cameraTarget) ?? .automatic)
     }
 
     var body: some View {
-        map
+        // Clear and untouchable: the host's map is under it. Only the chrome laid over it takes touches.
+        Color.clear
+            .allowsHitTesting(false)
             .ignoresSafeArea(edges: .bottom)
             .overlay(alignment: .top) {
                 topStack.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { mapMaxX = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapHeight = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { mapWidth = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { mapMinY = $0 }
@@ -177,8 +175,14 @@ struct TripMapView: View {
                 .animation(.linear(duration: 0.2), value: panelExpanded)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: Binding(get: { visible && !panelCovered }, set: { _ in }), onDismiss: panelDismissed) {
-                panelSheet
+            .preference(key: TripMapSpecKey.self, value: mapSpec)
+            // The one sheet: the lobby's content becomes the convoy panel's, with its detents, in the sheet that is up.
+            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(
+                presented: !panelCovered, onDismiss: panelDismissed, content: AnyView(panelSheet)))
+            .onChange(of: stage.reading, initial: true) { _, reading in measureCamera(reading) }
+            // Any pan, pinch or rotate by the user hands the camera back to them.
+            .onChange(of: stage.camera.positionedByUser) { _, byUser in
+                if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
             }
             .onChange(of: typeSize) { _, _ in
                 foldedContent = nil
@@ -226,29 +230,32 @@ struct TripMapView: View {
 
     // MARK: Map
 
-    private var map: some View {
-        Map(position: $camera) {
-            TripMapContent(
-                input: .driving(route: model.mainRouteCoordinates, overlays: model.overlays,
-                                hazards: model.hazards.markers, cars: model.markers),
-                style: TripMapStyle(cameraHeading: cameraHeading, containerWidth: mapMaxX, pingingEventId: approach?.eventId))
-        }
-        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-        // MapKit centers the camera, and fits regions, inside the safe area; `cameraRoom` does the
-        // same for the rest of what covers the map, so my car is in the middle of what can be seen.
-        .safeAreaPadding(.bottom, legalInset)
-        .onMapCameraChange { context in
-            cameraHeading = context.camera.heading
-            let fullHeight = mapMaxY - mapMinY
-            guard fullHeight > 0, context.camera.distance > 0, context.camera.pitch == 0 else { return }
-            let measured = latitudePerPointPerMeter
-            latitudePerPointPerMeter = context.region.span.latitudeDelta / Double(fullHeight) / context.camera.distance
-            if measured == 0 { move(to: model.cameraTarget, animated: true) }
-        }
-        // Any pan, pinch or rotate by the user hands the camera back to them.
-        .onChange(of: camera.positionedByUser) { _, byUser in
-            if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
-        }
+    /// What the host's map draws for driving. MapKit centers the camera, and fits regions, inside the map's safe area
+    /// (`legalInset`); `cameraRoom` does the same for the rest of what covers the map, so my car is in the middle of
+    /// what can be seen.
+    private var mapSpec: TripMapSpec {
+        TripMapSpec(
+            input: .driving(route: model.mainRouteCoordinates, overlays: model.overlays,
+                            hazards: model.hazards.markers, cars: model.markers),
+            style: TripMapStyle(pingingEventId: approach?.eventId),
+            bottomPadding: legalInset)
+    }
+
+    /// The map's height (it runs under the status bar, `mapAbove`), from the host's map.
+    private var mapFullHeight: CGFloat { mapMaxY - stage.mapFrame.minY }
+
+    /// How far above this layer's top the map starts: the one map runs under the status bar for the lobby and for
+    /// driving alike, while this layer (and the banner stack it measures) starts under it.
+    private var mapAbove: CGFloat { max(mapMinY - stage.mapFrame.minY, 0) }
+
+    /// Reads the map's scale off its own camera once a move has ended; the first reading aims the camera again.
+    private func measureCamera(_ reading: TripCameraReading?) {
+        guard let reading else { return }
+        let fullHeight = mapFullHeight
+        guard fullHeight > 0, reading.distance > 0, reading.pitch == 0 else { return }
+        let measured = latitudePerPointPerMeter
+        latitudePerPointPerMeter = reading.latitudeDelta / Double(fullHeight) / reading.distance
+        if measured == 0 { move(to: model.cameraTarget, animated: true) }
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
@@ -261,8 +268,8 @@ struct TripMapView: View {
     /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`).
     private var cameraRoom: MapCameraRoom {
         MapCameraRoom(
-            width: mapWidth, height: max(mapMaxY - mapMinY - legalInset, 0),
-            top: mapInsets.top, bottom: max(mapInsets.bottom - legalInset, 0),
+            width: mapWidth, height: max(mapFullHeight - legalInset, 0),
+            top: mapInsets.top + mapAbove, bottom: max(mapInsets.bottom - legalInset, 0),
             latitudePerPointPerMeter: latitudePerPointPerMeter)
     }
 
@@ -282,9 +289,9 @@ struct TripMapView: View {
     private func move(to target: CameraTarget?, animated: Bool) {
         guard let next = Self.position(for: cameraRoom.target(target)) else { return }
         if animated {
-            withAnimation(DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)) { camera = next }
+            withAnimation(DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)) { stage.camera = next }
         } else {
-            camera = next
+            stage.camera = next
         }
     }
 
@@ -453,9 +460,13 @@ struct TripMapView: View {
         }
     }
 
-    /// Back to the lobby: a round glass button of its own beside the pill, as tall as it.
+    /// Back to the lobby: a round glass button of its own beside the pill, as tall as it. The screen stays; the sheet
+    /// becomes the lobby's and the camera goes back to the whole trip. A card up goes with the convoy's content.
     private var backButton: some View {
-        Button { exit { dismiss() } } label: {
+        Button {
+            presentedCard = nil
+            onBack()
+        } label: {
             Image(systemName: "chevron.backward")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -465,6 +476,7 @@ struct TripMapView: View {
         .buttonStyle(.plain)
         .roundGlass()
         .accessibilityLabel("Back to lobby")
+        .accessibilityIdentifier("map.backToLobby")
     }
 
     private var tripPill: some View {
@@ -670,49 +682,22 @@ struct TripMapView: View {
         resettle()
     }
 
-    /// Steps aside for the trip ending (the recap), an exit in progress and the lobby's Always sheet.
+    /// Steps aside for the trip ending (the recap) and the lobby's Always sheet. Back to the lobby is not a leaving:
+    /// the sheet stays up and takes the lobby's content.
     private var panelCovered: Bool {
         PanelSheet.isCovered(
-            ended: session.isEnded, leaving: leaving,
+            ended: session.isEnded, leaving: false,
             explainerWants: TripSessionLogic.explainerWants(
                 wanted: session.alwaysExplainerShowing, askShowing: session.askShowing))
     }
 
-    /// The sheet's own dismissal is the signal: whatever waited for it (Back to lobby, Leave) runs now, no timer.
+    /// The convoy sheet went (the trip ended, the Always sheet): the card went with it.
     private func panelDismissed() {
         panelUp = false
         session.mapSheetUp = false
         // The card went with the convoy sheet; it comes back with it if it is still wanted.
         presentedCard = nil
         cardDismissing = PanelSheet.cardsGone.dismissing
-        runAfterPanel()
-    }
-
-    /// Runs the waiting action once, whether the dismissal report or the fallback gets here first.
-    private func runAfterPanel() {
-        guard exitWait.fire(), let action = afterPanel else { return }
-        afterPanel = nil
-        action()
-    }
-
-    /// Runs `action` once the sheet is gone: it would otherwise stay up over the screen that comes next.
-    private func exit(_ action: @escaping () -> Void) {
-        switch PanelSheet.exit(sheetUp: panelUp) {
-        case .now:
-            action()
-        case .afterDismissal:
-            afterPanel = action
-            exitWait.arm()
-            leaving = true
-            // A card up or sliding down must not hold the convoy sheet's dismissal; it goes with the sheet.
-            presentedCard = nil
-            cardDismissing = PanelSheet.cardsGone.dismissing
-            // A dismissal the sheet never reports must not keep the person on the map.
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(PanelSheet.exitFallback))
-                if exitWait.waiting { panelDismissed() }
-            }
-        }
     }
 
     /// Apple's own sheet over the map, as on Home: drag it between short (the folded panel) and tall (the
@@ -732,7 +717,7 @@ struct TripMapView: View {
             panelUp = true
             session.mapSheetUp = true
         }
-        .presentationDetents(PanelSheet.detents(in: heights), selection: Binding(
+        .presentationDetents(TripScreenLogic.Sheet.driving(heights).detents, selection: Binding(
             get: { PanelSheet.detent(shown, in: heights) },
             set: {
                 guard let tall = PanelSheet.choice($0, in: heights) else { return }
@@ -741,7 +726,7 @@ struct TripMapView: View {
         .onChange(of: measuredHeights, initial: true) { resettle() }
         .onChange(of: cardNow, initial: true) { _, want in syncCard(want) }
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(heights.tall)))
+        .presentationBackgroundInteraction(.enabled(upThrough: TripScreenLogic.Sheet.driving(heights).touchableUpThrough))
         .interactiveDismissDisabled()
         .sheet(item: Binding(get: { presentedCard }, set: cardSetByTheSystem), onDismiss: cardDismissed) { _ in
             cardSheet
@@ -1002,9 +987,9 @@ struct TripMapView: View {
     }
 
     private func appear() {
-        visible = true
         followApproachIfNeeded()
-        move(to: model.cameraTarget, animated: false)
+        // From the lobby the camera flies from the whole route to your car; on the screen's first frame it is placed.
+        move(to: model.cameraTarget, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
         guard liveServices else { return }
         model.regionMonitorFactory = { [session] in
             HazardRegionMonitor(
@@ -1061,12 +1046,8 @@ struct TripMapView: View {
     }
 
     private func disappear() {
-        visible = false
-        // Popped under the sheet (an edge swipe), its own dismissal may never come.
+        // Back to the lobby (the sheet stays up with the lobby's content) or popped: no convoy sheet any more.
         session.mapSheetUp = false
-        leaving = false
-        afterPanel = nil
-        _ = exitWait.fire()
         onScreen = false
         ask = nil
         session.askShowing = false

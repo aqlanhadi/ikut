@@ -89,7 +89,10 @@ struct HomeView: View {
                         path = [.lobby(tripId: tripId)]
                     }
                 case .lobby(let tripId):
-                    LobbyView(tripId: tripId, onExit: { path = [] }, onEnded: { path = [.recap(tripId: $0)] })
+                    // One trip screen: the lobby and driving are modes over its one map (D53).
+                    TripScreenHost {
+                        LobbyView(tripId: tripId, onExit: { path = [] }, onEnded: { path = [.recap(tripId: $0)] })
+                    }
                 case .recap(let tripId):
                     RecapView(tripId: tripId, onDone: { path = [] })
                 }

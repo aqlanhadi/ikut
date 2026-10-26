@@ -227,7 +227,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
         XCTAssertTrue(lobbyActionButton.waitForExistence(timeout: 120), "The organizer didn't start the trip")
         lobbyActionButton.tap()
         app.dismissMapAsks(first: 3)
-        XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
+        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 20), "Didn't reach the map")
         if notNow.waitForExistence(timeout: 2) { notNow.tap() }
         // The convoy sheet opens collapsed; open it to read the rows.
         let expand = app.buttons["Expand convoy list"]

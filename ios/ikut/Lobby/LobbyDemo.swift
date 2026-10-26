@@ -53,7 +53,7 @@ enum LobbyStopsDemo {
         stop("s3", "Kopitiam Gopeng", 4.45, 101.12, .food, nil, 2),
     ].sorted { $0.routeOffset < $1.routeOffset }.enumerated().map { var s = $1; s.order = $0; return s }
 
-    static func lobby(_ scene: Scene) -> LobbyView {
+    static func lobby(_ scene: Scene, driving: ((@escaping () -> Void) -> AnyView)? = nil) -> LobbyView {
         let planner = StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in })
         func model(_ stops: [PlannedStop], started: Bool = false) -> LobbyModel {
             let model = LobbyModel.sample(started: started, seconds: 2 * 3600 + 40 * 60, stops: stops, route: route)
@@ -75,7 +75,8 @@ enum LobbyStopsDemo {
         switch scene {
         case .organizer:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
-            return LobbyView(sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns)
+            return LobbyView(
+                sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns, driving: driving)
         case .tall:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true, tall: true)
@@ -196,6 +197,28 @@ struct DemoGeocoder: ReverseGeocoding {
     func lookup(_ coordinate: CLLocationCoordinate2D) async -> GeocodedName? { answer }
 }
 
+/// `trip-start-swap`: the organiser's lobby, and 2 s later Start trip, so the switch to driving can be watched: the same
+/// map, the camera from the whole route to my car, the lobby's sheet becoming the convoy's (D53).
+struct TripStartSwapDemo: View {
+    @Environment(TripMapStage.self) private var stage
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let lobby = LobbyStopsDemo.lobby(.organizer, driving: { onBack in
+        let model = MapDemo.model()
+        model.mode = TripScreenLogic.drivingEntryMode
+        return AnyView(TripMapView(
+            session: TripSession(tripId: "demo", userId: "u-c1"), model: model, stopService: DemoStopService(),
+            onBack: onBack))
+    })
+
+    var body: some View {
+        lobby.task {
+            try? await Task.sleep(for: .seconds(2))
+            let next = TripScreenLogic.mode(after: .start, from: stage.mode)
+            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.mode = next }
+        }
+    }
+}
+
 /// Screens for screenshots and UI tests, opened by launching with `IKUT_SCREEN=<name>` (debug builds only).
 @MainActor
 enum DemoScreens {
@@ -203,6 +226,8 @@ enum DemoScreens {
         func nav<V: View>(_ view: V) -> AnyView {
             AnyView(NavigationStack { view }.environment(LocationPermission()).environment(AuthModel()))
         }
+        /// A lobby is the trip screen's lobby mode, over the screen's one map.
+        func trip<V: View>(_ view: V) -> AnyView { nav(TripScreenHost { view }) }
         func home(_ state: String) -> AnyView {
             AnyView(HomePickedDemo.view(state).environment(AuthModel()))
         }
@@ -252,12 +277,12 @@ enum DemoScreens {
             let model = CreateTripModel()
             model.showForDemo(query: "zxqv", results: [], origin: kl, originName: "Kuala Lumpur")
             return search(model)
-        case "search-stop-results": return nav(LobbyStopsDemo.addStop(.results))
-        case "lobby-organizer": return nav(LobbyStopsDemo.lobby(.organizer))
-        case "lobby-tall": return nav(LobbyStopsDemo.lobby(.tall))
-        case "lobby-not-ready": return nav(LobbyStopsDemo.lobby(.notReady))
-        case "lobby-empty": return nav(LobbyStopsDemo.lobby(.organizerEmpty))
-        case "lobby-suggest-added": return nav(LobbyStopsDemo.lobby(.suggestAdded))
+        case "search-stop-results": return trip(LobbyStopsDemo.addStop(.results))
+        case "lobby-organizer": return trip(LobbyStopsDemo.lobby(.organizer))
+        case "lobby-tall": return trip(LobbyStopsDemo.lobby(.tall))
+        case "lobby-not-ready": return trip(LobbyStopsDemo.lobby(.notReady))
+        case "lobby-empty": return trip(LobbyStopsDemo.lobby(.organizerEmpty))
+        case "lobby-suggest-added": return trip(LobbyStopsDemo.lobby(.suggestAdded))
         // The Suggest stops sheet: the button is on lobby-empty; then the suggestion, the stepper moved, a short trip,
         // and the largest text.
         case "suggest-stops": return AnyView(SuggestStopsDemo.sheet())
@@ -265,12 +290,14 @@ enum DemoScreens {
         case "suggest-stops-short": return AnyView(SuggestStopsDemo.sheet(seconds: 50 * 60))
         case "suggest-stops-large": return AnyView(SuggestStopsDemo.sheet().dynamicTypeSize(.accessibility5))
         // lobby-member and lobby-waiting: a participant before the organiser starts (the waiting line, D39).
-        case "lobby-member": return nav(LobbyStopsDemo.lobby(.member))
-        case "lobby-waiting": return nav(LobbyStopsDemo.lobby(.member))
-        case "lobby-turnback": return nav(LobbyStopsDemo.lobby(.turnBack))
-        case "lobby-meet-failure": return nav(LobbyStopsDemo.lobby(.meetAndFailure))
+        case "lobby-member": return trip(LobbyStopsDemo.lobby(.member))
+        case "lobby-waiting": return trip(LobbyStopsDemo.lobby(.member))
+        case "lobby-turnback": return trip(LobbyStopsDemo.lobby(.turnBack))
+        case "lobby-meet-failure": return trip(LobbyStopsDemo.lobby(.meetAndFailure))
         // lobby-started: the organiser back in the lobby after Start trip, the convoy on the move.
-        case "lobby-started": return nav(LobbyStopsDemo.lobby(.started))
+        case "lobby-started": return trip(LobbyStopsDemo.lobby(.started))
+        // The lobby, then Start trip after 2 s: the sheet becomes the convoy's and the camera flies to my car (D53).
+        case "trip-start-swap": return trip(TripStartSwapDemo())
         case "join-stops": return nav(JoinDemo.ticket(withStops: true))
         case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "road-markers": return AnyView(MapMarkersDemo())
@@ -295,10 +322,10 @@ enum DemoScreens {
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))
         case "join-with-location": return nav(JoinDemo.ticket(withStops: true, drive: TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60)))
         case "join-without-location": return nav(JoinDemo.ticket(withStops: true))
-        case "lobby-own-merges": return nav(OwnWayDemo.lobby(.merges))
-        case "lobby-own-main": return nav(OwnWayDemo.lobby(.onMain))
-        case "lobby-own-never": return nav(OwnWayDemo.lobby(.neverMerges))
-        case "lobby-own-noroute": return nav(OwnWayDemo.lobby(.noRoute))
+        case "lobby-own-merges": return trip(OwnWayDemo.lobby(.merges))
+        case "lobby-own-main": return trip(OwnWayDemo.lobby(.onMain))
+        case "lobby-own-never": return trip(OwnWayDemo.lobby(.neverMerges))
+        case "lobby-own-noroute": return trip(OwnWayDemo.lobby(.noRoute))
         case "road-arrival": return AnyView(StopArrivalDemo(.someHere))
         case "road-arrival-all": return AnyView(StopArrivalDemo(.allHere))
         case "road-not-sharing": return AnyView(StopArrivalDemo(.notSharing))
@@ -331,11 +358,11 @@ enum DemoScreens {
             }
             return AnyView(Color.clear)
         // Add a stop over the map (B6, D51): the R&Rs in order, one chosen, and a searched place that isn't an R&R.
-        case "lobby-add-stop": return nav(LobbyStopsDemo.addStop(.list))
-        case "lobby-add-stop-picked": return nav(LobbyStopsDemo.addStop(.picked))
-        case "add-search": return nav(LobbyStopsDemo.addStop(.results))
-        case "add-details": return nav(LobbyStopsDemo.addStop(.searchedPlace))
-        case "add-meet": return nav(LobbyStopsDemo.addStop(.meetingPoint))
+        case "lobby-add-stop": return trip(LobbyStopsDemo.addStop(.list))
+        case "lobby-add-stop-picked": return trip(LobbyStopsDemo.addStop(.picked))
+        case "add-search": return trip(LobbyStopsDemo.addStop(.results))
+        case "add-details": return trip(LobbyStopsDemo.addStop(.searchedPlace))
+        case "add-meet": return trip(LobbyStopsDemo.addStop(.meetingPoint))
         // Home's sheet (D32): the list short and tall, and a picked trip short, tall, on a stop, loading, failed.
         case "home-compact": return home("list")
         case "home-tall": return home("list-tall")

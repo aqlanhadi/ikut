@@ -168,7 +168,7 @@ enum MapDemo {
         let board = env["IKUT_MAP_DEMO_NO_STOP"] == nil && !gallery
             ? stopBoard(env["IKUT_MAP_DEMO_STOP"] ?? "lead", fiveCars: five) : StopBoard.empty
         return NavigationStack {
-            TripMapView(
+            TripScreenHost(mode: .driving) { TripMapView(
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
                 demoCard: card ?? env["IKUT_MAP_DEMO_CARD"], demoReport: report || env["IKUT_MAP_DEMO_REPORT"] != nil, demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
@@ -178,6 +178,7 @@ enum MapDemo {
                 .overlay(alignment: .top) {
                     if gallery { BannerGallery(model: model).padding(.top, 72) }
                 }
+            }
         }
     }
 
@@ -198,9 +199,9 @@ enum MapDemo {
             model.setEvents([debris])
         }
         return NavigationStack {
-            TripMapView(
+            TripScreenHost(mode: .driving) { TripMapView(
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model, alerts: alerts,
-                demoExpanded: true, stopService: DemoStopService())
+                demoExpanded: true, stopService: DemoStopService()) }
         }
         .task {
             try? await Task.sleep(for: .seconds(3))
@@ -374,10 +375,10 @@ enum BannerSlotDemo {
         let session = TripSession(tripId: "demo", userId: "u-c1")
         if paused { session.pauseForDemo() }
         return NavigationStack {
-            TripMapView(
+            TripScreenHost(mode: .driving) { TripMapView(
                 session: session, model: model, stopBoard: board, demoError: error,
                 demoApproach: approach ? MapDemo.debrisAlert : nil, demoPassed: passed, demoToast: toast,
-                stopService: DemoStopService())
+                stopService: DemoStopService()) }
         }
     }
 }
