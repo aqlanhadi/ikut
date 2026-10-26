@@ -110,6 +110,9 @@ struct LobbyMapTests {
             == Double(LobbyMapLogic.typicalBar + LobbyMapLogic.flagRoom) / 874)
         #expect(LobbyMapLogic.topFraction(mapHeight: 1000, safeTop: 62)
             == Double(62 + LobbyMapLogic.flagRoom) / 1000)
+        // The map's bottom padding (the medium sheet) is not part of what the region is fitted into.
+        #expect(LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 116, bottomPadding: 500)
+            == Double(116 + LobbyMapLogic.flagRoom) / 374)
     }
 
     @Test(arguments: [(CGFloat(110), CGFloat(874)), (62, 667), (130, 956)])

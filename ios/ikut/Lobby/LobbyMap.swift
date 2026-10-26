@@ -108,10 +108,13 @@ enum LobbyMapLogic {
     /// map's own top safe area, so it follows the layout: piece 2 takes the toolbar out) and room for the
     /// destination flag, which stands about `flagRoom` above its coordinate. The sheet needs none at the bottom: the
     /// map's bottom safe area (`LobbySheet.legalInset`) already sits above the medium sheet, and MapKit fits inside
-    /// it. Before the map is measured a typical bar and phone height stand in.
-    static func topFraction(mapHeight: CGFloat, safeTop: CGFloat) -> Double {
+    /// it (`bottomPadding`). Before the map is measured a typical bar and phone height stand in.
+    static func topFraction(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat = 0) -> Double {
         let bar = safeTop > 0 ? safeTop : typicalBar
-        return Double((bar + flagRoom) / (mapHeight > 2 * (bar + flagRoom) ? mapHeight : 874))
+        // MapKit fits a region inside the map's safe area, so the fractions are of the part above the bottom padding.
+        let measured = mapHeight - bottomPadding
+        let viewport = measured > 2 * (bar + flagRoom) ? measured : 874 - bottomPadding
+        return Double((bar + flagRoom) / viewport)
     }
 
     /// The bar with the status bar before it is measured.
@@ -227,7 +230,8 @@ struct LobbyMapView: View {
 
     private func go(_ target: LobbyMapTarget, animated: Bool) {
         guard let region = LobbyMapLogic.region(for: target, route: route, pins: pins, bottomObscured: 0,
-                                                topObscured: LobbyMapLogic.topFraction(mapHeight: mapHeight, safeTop: safeTop)) else { return }
+                                                topObscured: LobbyMapLogic.topFraction(mapHeight: mapHeight, safeTop: safeTop,
+                                                                          bottomPadding: LobbySheet.legalInset(compact: sheetCompact))) else { return }
         onStop = target != .wholeTrip
         fitted = true
         let position = MapCameraPosition.region(region)
