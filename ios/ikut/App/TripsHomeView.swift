@@ -93,8 +93,9 @@ struct TripsHomeView: View {
         self.init(onNewTrip: {}, onJoin: {})
         if let createFlow {
             _flow = State(initialValue: createFlow)
-            let insets = Self.obscured(mapHeight: 0, sheet: HomeSheet.height(HomeSheet.mode(flow: createFlow), compact: HomeSheet.compactHeight),
-                                       padding: HomeSheet.legalInset(compact: HomeSheet.compactHeight))
+            let insets = HomeSheet.createInsets(
+                mapHeight: 0, sheet: HomeSheet.height(HomeSheet.mode(flow: createFlow), compact: HomeSheet.compactHeight),
+                compact: HomeSheet.compactHeight)
             if let region = createFlow.region(bottomObscured: insets.bottom, topObscured: insets.top) {
                 _camera = State(initialValue: .region(region))
             }
@@ -491,7 +492,7 @@ struct TripsHomeView: View {
     private func refocusCreate(animated: Bool) {
         guard let flow else { return }
         let sheet = HomeSheet.height(mode, compact: compact)
-        let insets = Self.obscured(mapHeight: mapHeight, sheet: sheet, padding: HomeSheet.legalInset(compact: compact))
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheet, compact: compact)
         guard let region = flow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }

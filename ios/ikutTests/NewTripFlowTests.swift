@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import Testing
 
 @testable import ikut
@@ -211,4 +212,33 @@ struct NewTripFlowTests {
     }
 
     @MainActor final class Gate { var open = false }
+
+    /// Where a latitude lands in the part of the map MapKit frames, in points from the screen's top (874 pt phone).
+    private func y(_ lat: Double, _ r: MKCoordinateRegion, mapHeight: Double = 874) -> Double {
+        let area = mapHeight - Double(HomeSheet.legalInset(compact: HomeSheet.compactHeight))
+        return (r.center.latitude + r.span.latitudeDelta / 2 - lat) / r.span.latitudeDelta * area
+    }
+
+    @Test func aLongRouteFitsBetweenTheStatusBarAndNewTripsSheet() async {
+        let (flow, _) = makeFlow()
+        let far = DestinationResult(name: "Alor Setar", subtitle: "Kedah", coordinate: .init(latitude: 6.12, longitude: 100.37))
+        await flow.pick(far)
+        let insets = HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.newTripHeight, compact: HomeSheet.compactHeight)
+        guard let r = flow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { Issue.record("no region"); return }
+        let sheetTop = 874 - Double(HomeSheet.newTripHeight)
+        for lat in [kl.latitude, far.coordinate.latitude] {
+            let at = y(lat, r)
+            #expect(at >= Double(HomeSheet.createTopRoom) && at <= sheetTop - 10, "latitude \(lat) at \(at)")
+        }
+    }
+
+    @Test func theTopPinSitsAboveWhereTosSheet() {
+        let (flow, _) = makeFlow()
+        let insets = HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.whereToHeight, compact: HomeSheet.compactHeight)
+        guard let r = flow.region(bottomObscured: insets.bottom, topObscured: insets.top), let target = flow.focusTarget else {
+            Issue.record("no region"); return
+        }
+        let at = y(target.coordinate.latitude, r)
+        #expect(at >= Double(HomeSheet.createTopRoom) && at <= 874 - Double(HomeSheet.whereToHeight) - 10, "pin at \(at)")
+    }
 }

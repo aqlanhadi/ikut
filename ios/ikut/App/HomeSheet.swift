@@ -59,6 +59,21 @@ enum HomeSheet {
         expanded ? tall : short(height(mode, compact: compact))
     }
 
+    /// Room kept between the camera's content and the sheet's top edge when making a trip.
+    static let createMargin: CGFloat = 24
+    /// Status bar plus room for a pin drawn above its coordinate.
+    static let createTopRoom: CGFloat = 110
+
+    /// What the camera keeps clear for Where to? and New trip, as fractions of the part of the map the camera frames.
+    /// MapKit frames the map above its bottom safe area (`legalInset`, fixed at the list's inset), so the fractions
+    /// are of that part, not of the whole screen: the sheet covers only the part of itself above the padding.
+    static func createInsets(mapHeight: CGFloat, sheet: CGFloat, compact: CGFloat) -> (top: Double, bottom: Double) {
+        let padding = legalInset(compact: compact)
+        let full = mapHeight > sheet + createTopRoom ? mapHeight : 874
+        let area = max(1, full - padding)
+        return (Double(createTopRoom / area), Double(max(0, sheet - padding + createMargin) / area))
+    }
+
     /// A sheet pulled up for one step does not stay tall for the next: New trip opens at its own height.
     static func expanded(_ was: Bool, from old: Mode, to new: Mode) -> Bool { old == new ? was : false }
 
