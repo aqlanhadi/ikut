@@ -179,6 +179,16 @@ enum HomePickedDemo {
                 flow.topResultID = ipoh.id
             }
             return TripsHomeView(demo: past, routes: [thin], creating: flow)
+        case "now", "now-started", "now-failed":
+            // A trip that hasn't ended, in Now above Past trips: gathering, on the move, or one that couldn't be read.
+            let running = PastTrips.Entry(id: "sample-now", name: "Balik kampung raya", destination: "Ipoh", endedAt: nil,
+                                          seenAt: now, others: ["Wyna", "Hafiz"])
+            let line = switch name {
+            case "now-started": "On the move · since 12:05"
+            case "now-failed": HomeNow.fallbackStatus
+            default: "Gathering · 4 of 5 cars ready · meet 12:00"
+            }
+            return TripsHomeView(demo: [running] + past, routes: [thin], nowStatus: ["sample-now": line])
         case "list-tall": return TripsHomeView(demo: past, routes: [thin], expanded: true)
         default: return TripsHomeView(demo: past, routes: [thin])
         }
