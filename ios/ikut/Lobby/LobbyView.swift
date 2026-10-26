@@ -395,7 +395,7 @@ struct LobbyView: View {
             .environment(\.defaultMinListRowHeight, 1)
             .contentMargins(.top, Spacing.xs, for: .scrollContent)
             .contentMargins(.bottom, Spacing.l, for: .scrollContent)
-            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .sheetBottomBar { bottomBar }
         }
         .environment(\.inPanelSheet, true)
         .padding(.top, LobbySheet.indicatorRoom)
@@ -530,10 +530,12 @@ struct LobbyView: View {
                 .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
             Text("Anyone with the code can join until the trip ends")
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
-            HStack(spacing: Spacing.s) {
+            // Side by side at the usual sizes; stacked at accessibility sizes, where the labels need the width.
+            let buttons = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
+            buttons {
                 Button { showQR = true } label: {
-                    Label("Show QR code", systemImage: "qrcode").font(.footnote.weight(.semibold))
-                        .lineLimit(1).minimumScaleFactor(0.75)
+                    Label("QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 36)
                 }
                 .actionButton(.secondary, onGlass: true)

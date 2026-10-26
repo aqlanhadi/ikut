@@ -14,6 +14,18 @@ extension View {
             .padding(.bottom, -lift)
     }
 
+    /// The sheet's bottom bar as a container: on iOS 26 a `safeAreaBar`, so the scrolling content under it fades out
+    /// with the system's soft bottom edge instead of reading through the bar; before that a plain bottom inset.
+    /// The bar's content takes `sheetActionBar(lift:)` as before.
+    @ViewBuilder func sheetBottomBar<Bar: View>(@ViewBuilder _ bar: () -> Bar) -> some View {
+        if #available(iOS 26, *) {
+            safeAreaBar(edge: .bottom, spacing: 0) { bar() }
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0) { bar() }
+        }
+    }
+
     /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): the main action prominent
     /// and tinted with the accent, the quieter one clear (`GlassSurface.useGlass` is the switch). Before iOS 26,
     /// the tinted and bordered capsules as before.
