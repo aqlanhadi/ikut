@@ -406,30 +406,7 @@ struct ConvoyActionBar: View {
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")
         }
-        .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.m)
-        // The sheet's bottom safe area is more than the side gap: the buttons hang down into it (the bar's layout
-        // height stops above it, so the detents are still content + bar) until the gap under them equals the gap
-        // beside them.
-        .padding(.bottom, -lift)
-    }
-}
-
-private extension View {
-    /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): Report prominent and tinted
-    /// with the accent, Pit stop clear (`GlassSurface.useGlass` is the switch). Before iOS 26, the tinted and bordered capsules as before.
-    @ViewBuilder func actionBarStyle(prominent: Bool) -> some View {
-        if GlassSurface.useGlass, #available(iOS 26, *) {
-            if prominent {
-                buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
-            } else {
-                buttonStyle(.glass).buttonBorderShape(.capsule).tint(.primary)
-            }
-        } else if prominent {
-            buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
-        } else {
-            buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.primary)
-        }
+        .sheetActionBar(lift: lift)
     }
 }
 
