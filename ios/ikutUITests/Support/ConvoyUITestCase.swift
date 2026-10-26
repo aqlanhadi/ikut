@@ -156,6 +156,18 @@ class ConvoyUITestCase: XCTestCase {
         enterNameIfAsked(name)
     }
 
+    /// New trip (the route drawn over Home's map, after a result is tapped): Create trip makes the trip and opens
+    /// its lobby. The route is built first, so the button can take a while to appear.
+    func tapCreateTrip(timeout: TimeInterval = 45) {
+        let create = app.buttons["Create trip"]
+        if create.waitForExistence(timeout: timeout) {
+            create.tap()
+        } else {
+            let errors = app.staticTexts.matching(identifier: "createTripError")
+            XCTFail("Didn't reach New trip (\(errors.firstMatch.exists ? errors.firstMatch.label : "no error shown"))")
+        }
+    }
+
     /// The organizer's lobby: the six-letter join code from the "Join code ..." label.
     func readJoinCode() -> String {
         let codeLabel = labelled("label BEGINSWITH %@", "Join code ")

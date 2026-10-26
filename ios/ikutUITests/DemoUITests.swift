@@ -204,6 +204,7 @@ final class DemoOrganizerUITests: DemoBase {
             let result = button(beginningWith: "Ipoh")
             XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
             result.tap()
+            tapCreateTrip()
             if !waitForLobby(timeout: 120) {
                 shot("FAILED-no-lobby")
                 let error = labelled("identifier == %@", "createTripError")

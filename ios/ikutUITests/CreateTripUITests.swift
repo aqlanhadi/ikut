@@ -1,6 +1,6 @@
 import XCTest
 
-/// Drives the organizer's path in a simulator: name, New trip, pick a destination, lobby, Start trip,
+/// Drives the organizer's path in a simulator: name, New trip, pick a destination, Create trip, lobby, Start trip,
 /// map. Needs the emulators and a simulated location (`xcrun simctl location <udid> set 3.139,101.687`).
 /// `TEST_RUNNER_IKUT_DESTINATION` picks the search text (default Ipoh); `TEST_RUNNER_IKUT_HOLD_SECONDS`
 /// stays on the map that long at the end.
@@ -25,6 +25,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         let firstResult = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", destination)).firstMatch
         XCTAssertTrue(firstResult.waitForExistence(timeout: 20), "No search result for \(destination)")
         firstResult.tap()
+        tapCreateTrip()
 
         let startTrip = app.buttons["Start trip"]
         if !startTrip.waitForExistence(timeout: 30) {

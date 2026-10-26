@@ -239,6 +239,7 @@ struct PlaceSearchResults: View {
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
+        .scrollTargetLayout()
         .ikutCard()
         .padding(.top, hasRows ? 0 : Spacing.m)
         .fullScreenCover(isPresented: $choosingOnMap) {
@@ -267,9 +268,13 @@ struct PlaceSearchResults: View {
                     .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.section)
             }
         }
+        // One view per result, so a scroll position can name it (Where to? follows the list with its camera).
         ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
-            if index > 0 { RowDivider() }
-            resultRow(result)
+            VStack(spacing: 0) {
+                if index > 0 { RowDivider() }
+                resultRow(result)
+            }
+            .id(result.id)
         }
     }
 

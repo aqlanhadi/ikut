@@ -36,6 +36,8 @@ final class CreateTripModel {
     @ObservationIgnored private var source: SuggestionSource?
     @ObservationIgnored private let makeSource: @MainActor () -> SuggestionSource
     @ObservationIgnored private let places: PlaceSearching
+    /// Builds the route from the phone to a place (MapKit); a test swaps it.
+    @ObservationIgnored private let buildRoute: @MainActor (CLLocationCoordinate2D) async throws -> BuiltRoute
     /// The text a query search ran for, so setting the field to it does not go back to suggestions.
     @ObservationIgnored private var searchedText = ""
 
@@ -47,8 +49,10 @@ final class CreateTripModel {
 
     init(
         suggestions: (@MainActor () -> SuggestionSource)? = nil, places: PlaceSearching = MapKitPlaceSearch(),
-        geocoder: ReverseGeocoding = CLReverseGeocoder()
+        geocoder: ReverseGeocoding = CLReverseGeocoder(),
+        route: @escaping @MainActor (CLLocationCoordinate2D) async throws -> BuiltRoute = { try await RouteBuilder.buildRoute(to: $0) }
     ) {
+        buildRoute = route
         makeSource = suggestions ?? { MapKitSuggestionSource() }
         self.places = places
         self.geocoder = geocoder
@@ -213,14 +217,26 @@ final class CreateTripModel {
         along?.rowText(for: result.coordinate)
     }
 
-    /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.
-    func use(_ result: DestinationResult, finish: (BuiltRoute) async throws -> Void) async -> Bool {
-        guard working == nil else { return false }
+    /// Builds the route to `result` and nothing else: the preview before a trip is made. Nil (with a message) on failure.
+    func preview(_ result: DestinationResult) async -> BuiltRoute? {
+        guard working == nil else { return nil }
         working = result.id
         errorMessage = nil
         defer { working = nil }
         do {
-            let route = try await RouteBuilder.buildRoute(to: result.coordinate)
+            return try await buildRoute(result.coordinate)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.
+    func use(_ result: DestinationResult, finish: (BuiltRoute) async throws -> Void) async -> Bool {
+        guard let route = await preview(result) else { return false }
+        working = result.id
+        defer { working = nil }
+        do {
             try await finish(route)
             return true
         } catch {

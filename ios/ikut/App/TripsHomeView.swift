@@ -15,6 +15,16 @@ struct TripsHomeView: View {
     var covered = false
     /// Follows whether the sheet is on screen (set when it appears, cleared once it has gone), for the parent.
     var sheetUp: Binding<Bool> = .constant(false)
+    /// New trip was tapped and its gates (name, location) are through: the sheet becomes Where to? over this map.
+    /// Cleared again when the flow closes or the trip is made.
+    var creating: Binding<Bool> = .constant(false)
+    /// The trip was made: its id, to open its lobby.
+    var onCreated: (String) -> Void = { _ in }
+
+    /// The create flow (Where to?, then New trip) over this map; nil while the sheet shows its list.
+    @State private var flow: NewTripFlow?
+    /// Where the camera was before the flow, for Close.
+    @State private var cameraBeforeCreate: MapCameraPosition?
 
     @State private var renaming = false
     @State private var newName = ""
@@ -50,9 +60,12 @@ struct TripsHomeView: View {
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry) -> Void = { _ in }, covered: Bool = false,
-         sheetUp: Binding<Bool> = .constant(false)) {
+         sheetUp: Binding<Bool> = .constant(false), creating: Binding<Bool> = .constant(false),
+         onCreated: @escaping (String) -> Void = { _ in }) {
         self.covered = covered
         self.sheetUp = sheetUp
+        self.creating = creating
+        self.onCreated = onCreated
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
         self.onOpenTrip = onOpenTrip
@@ -73,8 +86,17 @@ struct TripsHomeView: View {
     /// For previews and the screenshot test: Home with `past` listed and `routes` drawn, or with `picked`
     /// picked (its route from `routes`), pulled up if `expanded`.
     init(demo past: [PastTrips.Entry], routes: [PastTripRoute], picked: PickedTrip? = nil,
-         selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false) {
+         selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false,
+         creating createFlow: NewTripFlow? = nil) {
         self.init(onNewTrip: {}, onJoin: {})
+        if let createFlow {
+            _flow = State(initialValue: createFlow)
+            let insets = Self.obscured(mapHeight: 0, sheet: HomeSheet.height(HomeSheet.mode(flow: createFlow), compact: HomeSheet.compactHeight),
+                                       padding: HomeSheet.legalInset(compact: HomeSheet.compactHeight))
+            if let region = createFlow.region(bottomObscured: insets.bottom, topObscured: insets.top) {
+                _camera = State(initialValue: .region(region))
+            }
+        }
         _isDemo = State(initialValue: true)
         _demoModel = State(initialValue: tappable)
         _tour = State(initialValue: tour)
@@ -128,6 +150,10 @@ struct TripsHomeView: View {
             }
         }
         #endif
+        .onChange(of: creating.wrappedValue) { _, now in
+            if now { beginCreate() } else if flow != nil { closeCreate() }
+        }
+        .onChange(of: flow?.cameraKey) { _, _ in refocusCreate(animated: true) }
         .onChange(of: picked?.model.snapshot != nil) { was, has in
             // The recap arrived, perhaps from Try again: its route is the full one and the dots come with it.
             guard let picked, !isDemo,
@@ -150,7 +176,9 @@ struct TripsHomeView: View {
     /// its name; older ones are fainter. Tapping a destination opens that trip's recap.
     private var map: some View {
         Map(position: $camera) {
-            if let picked {
+            if let flow {
+                NewTripMapContent.content(flow)
+            } else if let picked {
                 pickedContent(picked)
             } else {
                 UserAnnotation()
@@ -174,7 +202,7 @@ struct TripsHomeView: View {
             guard height != mapHeight else { return }
             mapHeight = height
             // Refit for the real height while the camera is still ours.
-            if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
+            if flow != nil { refocusCreate(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !camera.positionedByUser { fit(animated: false) }
         }
     }
 
@@ -396,6 +424,7 @@ struct TripsHomeView: View {
 
     /// Points the camera at every drawn route, above the compact sheet.
     private func fit(animated: Bool) {
+        guard flow == nil else { return }
         let insets = Self.obscured(mapHeight: mapHeight)
         guard let region = PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom,
                                                     topObscured: insets.top) else { return }
@@ -417,6 +446,61 @@ struct TripsHomeView: View {
     /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
     nonisolated private static let topObscured: CGFloat = 110
 
+    // MARK: Create flow
+
+    private var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow) }
+
+    /// New trip's gates are through: Where to? takes over the sheet and the map.
+    private func beginCreate() {
+        guard flow == nil else { return }
+        cameraBeforeCreate = camera
+        if picked != nil { closePicked() }
+        withAnimation(sheetMotion) {
+            expanded = false
+            flow = NewTripFlow()
+        }
+    }
+
+    /// Back to Home's list, the camera where it was. Nothing was written.
+    private func closeCreate() {
+        withAnimation(sheetMotion) {
+            flow = nil
+            expanded = false
+        }
+        creating.wrappedValue = false
+        if let before = cameraBeforeCreate { move(to: before, animated: true) }
+        cameraBeforeCreate = nil
+    }
+
+    /// The camera for the step on screen: the pin at the top of the list, or the whole route above New trip's sheet.
+    private func refocusCreate(animated: Bool) {
+        guard let flow else { return }
+        let sheet = HomeSheet.height(mode, compact: compact)
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: sheet, padding: HomeSheet.legalInset(compact: compact))
+        guard let region = flow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { return }
+        move(to: .region(region), animated: animated)
+    }
+
+    private func createTrip() {
+        guard let flow else { return }
+        guard let uid = auth.userID else {
+            flow.createError = "Couldn’t sign you in. Check your signal and try again."
+            return
+        }
+        let organizer = TripOrganizer(id: uid, displayName: auth.displayName ?? "Organizer")
+        Task {
+            let id = await flow.create { name, place, route in
+                try await TripService.createTrip(name: name, destination: place, route: route, organizer: organizer).tripId
+            }
+            guard let id else { return }
+            flow.search.errorMessage = nil
+            self.flow = nil
+            cameraBeforeCreate = nil
+            creating.wrappedValue = false
+            onCreated(id)
+        }
+    }
+
     // MARK: Sheet
 
     /// The short detent's height: one for the list and a picked trip.
@@ -430,6 +514,18 @@ struct TripsHomeView: View {
         // The header and the scrolling body are one page that crossfades in place, so the sheet (always at the
         // same short height) keeps its size and only its contents change.
         return ZStack(alignment: .top) {
+            if let flow {
+                Group {
+                    if let ready = flow.ready {
+                        NewTripSheet(flow: flow, ready: ready, onBack: { withAnimation(sheetMotion) { flow.back() } },
+                                     onClose: closeCreate, onCreate: createTrip)
+                    } else {
+                        WhereToSheet(flow: flow, onClose: closeCreate)
+                    }
+                }
+                .id(flow.ready == nil ? "create-search" : "create-ready")
+                .transition(.opacity)
+            } else {
             VStack(alignment: .leading, spacing: 0) {
                 if let picked {
                     PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
@@ -449,15 +545,17 @@ struct TripsHomeView: View {
             }
             .id(picked?.entry.id ?? "")
             .transition(.opacity)
+            }
         }
+        .animation(sheetMotion, value: mode)
         .padding(.horizontal, Spacing.l)
         .padding(.top, HomeSheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .presentationDetents(HomeSheet.detents(compact: compact), selection: Binding(
-            get: { HomeSheet.detent(expanded: expanded, compact: compact) },
+        .presentationDetents(HomeSheet.detents(mode, compact: compact), selection: Binding(
+            get: { HomeSheet.detent(expanded: expanded, mode: mode, compact: compact) },
             set: { expanded = HomeSheet.isExpanded($0) }))
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(compact)))
+        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(mode, compact: compact))))
         .interactiveDismissDisabled()
         .alert("Your name", isPresented: $renaming) {
             TextField("Your name", text: $newName)

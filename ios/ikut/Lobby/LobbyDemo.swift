@@ -290,6 +290,9 @@ enum DemoScreens {
         case "home-picked-tall": return home("tall")
         case "home-picked-item": return home("item")
         case "home-picked-loading": return home("loading")
+        // The create flow over Home's map (D48): Where to? with results as pins, and New trip with the route drawn.
+        case "home-where-to": return home("where-to")
+        case "home-new-trip": return home("new-trip")
         case "home-picked-failed": return home("failed")
         case "stop-request-places": return AnyView(StopCardPreview(scene: "responder", screen: "places"))
         case "stop-request-places-two-reasons": return AnyView(StopCardPreview(scene: "two", screen: "places-two-reasons"))

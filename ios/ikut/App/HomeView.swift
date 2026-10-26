@@ -18,6 +18,8 @@ struct HomeView: View {
     @Binding var pendingJoinCode: String?
 
     @State private var path: [Route] = []
+    /// New trip's gates are through: Home's sheet becomes Where to? over its own map (no pushed screen).
+    @State private var creating = false
     @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
     @State private var showDenied = false
     @State private var showName = false
@@ -51,7 +53,9 @@ struct HomeView: View {
                         // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
                         onOpenTrip: { entry in begin(.lobby(tripId: entry.id)) },
                         covered: homeSheetCovered,
-                        sheetUp: $homeSheetUp
+                        sheetUp: $homeSheetUp,
+                        creating: $creating,
+                        onCreated: { tripId in path = [.lobby(tripId: tripId)] }
                     )
                 } else {
                     WelcomeView(
@@ -77,9 +81,8 @@ struct HomeView: View {
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .create:
-                    CreateTripView { tripId in
-                        path = [.lobby(tripId: tripId)]
-                    }
+                    // Never pushed: creating a trip happens in Home's sheet (see `creating`).
+                    EmptyView()
                 case .join(let code):
                     JoinTripView(initialCode: code) { tripId, _ in
                         path = [.lobby(tripId: tripId)]
@@ -157,6 +160,7 @@ struct HomeView: View {
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:
+                if case .create = route { creating = true; return }
                 if replacing { path = [route] } else { path.append(route) }
                 return
             }

@@ -155,6 +155,30 @@ enum HomePickedDemo {
                          line("sample-2", "Makan trip", "Melaka", kl, .init(latitude: 2.196, longitude: 102.25)),
                          line("sample-3", "Cameron weekend", "Tanah Rata", kl, .init(latitude: 4.47, longitude: 101.38))]
             return TripsHomeView(demo: past, routes: drawn, tappable: model, tour: name == "tour")
+        case "where-to", "new-trip":
+            // The create flow over Home's map: Ipoh's results as pins (the second one at the top of the list), or the
+            // route to Ipoh drawn with the Name field.
+            func place(_ name: String, _ area: String, _ lat: Double, _ lon: Double, _ category: MKPointOfInterestCategory? = nil)
+                -> DestinationResult {
+                DestinationResult(name: name, subtitle: area, coordinate: .init(latitude: lat, longitude: lon), category: category?.rawValue)
+            }
+            let ipoh = place("Ipoh", "City in Perak", 4.5975, 101.0901)
+            let search = CreateTripModel()
+            search.showForDemo(query: "Ipoh", results: [
+                ipoh,
+                place("Ipoh Parade", "Shopping centre · Perak", 4.6002, 101.0764, .store),
+                place("Ipoh railway station", "Station · Perak", 4.5985, 101.0902, .publicTransport),
+                place("Ipoh Garden", "Perak", 4.6140, 101.1210),
+            ], origin: .init(latitude: 3.139, longitude: 101.687), originName: "Kuala Lumpur")
+            let flow = NewTripFlow(search: search)
+            if name == "new-trip" {
+                flow.showReadyForDemo(
+                    place: ipoh,
+                    route: BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Polyline.encode(LobbyStopsDemo.route)))
+            } else {
+                flow.topResultID = ipoh.id
+            }
+            return TripsHomeView(demo: past, routes: [thin], creating: flow)
         case "list-tall": return TripsHomeView(demo: past, routes: [thin], expanded: true)
         default: return TripsHomeView(demo: past, routes: [thin])
         }

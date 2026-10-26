@@ -161,6 +161,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             let result = button(beginningWith: "Ipoh")
             XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
             result.tap()
+            tapCreateTrip()
             if !lobbyPresence.waitForExistence(timeout: 45) {
                 let error = labelled("identifier == %@", "createTripError")
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
