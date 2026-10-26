@@ -16,6 +16,7 @@ enum HomeNow {
     /// A trip that didn't load says "In progress".
     static func status(trip: Trip?, cars: [Car], stops: [PlannedStop], timeZone: TimeZone = .current) -> String {
         guard let trip else { return fallbackStatus }
+        if trip.status == .ended { return LobbyLogic.title(started: false, ended: true) }
         if LobbyLogic.isStarted(trip: trip) {
             guard let since = trip.startedAt else { return LobbyLogic.title(started: true, ended: false) }
             return "On the move · since \(StopFormat.clock(since, timeZone: timeZone))"
@@ -35,17 +36,26 @@ enum HomeNow {
         return first.meetAt
     }
 
-    /// One read of the trip, its cars and its stops, as a member can (no listener). Nil values for a trip that
-    /// can't be read, so its row says "In progress".
+    /// What one read of a trip found.
+    struct Read: Equatable {
+        var line: String
+        /// Set when the trip ended on the server: Home moves it to Past trips.
+        var endedAt: Date?
+        var name: String?
+        var destination: String?
+    }
+
+    /// One read of the trip, its cars and its stops, as a member can (no listener). A trip that can't be read says
+    /// "In progress"; cars or stops that can't be read are left out of the line.
     @MainActor
-    static func load(tripId: String, db: Firestore = Firestore.firestore()) async -> String {
-        do {
-            let trip = try await db.document(FirestorePaths.trip(tripId)).getDocument(as: Trip.self)
-            let cars = try await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments().decoded(Car.self)
-            let stops = (try? await db.collection(FirestorePaths.stops(tripId: tripId)).getDocuments().decoded(PlannedStop.self)) ?? []
-            return status(trip: trip, cars: cars, stops: stops)
-        } catch {
-            return fallbackStatus
+    static func load(tripId: String, db: Firestore = Firestore.firestore()) async -> Read {
+        guard let trip = try? await db.document(FirestorePaths.trip(tripId)).getDocument(as: Trip.self) else {
+            return Read(line: fallbackStatus)
         }
+        let cars = (try? await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments().decoded(Car.self)) ?? []
+        let stops = (try? await db.collection(FirestorePaths.stops(tripId: tripId)).getDocuments().decoded(PlannedStop.self)) ?? []
+        return Read(line: status(trip: trip, cars: cars, stops: stops),
+                    endedAt: trip.status == .ended ? (trip.endedAt ?? Date()) : nil,
+                    name: trip.name, destination: trip.destination.name)
     }
 }

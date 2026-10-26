@@ -217,7 +217,9 @@ class ConvoyUITestCase: XCTestCase {
     /// Welcome or Home to the join form with `code` typed in (the name sheet comes first when signed out).
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
         failIfAlreadyInATrip()
-        let joinButton = app.buttons["homeJoin"]
+        // Home's row, or Welcome's link on a fresh install.
+        let joinButton = app.buttons
+            .matching(NSPredicate(format: "identifier IN %@", ["homeJoin", "welcomeJoin"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn’t show Join trip")
         joinButton.tap()
         enterNameIfAsked(name)

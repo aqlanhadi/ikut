@@ -36,8 +36,6 @@ struct TripsHomeView: View {
     @State private var past: [PastTrips.Entry] = []
     /// The status line of each trip in Now (one read when the list appears), by trip id.
     @State private var nowStatus: [String: String] = [:]
-    /// Bumped when the list appears again, so Now reads once more.
-    @State private var nowRefresh = 0
     /// Routes of the newest ended trips, drawn on the map (newest first).
     @State private var routes: [PastTripRoute] = []
     @State private var camera: MapCameraPosition
@@ -662,21 +660,24 @@ struct TripsHomeView: View {
                 group(parts.past) { pastRow($0) }
             }
         }
-        .onAppear {
-            if !isDemo { past = PastTrips.all() }
-            nowRefresh += 1
-        }
-        .task(id: NowKey(ids: parts.now.map(\.id), refresh: nowRefresh)) {
+        .onAppear { if !isDemo { past = PastTrips.all() } }
+        // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
+        .task(id: parts.now.map(\.id)) {
             guard !isDemo else { return }
             for entry in parts.now {
-                let line = await HomeNow.load(tripId: entry.id)
+                let read = await HomeNow.load(tripId: entry.id)
                 if Task.isCancelled { return }
-                nowStatus[entry.id] = line
+                if let endedAt = read.endedAt {
+                    // It ended while this phone wasn't in it: remember that, and it moves to Past trips.
+                    PastTrips.record(tripId: entry.id, name: read.name ?? entry.name,
+                                     destination: read.destination ?? entry.destination, endedAt: endedAt)
+                    past = PastTrips.all()
+                } else {
+                    nowStatus[entry.id] = read.line
+                }
             }
         }
     }
-
-    private struct NowKey: Equatable { var ids: [String]; var refresh: Int }
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)

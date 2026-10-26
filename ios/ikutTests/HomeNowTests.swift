@@ -77,3 +77,22 @@ struct HomeNowTests {
         #expect(HomeNow.split([]).now.isEmpty)
     }
 }
+
+extension HomeNowTests {
+    @Test func aTripThatEndedOnTheServerHasNoGatheringLineAndMovesToPast() throws {
+        let ended = Trip.fixture(name: "Trip", code: "ABC123", organizerId: "u1", status: .ended, startedAt: nil)
+        let line = HomeNow.status(trip: ended, cars: [], stops: [])
+        #expect(!line.contains("Gathering"))
+        #expect(line == "Trip ended")
+
+        let suite = "HomeNowTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        PastTrips.record(tripId: "t", name: "Trip", destination: "Ipoh", endedAt: nil, defaults: defaults)
+        #expect(HomeNow.split(PastTrips.all(defaults: defaults)).past.isEmpty)
+        PastTrips.record(tripId: "t", name: "Trip", destination: "Ipoh", endedAt: Date(), defaults: defaults)
+        let parts = HomeNow.split(PastTrips.all(defaults: defaults))
+        #expect(parts.now.isEmpty)
+        #expect(parts.past.map(\.id) == ["t"])
+    }
+}
