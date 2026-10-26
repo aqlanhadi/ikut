@@ -42,7 +42,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         if notNow.waitForExistence(timeout: 6) { notNow.tap() }
         startTrip.tap()
         app.dismissMapAsks(first: 3)
-        XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 20), "Didn't reach the map")
+        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 20), "Didn't reach the map")
         add(XCTAttachment(screenshot: app.screenshot()))
 
         // TEST_RUNNER_IKUT_HOLD_SECONDS keeps the map open, e.g. to watch `qa/drive-trip.mjs` play the route.
@@ -83,7 +83,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         // Start trip to the map, Back: the lobby's sheet is back.
         lobbyActionButton.tap()
         app.dismissMapAsks(first: 3)
-        let back = app.buttons["Back to lobby"]
+        let back = app.backToLobby
         XCTAssertTrue(back.waitForExistence(timeout: 30), "Didn't reach the map")
         back.tap()
         XCTAssertTrue(waitForLobby(timeout: 20), "Back from the map: the lobby's sheet didn't come back")

@@ -3,12 +3,15 @@ import MapKit
 import SwiftUI
 
 /// Shown after creating or joining a trip (CreateTrip.dc.html): the route card, join code with
-/// QR and share, and the live list of cars.
+/// QR and share, and the live list of cars. It is the trip screen's lobby layer over the one map (`TripScreenHost`), and
+/// holds the trip's session; Start trip and Show map switch the screen to driving (`TripMapView`, the driving layer)
+/// without a new screen.
 struct LobbyView: View {
     let onExit: () -> Void
     /// The trip ended (by the organizer or the server): show the recap.
     var onEnded: (String) -> Void = { _ in }
     @Environment(LocationPermission.self) private var location
+    @Environment(TripMapStage.self) private var stage
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .title) private var codeSize: CGFloat = 30
     @State private var model: LobbyModel
@@ -38,14 +41,13 @@ struct LobbyView: View {
     @State private var confirmEnd = false
     @State private var isWorking = false
     @State private var actionError: String?
-    @State private var showMap = false
     /// Start trip with a car not sharing yet asks first (#362).
     @State private var confirmStart = false
     @State private var showQR = false
     /// Copy was just tapped: its label says Copied for a moment.
     @State private var copied = false
     @State private var copiedCount = 0
-    /// The lobby is on screen (not popped): the sheet is presented from it, so it goes with it.
+    /// The trip screen is on screen (not popped, nothing pushed over it): the sheet goes with it.
     @State private var onScreen = false
     /// The lobby's sheet is up (it reports its own appear and dismiss); what else is presented waits for it to go.
     @State private var sheetUp = false
@@ -62,6 +64,8 @@ struct LobbyView: View {
     private var sampleOrganizer = true
     /// The car colour a sample participant's own route is drawn in.
     private let sampleCarColor = "#D9480F"
+    /// In a sample lobby: the driving layer Start switches to (a demo map; nil, the live one).
+    private var sampleDriving: ((@escaping () -> Void) -> AnyView)?
 
     init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
@@ -88,9 +92,11 @@ struct LobbyView: View {
     /// organizer's card (editable) rather than a member's.
     init(
         sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false,
-        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil
+        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil,
+        driving: ((@escaping () -> Void) -> AnyView)? = nil
     ) {
         self.init(sample: model)
+        sampleDriving = driving
         // A sample lobby never looks a town up unless the demo gives it a geocoder.
         if let joinTowns { _joinTowns = State(initialValue: joinTowns) }
         _expanded = State(initialValue: tall)
@@ -160,7 +166,7 @@ struct LobbyView: View {
                     if bar == .startTrip {
                         if LobbyContent.startConfirm(model.groupedCars) != nil { confirmStart = true } else { startTrip() }
                     } else {
-                        showMap = true
+                        switchMode(.showMap)
                     }
                 } label: {
                     Text(bar.label).font(.headline).frame(maxWidth: .infinity, minHeight: 50)
@@ -182,7 +188,15 @@ struct LobbyView: View {
     private func startTrip() {
         startedHere = true
         Task { await TripService.markStarted(tripId: model.tripId) }
-        showMap = true
+        switchMode(.start)
+    }
+
+    /// Lobby and driving are modes of one screen: the sheet's content and detents change in one motion, and the
+    /// layer coming on screen moves the camera (`TripScreenLogic.entryCamera`).
+    private func switchMode(_ event: TripScreenLogic.Event) {
+        let next = TripScreenLogic.mode(after: event, from: stage.mode)
+        guard next != stage.mode else { return }
+        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.mode = next }
     }
 
     /// Stop edits run in the banner motion, so the List slides the rows around an inserted, removed or moved one.
@@ -244,7 +258,7 @@ struct LobbyView: View {
 
     private var cover: LobbySheet.Cover {
         LobbySheet.Cover(
-            tripMap: showMap, changeDestination: showChangeDestination,
+            changeDestination: showChangeDestination,
             suggestStops: showSuggestStops, renaming: renaming, alwaysExplainer: session.alwaysExplainerShowing,
             confirmLeave: confirmLeave, confirmEnd: confirmEnd)
     }
@@ -283,20 +297,32 @@ struct LobbyView: View {
     }
 
     var body: some View {
-        LobbyMapView(
-            route: routeInfo.coordinates, pins: mapPins, ownRoute: isOrganizer ? [] : ownWay.ownRoute,
-            ownColorHex: ownCarColor, sheetCompact: compact,
-            onCandidateTap: { adding?.select($0) }, command: $mapCommand)
-            // The trip started from another phone: no more stop edits.
-            .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
-            .onChange(of: adding?.selectedId, initial: true) { _, id in if let id { flyTo(id) } }
-            .onAppear { onScreen = true }
-            .onDisappear { onScreen = false }
-            .sheet(isPresented: Binding(get: { !sheetCovered }, set: { _ in }), onDismiss: { sheetUp = false }) {
-                sheetContent.onAppear { sheetUp = true }
+        ZStack {
+            switch TripScreenLogic.layer(in: stage.mode) {
+            case .lobby:
+                lobbyLayer
+            case .driving:
+                if let sampleDriving {
+                    sampleDriving { switchMode(.back) }
+                } else {
+                    TripMapView(session: session, onBack: { switchMode(.back) }, onEnded: { onEnded(model.tripId) })
+                }
             }
-        .navigationDestination(isPresented: $showMap) {
-            TripMapView(session: session, onExit: onExit, onEnded: { onEnded(model.tripId) })
+        }
+        // The trip started from another phone: no more stop edits.
+        .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+        // While driving the lobby's own listeners rest, as they did when the map was a screen pushed over it.
+        .onChange(of: stage.mode) { _, mode in
+            guard !isSample else { return }
+            if mode == .driving {
+                model.stop()
+                joinTowns.cancel()
+            } else {
+                joinTowns.open()
+                model.start()
+            }
         }
         .navigationDestination(isPresented: $showChangeDestination) {
             CreateTripView(
@@ -365,8 +391,8 @@ struct LobbyView: View {
             model.start()
             session.start()
         }
-        // The session keeps running when another screen (the map) is pushed on top; it stops when
-        // the lobby is popped and the session is released.
+        // The session keeps running while driving and when another screen is pushed on top; it stops when the trip
+        // screen is popped and the session is released.
         .onDisappear {
             model.stop()
             joinTowns.cancel()
@@ -389,6 +415,21 @@ struct LobbyView: View {
             confirmEnd: Binding(get: { BottomSheet.presents(wanted: confirmEnd, sheetUp: sheetUp) }, set: { confirmEnd = $0 }),
             leave: { run { try await session.leave(); onExit() } },
             end: { run { try await session.endTrip() } })
+    }
+
+    /// The lobby's map (route, pins, the whole-trip button) and its sheet, handed to the host's one map and one sheet.
+    private var lobbyLayer: some View {
+        LobbyMapLayer(
+            route: routeInfo.coordinates, pins: mapPins, ownRoute: isOrganizer ? [] : ownWay.ownRoute,
+            ownColorHex: ownCarColor, sheetCompact: compact,
+            onCandidateTap: { adding?.select($0) }, command: $mapCommand)
+            .onChange(of: adding?.selectedId, initial: true) { _, id in if let id { flyTo(id) } }
+            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(
+                presented: !sheetCovered, onDismiss: { sheetUp = false },
+                content: AnyView(sheetContent
+                    .onAppear { sheetUp = true }
+                    // The content changing to the convoy's (driving) is not a dismissal: the lobby's sheet is gone all the same.
+                    .onDisappear { sheetUp = false })))
     }
 
     /// The lobby's content in Apple's own sheet over the map (canvas B4 medium, B5 tall): the same glass surface as the
@@ -418,11 +459,11 @@ struct LobbyView: View {
         .sheet(isPresented: $showQR) {
             if let code = model.trip?.code { QRCodeSheet(code: code) }
         }
-        .presentationDetents(LobbySheet.detents(compact: compact), selection: Binding(
+        .presentationDetents(TripScreenLogic.Sheet.lobby(compact: compact).detents, selection: Binding(
             get: { LobbySheet.detent(expanded: expanded, compact: compact) },
             set: { expanded = LobbySheet.isExpanded($0) }))
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: LobbySheet.medium(compact)))
+        .presentationBackgroundInteraction(.enabled(upThrough: TripScreenLogic.Sheet.lobby(compact: compact).touchableUpThrough))
         .interactiveDismissDisabled()
     }
 
@@ -955,7 +996,7 @@ struct LobbyView: View {
 #Preview("Gathering") {
     Backend.configure()
     return NavigationStack {
-        LobbyView(sample: .sample(started: false))
+        TripScreenHost { LobbyView(sample: .sample(started: false)) }
     }
     .environment(LocationPermission())
 }
@@ -963,7 +1004,7 @@ struct LobbyView: View {
 #Preview("On the move") {
     Backend.configure()
     return NavigationStack {
-        LobbyView(sample: .sample(started: true))
+        TripScreenHost { LobbyView(sample: .sample(started: true)) }
     }
     .environment(LocationPermission())
 }

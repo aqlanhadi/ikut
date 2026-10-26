@@ -375,6 +375,7 @@ struct ConvoyActionBar: View {
             }
             .actionBarStyle(prominent: true)
             .disabled(!canReport)
+            .accessibilityIdentifier("convoy.report")
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
                 // An open stop shows its reason's icon and how it stands; the label never wraps, the

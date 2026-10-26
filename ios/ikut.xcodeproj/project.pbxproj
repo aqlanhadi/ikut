@@ -151,6 +151,7 @@
 		8736207F4C70DFC6ED87A072 /* BannerSlotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385EEAB04673E246156A8065 /* BannerSlotTests.swift */; };
 		875D0079B62FB671E73E3916 /* README-places.md in Resources */ = {isa = PBXBuildFile; fileRef = CBAB9007352FC219EF36852D /* README-places.md */; };
 		896F02208FFDCCBE93C739BF /* StopCardDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8874DCFA37C43892F53DB83 /* StopCardDemo.swift */; };
+		89E1E4C74927026617A7BC88 /* TripScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511C3C2D00712F5DF0E5FBDE /* TripScreen.swift */; };
 		8AD641712731A68B8D09EEF5 /* LobbyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */; };
 		8CC56385CA269B6E337E6858 /* RecapMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7817F4C6CB269ADF3664EA9E /* RecapMapView.swift */; };
 		8D67D8F00984536BF6345D04 /* StopArrivalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */; };
@@ -196,6 +197,7 @@
 		AF04B2967E2DDA9303ECB310 /* RouteTimeoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */; };
 		AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01043B5C41A66BD353B61377 /* SuggestStopsSheet.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
+		B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */; };
 		B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */; };
 		B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A209AB9671B47B22C20E451 /* ikut.icon */; };
 		B7DDF8AAF5AC85A86C6F39D6 /* StopPillLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */; };
@@ -370,8 +372,10 @@
 		456F6193440599A0317F386C /* TripExitMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripExitMenu.swift; sourceTree = "<group>"; };
 		48AAE1E4ECEB3FDD4AEE0F07 /* RecapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapView.swift; sourceTree = "<group>"; };
 		4AF3B9CBA8F2BD599933F59C /* StopApproach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproach.swift; sourceTree = "<group>"; };
+		4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripScreenTests.swift; sourceTree = "<group>"; };
 		4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachDemo.swift; sourceTree = "<group>"; };
 		5055B23595FC815A408187BC /* YouStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouStatus.swift; sourceTree = "<group>"; };
+		511C3C2D00712F5DF0E5FBDE /* TripScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripScreen.swift; sourceTree = "<group>"; };
 		52C0A56BCBBB39D114D5E659 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillLogic.swift; sourceTree = "<group>"; };
 		55067EC070E1EB3342E091A2 /* StopPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPlanner.swift; sourceTree = "<group>"; };
@@ -708,6 +712,7 @@
 				F849A1145EA5F7AF5598EF32 /* TripMapContent.swift */,
 				5AD7663BE4B472EA27B284CC /* TripMapModel.swift */,
 				265DA41B16D79FE07ABF962B /* TripMapView.swift */,
+				511C3C2D00712F5DF0E5FBDE /* TripScreen.swift */,
 				5055B23595FC815A408187BC /* YouStatus.swift */,
 			);
 			path = Map;
@@ -959,6 +964,7 @@
 				29D417D8CDD8A80CCF181936 /* TrackingTests.swift */,
 				66FF5396649ED8B58EC123A7 /* TripAskTests.swift */,
 				94110B44C36ABA8B33885499 /* TripMapContentTests.swift */,
+				4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */,
 				A9B60214D010449BFA91F229 /* TripServiceTests.swift */,
 				39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */,
 				06B07E299123E0601E23DBDD /* YouTagTests.swift */,
@@ -1381,6 +1387,7 @@
 				6E9EB28B2723AACAD74CD9FC /* TripMapModel.swift in Sources */,
 				A6127DCD2CA228902ADF16A4 /* TripMapView.swift in Sources */,
 				53EF6DDB8C3D86482D63952C /* TripRouteInfo.swift in Sources */,
+				89E1E4C74927026617A7BC88 /* TripScreen.swift in Sources */,
 				F07B4F17815DB1F4736E7F78 /* TripService.swift in Sources */,
 				1DBF5A11C11CA256FEF45763 /* TripSession.swift in Sources */,
 				7296DE8EDE46EEF454129D03 /* TripSessionLogic.swift in Sources */,
@@ -1470,6 +1477,7 @@
 				D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */,
 				178973148E0EE42B411C79AC /* TripAskTests.swift in Sources */,
 				5A4D6B4B863E8EC2FA5727C3 /* TripMapContentTests.swift in Sources */,
+				B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */,
 				5A3DA96314D84E3905601EC8 /* TripServiceTests.swift in Sources */,
 				C2B70671091C8C289A2A2D00 /* TypeSizeTests.swift in Sources */,
 				2F95598DD8FDAA17D01B2DA1 /* YouTagTests.swift in Sources */,

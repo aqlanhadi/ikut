@@ -30,8 +30,8 @@ enum StopApproachDemo {
         model.setStops([stop])
         model.setCars(model.cars)
         return NavigationStack {
-            TripMapView(session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
-                        stopService: DemoStopService())
+            TripScreenHost(mode: .driving) { TripMapView(session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
+                        stopService: DemoStopService()) }
         }
     }
 
@@ -45,7 +45,7 @@ enum StopApproachDemo {
             text: waiting ? RouteRebuilder.waitingLine : RouteRebuild.sentence(through: ["R&R Tapah", "Ipoh"]),
             waiting: waiting))
         return NavigationStack {
-            TripMapView(session: session, model: model, stopService: DemoStopService())
+            TripScreenHost(mode: .driving) { TripMapView(session: session, model: model, stopService: DemoStopService()) }
         }
     }
 }

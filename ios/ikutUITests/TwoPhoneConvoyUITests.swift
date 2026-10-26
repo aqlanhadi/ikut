@@ -117,7 +117,7 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
         // The organizer's phone taps Start trip; the other waits for it, then taps Show map.
         XCTAssertTrue(lobbyActionButton.waitForExistence(timeout: 120), "The organizer didn't start the trip")
         lobbyActionButton.tap()
-        XCTAssertTrue(app.buttons["Report"].waitForExistence(timeout: 30), "Didn't reach the map")
+        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Didn't reach the map")
         app.dismissMapAsks(first: 3)
         // The convoy sheet opens collapsed; open it for the steps that read the rows.
         let expand = app.buttons["Expand convoy list"]
@@ -147,7 +147,7 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
 
     /// The map's back button, then the lobby's End trip row: the map no longer has trip controls.
     func endTripFromLobby() {
-        app.buttons["Back to lobby"].tap()
+        app.backToLobby.tap()
         XCTAssertTrue(waitForLobby(timeout: 15), "no lobby after Back to lobby")
         tapLobbyRow("lobby.endTrip")
     }
@@ -422,7 +422,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
         }
 
         try step("8. pauses sharing in the lobby, then resumes") {
-            app.buttons["Back to lobby"].tap()
+            app.backToLobby.tap()
             XCTAssertTrue(waitForLobby(timeout: 15), "no lobby after Back to lobby")
             tapLobbyRow("lobby.pause")
             try waitFor("paused banner", timeout: 20) { labelled("label CONTAINS %@", "Sharing paused").exists }
