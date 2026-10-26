@@ -438,7 +438,7 @@ struct LobbyView: View {
                     .accessibilityIdentifier("lobby.share")
             }
         }
-        .padding(.horizontal, Spacing.m)
+        .padding(.horizontal, Spacing.l)
         .padding(.bottom, Spacing.xs)
     }
 

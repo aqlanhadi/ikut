@@ -110,9 +110,11 @@ struct RoundGlassIconButton: View {
     private var isText: Bool { if case .text = face { true } else { false } }
 }
 
-/// The top row of a sheet over the map: [leading round button] [title over subtitle] [trailing round button(s)], as
-/// Apple Maps' place sheet. The title block starts right after the leading button, so a long name has the room a
-/// centred title wouldn't. One line each (the title semibold title3, the subtitle footnote); two at accessibility sizes.
+/// The top row of a sheet over the map: [leading round button] [title over subtitle] [trailing round button], with the
+/// title block centred between them as Apple's inline sheet titles are. Each side reserves a button's width (44 pt)
+/// even with no button, so the block stays truly centred, and it keeps `Spacing.m` from each button. The title is one line
+/// (semibold title3; two at accessibility sizes), the subtitle up to two (footnote), truncating in the middle. Give it
+/// the sheet's side insets (`Spacing.l`) where it is used.
 struct SheetTopRow<Leading: View, Trailing: View>: View {
     var title: String
     var subtitle: String?
@@ -125,24 +127,28 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
 
     var body: some View {
         let lines = typeSize.isAccessibilitySize ? 2 : 1
-        HStack(spacing: Spacing.s) {
-            leading
-            VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 0) {
+            leading.frame(width: 44, height: 44)
+            VStack(spacing: Spacing.xxs) {
                 Text(title)
                     .font(.title3.weight(.semibold))
                     .lineLimit(lines)
+                    .truncationMode(.middle)
                     .accessibilityLabel(titleLabel ?? title)
                     .accessibilityAddTraits(.isHeader)
                 if let subtitle {
                     Text(subtitle)
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
-                        .lineLimit(lines)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
                         .accessibilityIdentifier(subtitleIdentifier ?? "")
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            trailing
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.m)
+            trailing.frame(width: 44, height: 44)
         }
         .frame(minHeight: 48)
     }
