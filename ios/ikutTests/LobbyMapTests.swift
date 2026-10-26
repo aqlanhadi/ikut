@@ -105,9 +105,23 @@ struct LobbyMapTests {
         #expect(clear.span.latitudeDelta > plain.span.latitudeDelta)
     }
 
-    @Test func theTopFractionFallsBackToATypicalPhoneBeforeTheMapIsMeasured() {
-        #expect(LobbyMapLogic.topFraction(mapHeight: 0) == Double(LobbyMapLogic.topObscured) / 874)
-        #expect(LobbyMapLogic.topFraction(mapHeight: 1000) == Double(LobbyMapLogic.topObscured) / 1000)
+    @Test func theTopFractionFollowsTheMeasuredBarAndFallsBackBeforeThat() {
+        #expect(LobbyMapLogic.topFraction(mapHeight: 0, safeTop: 0)
+            == Double(LobbyMapLogic.typicalBar + LobbyMapLogic.flagRoom) / 874)
+        #expect(LobbyMapLogic.topFraction(mapHeight: 1000, safeTop: 62)
+            == Double(62 + LobbyMapLogic.flagRoom) / 1000)
+    }
+
+    @Test(arguments: [(CGFloat(110), CGFloat(874)), (62, 667), (130, 956)])
+    func aDestinationAtTheNorthEdgeLandsBelowTheBar(bar: CGFloat, height: CGFloat) throws {
+        // The destination is the northernmost point, with the route running south from it.
+        let north = [CLLocationCoordinate2D(latitude: 5.0, longitude: 101.0), .init(latitude: 3.0, longitude: 101.6)]
+        let pins = LobbyMapLogic.pins(stops: [], destinationName: "North", destination: north[0], isOrganizer: true, ownJoin: nil)
+        let top = LobbyMapLogic.topFraction(mapHeight: height, safeTop: bar)
+        let region = try #require(LobbyMapLogic.region(for: .wholeTrip, route: north, pins: pins, bottomObscured: 0, topObscured: top))
+        let fromTop = (region.center.latitude + region.span.latitudeDelta / 2 - 5.0) / region.span.latitudeDelta * height
+        // The coordinate is below the bar, with the flag's room above it.
+        #expect(fromTop >= bar + LobbyMapLogic.flagRoom - 1)
     }
 
     @Test func aMovedCameraOrAStopViewIsNotRefitted() {

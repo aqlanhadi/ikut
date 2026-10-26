@@ -112,7 +112,10 @@ struct LobbyView: View {
                 .foregroundStyle(Color.surfaceSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .padding(.horizontal, Spacing.l)
                 .frame(minHeight: 50)
+                // On a surface of its own: the list scrolls under the bar, and a bare line read over the rows.
+                .surfaceTile(radius: 25)
                 .accessibilityIdentifier("lobbyWaiting")
                 .sheetActionBar(lift: barLift)
                 .transition(.opacity)

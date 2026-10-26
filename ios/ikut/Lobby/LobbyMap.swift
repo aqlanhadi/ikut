@@ -104,15 +104,20 @@ enum LobbyMapLogic {
         return result
     }
 
-    /// The fraction of the map's height kept clear at the top: the bar and room for a flag. The sheet needs none at
-    /// the bottom: the map's bottom safe area (`LobbySheet.legalInset`) already sits above the medium sheet, and
-    /// MapKit fits inside it. Before the map is measured a typical phone height stands in.
-    static func topFraction(mapHeight: CGFloat) -> Double {
-        Double(topObscured / (mapHeight > topObscured * 2 ? mapHeight : 874))
+    /// The fraction of the map's height kept clear at the top: the navigation bar with the status bar (`safeTop`, the
+    /// map's own top safe area, so it follows the layout: piece 2 takes the toolbar out) and room for the
+    /// destination flag, which stands about `flagRoom` above its coordinate. The sheet needs none at the bottom: the
+    /// map's bottom safe area (`LobbySheet.legalInset`) already sits above the medium sheet, and MapKit fits inside
+    /// it. Before the map is measured a typical bar and phone height stand in.
+    static func topFraction(mapHeight: CGFloat, safeTop: CGFloat) -> Double {
+        let bar = safeTop > 0 ? safeTop : typicalBar
+        return Double((bar + flagRoom) / (mapHeight > 2 * (bar + flagRoom) ? mapHeight : 874))
     }
 
-    /// Navigation bar plus a destination flag drawn above its coordinate.
-    static let topObscured: CGFloat = 150
+    /// The bar with the status bar before it is measured.
+    static let typicalBar: CGFloat = 110
+    /// The destination flag: its pin and name above the coordinate, with a margin.
+    static let flagRoom: CGFloat = 50
     /// Degrees of latitude shown when the camera flies to one stop.
     static let stopSpan = 0.12
 
@@ -154,6 +159,8 @@ struct LobbyMapView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var camera: MapCameraPosition = .automatic
     @State private var mapHeight: CGFloat = 0
+    /// The map's top safe area: the navigation bar and the status bar.
+    @State private var safeTop: CGFloat = 0
     @State private var onStop = false
     @State private var fitted = false
 
@@ -178,6 +185,11 @@ struct LobbyMapView: View {
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
+            guard top != safeTop else { return }
+            safeTop = top
+            refitIfOurs(animated: false)
+        }
         // The logo and Legal ride above the medium sheet from the first frame, and stay when it is pulled up.
         .safeAreaPadding(.bottom, LobbySheet.legalInset(compact: sheetCompact))
         .ignoresSafeArea()
@@ -200,7 +212,7 @@ struct LobbyMapView: View {
             .buttonStyle(.plain)
             .roundGlass()
             .padding(.trailing, Spacing.m)
-            .padding(.top, Spacing.xs)
+            .padding(.top, safeTop + Spacing.xs)
             .accessibilityLabel("Show the whole trip")
             .accessibilityIdentifier("lobby.wholeTrip")
         }
@@ -213,7 +225,7 @@ struct LobbyMapView: View {
 
     private func go(_ target: LobbyMapTarget, animated: Bool) {
         guard let region = LobbyMapLogic.region(for: target, route: route, pins: pins, bottomObscured: 0,
-                                                topObscured: LobbyMapLogic.topFraction(mapHeight: mapHeight)) else { return }
+                                                topObscured: LobbyMapLogic.topFraction(mapHeight: mapHeight, safeTop: safeTop)) else { return }
         onStop = target != .wholeTrip
         fitted = true
         let position = MapCameraPosition.region(region)
