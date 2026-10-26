@@ -158,7 +158,6 @@ struct AddStopContent: View {
                 }
             }
             .surfaceTile(radius: Radius.card)
-            if model.selected != nil { stayRow }
         }
     }
 
@@ -192,6 +191,7 @@ struct AddStopContent: View {
         .accessibilityIdentifier("addStop.rnr.\(row.number)")
     }
 
+    /// On a material, not the tile fill: the rows scroll under it.
     private var stayRow: some View {
         HStack(spacing: Spacing.m) {
             Text("Stay").font(.callout)
@@ -210,20 +210,24 @@ struct AddStopContent: View {
         }
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
         .frame(minHeight: 50)
-        .surfaceTile(radius: Radius.card)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 
     // MARK: Add
 
     @ViewBuilder private var addBar: some View {
         if let title = model.addTitle {
-            Button {
-                if let draft = model.draft { onAdd(draft) }
-            } label: { Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, minHeight: 50) }
-                .actionButton(.primary, onGlass: true)
-                .disabled(model.draft == nil)
-                .sheetActionBar(lift: barLift)
-                .accessibilityIdentifier("addStop.add")
+            // Stay sits with the button, so it is in view whatever the list's length (an R&R only, not a searched place).
+            VStack(spacing: Spacing.s) {
+                if model.picked == nil, model.selected != nil { stayRow }
+                Button {
+                    if let draft = model.draft { onAdd(draft) }
+                } label: { Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, minHeight: 50) }
+                    .actionButton(.primary, onGlass: true)
+                    .disabled(model.draft == nil)
+                    .accessibilityIdentifier("addStop.add")
+            }
+            .sheetActionBar(lift: barLift)
         }
     }
 
