@@ -29,6 +29,10 @@ struct DemoRoads: LegRouting {
 enum LobbyStopsDemo {
     enum Scene: String {
         case organizer, organizerEmpty, member, meetAndFailure, turnBack, suggestAdded, started
+        /// The organiser pulled up to the tall height (B5).
+        case tall
+        /// B4: a meeting point, five cars, the last one not sharing yet.
+        case notReady
     }
 
     /// KL to Ipoh, about 190 km.
@@ -60,6 +64,24 @@ enum LobbyStopsDemo {
         case .organizer:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true)
+        case .tall:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true, tall: true)
+        case .notReady:
+            let meet = StopDraft(
+                id: "m", name: "Petronas Jalan Duta", coordinate: .init(latitude: 3.17, longitude: 101.68), kind: .meet,
+                meetAt: Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Date()), routeOffset: 0)
+            let items = [meet] + stopsOnRoute.map(StopDraft.init)
+            planner.showForDemo(items: items)
+            let base = model(stopsOnRoute)
+            func ready(_ car: Car) -> Car { var car = car; car.trackerUserId = car.trackerUserId ?? "u3"; return car }
+            let siti = Car(id: "c5", name: "Siti’s Bezza", color: "#8E8E93", trackerUserId: nil, isLead: false, route: nil,
+                           mergeOffset: nil, state: .convoy, number: 5)
+            let crowded = LobbyModel(
+                sampleTrip: base.trip!, cars: base.cars.map(ready) + [siti],
+                members: base.members + [Member(id: "u8", displayName: "Nora", carId: "c5", role: .member)],
+                stops: base.stops)
+            return LobbyView(sample: crowded, planner: planner, organizer: true)
         case .organizerEmpty:
             return LobbyView(sample: model([]), planner: planner, organizer: true)
         case .suggestAdded:
@@ -199,6 +221,8 @@ enum DemoScreens {
             return AnyView(AddStopSheet(demoModel: model, picked: nil, kind: .fuel, minutes: nil, canMeet: false)
                 .environment(LocationPermission()))
         case "lobby-organizer": return nav(LobbyStopsDemo.lobby(.organizer))
+        case "lobby-tall": return nav(LobbyStopsDemo.lobby(.tall))
+        case "lobby-not-ready": return nav(LobbyStopsDemo.lobby(.notReady))
         case "lobby-empty": return nav(LobbyStopsDemo.lobby(.organizerEmpty))
         case "lobby-suggest-added": return nav(LobbyStopsDemo.lobby(.suggestAdded))
         // The Suggest stops sheet: the button is on lobby-empty; then the suggestion, the stepper moved, a short trip,

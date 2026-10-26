@@ -98,6 +98,29 @@ struct RoundGlassIconButton: View {
     private var isText: Bool { if case .text = face { true } else { false } }
 }
 
+/// The same round button for the system share sheet (a `ShareLink`, which isn't a `Button` to wrap).
+struct RoundGlassShareLink: View {
+    var item: String
+    var label = "Share invite"
+
+    var body: some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            ShareLink(item: item) { face.frame(width: 44, height: 44) }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
+                .accessibilityLabel(label)
+        } else {
+            ShareLink(item: item) {
+                face.foregroundStyle(.secondary).frame(width: 44, height: 44).background(.quaternary, in: Circle())
+            }
+            .accessibilityLabel(label)
+        }
+    }
+
+    private var face: some View { Image(systemName: "square.and.arrow.up").font(.footnote.weight(.bold)) }
+}
+
 /// The search bar of an Apple-Maps-style sheet (Home's Where to?, then the live search): a full-width capsule at
 /// least 48 pt tall on a light translucent fill with a hairline edge, a magnifier in .primary, then the text at the
 /// body size. Two forms with the same face: `SheetSearchButton` (a placeholder you tap) and `SheetSearchField`

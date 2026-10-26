@@ -192,6 +192,7 @@
 		AF04B2967E2DDA9303ECB310 /* RouteTimeoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */; };
 		AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01043B5C41A66BD353B61377 /* SuggestStopsSheet.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
+		B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */; };
 		B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A209AB9671B47B22C20E451 /* ikut.icon */; };
 		B7DDF8AAF5AC85A86C6F39D6 /* StopPillLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */; };
 		B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */; };
@@ -199,6 +200,7 @@
 		B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E26FDD008B015443CC328 /* AlertWording.swift */; };
 		BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D43EA449C4A10B16261D617 /* HazardMapContent.swift */; };
 		BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56D59AA9467F430D986EC9F /* HomeSheet.swift */; };
+		BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E803C8C9331D07C56F506F44 /* LobbyContent.swift */; };
 		BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34759F3D28A64C5908B2C7D /* AuthTests.swift */; };
 		BEFD37A841FAEB09281F0EDB /* JoinModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DD0AB1BDC90D15EA18EE2B /* JoinModel.swift */; };
 		BF856415E97C93CCF1248A8E /* MapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D7948AC8E4880C3065A836 /* MapTests.swift */; };
@@ -504,6 +506,7 @@
 		E5E2C4D6FFA56CAD6008809D /* TrackingTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTypes.swift; sourceTree = "<group>"; };
 		E6DA41E66D3D8B93F91BEADF /* StopDelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopDelay.swift; sourceTree = "<group>"; };
 		E715F12926E78F920D452DEC /* ConvoyRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyRows.swift; sourceTree = "<group>"; };
+		E803C8C9331D07C56F506F44 /* LobbyContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyContent.swift; sourceTree = "<group>"; };
 		E8576506422AFD08E8778B82 /* LobbyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyTests.swift; sourceTree = "<group>"; };
 		EBDD23345E4B5753BEC3866D /* JoinService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinService.swift; sourceTree = "<group>"; };
 		ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalCard.swift; sourceTree = "<group>"; };
@@ -522,6 +525,7 @@
 		FE37346B0076B57911BFD71C /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyLogic.swift; sourceTree = "<group>"; };
 		FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkTests.swift; sourceTree = "<group>"; };
+		FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyContentTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -570,6 +574,7 @@
 			isa = PBXGroup;
 			children = (
 				1252A60E6727550F035DB2EA /* CarRow.swift */,
+				E803C8C9331D07C56F506F44 /* LobbyContent.swift */,
 				A934C926EBC010FFC24A37C0 /* LobbyDemo.swift */,
 				FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */,
 				5D682C5C9F984EC55FF14A11 /* LobbyMap.swift */,
@@ -899,6 +904,7 @@
 				43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */,
 				9A4E6220545874C63A72429B /* HomeNowTests.swift */,
 				55CC3926DEEA6AE07A394182 /* JoinTests.swift */,
+				FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */,
 				B249BC9D63DDB50ACFFF29BF /* LobbyMapTests.swift */,
 				E8576506422AFD08E8778B82 /* LobbyTests.swift */,
 				A65171C412E1666014BC2347 /* LocationPermissionTests.swift */,
@@ -1251,6 +1257,7 @@
 				66E1D3BEB35CA17544C67084 /* JoinService.swift in Sources */,
 				1DDB1C1F2C277F3876102F3C /* JoinTripView.swift in Sources */,
 				66086EF8F71F7F9414B5ED2F /* LiveSpeechEngine.swift in Sources */,
+				BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */,
 				06E8B7D6E99A761D1368E5D4 /* LobbyDemo.swift in Sources */,
 				E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */,
 				7E6E1801B96D4FC4E6A46128 /* LobbyMap.swift in Sources */,
@@ -1402,6 +1409,7 @@
 				A773017CB9C9B79C20C393FC /* HomeNowEmulatorTests.swift in Sources */,
 				3E3947EE2E72D11FC40409C1 /* HomeNowTests.swift in Sources */,
 				9785EEBC824C5B168FFD8B25 /* JoinTests.swift in Sources */,
+				B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */,
 				EC912979E5006A45CFC1EBE8 /* LobbyMapTests.swift in Sources */,
 				90699FA2CC334EB3BF76387C /* LobbyTests.swift in Sources */,
 				36C740A771C8B0FDCACDCEDA /* LocationPermissionTests.swift in Sources */,

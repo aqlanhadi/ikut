@@ -79,9 +79,11 @@ struct StopNote: View {
     }
 }
 
-/// One planned stop: its kind's icon, name, "Fuel · 20 min", how far along, and (for the organizer) a drag handle.
+/// One planned stop: its number as on the map's pin (a person symbol for the meeting point, which takes none), its
+/// name with the line under it ("About 1 h 35 min in · stay 20 min"), and for the organizer a drag handle.
 struct StopRow: View {
     var stop: StopDraft
+    var text: LobbyContent.StopText
     var editable: Bool
     var first: Bool
     /// Extra meters the road turns back on itself near this stop, when it does.
@@ -91,35 +93,17 @@ struct StopRow: View {
     var onRetry: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var offsetText: String? {
-        guard !failed, !stop.isMeeting || stop.routeOffset != nil, let offset = stop.routeOffset else { return nil }
-        return StopFormat.along(meters: offset)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: Spacing.m) {
-                Image(systemName: stop.kind.symbol)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(stop.kind.tint, in: Circle())
+                badge
                     .padding(.top, typeSize.isAccessibilitySize ? Spacing.s : 0)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(stop.name).foregroundStyle(failed ? .secondary : .primary)
-                    Text(StopFormat.detail(stop)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
-                    if typeSize.isAccessibilitySize, let offsetText {
-                        Text(offsetText).font(.system(.subheadline, design: .rounded).weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
-                    }
+                    Text(text.name).foregroundStyle(failed ? .secondary : .primary)
+                    Text(failed ? StopFormat.detail(stop) : text.detail).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if !typeSize.isAccessibilitySize, let offsetText {
-                    Text(offsetText)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.surfaceSecondary)
-                }
                 if editable {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(Color.surfaceSecondary)
@@ -144,6 +128,22 @@ struct StopRow: View {
         }
         .overlay(alignment: .top) { if !first { Divider() } }
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var badge: some View {
+        if let number = text.number {
+            Text("\(number)")
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color.ikutAccent, in: Circle())
+        } else {
+            Image(systemName: stop.kind.symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(stop.kind.tint, in: Circle())
+        }
     }
 }
 

@@ -14,6 +14,8 @@ struct LobbyView: View {
     @State private var model: LobbyModel
     @State private var session: TripSession
     @State private var routeInfo = TripRouteInfo()
+    /// The main route's length in meters, for how far along a stop is in time.
+    @State private var routeLength: Double?
     // The same switch the map applies (TripMapView): the lobby is where it moved to.
     @AppStorage("ikut.map.keepAwake") private var keepAwake = false
     @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
@@ -31,6 +33,9 @@ struct LobbyView: View {
     @State private var isWorking = false
     @State private var actionError: String?
     @State private var showMap = false
+    /// Start trip with a car not sharing yet asks first (#362).
+    @State private var confirmStart = false
+    @State private var showQR = false
     /// The lobby is on screen (not popped): the sheet is presented from it, so it goes with it.
     @State private var onScreen = false
     /// The lobby's sheet is up (it reports its own appear and dismiss); what else is presented waits for it to go.
@@ -70,8 +75,9 @@ struct LobbyView: View {
 
     /// A lobby on sample data with the planner in a given state, for previews and screenshots: `organizer` shows the
     /// organizer's card (editable) rather than a member's.
-    init(sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil) {
+    init(sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false) {
         self.init(sample: model)
+        _expanded = State(initialValue: tall)
         _planner = State(initialValue: planner)
         sampleOrganizer = organizer
         if let ownWay { _ownWay = State(initialValue: ownWay) }
@@ -89,7 +95,8 @@ struct LobbyView: View {
         !session.isEnded && (LobbyLogic.isStarted(trip: model.trip) || startedHere)
     }
 
-    /// Organiser: Start trip. Participant: a plain waiting line until the trip starts, then Show map (D39).
+    /// Organiser: Start trip, with the line above it while a car isn't sharing yet. Participant: a plain waiting line
+    /// until the trip starts, then Show map (D39).
     @ViewBuilder private var bottomBar: some View {
         let bar = LobbyLogic.bottomBar(
             isOrganizer: isOrganizer, tripLoaded: model.trip != nil, isMember: !session.membershipLost,
@@ -121,19 +128,43 @@ struct LobbyView: View {
                 .sheetActionBar(lift: barLift)
                 .transition(.opacity)
         case .startTrip, .showMap:
-            Button {
-                if bar == .startTrip {
-                    startedHere = true
-                    Task { await TripService.markStarted(tripId: model.tripId) }
+            VStack(spacing: Spacing.s) {
+                if bar == .startTrip, let line = LobbyContent.waitingLine(model.groupedCars) {
+                    Text(line)
+                        .font(.footnote)
+                        .foregroundStyle(Color.surfaceSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .accessibilityIdentifier("lobby.waitingForCars")
                 }
-                showMap = true
-            } label: {
-                Text(bar.label).font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                Button {
+                    if bar == .startTrip {
+                        if LobbyContent.startConfirm(model.groupedCars) != nil { confirmStart = true } else { startTrip() }
+                    } else {
+                        showMap = true
+                    }
+                } label: {
+                    Text(bar.label).font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .actionBarStyle(prominent: true)
+                .confirmationDialog(
+                    LobbyContent.startConfirm(model.groupedCars) ?? "", isPresented: $confirmStart, titleVisibility: .visible
+                ) {
+                    Button("Start anyway") { startTrip() }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
-            .actionBarStyle(prominent: true)
             .sheetActionBar(lift: barLift)
             .transition(.opacity)
         }
+    }
+
+    private func startTrip() {
+        startedHere = true
+        Task { await TripService.markStarted(tripId: model.tripId) }
+        showMap = true
     }
 
     /// Stop edits run in the banner motion, so the List slides the rows around an inserted, removed or moved one.
@@ -167,19 +198,21 @@ struct LobbyView: View {
     }
 
     private var canLeave: Bool { session.isLiveMember }
-    /// The Leave trip menu item: not the organizer before the start (they can only End it).
-    private var canLeaveTrip: Bool {
-        LobbyLogic.canLeaveTrip(isOrganizer: isOrganizer, started: isStarted, isLiveMember: canLeave)
+    /// Which rows this person gets (`LobbyContent.rows`): the organizer's edits before the start, a participant's own way in.
+    private var rows: LobbyContent.Rows {
+        LobbyContent.rows(
+            isOrganizer: isOrganizer, started: isStarted, ended: session.isEnded, isLiveMember: canLeave,
+            trackingOrPaused: session.isTracking || session.isPaused)
     }
-    private var canEnd: Bool { isOrganizer && !session.isEnded }
+    /// The Leave trip row: not the organizer before the start (they can only End it).
+    private var canLeaveTrip: Bool { rows.canLeave }
+    private var canEnd: Bool { rows.canEnd }
     /// Rename and change destination: the organizer, before the trip ends.
-    private var canEdit: Bool { isOrganizer && canLeave }
+    private var canEdit: Bool { rows.canRename }
     /// Change destination: the organizer, until the trip ends (mid-trip it rebuilds the route from where they are).
-    private var canChangeDestination: Bool {
-        LobbyLogic.canChangeDestination(canEdit: canEdit)
-    }
+    private var canChangeDestination: Bool { rows.canChangeDestination }
     /// Add, move and remove stops: the organizer, before the trip has started.
-    private var canEditStops: Bool { canEdit && !isStarted }
+    private var canEditStops: Bool { rows.canEditStops }
 
     /// "Kuala Lumpur to Ipoh · 205 km · 2 h 25 min", the line under the Suggest stops title.
     private var suggestSummary: String {
@@ -189,7 +222,7 @@ struct LobbyView: View {
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
-    private var canPause: Bool { (session.isTracking || session.isPaused) && canLeave }
+    private var canPause: Bool { rows.canPause }
 
     private var cover: LobbySheet.Cover {
         LobbySheet.Cover(
@@ -232,10 +265,9 @@ struct LobbyView: View {
                 midTrip: LobbyLogic.isStarted(trip: model.trip) ? { [session] in try await session.rebuilder.changeDestination(to: $0) } : nil
             ) { _ in showChangeDestination = false }
         }
-        .navigationTitle(LobbyLogic.title(started: isStarted, ended: session.isEnded))
-        .lobbySubtitle(
-            title: LobbyLogic.title(started: isStarted, ended: session.isEnded),
-            subtitle: isStarted ? LobbyLogic.sinceLine(startedAt: model.trip?.startedAt ?? model.trip?.createdAt) : nil)
+        // The header (Back, the trip's name, Share) is in the sheet, so the map runs to the top of the screen.
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
         .onChange(of: session.isEnded, initial: true) { _, ended in
             if ended { onEnded(model.tripId) }
         }
@@ -264,9 +296,9 @@ struct LobbyView: View {
                 onAdd: { addStop($0) })
         }
         .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
-        .navigationBarTitleDisplayMode(.inline)
         .task(id: model.trip?.route) {
             guard let trip = model.trip else { return }
+            routeLength = RouteLine(Polyline.decode(trip.route)).length
             await routeInfo.load(
                 route: trip.route, routeSeconds: trip.routeSeconds, needsRoadName: model.stops.isEmpty, ownTrip: !isOrganizer)
         }
@@ -291,47 +323,6 @@ struct LobbyView: View {
                 let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !name.isEmpty, let id = model.trip?.id else { return }
                 run { try await TripService.rename(tripId: id, to: name) }
-            }
-        }
-        .toolbar {
-            if canEdit, let trip = model.trip {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        renameText = trip.name
-                        renaming = true
-                    } label: {
-                        Image(systemName: "pencil")
-                    }
-                    .disabled(isWorking)
-                    .accessibilityLabel("Rename trip")
-                }
-            }
-            if canLeaveTrip || canEnd || canPause || !isSample {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        if canPause {
-                            if session.isPaused {
-                                Button("Resume sharing", systemImage: "play.fill") {
-                                    run { try await session.resumeSharing() }
-                                }
-                            } else {
-                                Button("Pause sharing", systemImage: "pause.fill") {
-                                    run { try await session.pauseSharing() }
-                                }
-                            }
-                        }
-                        if !isSample {
-                            Toggle("Keep screen on", systemImage: "sun.max", isOn: Binding(
-                                get: { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) },
-                                set: { keepAwake = $0; keepAwakeAnswered = true }))
-                        }
-                        TripExitMenu(canEnd: canEnd, canLeave: canLeaveTrip, confirmEnd: $confirmEnd, confirmLeave: $confirmLeave)
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .disabled(isWorking)
-                    .accessibilityLabel("Trip options")
-                }
             }
         }
         .onAppear {
@@ -363,57 +354,411 @@ struct LobbyView: View {
     }
 
     /// The lobby's content in Apple's own sheet over the map (canvas B4 medium, B5 tall): the same glass surface as the
-    /// driving screen's convoy sheet, always up, the map above it touchable at medium. Start trip, the waiting line and
-    /// Show map sit in its bottom bar at both heights.
+    /// driving screen's convoy sheet, always up, the map above it touchable at medium. The header stays on top; below
+    /// it the cars show at medium, and what pulling the sheet up adds (code, trip, stops, options) follows them. Start
+    /// trip, the waiting line and Show map sit in its bottom bar at both heights.
     private var sheetContent: some View {
         let compact = compact
-        return List {
-            statusBanner
-                .lobbyRow()
-            if session.isPaused && !session.isEnded && !session.membershipLost {
-                PausedBanner(session: session, onError: { actionError = $0 })
-                    .padding(.bottom, Spacing.xs)
+        return VStack(spacing: 0) {
+            sheetHeader
+            List {
+                statusBanner
                     .lobbyRow()
-            }
-            if let trip = model.trip {
-                tripCardRows(trip)
-                inviteCard(trip.code)
-                    .padding(.top, Spacing.m)
-                    .lobbyRow()
-                carsHeader
-                    .lobbyRow()
-                carsCard
-                    .lobbyRow()
-                if let actionError {
-                    InlineNote(actionError, tone: .alert)
-                        .padding(.top, Spacing.m)
+                if session.isPaused && !session.isEnded && !session.membershipLost {
+                    PausedBanner(session: session, onError: { actionError = $0 })
+                        .padding(.bottom, Spacing.xs)
                         .lobbyRow()
                 }
-            } else if let message = model.errorMessage {
-                Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
-                    .lobbyRow()
-            } else {
-                ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
-                    .lobbyRow()
+                if let trip = model.trip {
+                    if rows.ownWay { ownWayTile(trip).lobbyRow(top: Spacing.xs, bottom: Spacing.xs) }
+                    carsRows
+                    if let actionError {
+                        InlineNote(actionError, tone: .alert)
+                            .padding(.top, Spacing.m)
+                            .lobbyRow()
+                    }
+                    codeCard(trip.code).lobbyRow(top: Spacing.section)
+                    tripRows(trip)
+                    stopsRows(trip)
+                    optionRows
+                } else if let message = model.errorMessage {
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
+                        .lobbyRow()
+                } else {
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                        .lobbyRow()
+                }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .listRowSpacing(0)
+            .environment(\.defaultMinListRowHeight, 1)
+            .contentMargins(.top, Spacing.xs, for: .scrollContent)
+            .contentMargins(.bottom, Spacing.l, for: .scrollContent)
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .listRowSpacing(0)
-        .environment(\.defaultMinListRowHeight, 1)
-        .contentMargins(.top, Spacing.m, for: .scrollContent)
-        .contentMargins(.bottom, Spacing.l, for: .scrollContent)
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .environment(\.inPanelSheet, true)
         .padding(.top, LobbySheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
+        .sheet(isPresented: $showQR) {
+            if let code = model.trip?.code { QRCodeSheet(code: code) }
+        }
         .presentationDetents(LobbySheet.detents(compact: compact), selection: Binding(
             get: { LobbySheet.detent(expanded: expanded, compact: compact) },
             set: { expanded = LobbySheet.isExpanded($0) }))
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: LobbySheet.medium(compact)))
         .interactiveDismissDisabled()
+    }
+
+    // MARK: Header
+
+    /// Back to trips and Share invite as round glass buttons, the trip's name under them and, under that, where it goes,
+    /// when they meet and the code (canvas B4). After the start the title and line are the trip's state.
+    private var sheetHeader: some View {
+        let trip = model.trip
+        let ended = session.isEnded
+        return VStack(alignment: .leading, spacing: Spacing.xxs) {
+            HStack {
+                RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: onExit)
+                    .accessibilityIdentifier("lobby.back")
+                Spacer()
+                if let trip {
+                    RoundGlassShareLink(item: LobbyLogic.shareText(code: trip.code))
+                        .accessibilityIdentifier("lobby.share")
+                }
+            }
+            .padding(.horizontal, Spacing.m)
+            if let trip {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(LobbyContent.headerTitle(tripName: trip.name, started: isStarted, ended: ended))
+                        .font(.title.weight(.bold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                        .accessibilityAddTraits(.isHeader)
+                    if let line = LobbyContent.subtitle(
+                        destination: trip.destination.name,
+                        meetAt: TripSessionLogic.meetingPoint(in: model.stops) != nil ? shownStops.first(where: \.isMeeting)?.meetAt : nil,
+                        code: trip.code, started: isStarted, ended: ended,
+                        startedAt: trip.startedAt ?? trip.createdAt)
+                    {
+                        Text(line)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.surfaceSecondary)
+                            .accessibilityIdentifier("lobby.subtitle")
+                    }
+                }
+                .padding(.horizontal, Spacing.l)
+            }
+        }
+        .padding(.bottom, Spacing.xs)
+    }
+
+    // MARK: Cars
+
+    private func isMine(_ item: LobbyCar) -> Bool {
+        if isSample { return item.car.id == (isOrganizer ? "c1" : "c2") }
+        guard let currentUserId else { return false }
+        return item.members.contains { $0.id == currentUserId }
+    }
+
+    /// "Cars · 4 of 5 ready" and the cars, each with the line under it. Tapping a car does nothing (no other car's
+    /// position, #361), except a participant's own row, which shows where they join when the lobby knows.
+    @ViewBuilder private var carsRows: some View {
+        let cars = model.groupedCars
+        sectionLabel(LobbyContent.carsHeader(cars)).lobbyRow(top: Spacing.s)
+        VStack(spacing: 0) {
+            if cars.isEmpty { EmptyRow("No cars yet") }
+            ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { RowDivider() }
+                let mine = isMine(item)
+                let text = LobbyContent.carText(
+                    item, mine: mine, viewerLeavesFromTheStart: isOrganizer || ownWay.join == .startsWithConvoy)
+                let row = CarRow(text: text, number: item.car.number ?? index + 1, colorHex: item.car.color)
+                if mine, !isOrganizer, ownWay.joinCoordinate != nil {
+                    Button { flyTo("join") } label: { row }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Shows where you join")
+                } else {
+                    row
+                }
+            }
+        }
+        .surfaceTile(radius: Radius.card)
+        .lobbyRow()
+    }
+
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.surfaceSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.m)
+            .padding(.bottom, Spacing.xs)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: A participant's own way in
+
+    /// FROM to TO, where they join the convoy, and their drive (D26).
+    private func ownWayTile(_ trip: Trip) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.gap) {
+            RouteEnds(from: ownWay.fromName, to: trip.destination.name)
+            if let line = ownWay.joinLine {
+                Text(line).font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+            }
+            routeTotal(trip, stops: shownStops)
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surfaceTile(radius: Radius.card)
+    }
+
+    // MARK: Tall: the code
+
+    private func codeCard(_ code: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text("Trip code").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
+            Text(LobbyLogic.displayCode(code))
+                .font(.system(size: ScaledSize.capped(codeSize, base: 30, cap: 1.5), weight: .bold, design: .monospaced))
+                .kerning(2)
+                // The code is one token that must stay on one line, so it shrinks rather than wraps.
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+                .textSelection(.enabled)
+                .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
+            Text("Anyone with the code can join until the trip ends")
+                .font(.footnote).foregroundStyle(Color.surfaceSecondary)
+            HStack(spacing: Spacing.s) {
+                Button { showQR = true } label: {
+                    Label("Show QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                }
+                .actionButton(.secondary, onGlass: true)
+                .accessibilityIdentifier("lobby.showQR")
+                // The share sheet also offers Copy, so there's no separate copy button.
+                ShareLink(item: LobbyLogic.shareText(code: code)) {
+                    Label("Share", systemImage: "square.and.arrow.up").font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                }
+                .actionButton(.secondary, onGlass: true)
+                .accessibilityIdentifier("lobby.shareCode")
+            }
+            .padding(.top, Spacing.tight)
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surfaceTile(radius: Radius.card)
+    }
+
+    // MARK: Tall: the trip
+
+    /// Name (the organizer taps to rename) and Destination (the organizer taps to change it; a participant reads it).
+    @ViewBuilder private func tripRows(_ trip: Trip) -> some View {
+        sectionLabel("Trip").lobbyRow(top: Spacing.m)
+        VStack(spacing: 0) {
+            tripRow("Name", value: trip.name, tappable: canEdit, id: "lobby.rename") {
+                renameText = trip.name
+                renaming = true
+            }
+            RowDivider()
+            tripRow("Destination", value: trip.destination.name, tappable: canChangeDestination, id: "lobby.destination") {
+                showChangeDestination = true
+            }
+        }
+        .surfaceTile(radius: Radius.card)
+        .lobbyRow()
+    }
+
+    @ViewBuilder private func tripRow(_ title: String, value: String, tappable: Bool, id: String, action: @escaping () -> Void) -> some View {
+        let content = HStack(spacing: Spacing.s) {
+            Text(title)
+            Spacer(minLength: Spacing.s)
+            Text(value).foregroundStyle(Color.surfaceSecondary).lineLimit(1)
+            if tappable {
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, Spacing.l)
+        .frame(minHeight: 48)
+        .contentShape(Rectangle())
+        if tappable {
+            Button(action: action) { content }
+                .buttonStyle(.plain)
+                .disabled(isWorking)
+                .accessibilityIdentifier(id)
+        } else {
+            content.accessibilityElement(children: .combine)
+        }
+    }
+
+    // MARK: Tall: the stops
+
+    /// The stops as shown: the organizer's own edits while they are being built, else what the trip says.
+    private var shownStops: [StopDraft] {
+        canEditStops ? planner.items : model.stops.sorted { $0.order < $1.order }.map(StopDraft.init)
+    }
+
+    private var failure: StopPlanner.Failure? {
+        if case .failed(let failure) = planner.status, canEditStops { return failure }
+        return nil
+    }
+
+    /// The meeting point first, the stops numbered as on the map, then (the organizer, before the start) Add a stop and
+    /// Suggest stops, and the route's total. Reorder and swipe to remove work on the rows as before.
+    @ViewBuilder private func stopsRows(_ trip: Trip) -> some View {
+        let stops = shownStops
+        let showStops = canEditStops || !stops.isEmpty
+        let texts = LobbyContent.stopTexts(stops, routeLength: routeLength, routeSeconds: trip.routeSeconds ?? routeInfo.travelTime)
+        if showStops {
+            let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
+            layout {
+                Text("Stops").font(.footnote.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
+                if planner.isBuilding && canEditStops {
+                    ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
+                        .transition(.opacity)
+                } else if canEditStops, stops.count > 1 {
+                    Text("Hold and drag to reorder").font(.footnote)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Motion.quick(reduceMotion: reduceMotion), value: planner.isBuilding)
+            .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
+            .foregroundStyle(Color.surfaceSecondary)
+            .padding(.horizontal, Spacing.m)
+            .lobbyRow(top: Spacing.m, bottom: Spacing.xs)
+
+            if stops.isEmpty {
+                Text("No stops yet. Add one for fuel, food or a place to meet.")
+                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.m)
+                    .cardSlice(top: true, bottom: !canEditStops)
+                    .lobbyRow()
+            }
+            ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
+                stopRow(stop, text: texts[index], index: index, stops: stops, lastOfCard: !isOrganizer && index == stops.count - 1)
+            }
+            .onMove(perform: canEditStops ? { planner.move(from: $0, to: $1) } : nil)
+            if let failure, failure.place.stopId == nil {
+                StopNote(
+                    tone: .failure,
+                    title: StopNoteText.failureTitle(failure, stopName: nil, destinationName: trip.destination.name),
+                    detail: StopNoteText.failureDetail(failure), retry: { planner.retry() })
+                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                    .cardSlice()
+                    .lobbyRow()
+            }
+            if planner.queued && canEditStops {
+                StopNote(tone: .warning, title: StopNoteText.queuedTitle, detail: StopNoteText.queuedDetail)
+                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                    .cardSlice()
+                    .lobbyRow()
+            }
+            if canEditStops {
+                stopAction("Add a stop", systemImage: "plus", caption: nil, id: "stops.add") { showAddStop = true }
+                    .disabled(!StopListLogic.canAdd(among: stops))
+                    .overlay(alignment: .top) { Divider() }
+                    .cardSlice()
+                    .lobbyRow()
+                stopAction(
+                    "Suggest stops", systemImage: "sparkles",
+                    caption: LobbyContent.suggestCaption(routeSeconds: trip.routeSeconds ?? routeInfo.travelTime), id: "stops.suggest"
+                ) { showSuggestStops = true }
+                    .overlay(alignment: .top) { Divider() }
+                    .cardSlice()
+                    .lobbyRow()
+            }
+            if isOrganizer {
+                routeTotal(trip, stops: stops)
+                    .padding(.horizontal, Spacing.s)
+                    .padding(.top, Spacing.xs).padding(.bottom, Spacing.s)
+                    .cardSlice(bottom: true)
+                    .lobbyRow()
+            }
+        }
+    }
+
+    private func stopAction(_ title: String, systemImage: String, caption: String?, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.m) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.ikutAccent)
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+                Text(title).foregroundStyle(Color.ikutAccent)
+                Spacer(minLength: Spacing.s)
+                if let caption {
+                    Text(caption).font(.footnote).foregroundStyle(Color.surfaceSecondary)
+                }
+            }
+            .padding(.horizontal, Spacing.l)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+    }
+
+    // MARK: Tall: options and leaving
+
+    /// Keep screen on, Pause or Resume sharing, and at the very end Leave trip or End trip.
+    @ViewBuilder private var optionRows: some View {
+        let exit = canEnd || canLeaveTrip
+        if !isSample || canPause {
+            VStack(spacing: 0) {
+                if !isSample {
+                    Toggle("Keep screen on", isOn: Binding(
+                        get: { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) },
+                        set: { keepAwake = $0; keepAwakeAnswered = true }))
+                        .padding(.horizontal, Spacing.l)
+                        .frame(minHeight: 48)
+                        .accessibilityIdentifier("lobby.keepAwake")
+                }
+                if canPause {
+                    if !isSample { RowDivider() }
+                    optionButton(
+                        session.isPaused ? "Resume sharing" : "Pause sharing", systemImage: session.isPaused ? "play.fill" : "pause.fill",
+                        id: session.isPaused ? "lobby.resume" : "lobby.pause"
+                    ) { run { session.isPaused ? try await session.resumeSharing() : try await session.pauseSharing() } }
+                }
+            }
+            .surfaceTile(radius: Radius.card)
+            .lobbyRow(top: Spacing.section)
+        }
+        if exit {
+            VStack(spacing: 0) {
+                if canEnd {
+                    optionButton("End trip", systemImage: "flag.checkered", id: "lobby.endTrip", destructive: true) { confirmEnd = true }
+                }
+                if canEnd && canLeaveTrip { RowDivider() }
+                if canLeaveTrip {
+                    optionButton("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", id: "lobby.leaveTrip", destructive: true) {
+                        confirmLeave = true
+                    }
+                }
+            }
+            .surfaceTile(radius: Radius.card)
+            .lobbyRow(top: Spacing.m, bottom: Spacing.l)
+        }
+    }
+
+    private func optionButton(
+        _ title: String, systemImage: String, id: String, destructive: Bool = false, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .foregroundStyle(destructive ? Color.red : Color.primary)
+                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .padding(.horizontal, Spacing.l)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isWorking)
+        .accessibilityIdentifier(id)
     }
 
     private func run(_ action: @escaping () async throws -> Void) {
@@ -456,160 +801,18 @@ struct LobbyView: View {
         .padding(.bottom, Spacing.s)
     }
 
-    /// The stops as shown: the organizer's own edits while they are being built, else what the trip says.
-    private var shownStops: [StopDraft] {
-        canEditStops ? planner.items : model.stops.sorted { $0.order < $1.order }.map(StopDraft.init)
-    }
-
-    private var failure: StopPlanner.Failure? {
-        if case .failed(let failure) = planner.status, canEditStops { return failure }
-        return nil
-    }
-
-    /// Route preview, name, FROM → TO, the stops, and the total: rows of one white card.
     @ViewBuilder
-    private func tripCardRows(_ trip: Trip) -> some View {
-        let stops = shownStops
-        let showStops = canEditStops || !stops.isEmpty
-        let hasPills = canEdit && (canChangeDestination || canEditStops)
-        if canEdit, canChangeDestination || canEditStops {
-            VStack(alignment: .leading, spacing: 0) {
-                if canChangeDestination {
-                    Button { showChangeDestination = true } label: {
-                        pill("Change destination", systemImage: "magnifyingglass")
-                    }
-                    .buttonStyle(.plain)
-                }
-                if canEditStops {
-                    HStack(spacing: Spacing.tight) {
-                        Button { showAddStop = true } label: {
-                            pill("Add a stop", systemImage: "plus")
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!StopListLogic.canAdd(among: stops))
-                        .accessibilityIdentifier("stops.add")
-                        Button { showSuggestStops = true } label: {
-                            pill("Suggest stops", systemImage: "sparkles")
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("stops.suggest")
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.gap)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-            .cardSlice(top: true)
-            .lobbyRow()
-        }
-
-        VStack(alignment: .leading, spacing: Spacing.gap) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(trip.name)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.surfaceSecondary)
-                Spacer(minLength: Spacing.s)
-                if isStarted {
-                    StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
-                } else if !session.isEnded {
-                    StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
-                }
-            }
-            RouteEnds(from: isOrganizer ? routeInfo.originName : ownWay.fromName, to: trip.destination.name)
-                .padding(.top, -6)
-            if !isOrganizer, let line = ownWay.joinLine {
-                Text(line)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.surfaceSecondary)
-            }
-        }
-        .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.m)
-        .padding(.bottom, showStops ? 0 : Spacing.gap)
-        .cardSlice(top: !hasPills)
-        .lobbyRow()
-
-        if showStops {
-            let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
-            layout {
-                Text("Stops on the way").font(.caption.weight(.semibold)).tracking(0.6).textCase(.uppercase).accessibilityAddTraits(.isHeader)
-                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
-                if planner.isBuilding && canEditStops {
-                    ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
-                        .transition(.opacity)
-                } else if canEditStops, stops.count > 1 {
-                    Text("Hold and drag to reorder").font(.footnote)
-                        .transition(.opacity)
-                }
-            }
-            .animation(Motion.quick(reduceMotion: reduceMotion), value: planner.isBuilding)
-            .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
-            .foregroundStyle(Color.surfaceSecondary)
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.m).padding(.bottom, Spacing.tight)
-            .cardSlice()
-            .lobbyRow()
-
-            if stops.isEmpty {
-                Text("No stops yet. Add one for fuel, food or a place to meet.")
-                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-                    .cardSlice()
-                    .lobbyRow()
-            }
-            ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
-                stopRow(stop, index: index, stops: stops)
-            }
-            .onMove(perform: canEditStops ? { planner.move(from: $0, to: $1) } : nil)
-            if let failure, failure.place.stopId == nil {
-                StopNote(
-                    tone: .failure,
-                    title: StopNoteText.failureTitle(failure, stopName: nil, destinationName: trip.destination.name),
-                    detail: StopNoteText.failureDetail(failure), retry: { planner.retry() })
-                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
-                    .cardSlice()
-                    .lobbyRow()
-            }
-        }
-
-        if planner.queued && canEditStops {
-            StopNote(tone: .warning, title: StopNoteText.queuedTitle, detail: StopNoteText.queuedDetail)
-                .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
-                .cardSlice()
-                .lobbyRow()
-        }
-
-        routeTotal(trip, stops: stops)
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, showStops ? Spacing.gap : 0).padding(.bottom, Spacing.cozy)
-            .cardSlice(bottom: true)
-            .lobbyRow()
-    }
-
-    private func pill(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Color.ikutAccent)
-            .padding(.horizontal, 11)
-            .frame(minHeight: 30)
-            .background(.regularMaterial, in: Capsule())
-            // Drawn 30 pt tall, taps over 44 (HIG: a hit region of at least 44 x 44 pt).
-            .padding(.vertical, 7)
-            .contentShape(Rectangle())
-    }
-
-    @ViewBuilder
-    private func stopRow(_ stop: StopDraft, index: Int, stops: [StopDraft]) -> some View {
+    private func stopRow(_ stop: StopDraft, text: LobbyContent.StopText, index: Int, stops: [StopDraft], lastOfCard: Bool) -> some View {
         let failedHere = failure?.place == .stop(stop.id)
         StopRow(
-            stop: stop, editable: canEditStops, first: index == 0,
+            stop: stop, text: text, editable: canEditStops, first: index == 0,
             turnBack: canEditStops && !planner.isBuilding ? planner.turnBacks[stop.id] : nil,
             failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() })
             .contentShape(Rectangle())
             .onTapGesture { flyTo(stop.id) }
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Shows it on the map")
-            .cardSlice()
+            .cardSlice(top: index == 0, bottom: lastOfCard)
             .lobbyRow()
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if canEditStops {
@@ -662,89 +865,6 @@ struct LobbyView: View {
 
     private var ownCarColor: String { session.car?.color ?? sampleCarColor }
 
-    private func inviteCard(_ code: String) -> some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                StatCaption("Join code")
-                Text(LobbyLogic.displayCode(code))
-                    .font(.system(size: ScaledSize.capped(codeSize, base: 30, cap: 1.5), weight: .bold, design: .monospaced))
-                    .kerning(2)
-                    // The code is one token that must stay on one line, so it shrinks rather than wraps.
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .textSelection(.enabled)
-                    .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
-                // The share sheet also offers Copy, so there's no separate copy button.
-                ShareLink(item: LobbyLogic.shareText(code: code)) {
-                    Label("Share invite", systemImage: "square.and.arrow.up")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.tight)
-                        .frame(minHeight: 36)
-                }
-                .surfaceButton(.primary, fill: .ikutAccent, foreground: .white)
-                .padding(.top, Spacing.tight)
-            }
-            .padding(Spacing.l)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            DashedDivider()
-                .padding(.vertical, Spacing.m)
-
-            VStack(spacing: Spacing.xs) {
-                if let image = QRCode.image(for: LobbyLogic.joinURL(code: code)) {
-                    Image(uiImage: image)
-                        .interpolation(.none)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 80, height: 80)
-                        .accessibilityLabel("QR code to join with code \(code)")
-                }
-                Text("Scan to join")
-                    .font(.caption2)
-                    .foregroundStyle(Color.surfaceSecondary)
-            }
-            .frame(width: 112)
-        }
-        .surfaceTile(radius: Radius.card)
-    }
-
-    /// "CARS", one bar segment per car (green once tracking), then "3 of 4 ready".
-    private var carsHeader: some View {
-        let cars = model.groupedCars
-        let ready = cars.filter(\.hasTracker).count
-        return CardHeader("Cars") {
-            if !cars.isEmpty {
-                HStack(spacing: 3) {
-                    ForEach(cars) { car in
-                        Capsule()
-                            .fill(car.hasTracker ? Color.green : Color.orange)
-                            .frame(height: 4)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityHidden(true)
-                Text("\(ready) of \(cars.count) ready")
-                    .fontWeight(.semibold)
-                    .monospacedDigit()
-                    .foregroundStyle(ready == cars.count ? Color.ikutPositive : Color.ikutWarning)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var carsCard: some View {
-        let cars = model.groupedCars
-        return VStack(spacing: 0) {
-            if cars.isEmpty {
-                EmptyRow("No cars yet")
-            }
-            ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
-                if index > 0 { RowDivider() }
-                CarRow(item: item, position: index + 1, currentUserId: currentUserId)
-            }
-        }
-        .surfaceTile(radius: Radius.card)
-    }
 }
 
 #if DEBUG
@@ -765,27 +885,6 @@ struct LobbyView: View {
 }
 #endif
 
-private extension View {
-    /// The line under the lobby's title ("Since 9:35 PM"): the navigation subtitle on iOS 26, before that a
-    /// two-line title in the bar's middle.
-    @ViewBuilder func lobbySubtitle(title: String, subtitle: String?) -> some View {
-        if #available(iOS 26, *) {
-            navigationSubtitle(subtitle ?? "")
-        } else {
-            toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 0) {
-                        Text(title).font(.headline)
-                        if let subtitle { Text(subtitle).font(.caption).foregroundStyle(Color.surfaceSecondary) }
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isHeader)
-                }
-            }
-        }
-    }
-}
-
 /// What the participant's own-way-in task reloads on.
 private struct OwnWayTaskKey: Equatable {
     var route: String?
@@ -794,4 +893,34 @@ private struct OwnWayTaskKey: Equatable {
     var loaded: Bool
     var granted: Bool
     var meeting: Bool
+}
+
+/// The code's QR behind Show QR code: big enough to scan from another phone.
+private struct QRCodeSheet: View {
+    var code: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: Spacing.m) {
+            if let image = QRCode.image(for: LobbyLogic.joinURL(code: code)) {
+                Image(uiImage: image)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 260, maxHeight: 260)
+                    .padding(Spacing.m)
+                    .background(.white, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                    .accessibilityLabel("QR code to join with code \(code)")
+            }
+            Text(LobbyLogic.displayCode(code))
+                .font(.system(.title2, design: .monospaced).weight(.bold))
+                .kerning(2)
+            Text("Scan to join").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) {
+            SheetCloseButton(action: { dismiss() }, onGlass: true).padding(Spacing.m)
+        }
+        .presentationDetents([.medium])
+    }
 }
