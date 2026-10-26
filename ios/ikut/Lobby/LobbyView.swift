@@ -36,6 +36,9 @@ struct LobbyView: View {
     /// Start trip with a car not sharing yet asks first (#362).
     @State private var confirmStart = false
     @State private var showQR = false
+    /// Copy was just tapped: its label says Copied for a moment.
+    @State private var copied = false
+    @State private var copiedCount = 0
     /// The lobby is on screen (not popped): the sheet is presented from it, so it goes with it.
     @State private var onScreen = false
     /// The lobby's sheet is up (it reports its own appear and dismiss); what else is presented waits for it to go.
@@ -505,11 +508,11 @@ struct LobbyView: View {
     // MARK: Tall: the code
 
     private func codeCard(_ code: String) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
+        VStack(spacing: Spacing.xs) {
             Text("Trip code").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
             Text(LobbyLogic.displayCode(code))
-                .font(.system(size: ScaledSize.capped(codeSize, base: 30, cap: 1.5), weight: .bold, design: .monospaced))
-                .kerning(2)
+                .font(.system(size: ScaledSize.capped(codeSize, base: 36, cap: 1.5), weight: .bold, design: .monospaced))
+                .kerning(5)
                 // The code is one token that must stay on one line, so it shrinks rather than wraps.
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
@@ -517,28 +520,39 @@ struct LobbyView: View {
                 .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
             Text("Anyone with the code can join until the trip ends")
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
             // Side by side at the usual sizes; stacked at accessibility sizes, where the labels need the width.
             let buttons = dynamicTypeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
             buttons {
+                Button {
+                    UIPasteboard.general.string = code
+                    copiedCount += 1
+                    copied = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copied = false
+                    }
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                }
+                .actionButton(.secondary, onGlass: true)
+                .sensoryFeedback(.success, trigger: copiedCount)
+                .accessibilityIdentifier("lobby.copyCode")
                 Button { showQR = true } label: {
                     Label("QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 36)
                 }
                 .actionButton(.secondary, onGlass: true)
                 .accessibilityIdentifier("lobby.showQR")
-                // The share sheet also offers Copy, so there's no separate copy button.
-                ShareLink(item: LobbyLogic.shareText(code: code)) {
-                    Label("Share", systemImage: "square.and.arrow.up").font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                }
-                .actionButton(.secondary, onGlass: true)
-                .accessibilityIdentifier("lobby.shareCode")
             }
             .padding(.top, Spacing.tight)
         }
         .padding(Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .surfaceTile(radius: Radius.card)
     }
 

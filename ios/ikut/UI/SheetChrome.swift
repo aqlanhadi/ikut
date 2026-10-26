@@ -187,6 +187,19 @@ enum SheetSearch {
     static let radius: CGFloat = height / 2
 }
 
+extension View {
+    /// The search bar's face: raised Liquid Glass on iOS 26 (the same glass as the round buttons beside it; the glass
+    /// draws its own edge), the flat tile fill before that. Not interactive for the field form's sake: it must not
+    /// take the taps meant for the text field.
+    @ViewBuilder fileprivate func searchBarSurface(interactive: Bool = false) -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            glassEffect(interactive ? .regular.interactive() : .regular, in: Capsule())
+        } else {
+            surfaceTile(radius: SheetSearch.radius)
+        }
+    }
+}
+
 /// The TextField form. `clear` is the action of the clear button, shown when it isn't nil (pass it while there is text).
 struct SheetSearchField<Field: View>: View {
     var clear: (() -> Void)?
@@ -207,7 +220,7 @@ struct SheetSearchField<Field: View>: View {
         .padding(.leading, Spacing.m)
         .padding(.trailing, clear == nil ? Spacing.m : 0)
         .frame(minHeight: SheetSearch.height)
-        .surfaceTile(radius: SheetSearch.radius)
+        .searchBarSurface()
     }
 }
 
@@ -226,7 +239,7 @@ struct SheetSearchButton: View {
             .padding(.horizontal, Spacing.m)
             .frame(minHeight: SheetSearch.height)
             .contentShape(Capsule())
-            .surfaceTile(radius: SheetSearch.radius)
+            .searchBarSurface(interactive: true)
         }
         .buttonStyle(.plain)
     }
