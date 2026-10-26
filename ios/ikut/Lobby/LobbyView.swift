@@ -31,6 +31,15 @@ struct LobbyView: View {
     @State private var isWorking = false
     @State private var actionError: String?
     @State private var showMap = false
+    /// The lobby is on screen (not popped): the sheet is presented from it, so it goes with it.
+    @State private var onScreen = false
+    /// The lobby's sheet is up (it reports its own appear and dismiss); what else is presented waits for it to go.
+    @State private var sheetUp = false
+    /// The sheet is at its tall detent.
+    @State private var expanded = false
+    @State private var mapCommand = LobbyMapCommand()
+    @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
+    @State private var sheetSafeBottom: CGFloat = 0
     /// This phone opened the map; covers the gap before the startedAt write comes back.
     @State private var startedHere = false
     /// Shows `model` as given: nothing is loaded, started or remembered.
@@ -90,6 +99,9 @@ struct LobbyView: View {
             .animation(Motion.quick(reduceMotion: reduceMotion), value: bar)
     }
 
+    /// How far the bar's button hangs into the sheet's bottom safe area (`PanelSheet.barLift`).
+    private var barLift: CGFloat { PanelSheet.barLift(safeBottom: sheetSafeBottom) }
+
     @ViewBuilder private func barContent(_ bar: LobbyLogic.BottomBar) -> some View {
         switch bar {
         case .none:
@@ -97,12 +109,16 @@ struct LobbyView: View {
         case .waiting:
             Text(bar.label)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.surfaceSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .padding(.horizontal, Spacing.l)
                 .frame(minHeight: 50)
+                // On a surface that hides the rows scrolling under the bar: a blurred material under the glass capsule.
+                .background(.regularMaterial, in: Capsule())
+                .glassSurface(.pill)
                 .accessibilityIdentifier("lobbyWaiting")
-                .ikutBottomBar()
+                .sheetActionBar(lift: barLift)
                 .transition(.opacity)
         case .startTrip, .showMap:
             Button {
@@ -112,10 +128,10 @@ struct LobbyView: View {
                 }
                 showMap = true
             } label: {
-                Text(bar.label).frame(maxWidth: .infinity)
+                Text(bar.label).font(.headline).frame(maxWidth: .infinity, minHeight: 50)
             }
-            .actionButton(.primary)
-            .ikutBottomBar()
+            .actionBarStyle(prominent: true)
+            .sheetActionBar(lift: barLift)
             .transition(.opacity)
         }
     }
@@ -175,50 +191,38 @@ struct LobbyView: View {
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
     private var canPause: Bool { (session.isTracking || session.isPaused) && canLeave }
 
+    private var cover: LobbySheet.Cover {
+        LobbySheet.Cover(
+            tripMap: showMap, changeDestination: showChangeDestination, addStop: showAddStop,
+            suggestStops: showSuggestStops, renaming: renaming, alwaysExplainer: session.alwaysExplainerShowing,
+            confirmLeave: confirmLeave, confirmEnd: confirmEnd)
+    }
+    private var sheetCovered: Bool { LobbySheet.isCovered(cover, lobbyOnScreen: onScreen) }
+    private var compact: CGFloat { LobbySheet.compact(scaled: mediumHeight) }
+
+    /// What the sheet's content change runs on, and what a stop tap's camera flight uses.
+    private func flyTo(_ stopId: String) {
+        mapCommand = mapCommand.asking(.stop(stopId))
+        // The map is behind the sheet when it is tall: bring it down to the medium detent to show the stop.
+        if expanded { withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { expanded = false } }
+    }
+
+    private var mapPins: [LobbyPin] {
+        let trip = model.trip
+        return LobbyMapLogic.pins(
+            stops: shownStops, destinationName: trip?.destination.name, destination: trip?.destination.coordinate.coordinate,
+            isOrganizer: isOrganizer, ownJoin: ownWay.joinCoordinate)
+    }
+
     var body: some View {
-        // A List, not a ScrollView of cards: the stops need its drag to reorder and swipe to remove. Each block of
-        // the lobby is a row; the route card is several rows drawn as one card.
-        List {
-            statusBanner
-                .lobbyRow()
-            if session.isPaused && !session.isEnded && !session.membershipLost {
-                PausedBanner(session: session, onError: { actionError = $0 })
-                    .padding(.bottom, Spacing.xs)
-                    .lobbyRow()
+        LobbyMapView(
+            route: routeInfo.coordinates, pins: mapPins, ownRoute: isOrganizer ? [] : ownWay.ownRoute,
+            ownColorHex: ownCarColor, sheetCompact: compact, command: $mapCommand)
+            .onAppear { onScreen = true }
+            .onDisappear { onScreen = false }
+            .sheet(isPresented: Binding(get: { !sheetCovered }, set: { _ in }), onDismiss: { sheetUp = false }) {
+                sheetContent.onAppear { sheetUp = true }
             }
-            if let trip = model.trip {
-                tripCardRows(trip)
-                inviteCard(trip.code)
-                    .padding(.top, Spacing.m)
-                    .lobbyRow()
-                carsHeader
-                    .lobbyRow()
-                carsCard
-                    .lobbyRow()
-                if let actionError {
-                    InlineNote(actionError, tone: .alert)
-                        .padding(.top, Spacing.m)
-                        .lobbyRow()
-                }
-            } else if let message = model.errorMessage {
-                Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
-                    .lobbyRow()
-            } else {
-                ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
-                    .lobbyRow()
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .listRowSpacing(0)
-        .environment(\.defaultMinListRowHeight, 1)
-        .contentMargins(.top, Spacing.m, for: .scrollContent)
-        .contentMargins(.bottom, Spacing.l, for: .scrollContent)
-        .background(Color.ikutScreen)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomBar
-        }
-        // The map shares this lobby's session; the lobby stays on the stack underneath it.
         .navigationDestination(isPresented: $showMap) {
             TripMapView(session: session, onExit: onExit, onEnded: { onEnded(model.tripId) })
         }
@@ -240,14 +244,16 @@ struct LobbyView: View {
             syncPlanner()
         }
         .onChange(of: model.stops) { _, _ in syncPlanner() }
-        .sheet(isPresented: $showAddStop) {
+        .sheet(isPresented: Binding(
+            get: { BottomSheet.presents(wanted: showAddStop, sheetUp: sheetUp) }, set: { showAddStop = $0 })) {
             AddStopSheet(
                 along: routeInfo.coordinates.count > 1
                     ? AlongRoute(coordinates: routeInfo.coordinates, seconds: routeInfo.travelTime) : nil,
                 canMeet: StopListLogic.canMeet(among: planner.items),
                 onAdd: { addStop($0) })
         }
-        .sheet(isPresented: $showSuggestStops) {
+        .sheet(isPresented: Binding(
+            get: { BottomSheet.presents(wanted: showSuggestStops, sheetUp: sheetUp) }, set: { showSuggestStops = $0 })) {
             SuggestStopsSheet(
                 model: SuggestStopsModel(
                     line: routeInfo.coordinates.count > 1 ? RouteLine(routeInfo.coordinates) : nil,
@@ -276,7 +282,8 @@ struct LobbyView: View {
                 meetingPoint: TripSessionLogic.meetingPoint(in: model.stops), routeSeconds: trip.routeSeconds,
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
-        .alert("Trip name", isPresented: $renaming) {
+        .alert("Trip name", isPresented: Binding(
+            get: { BottomSheet.presents(wanted: renaming, sheetUp: sheetUp) }, set: { renaming = $0 })) {
             TextField("Trip name", text: $renameText)
                 .textInputAutocapitalization(.words)
             Button("Cancel", role: .cancel) {}
@@ -342,16 +349,71 @@ struct LobbyView: View {
             if session.consumeAlwaysExplainer(action: action) { session.alwaysExplainerShowing = true }
         }
         .sheet(isPresented: Binding(
-            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing, mapSheetUp: session.mapSheetUp) },
+            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing, mapSheetUp: session.mapSheetUp || sheetUp) },
             set: { if !$0 { session.alwaysExplainerShowing = false } }
         )) {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.
             AlwaysLocationExplainerView(permission: location) { _ in session.alwaysExplainerShowing = false }
         }
         .tripExitDialogs(
-            confirmLeave: $confirmLeave, confirmEnd: $confirmEnd,
+            confirmLeave: Binding(get: { BottomSheet.presents(wanted: confirmLeave, sheetUp: sheetUp) }, set: { confirmLeave = $0 }),
+            confirmEnd: Binding(get: { BottomSheet.presents(wanted: confirmEnd, sheetUp: sheetUp) }, set: { confirmEnd = $0 }),
             leave: { run { try await session.leave(); onExit() } },
             end: { run { try await session.endTrip() } })
+    }
+
+    /// The lobby's content in Apple's own sheet over the map (canvas B4 medium, B5 tall): the same glass surface as the
+    /// driving screen's convoy sheet, always up, the map above it touchable at medium. Start trip, the waiting line and
+    /// Show map sit in its bottom bar at both heights.
+    private var sheetContent: some View {
+        let compact = compact
+        return List {
+            statusBanner
+                .lobbyRow()
+            if session.isPaused && !session.isEnded && !session.membershipLost {
+                PausedBanner(session: session, onError: { actionError = $0 })
+                    .padding(.bottom, Spacing.xs)
+                    .lobbyRow()
+            }
+            if let trip = model.trip {
+                tripCardRows(trip)
+                inviteCard(trip.code)
+                    .padding(.top, Spacing.m)
+                    .lobbyRow()
+                carsHeader
+                    .lobbyRow()
+                carsCard
+                    .lobbyRow()
+                if let actionError {
+                    InlineNote(actionError, tone: .alert)
+                        .padding(.top, Spacing.m)
+                        .lobbyRow()
+                }
+            } else if let message = model.errorMessage {
+                Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
+                    .lobbyRow()
+            } else {
+                ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                    .lobbyRow()
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .listRowSpacing(0)
+        .environment(\.defaultMinListRowHeight, 1)
+        .contentMargins(.top, Spacing.m, for: .scrollContent)
+        .contentMargins(.bottom, Spacing.l, for: .scrollContent)
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+        .environment(\.inPanelSheet, true)
+        .padding(.top, LobbySheet.indicatorRoom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
+        .presentationDetents(LobbySheet.detents(compact: compact), selection: Binding(
+            get: { LobbySheet.detent(expanded: expanded, compact: compact) },
+            set: { expanded = LobbySheet.isExpanded($0) }))
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: LobbySheet.medium(compact)))
+        .interactiveDismissDisabled()
     }
 
     private func run(_ action: @escaping () async throws -> Void) {
@@ -390,7 +452,7 @@ struct LobbyView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(Spacing.l)
-        .ikutCard()
+        .surfaceTile(radius: Radius.card)
         .padding(.bottom, Spacing.s)
     }
 
@@ -409,24 +471,8 @@ struct LobbyView: View {
     private func tripCardRows(_ trip: Trip) -> some View {
         let stops = shownStops
         let showStops = canEditStops || !stops.isEmpty
-        routePreview(stops: stops)
-            .frame(height: 104)
-            .overlay(alignment: .bottomTrailing) {
-                if isStarted {
-                    StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
-                        .padding(Spacing.gap)
-                } else if !session.isEnded {
-                    StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
-                        .padding(Spacing.gap)
-                }
-            }
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: Radius.card, topTrailingRadius: Radius.card, style: .continuous))
-            .cardSlice(top: true)
-            .lobbyRow()
-
+        let hasPills = canEdit && (canChangeDestination || canEditStops)
         if canEdit, canChangeDestination || canEditStops {
-            // Below the map, so the map's logo and Legal stay clear.
             VStack(alignment: .leading, spacing: 0) {
                 if canChangeDestination {
                     Button { showChangeDestination = true } label: {
@@ -453,26 +499,34 @@ struct LobbyView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.gap)
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-            .cardSlice()
+            .cardSlice(top: true)
             .lobbyRow()
         }
 
         VStack(alignment: .leading, spacing: Spacing.gap) {
-            Text(trip.name)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(trip.name)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.surfaceSecondary)
+                Spacer(minLength: Spacing.s)
+                if isStarted {
+                    StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
+                } else if !session.isEnded {
+                    StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
+                }
+            }
             RouteEnds(from: isOrganizer ? routeInfo.originName : ownWay.fromName, to: trip.destination.name)
                 .padding(.top, -6)
             if !isOrganizer, let line = ownWay.joinLine {
                 Text(line)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.surfaceSecondary)
             }
         }
         .padding(.horizontal, Spacing.l)
         .padding(.top, Spacing.m)
         .padding(.bottom, showStops ? 0 : Spacing.gap)
-        .cardSlice()
+        .cardSlice(top: !hasPills)
         .lobbyRow()
 
         if showStops {
@@ -490,7 +544,7 @@ struct LobbyView: View {
             }
             .animation(Motion.quick(reduceMotion: reduceMotion), value: planner.isBuilding)
             .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.surfaceSecondary)
             .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.m).padding(.bottom, Spacing.tight)
             .cardSlice()
@@ -498,7 +552,7 @@ struct LobbyView: View {
 
             if stops.isEmpty {
                 Text("No stops yet. Add one for fuel, food or a place to meet.")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
                     .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
                     .cardSlice()
                     .lobbyRow()
@@ -551,6 +605,10 @@ struct LobbyView: View {
             stop: stop, editable: canEditStops, first: index == 0,
             turnBack: canEditStops && !planner.isBuilding ? planner.turnBacks[stop.id] : nil,
             failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() })
+            .contentShape(Rectangle())
+            .onTapGesture { flyTo(stop.id) }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Shows it on the map")
             .cardSlice()
             .lobbyRow()
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -599,47 +657,6 @@ struct LobbyView: View {
         }
     }
 
-    private func routePreview(stops: [StopDraft]) -> some View {
-        let coords = routeInfo.coordinates
-        return Map(initialPosition: .automatic, interactionModes: []) {
-            if coords.count > 1 {
-                MapPolyline(coordinates: coords)
-                    .stroke(Color.yellow.opacity(0.5), style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                MapPolyline(coordinates: coords)
-                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                Annotation("", coordinate: coords[0], anchor: .center) {
-                    Circle().fill(.white).frame(width: 10, height: 10)
-                        .overlay(Circle().strokeBorder(Color.blue, lineWidth: 3))
-                }
-                Annotation("", coordinate: coords[coords.count - 1], anchor: .center) {
-                    Circle().fill(Color.blue).frame(width: 12, height: 12)
-                        .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
-                }
-                ForEach(stops.filter { !$0.isMeeting }) { stop in
-                    Annotation("", coordinate: stop.coordinate, anchor: .center) {
-                        Circle().fill(Color.ikutAccent).frame(width: 12, height: 12)
-                            .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
-                    }
-                }
-                if !isOrganizer, ownWay.ownRoute.count > 1 {
-                    let own = Color.car(hex: ownCarColor)
-                    MapPolyline(coordinates: ownWay.ownRoute)
-                        .stroke(own, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                }
-                if !isOrganizer, let join = ownWay.joinCoordinate {
-                    Annotation("", coordinate: join, anchor: .center) {
-                        Circle().fill(Color.car(hex: ownCarColor)).frame(width: 12, height: 12)
-                            .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
-                    }
-                }
-            }
-        }
-        .mapStyle(.standard(pointsOfInterest: .excludingAll))
-        // The camera fits the route only when the map is built, so rebuild once the route loads.
-        .id(coords.count + ownWay.ownRoute.count)
-        .accessibilityHidden(true)
-    }
-
     /// The viewer's car colour for their own route on the map preview.
     private var locationGranted: Bool { location.status == .whenInUse || location.status == .always }
 
@@ -661,14 +678,10 @@ struct LobbyView: View {
                 ShareLink(item: LobbyLogic.shareText(code: code)) {
                     Label("Share invite", systemImage: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Spacing.cozy)
+                        .padding(.horizontal, Spacing.tight)
                         .frame(minHeight: 36)
-                        .background(Color.ikutAccent, in: Capsule())
-                        // Drawn 36 pt tall, taps over 44.
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
                 }
+                .surfaceButton(.primary, fill: .ikutAccent, foreground: .white)
                 .padding(.top, Spacing.tight)
             }
             .padding(Spacing.l)
@@ -688,11 +701,11 @@ struct LobbyView: View {
                 }
                 Text("Scan to join")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.surfaceSecondary)
             }
             .frame(width: 112)
         }
-        .ikutCard()
+        .surfaceTile(radius: Radius.card)
     }
 
     /// "CARS", one bar segment per car (green once tracking), then "3 of 4 ready".
@@ -730,7 +743,7 @@ struct LobbyView: View {
                 CarRow(item: item, position: index + 1, currentUserId: currentUserId)
             }
         }
-        .ikutCard()
+        .surfaceTile(radius: Radius.card)
     }
 }
 
@@ -763,7 +776,7 @@ private extension View {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 0) {
                         Text(title).font(.headline)
-                        if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+                        if let subtitle { Text(subtitle).font(.caption).foregroundStyle(Color.surfaceSecondary) }
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.isHeader)

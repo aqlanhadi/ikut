@@ -5,6 +5,7 @@ import SwiftUI
 
 /// A row of a List drawn as a slice of the lobby's white card: `top` and `bottom` round that end.
 struct CardSlice: ViewModifier {
+    @Environment(\.inPanelSheet) private var inSheet
     var top = false
     var bottom = false
 
@@ -16,7 +17,7 @@ struct CardSlice: ViewModifier {
                 UnevenRoundedRectangle(
                     topLeadingRadius: top ? r : 0, bottomLeadingRadius: bottom ? r : 0,
                     bottomTrailingRadius: bottom ? r : 0, topTrailingRadius: top ? r : 0, style: .continuous
-                ).fill(Color.ikutCard))
+                ).fill(inSheet && GlassSurface.active ? Color.surfaceTileFill : Color.ikutCard))
     }
 }
 
@@ -54,7 +55,7 @@ struct StopNote: View {
             Label(title, systemImage: "exclamationmark.triangle")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(titleColor)
-            Text(detail).font(.footnote).foregroundStyle(.secondary)
+            Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary)
             if let retry {
                 Button(action: retry) {
                     Label("Try again", systemImage: "arrow.clockwise")
@@ -107,9 +108,9 @@ struct StopRow: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(stop.name).foregroundStyle(failed ? .secondary : .primary)
-                    Text(StopFormat.detail(stop)).font(.footnote).foregroundStyle(.secondary)
+                    Text(StopFormat.detail(stop)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                     if typeSize.isAccessibilitySize, let offsetText {
-                        Text(offsetText).font(.system(.subheadline, design: .rounded).weight(.semibold)).foregroundStyle(.secondary)
+                        Text(offsetText).font(.system(.subheadline, design: .rounded).weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,11 +118,11 @@ struct StopRow: View {
                     Text(offsetText)
                         .font(.system(.subheadline, design: .rounded).weight(.semibold))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.surfaceSecondary)
                 }
                 if editable {
                     Image(systemName: "line.3.horizontal")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.surfaceSecondary)
                         .frame(width: 32, height: 44)
                         .accessibilityHidden(true)
                 }
@@ -163,20 +164,20 @@ struct RouteTotalLine: View {
             switch content {
             case .total(let line, let caption):
                 Text(line).font(.system(.headline, design: .rounded)).monospacedDigit().multilineTextAlignment(.center)
-                Text(caption).font(.caption).foregroundStyle(.secondary)
+                Text(caption).font(.caption).foregroundStyle(Color.surfaceSecondary)
             case .notReady:
                 Text("Route not ready").font(.system(.headline, design: .rounded))
-                Text("The total shows once every stop has a road").font(.caption).foregroundStyle(.secondary)
+                Text("The total shows once every stop has a road").font(.caption).foregroundStyle(Color.surfaceSecondary)
                     .multilineTextAlignment(.center)
             case .pending(let text):
-                Text(text).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(text).font(.subheadline).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
             case .loading:
                 ProgressView().accessibilityLabel("Getting the route")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
-        .ikutSurface(Color.ikutScreen, radius: Radius.inner)
+        .innerTile(radius: Radius.inner)
         .opacity(dimmed ? 0.5 : 1)
         .accessibilityElement(children: .combine)
     }

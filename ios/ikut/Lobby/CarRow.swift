@@ -20,7 +20,7 @@ struct CarRow: View {
                     }
                 }
                 Text(people)
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(Color.surfaceSecondary)
             }
             Spacer(minLength: Spacing.s)
             let color = item.hasTracker ? Color.ikutPositive : Color.ikutWarning

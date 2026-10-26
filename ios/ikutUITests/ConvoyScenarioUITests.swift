@@ -218,7 +218,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
         if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
 
         app.buttons["Join trip"].tap()
-        XCTAssertTrue(lobbyPresence.waitForExistence(timeout: 20), "Didn't reach the lobby")
+        XCTAssertTrue(waitForLobby(timeout: 20), "Didn't reach the lobby")
 
         // Tracking starts in the lobby; the Always explainer may come up once it does.
         let notNow = app.buttons["Not now"]

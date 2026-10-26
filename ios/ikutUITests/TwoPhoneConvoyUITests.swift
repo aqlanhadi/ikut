@@ -101,6 +101,8 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
 
     /// Lobby: 4 cars, all tracking, with the expected names.
     func checkLobbyHasFourCars() throws {
+        // The cars sit below the fold of the sheet at medium.
+        pullLobbySheetUp()
         try waitFor("lobby shows 4 of 4 ready", timeout: 90) { labelled("label CONTAINS %@", "4 of 4 ready").exists }
         // ("Wyna" only: typing an apostrophe may come out curly with smart punctuation.)
         for car in ["Wyna", "Hafiz’s Hilux", "Daniel’s City"] {
@@ -162,7 +164,7 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
             result.tap()
             tapCreateTrip()
-            if !lobbyPresence.waitForExistence(timeout: 45) {
+            if !waitForLobby(timeout: 45) {
                 let error = labelled("identifier == %@", "createTripError")
                 XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
                 throw WaitFailure()

@@ -92,7 +92,8 @@ struct NewTripSheet: View {
                 Spacer()
                 Text("New trip").font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer()
-                SheetCloseButton(action: onClose, onGlass: true).disabled(flow.isCreating)
+                RoundGlassIconButton(systemImage: "xmark", label: "Close", action: onClose)
+                    .accessibilityIdentifier("sheet.close").disabled(flow.isCreating)
             }
             .padding(.top, Spacing.xs)
 
@@ -135,9 +136,10 @@ struct NewTripSheet: View {
                 Group {
                     if flow.isCreating { ProgressView().accessibilityLabel("Creating trip") } else { Text("Create trip") }
                 }
-                .frame(maxWidth: .infinity)
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 50)
             }
-            .actionButton(.primary, onGlass: true)
+            .actionBarStyle(prominent: true)
             .disabled(flow.isCreating)
             .padding(.top, Spacing.s)
             .padding(.bottom, Spacing.s)
@@ -145,25 +147,9 @@ struct NewTripSheet: View {
         .environment(\.inPanelSheet, true)
     }
 
-    /// The same glass circle as `SheetCloseButton`'s, with a chevron.
-    @ViewBuilder private var backButton: some View {
-        if GlassSurface.useGlass, #available(iOS 26, *) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left").font(.footnote.weight(.bold)).frame(width: 44, height: 44)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .tint(.primary)
+    private var backButton: some View {
+        RoundGlassIconButton(systemImage: "chevron.left", label: "Back to search", action: onBack)
             .disabled(flow.isCreating)
-            .accessibilityLabel("Back to search")
-        } else {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left").font(.footnote.weight(.bold)).foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44).background(.quaternary, in: Circle())
-            }
-            .disabled(flow.isCreating)
-            .accessibilityLabel("Back to search")
-        }
     }
 }
 

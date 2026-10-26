@@ -184,15 +184,7 @@ struct SheetCloseButton: View {
 
     var body: some View {
         if onGlass, GlassSurface.useGlass, #available(iOS 26, *) {
-            Button(action: action) {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .tint(.primary)
-            .accessibilityLabel("Close")
+            RoundGlassIconButton(systemImage: "xmark", label: "Close", action: action)
         } else {
             Button(action: action) {
                 Image(systemName: "xmark")
