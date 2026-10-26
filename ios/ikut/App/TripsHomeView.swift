@@ -25,6 +25,8 @@ struct TripsHomeView: View {
     @State private var flow: NewTripFlow?
     /// Where the camera was before the flow, for Close.
     @State private var cameraBeforeCreate: MapCameraPosition?
+    /// The trip was made and its lobby is being pushed: the flow stays until Home's sheet is covered, so the list never flashes.
+    @State private var finishingCreate = false
 
     @State private var renaming = false
     @State private var newName = ""
@@ -151,7 +153,11 @@ struct TripsHomeView: View {
         }
         #endif
         .onChange(of: creating.wrappedValue) { _, now in
-            if now { beginCreate() } else if flow != nil { closeCreate() }
+            if now { beginCreate() } else if flow != nil, !finishingCreate { closeCreate() }
+        }
+        .onChange(of: mode) { old, new in
+            let keep = HomeSheet.expanded(expanded, from: old, to: new)
+            if keep != expanded { withAnimation(sheetMotion) { expanded = keep } }
         }
         .onChange(of: flow?.cameraKey) { _, _ in refocusCreate(animated: true) }
         .onChange(of: picked?.model.snapshot != nil) { was, has in
@@ -166,7 +172,15 @@ struct TripsHomeView: View {
         }
         // The name alert belongs to the sheet; when the sheet steps aside it must not come back on its own later.
         .onChange(of: covered) { _, now in
-            if now { renaming = false; renameError = nil }
+            if now {
+                renaming = false
+                renameError = nil
+                if finishingCreate {
+                    finishingCreate = false
+                    flow = nil
+                    cameraBeforeCreate = nil
+                }
+            }
         }
     }
 
@@ -463,6 +477,7 @@ struct TripsHomeView: View {
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeCreate() {
+        flow?.cancel()
         withAnimation(sheetMotion) {
             flow = nil
             expanded = false
@@ -494,10 +509,11 @@ struct TripsHomeView: View {
             }
             guard let id else { return }
             flow.search.errorMessage = nil
-            self.flow = nil
-            cameraBeforeCreate = nil
+            finishingCreate = true
             creating.wrappedValue = false
             onCreated(id)
+            // Demo and tests have no parent to cover the sheet.
+            if !covered, isDemo { finishingCreate = false; self.flow = nil }
         }
     }
 

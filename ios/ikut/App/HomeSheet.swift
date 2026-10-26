@@ -59,6 +59,9 @@ enum HomeSheet {
         expanded ? tall : short(height(mode, compact: compact))
     }
 
+    /// A sheet pulled up for one step does not stay tall for the next: New trip opens at its own height.
+    static func expanded(_ was: Bool, from old: Mode, to new: Mode) -> Bool { old == new ? was : false }
+
     /// Past routes are drawn only with the list; making a trip shows its own pins and route.
     static func drawsPastRoutes(_ mode: Mode) -> Bool { mode == .list }
 

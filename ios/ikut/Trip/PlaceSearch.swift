@@ -220,6 +220,7 @@ struct PlaceSearchResults: View {
     var onPick: (DestinationResult) -> Void
 
     @State private var choosingOnMap = false
+    @Environment(\.inPanelSheet) private var inSheet
 
     private var busy: Bool { model.isWorking || model.resolving != nil }
     private var hasRows: Bool { model.pastedPin || model.showingResults || model.isSearching || !model.suggestions.isEmpty }
@@ -240,7 +241,7 @@ struct PlaceSearchResults: View {
             }
         }
         .scrollTargetLayout()
-        .ikutCard()
+        .tileOrCard(inSheet)
         .padding(.top, hasRows ? 0 : Spacing.m)
         .fullScreenCover(isPresented: $choosingOnMap) {
             MapPickView(origin: model.origin, along: model.along, geocoder: model.geocoder) { place in
@@ -332,5 +333,12 @@ struct PlaceSearchResults: View {
                 .monospacedDigit()
                 .foregroundStyle(.primary)
         }
+    }
+}
+
+private extension View {
+    /// Grouped rows: the sheet's own tile on the convoy-style glass sheet, the grouped card on a plain screen.
+    @ViewBuilder func tileOrCard(_ inSheet: Bool) -> some View {
+        if inSheet { surfaceTile() } else { ikutCard() }
     }
 }

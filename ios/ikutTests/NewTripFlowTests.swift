@@ -164,4 +164,51 @@ struct NewTripFlowTests {
         let route = BuiltRoute(distance: 205_400, travelTime: 9_600, name: "E1", polyline: "")
         #expect(NewTripFlow.detailLine(place: ipoh, route: route) == "City in Perak · 205 km · about 2 h 40 min from you")
     }
+
+    @Test func closingWhileTheRouteBuildsLeavesNoNewTrip() async {
+        let gate = Gate()
+        let search = CreateTripModel(route: { _ in
+            while !gate.open { try await Task.sleep(for: .milliseconds(5)) }
+            return BuiltRoute(distance: 1000, travelTime: 600, name: "", polyline: "")
+        })
+        search.showForDemo(query: "Ipoh", results: [ipoh], origin: kl, originName: "KL")
+        let flow = NewTripFlow(search: search)
+        let picking = Task { await flow.pick(ipoh) }
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(search.isWorking)
+        flow.cancel()
+        gate.open = true
+        await picking.value
+        #expect(flow.ready == nil)
+        #expect(search.errorMessage == nil)
+        #expect(!search.isWorking)
+    }
+
+    @Test func twoCreatesAtOnceWriteOneTrip() async {
+        let (flow, _) = makeFlow()
+        await flow.pick(ipoh)
+        let gate = Gate()
+        let writes = Counter()
+        let slow: NewTripFlow.Creator = { name, place, route in
+            writes.builds += 1
+            while !gate.open { try await Task.sleep(for: .milliseconds(5)) }
+            return "trip-1"
+        }
+        let first = Task { await flow.create(using: slow) }
+        try? await Task.sleep(for: .milliseconds(30))
+        let second = await flow.create(using: slow)
+        gate.open = true
+        #expect(second == nil)
+        #expect(await first.value == "trip-1")
+        #expect(writes.builds == 1)
+    }
+
+    @Test func newTripOpensAtItsOwnHeightEvenIfWhereToWasPulledUp() {
+        #expect(HomeSheet.expanded(true, from: .whereTo, to: .newTrip) == false)
+        #expect(HomeSheet.expanded(true, from: .newTrip, to: .whereTo) == false)
+        #expect(HomeSheet.expanded(true, from: .whereTo, to: .whereTo) == true)
+        #expect(HomeSheet.detent(expanded: false, mode: .newTrip, compact: 300) == .height(420))
+    }
+
+    @MainActor final class Gate { var open = false }
 }

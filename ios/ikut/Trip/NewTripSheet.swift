@@ -38,10 +38,8 @@ struct WhereToSheet: View {
                 }
                 .padding(.leading, Spacing.m)
                 .frame(minHeight: 44)
-                .background(Color(.tertiarySystemFill), in: Capsule())
-                Button("Cancel", action: onClose)
-                    .foregroundStyle(Color.ikutAccent)
-                    .frame(minHeight: 44)
+                .surfaceTile(radius: 22)
+                glassCapsule("Cancel", action: onClose)
             }
             .padding(.top, Spacing.xs)
 
@@ -62,9 +60,19 @@ struct WhereToSheet: View {
             .scrollPosition(id: $flow.topResultID, anchor: .top)
             .scrollDismissesKeyboard(.interactively)
         }
+        .environment(\.inPanelSheet, true)
         .task {
             searchFocused = true
             await model.locate()
+        }
+    }
+
+    /// Cancel: a glass capsule on the sheet (iOS 26), plain accent text otherwise.
+    @ViewBuilder private func glassCapsule(_ title: String, action: @escaping () -> Void) -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            Button(title, action: action).buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(.primary)
+        } else {
+            Button(title, action: action).foregroundStyle(Color.ikutAccent).frame(minHeight: 44)
         }
     }
 }
@@ -80,18 +88,18 @@ struct NewTripSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                circleButton("chevron.left", label: "Back to search", action: onBack)
+                backButton
                 Spacer()
                 Text("New trip").font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer()
-                circleButton("xmark", label: "Close", action: onClose)
+                SheetCloseButton(action: onClose, onGlass: true).disabled(flow.isCreating)
             }
             .padding(.top, Spacing.xs)
 
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(ready.place.name).font(.largeTitle.bold()).minimumScaleFactor(0.7).lineLimit(2)
                 Text(NewTripFlow.detailLine(place: ready.place, route: ready.route))
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             }
             .padding(.horizontal, Spacing.xs)
             .padding(.top, Spacing.xs)
@@ -108,7 +116,7 @@ struct NewTripSheet: View {
             }
             .padding(.horizontal, Spacing.l)
             .frame(minHeight: 46)
-            .ikutCard()
+            .surfaceTile()
             .padding(.top, Spacing.m)
 
             if let message = flow.createError {
@@ -120,7 +128,7 @@ struct NewTripSheet: View {
             Spacer(minLength: Spacing.m)
 
             Text("Next you get a code for the group chat. Add a meeting point and stops once the trip is made.")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
             Button(action: onCreate) {
@@ -134,20 +142,28 @@ struct NewTripSheet: View {
             .padding(.top, Spacing.s)
             .padding(.bottom, Spacing.s)
         }
+        .environment(\.inPanelSheet, true)
     }
 
-    private func circleButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 44, height: 44)
-                .background(Color(.tertiarySystemFill), in: Circle())
-                .contentShape(Circle())
+    /// The same glass circle as `SheetCloseButton`'s, with a chevron.
+    @ViewBuilder private var backButton: some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left").font(.footnote.weight(.bold)).frame(width: 44, height: 44)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(.primary)
+            .disabled(flow.isCreating)
+            .accessibilityLabel("Back to search")
+        } else {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left").font(.footnote.weight(.bold)).foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44).background(.quaternary, in: Circle())
+            }
+            .disabled(flow.isCreating)
+            .accessibilityLabel("Back to search")
         }
-        .buttonStyle(.plain)
-        .disabled(flow.isCreating)
-        .accessibilityLabel(label)
     }
 }
 

@@ -145,6 +145,8 @@ struct HomeView: View {
     }
 
     private func open(_ route: Route, replacing: Bool = false) async {
+        // A join link (or code) opened during Where to? or New trip leaves that flow: Home is not left on it afterwards.
+        if case .join = route { creating = false }
         opening = true
         defer { opening = false }
         while true {

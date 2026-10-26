@@ -217,18 +217,41 @@ final class CreateTripModel {
         along?.rowText(for: result.coordinate)
     }
 
-    /// Builds the route to `result` and nothing else: the preview before a trip is made. Nil (with a message) on failure.
+    @ObservationIgnored private var previewGeneration = 0
+    @ObservationIgnored private var previewTask: Task<BuiltRoute, Error>?
+
+    /// Builds the route to `result` and nothing else: the preview before a trip is made. Nil (with a message) on
+    /// failure, and nil with no message when `cancelPreview` was called while it built.
     func preview(_ result: DestinationResult) async -> BuiltRoute? {
         guard working == nil else { return nil }
         working = result.id
         errorMessage = nil
-        defer { working = nil }
+        previewGeneration += 1
+        let generation = previewGeneration
+        let build = buildRoute
+        let task = Task { try await build(result.coordinate) }
+        previewTask = task
+        defer {
+            if generation == previewGeneration {
+                working = nil
+                previewTask = nil
+            }
+        }
         do {
-            return try await buildRoute(result.coordinate)
+            let route = try await task.value
+            return generation == previewGeneration ? route : nil
         } catch {
-            errorMessage = error.localizedDescription
+            if generation == previewGeneration { errorMessage = error.localizedDescription }
             return nil
         }
+    }
+
+    /// Drops a route that is still being built (Cancel or Close): its answer is ignored and the search is free again.
+    func cancelPreview() {
+        previewGeneration += 1
+        previewTask?.cancel()
+        previewTask = nil
+        working = nil
     }
 
     /// Builds the route to `result`, then runs `finish` with it. Returns false (with a message) on failure.

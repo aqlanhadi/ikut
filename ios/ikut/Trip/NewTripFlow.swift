@@ -84,6 +84,13 @@ final class NewTripFlow {
         phase = .ready(Ready(place: place, route: route))
     }
 
+    /// Drops a route still being built, so Close during the build leaves no New trip behind.
+    func cancel() {
+        search.cancelPreview()
+        phase = .search
+        createError = nil
+    }
+
     /// Back to the search, query and results kept.
     func back() {
         phase = .search

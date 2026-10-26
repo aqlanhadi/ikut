@@ -12,6 +12,7 @@ struct PlaceResultRow<Trailing: View>: View {
     var disabled = false
     var action: () -> Void
     @ViewBuilder var trailing: Trailing
+    @Environment(\.inPanelSheet) private var inSheet
 
     init(result: DestinationResult, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
         let kind = PlaceKind(result)
@@ -69,7 +70,7 @@ struct PlaceResultRow<Trailing: View>: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).foregroundStyle(.primary).lineLimit(1)
                     if !subtitle.isEmpty {
-                        Text(subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                        Text(subtitle).font(.footnote).foregroundStyle(inSheet ? Color.surfaceSecondary : Color.secondary).lineLimit(1)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
