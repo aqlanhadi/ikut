@@ -90,4 +90,31 @@ struct LaunchRouteTests {
         #expect(route == .home)
         #expect(asked == 0)
     }
+
+    @Test func aReadThatNeverAnswersOpensTheTripAfterFourSeconds() async {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let route = await LaunchRoute.load(
+            signedIn: true, pendingJoin: nil, entries: [entry("a")],
+            read: { _ in
+                try? await Task.sleep(for: .seconds(60))
+                return HomeNow.Read(line: "")
+            },
+            cached: { _ in nil }, record: { _, _, _ in })
+        let waited = clock.now - start
+        #expect(route == .trip(id: "a", started: false))
+        #expect(waited >= LaunchRoute.readTimeout)
+        #expect(waited < .seconds(10))
+    }
+
+    @Test func inATunnelThePhonesOwnCopySaysItStarted() async {
+        let route = await LaunchRoute.load(
+            signedIn: true, pendingJoin: nil, entries: [entry("a")], timeout: .milliseconds(100),
+            read: { _ in
+                try? await Task.sleep(for: .seconds(60))
+                return HomeNow.Read(line: "")
+            },
+            cached: { _ in HomeNow.Read(line: "", started: true) }, record: { _, _, _ in })
+        #expect(route == .trip(id: "a", started: true))
+    }
 }

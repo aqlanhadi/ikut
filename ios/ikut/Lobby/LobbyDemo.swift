@@ -437,6 +437,8 @@ enum DemoScreens {
         // New trip, then Create trip 2 s later: the switch to the lobby on the same map (D54).
         case "home-create-swap": return nav(TripScreenHost(mode: .home) { HomeCreateSwapDemo() })
         case "home-picked-failed": return home("failed")
+        // A trip left early, picked: its route, and no recap (D54, #421).
+        case "home-picked-left": return home("left")
         case "stop-request-places": return AnyView(StopCardPreview(scene: "responder", screen: "places"))
         case "stop-request-places-two-reasons": return AnyView(StopCardPreview(scene: "two", screen: "places-two-reasons"))
         case "stop-request-no-places": return AnyView(StopCardPreview(scene: "responder", screen: "no-places"))

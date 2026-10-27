@@ -152,9 +152,11 @@ struct TripsHomeView: View {
                     .onDisappear { sheetUp.wrappedValue = false })))
             // Coming back from a trip the camera flies from it to the list; the app's first frame just places it.
             .onAppear {
-                if TripScreenLogic.entryCamera(.home) == .homeList {
-                    move(to: listCamera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
-                }
+                guard TripScreenLogic.entryCamera(.home) == .homeList else { return }
+                let animated = TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera)
+                // Back from a trip the map already has its height: fit the routes to it (the list camera was worked
+                // out before, for a typical phone).
+                if mapHeight > 0, !routes.isEmpty { fit(animated: animated) } else { move(to: listCamera, animated: animated) }
             }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
@@ -328,7 +330,8 @@ struct TripsHomeView: View {
 
     /// Loads the picked trip's recap, and its route alone when it is older than the 12 drawn.
     private func loadPicked() async {
-        guard let picked else { return }
+        // A trip left early shows only its cached route: the trip and its recap are members-only.
+        guard let picked, PickedTripLogic.readsServer(picked.entry) else { return }
         let entry = picked.entry
         async let recapLoaded: Void = picked.model.load(myUserId: Auth.auth().currentUser?.uid)
         if !routes.contains(where: { $0.id == entry.id }), picked.model.snapshot == nil {
@@ -580,7 +583,8 @@ struct TripsHomeView: View {
                     // It ended while this phone wasn't in it, or this phone left or was removed: remember that, and it
                     // moves to Past trips.
                     PastTrips.record(tripId: entry.id, name: read.name ?? entry.name,
-                                     destination: read.destination ?? entry.destination, endedAt: moved)
+                                     destination: read.destination ?? entry.destination, endedAt: moved,
+                                     left: HomeNow.wasLeft(read))
                     past = PastTrips.all()
                 } else {
                     nowStatus[entry.id] = read.line

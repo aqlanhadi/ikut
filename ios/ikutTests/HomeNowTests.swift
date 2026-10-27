@@ -119,4 +119,10 @@ extension HomeNowTests {
         #expect(HomeNow.movesToPast(.init(line: "In progress"), signedIn: true, now: now) == nil)
         #expect(HomeNow.movesToPast(.init(line: "On the move", started: true), signedIn: true, now: now) == nil)
     }
+
+    @Test func goneBeforeItEndedIsLeft() {
+        #expect(HomeNow.wasLeft(.init(line: "", gone: true)))
+        #expect(!HomeNow.wasLeft(.init(line: "", endedAt: Date(), gone: true)))
+        #expect(!HomeNow.wasLeft(.init(line: "")))
+    }
 }

@@ -38,18 +38,23 @@ enum LaunchRoute: Equatable {
     static let readTimeout: Duration = .seconds(4)
 
     /// Reads the trips in Now, newest first, until one is still going (each ended or gone one moves to Past trips on
-    /// the way), and decides.
+    /// the way), and decides. A read that takes longer than `timeout` (a tunnel) falls back to the phone's own copy of
+    /// the trip (`cached`), so a started trip still opens on the driving map.
     @MainActor
     static func load(signedIn: Bool, pendingJoin: String?, entries: [PastTrips.Entry] = PastTrips.all(),
+                     timeout: Duration = readTimeout,
                      read: @escaping @MainActor (String) async -> HomeNow.Read = { await HomeNow.load(tripId: $0, line: false) },
+                     cached: @MainActor (String) async -> HomeNow.Read? = { await HomeNow.loadCached(tripId: $0) },
                      record: (PastTrips.Entry, HomeNow.Read, Date) -> Void = { entry, found, endedAt in
                          PastTrips.record(tripId: entry.id, name: found.name ?? entry.name,
-                                          destination: found.destination ?? entry.destination, endedAt: endedAt)
+                                          destination: found.destination ?? entry.destination, endedAt: endedAt,
+                                          left: HomeNow.wasLeft(found))
                      }) async -> LaunchRoute {
         var reads: [String: HomeNow.Read] = [:]
         if signedIn {
             for entry in candidates(entries) {
-                guard let found = await withTimeout(readTimeout, { await read(entry.id) }) else { break }
+                let answered = await withTimeout(timeout, { await read(entry.id) })
+                guard let found = answered != nil ? answered : await cached(entry.id) else { break }
                 reads[entry.id] = found
                 guard let movedAt = HomeNow.movesToPast(found, signedIn: true) else { break }
                 record(entry, found, movedAt)

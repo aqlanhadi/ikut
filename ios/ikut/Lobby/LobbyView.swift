@@ -79,12 +79,15 @@ struct LobbyView: View {
     /// In a sample lobby: this person is no longer in the trip.
     private var sampleLost = false
 
-    init(tripId: String, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
+    /// `session`: the trip's session, made once by the caller (`HomeView`), so redrawing the caller doesn't make (and
+    /// drop) a session with its own location manager each time; nil makes one here.
+    init(tripId: String, session: TripSession? = nil, onExit: @escaping () -> Void,
+         onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
         self.onEnded = onEnded
         _model = State(initialValue: LobbyModel(tripId: tripId))
         _joinTowns = State(initialValue: JoinTowns.shared(for: tripId))
-        _session = State(initialValue: TripSession(
+        _session = State(initialValue: session ?? TripSession(
             tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
         _planner = State(initialValue: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
     }
@@ -432,7 +435,28 @@ struct LobbyView: View {
             leave: leaveTrip, end: endTrip)
     }
 
-    private func leaveTrip() { run { try await session.leave(); onExit() } }
+    private func leaveTrip() {
+        run {
+            try await session.leave()
+            // Past trips from now on, marked as left: a relaunch (even offline) never reopens it, and Home shows its
+            // route without reading the trip or its recap, which are members-only.
+            if let trip = model.trip {
+                PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name,
+                                 endedAt: Date(), left: true)
+                PastTripsMapService.remember(PastTripsMapLogic.route(
+                    id: model.tripId, name: trip.name, destinationName: trip.destination.name,
+                    destination: trip.destination.coordinate.coordinate, encodedRoute: trip.route))
+            }
+            onExit()
+        }
+    }
+
+    /// Back to trips: the trip keeps going without this screen. Its session stops here, before Home takes the map,
+    /// rather than whenever the view is released.
+    private func backToTrips() {
+        if !isSample { session.stop() }
+        onExit()
+    }
     private func endTrip() { run { try await session.endTrip() } }
 
     /// Rename's field and buttons, in the lobby's alert and the driving sheet's.
@@ -574,7 +598,7 @@ struct LobbyView: View {
             subtitle: LobbyContent.subtitleWords(subtitle, sharing: sharing), subtitleIdentifier: "lobby.subtitle",
             styledSubtitle: sharing ? sharingSubtitle(subtitle) : nil
         ) {
-            RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: onExit)
+            RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: backToTrips)
                 .accessibilityIdentifier("lobby.back")
         } trailing: {
             if let trip {
@@ -1055,7 +1079,7 @@ struct LobbyView: View {
     private func exitBanner(_ title: String, systemImage: String) -> some View {
         VStack(spacing: Spacing.m) {
             Label(title, systemImage: systemImage).font(.headline)
-            Button("Back to trips", action: onExit).buttonStyle(.bordered)
+            Button("Back to trips", action: backToTrips).buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
         .padding(Spacing.l)

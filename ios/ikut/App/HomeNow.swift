@@ -58,11 +58,24 @@ enum HomeNow {
         return read.gone && signedIn ? now : nil
     }
 
+    /// Gone before it ended: this phone left or was removed, so Past trips shows it as left (route, no recap).
+    static func wasLeft(_ read: Read) -> Bool { read.gone && read.endedAt == nil }
+
     /// Whether a failed read means this phone is no longer in the trip: the rules refuse a trip to anyone not a member
     /// (or a trip that doesn't exist), so a refusal or a missing trip is "gone"; anything else (offline) is not known.
     static func isGone(_ error: Error?) -> Bool {
         guard let error = error as NSError?, error.domain == FirestoreErrorDomain else { return false }
         return error.code == FirestoreErrorCode.permissionDenied.rawValue || error.code == FirestoreErrorCode.notFound.rawValue
+    }
+
+    /// The phone's own copy of the trip (no server), for a launch whose read didn't answer in time: whether it ended
+    /// or started as last seen. Nil when the phone has none.
+    @MainActor
+    static func loadCached(tripId: String, db: Firestore = Firestore.firestore()) async -> Read? {
+        guard let snapshot = try? await db.document(FirestorePaths.trip(tripId)).getDocument(source: .cache),
+              snapshot.exists, let trip = try? snapshot.data(as: Trip.self) else { return nil }
+        return Read(line: fallbackStatus, endedAt: trip.status == .ended ? (trip.endedAt ?? Date()) : nil,
+                    name: trip.name, destination: trip.destination.name, started: LobbyLogic.isStarted(trip: trip))
     }
 
     /// One read of the trip, its cars and its stops, as a member can (no listener). A trip that can't be read says

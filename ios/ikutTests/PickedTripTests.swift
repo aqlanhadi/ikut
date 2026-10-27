@@ -16,6 +16,36 @@ struct PickedTripTests {
         return PickedTrip(entry: e, model: RecapModel(snapshot: .demo(), originName: "Tanjung Malim"))
     }
 
+    // MARK: A trip left early (D54, #421)
+
+    @Test func aTripLeftEarlyShowsItsRouteAndReadsNothing() {
+        var left = entry()
+        left.leftAt = Date(timeIntervalSince1970: 1_774_800_000)
+        #expect(!PickedTripLogic.readsServer(left))
+        #expect(PickedTripLogic.readsServer(entry()))
+
+        let picked = PickedTrip(entry: left, model: RecapModel(tripId: left.id))
+        #expect(picked.isLeft)
+        #expect(!pickedTrip().isLeft)
+        // Its name and the drawn (cached) route, no stats.
+        #expect(picked.title == "Balik kampung raya")
+        #expect(picked.statsLine == nil)
+        let drawn = PastTripRoute(id: left.id, name: left.name, destinationName: "Ipoh", destinationLatitude: 4.6,
+                                  destinationLongitude: 101.1, points: [[3.1, 101.6], [4.6, 101.1]])
+        #expect(PickedTripLogic.route(for: left, snapshot: nil, drawn: [drawn], fetched: nil) == drawn)
+        #expect(PickedTripLogic.leftTitle == "You left while the trip was in progress")
+        #expect(PickedTripLogic.leftLine == "No recap for trips you leave early.")
+    }
+
+    @Test func leavingIsKeptWhenTheTripIsRecordedAgain() {
+        var left = entry(ended: Date(timeIntervalSince1970: 5))
+        left.leftAt = Date(timeIntervalSince1970: 5)
+        let list = PastTrips.upsert([left], PastTrips.Entry(id: left.id, name: "Renamed", destination: "Ipoh", endedAt: nil,
+                                                            seenAt: Date()))
+        #expect(list.first?.leftAt == left.leftAt)
+        #expect(list.first?.endedAt == left.endedAt)
+    }
+
     // MARK: Words
 
     @Test func subtitleIsDestinationAndDay() {
