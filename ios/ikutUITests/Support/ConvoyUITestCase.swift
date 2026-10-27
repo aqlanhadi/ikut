@@ -209,6 +209,30 @@ class ConvoyUITestCase: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
     }
 
+    /// The join sheet's first steps, when this phone needs them (D58): "Welcome to ikut" with the name (signed out), then
+    /// the location step before iOS asks (permission not decided). Returns once the code field shows. The permission
+    /// monitor answers iOS's own prompt on a tap at the top edge.
+    func passJoinGates(name: String, timeout: TimeInterval = 40) {
+        let nameField = app.textFields["Your name"]
+        let code = app.textFields["Trip code"]
+        let locationContinue = app.buttons["joinLocationContinue"]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline, !code.exists {
+            if nameField.exists {
+                nameField.tap()
+                nameField.typeText(name)
+                let next = app.buttons["joinNameContinue"]
+                if next.isHittable { next.tap() }
+                _ = nameField.waitForNonExistence(timeout: 15)
+            } else if locationContinue.exists, locationContinue.isHittable {
+                locationContinue.tap()
+            }
+            // Wakes the permission monitor; at the top edge, so it can't land on the sheet or a control.
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+    }
+
     /// The app opens straight into a trip this phone is still in (#401, D54), so a run that left one behind starts
     /// there: from the lobby, Back to trips; from the driving map, End trip (the organiser) or Leave trip from the pulled-up
     /// sheet below the convoy, then Done on the recap. Returns once Welcome, Home or neither shows (a fresh install).
@@ -313,7 +337,7 @@ class ConvoyUITestCase: XCTestCase {
             .matching(NSPredicate(format: "identifier IN %@", ["homeJoin", "welcomeJoin"])).firstMatch
         XCTAssertTrue(joinButton.waitForExistence(timeout: homeTimeout), "Home didn’t show Join trip")
         joinButton.tap()
-        enterNameIfAsked(name)
+        passJoinGates(name: name)
         let codeField = app.textFields["Trip code"]
         XCTAssertTrue(codeField.waitForExistence(timeout: 15), "Join sheet didn't show the code field")
         codeField.tap()

@@ -127,6 +127,20 @@ struct JoinStepperTests {
         #expect(JoinSteps.meetLine(trip(stops: [fuel])) == "1 stop")
     }
 
+    @Test func theCardLinesWithTheOrganiserAndTheMeetingTime() {
+        let t = tripWithRoute()
+        #expect(JoinSteps.toLine(t) == "To Ipoh · Aqlan organises · 2 cars in")
+        let tz = TimeZone(identifier: "Asia/Kuala_Lumpur")!
+        let noon = Calendar(identifier: .gregorian).date(from: DateComponents(timeZone: tz, year: 2026, month: 10, day: 27, hour: 12))!
+        let meet = PreviewStop(name: "Petronas Jalan Duta", kind: .meet, meetAt: noon)
+        let fuel = PreviewStop(name: "R&R Tapah", kind: .fuel, minutes: 20)
+        #expect(JoinSteps.meetLine(trip(stops: [meet, fuel]), timeZone: tz) == "Meets at Petronas Jalan Duta, 12:00 · 1 stop")
+        #expect(JoinSteps.meetLine(trip(stops: [meet]), timeZone: tz) == "Meets at Petronas Jalan Duta, 12:00")
+        // An older server: no organiser, no time.
+        #expect(JoinSteps.toLine(trip()) == "To Ipoh · 2 cars in")
+        #expect(JoinSteps.meetLine(trip(stops: [PreviewStop(name: "Petronas Jalan Duta", kind: .meet)])) == "Meets at Petronas Jalan Duta")
+    }
+
     @Test func theMainButtonNamesTheCarAndThePerson() {
         #expect(JoinSteps.joinLabel(car: myvi, ownCar: false, firstName: "Nurul") == "Join Aqlan’s Myvi as Nurul")
         #expect(JoinSteps.joinLabel(car: nil, ownCar: true, firstName: "Nurul") == "Join in my own car as Nurul")
@@ -135,13 +149,50 @@ struct JoinStepperTests {
 
     // MARK: Map
 
-    @Test func theMapDrawsOnlyWhereTheTripEndsAndNeverAStart() {
+    @Test func theMapDrawsOnlyWhereTheTripEndsWithoutTheNewFields() {
         let input = JoinSteps.map(for: trip())
         #expect(input.pins.count == 1 && input.pins.first?.kind == .destination)
         #expect(input.route.isEmpty && input.ownRoute.isEmpty && input.overlays.isEmpty && input.cars.isEmpty)
         #expect(input.layers.isDisjoint(with: [.route, .ownRoute, .overlays, .cars, .pastRoutes, .pickedRoute]))
         #expect(JoinSteps.map(for: nil).pins.isEmpty)
         #expect(JoinSteps.map(for: trip(coordinate: false)).pins.isEmpty)
+    }
+
+    private static let line = [(3.1873, 101.6773), (3.8, 101.5), (4.2, 101.26), (4.5975, 101.09)]
+        .map { CLLocationCoordinate2D(latitude: $0.0, longitude: $0.1) }
+
+    private func tripWithRoute() -> TripPreview {
+        var t = trip(stops: [
+            PreviewStop(name: "Petronas Jalan Duta", kind: .meet, coordinate: PreviewCoordinate(latitude: 3.1873, longitude: 101.6773), meetAt: Date()),
+            PreviewStop(name: "R&R Tapah", kind: .fuel, minutes: 20, coordinate: PreviewCoordinate(latitude: 4.2, longitude: 101.26)),
+            PreviewStop(name: "No place", kind: .food),
+        ])
+        t.organizerName = "Aqlan"
+        t.route = Polyline.encode(Self.line)
+        return t
+    }
+
+    @Test func theMapDrawsTheRouteAndStopsAndNeverAStart() {
+        let t = tripWithRoute()
+        let input = JoinSteps.map(for: t)
+        #expect(input.route.count == Self.line.count)
+        // The meeting point, the numbered stop that has a place, and the end; a stop without a place is left out.
+        #expect(input.pins.map(\.kind) == [.meeting, .stop(number: 1), .destination])
+        #expect(input.layers.contains([.route, .pins]))
+        #expect(input.layers.isDisjoint(with: [.ownRoute, .overlays, .cars, .pastRoutes, .pickedRoute]))
+        #expect(!input.pins.contains { if case .join = $0.kind { true } else { false } }, "no start or join point")
+        // The camera fits the whole line above the sheet.
+        let region = JoinSteps.region(for: t, bottomObscured: 0.45, topObscured: 0.1)
+        #expect(region != nil && (region?.span.latitudeDelta ?? 0) > 1.4)
+        #expect(input.route.first.map { abs($0.latitude - 3.1873) < 0.001 } == true, "line begins where the server cut it")
+    }
+
+    @Test func aRouteTooShortToSendLeavesTheCaptionOnTheEnd() {
+        var t = tripWithRoute()
+        #expect(JoinSteps.mapCaption(t) == "The map shows the route and stops. Nobody’s start is shown.")
+        t.route = nil
+        #expect(JoinSteps.mapCaption(t) == "The map shows where the trip ends. Nobody’s start is shown.")
+        #expect(JoinSteps.map(for: t).route.isEmpty)
     }
 
     @Test func theCameraKeepsTheEndAboveTheSheet() throws {
@@ -199,5 +250,89 @@ struct JoinStepperTests {
         #expect(!HomeSheet.drawsPastRoutes(.join))
         // A sheet pulled up on the list does not stay tall for Join.
         #expect(!HomeSheet.expanded(true, from: .list, to: .join))
+    }
+
+    // MARK: First run
+
+    @Test func theStepsADifferentPersonSees() {
+        let first = JoinSteps.plan(hasName: false, location: .notDetermined)
+        #expect(first.steps == [.name, .location, .code, .car])
+        #expect(JoinSteps.plan(hasName: true, location: .notDetermined).steps == [.location, .code, .car])
+        #expect(JoinSteps.plan(hasName: false, location: .whenInUse).steps == [.name, .code, .car])
+        #expect(JoinSteps.plan(hasName: true, location: .always).steps == [.code, .car])
+        #expect(JoinSteps.plan(hasName: true, location: .denied).steps == [.code, .car])
+        #expect(JoinSteps.indicator(.name, plan: first) == "Step 1 of 4")
+        #expect(JoinSteps.indicator(.car, plan: first) == "Step 4 of 4")
+        let named = JoinSteps.plan(hasName: true, location: .always)
+        #expect(JoinSteps.indicator(.code, plan: named) == "Step 1 of 2")
+        #expect(JoinSteps.title(.name) == "Welcome to ikut" && JoinSteps.title(.location) == "Location")
+    }
+
+    @Test func aLinkOnFirstRunGoesThroughNameAndLocationToTheCodeFilledIn() async {
+        let plan = JoinSteps.plan(hasName: false, location: .notDetermined)
+        let s = JoinStepper.begin(JoinStart(code: "k7m-2qx"), displayName: "", plan: plan, api: FakeJoinAPI(preview: trip()))
+        #expect(s.step == .name && s.model.code == "K7M2QX")
+        #expect(!s.model.isLoadingPreview, "no lookup before the name: the server wants a signed-in person")
+        #expect(!s.canContinue)
+        s.goNext()
+        #expect(s.step == .name)
+        s.model.displayName = "Nurul"
+        #expect(s.canContinue)
+        s.goNext()
+        #expect(s.step == .location && s.canContinue)
+        #expect(s.model.isLoadingPreview, "looked up once the name is in")
+        s.goNext()
+        #expect(s.step == .code && s.model.code == "K7M2QX")
+        await waitUntil { s.model.preview != nil }
+        #expect(s.canContinue)
+        #expect(!s.canGoBack, "the name and the location ask are done once answered")
+        s.goNext()
+        #expect(s.step == .car && s.canGoBack)
+    }
+
+    @Test func whenLocationIsAskedInTheSheetAndWhenHomeStillGatesIt() {
+        #expect(JoinSteps.sheetHostsLocation(status: .notDetermined, accuracy: .full))
+        #expect(JoinSteps.sheetHostsLocation(status: .whenInUse, accuracy: .full))
+        #expect(JoinSteps.sheetHostsLocation(status: .always, accuracy: .full))
+        #expect(!JoinSteps.sheetHostsLocation(status: .denied, accuracy: .full))
+        #expect(!JoinSteps.sheetHostsLocation(status: .whenInUse, accuracy: .reduced))
+    }
+
+    @Test func everyStepAsksForTheSameDetent() {
+        let plan = JoinSteps.plan(hasName: false, location: .notDetermined)
+        let s = JoinStepper(model: JoinModel(displayName: "", api: FakeJoinAPI(preview: trip())), plan: plan)
+        let asked = Set(JoinStep.allCases.map { step -> PresentationDetent in
+            s.show(step)
+            return HomeSheet.detent(expanded: false, mode: HomeSheet.mode(flow: nil, joining: true), compact: 300)
+        })
+        #expect(asked == [HomeSheet.short(HomeSheet.joinHeight)])
+    }
+
+    /// A join that stays in flight until `finish` is called.
+    private final class SlowJoin: JoinAPI, @unchecked Sendable {
+        let trip: TripPreview
+        private let gate = AsyncStream<Void>.makeStream()
+        init(trip: TripPreview) { self.trip = trip }
+        func finish() { gate.continuation.yield() }
+        func preview(code: String) async throws -> TripPreview { trip }
+        func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
+            for await _ in gate.stream { break }
+            return JoinResult(tripId: "t1", carId: "c9", trackerTaken: false)
+        }
+    }
+
+    @Test func aLinkMidJoinDoesNotReplaceTheSteps() async {
+        #expect(JoinStepper.shouldReplace(nil))
+        let api = SlowJoin(trip: trip())
+        let s = JoinStepper(displayName: "Nurul", code: "K7M2QX", api: api)
+        s.model.start()
+        await waitUntil { s.model.preview != nil }
+        #expect(JoinStepper.shouldReplace(s), "browsing: a new link replaces the steps")
+        s.model.selectNewCar()
+        let join = Task { await s.model.join() }
+        await waitUntil { s.model.isJoining }
+        #expect(s.model.isJoining && !JoinStepper.shouldReplace(s))
+        api.finish()
+        _ = await join.value
     }
 }

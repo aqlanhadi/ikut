@@ -72,6 +72,7 @@
 		3C240B4486DA232F9E1504AA /* StopAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B7CE38A043F2B0EBAC9A5 /* StopAskModel.swift */; };
 		3E02B8B76CF74C64C90ADFAD /* StopArrivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */; };
 		3E3947EE2E72D11FC40409C1 /* HomeNowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4E6220545874C63A72429B /* HomeNowTests.swift */; };
+		3E6A5D5154BD66BCF5B44BFA /* LocationAskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FE3485E8DF3951CE95A9ABD /* LocationAskStep.swift */; };
 		40BC71734DC98A8BB57D4D52 /* SuggestStopsSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B57D9F42E46F04ABDC9F7C /* SuggestStopsSheetTests.swift */; };
 		4151B4E056B2B1144C676055 /* PlacesKLIpohTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7E06B398795C1AC5DEE699 /* PlacesKLIpohTests.swift */; };
 		41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */; };
@@ -329,6 +330,7 @@
 		1DE38EDF4446EB6024A65E6A /* StopPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillView.swift; sourceTree = "<group>"; };
 		1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRebuildTests.swift; sourceTree = "<group>"; };
 		1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarRouteTests.swift; sourceTree = "<group>"; };
+		1FE3485E8DF3951CE95A9ABD /* LocationAskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationAskStep.swift; sourceTree = "<group>"; };
 		220B4DCEF3B189952DC1F1B9 /* PickedTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedTripTests.swift; sourceTree = "<group>"; };
 		2244F4B55239022AF10B572D /* kl-ipoh-south.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "kl-ipoh-south.json"; sourceTree = "<group>"; };
 		22B87A46A5250E86D1E67E5D /* CarRouteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarRouteService.swift; sourceTree = "<group>"; };
@@ -876,6 +878,7 @@
 			children = (
 				409F2A2E1542D39038AFC98D /* AlwaysLocationExplainerView.swift */,
 				2F08168BB70493362B6773C8 /* LocationAccess.swift */,
+				1FE3485E8DF3951CE95A9ABD /* LocationAskStep.swift */,
 				991414E381145C07351D7F20 /* LocationDeniedView.swift */,
 				13A75CB34F97F77AD0AFCEB3 /* LocationPermission.swift */,
 			);
@@ -1313,6 +1316,7 @@
 				48A0796725D089ABD3E90FD1 /* LobbyStopsViews.swift in Sources */,
 				9EDC48B733121D1A6E0056D6 /* LobbyView.swift in Sources */,
 				4A62431BEA2E9F01E17A2CE2 /* LocationAccess.swift in Sources */,
+				3E6A5D5154BD66BCF5B44BFA /* LocationAskStep.swift in Sources */,
 				D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */,
 				1D850DCEE3C7494160CDB1AD /* LocationPermission.swift in Sources */,
 				3BDC0CAEB4A0D68F7B58D638 /* MapColors.swift in Sources */,

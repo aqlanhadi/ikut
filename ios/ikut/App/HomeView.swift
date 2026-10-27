@@ -148,11 +148,10 @@ struct HomeView: View {
         // Launch decides first: a trip this phone is in comes before the link.
         guard launched || !hasSeenWelcome, let code = pendingJoinCode else { return }
         pendingJoinCode = nil
-        // A name comes first when signed out; the join carries on afterwards.
-        if auth.state != .signedIn { begin(.join(code: code)); return }
         // Don't pull someone out of a trip they're already in.
-        if stage.tripId != nil { return }
-        Task { await open(.join(code: code), replacing: true) }
+        if auth.state == .signedIn, stage.tripId != nil { return }
+        // The join sheet asks for a name and location itself when needed (D58).
+        begin(.join(code: code))
     }
 
     /// Decides where the app opens (#401): straight into a trip this phone is still in, the lobby before Start and the
@@ -256,6 +255,14 @@ struct HomeView: View {
 
     /// Signed in: go straight to the route. Signed out: ask for a name first.
     private func begin(_ route: Route) {
+        // Joining asks for the name and the location as its own first steps in Home's sheet (D58). Only a denied or
+        // approximate location still goes through the settings prompt first.
+        if case .join(let code) = route, JoinSteps.sheetHostsLocation(status: location.status, accuracy: location.accuracy) {
+            hasSeenWelcome = true
+            creating = false
+            joining = JoinStart(code: code)
+            return
+        }
         if auth.state == .signedIn {
             Task { await open(route) }
         } else {

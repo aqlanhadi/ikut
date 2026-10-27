@@ -1,4 +1,5 @@
 #if DEBUG
+import CoreLocation
 import SwiftUI
 
 /// Fixed-data trips for the join steps' launch states and previews.
@@ -7,6 +8,7 @@ enum JoinDemo {
     private struct API: JoinAPI {
         var withStops: Bool
         var withCoordinate = true
+        var withRoute = false
         /// When set, the ticket can't be read and says this.
         var failure: String?
 
@@ -21,10 +23,17 @@ enum JoinDemo {
                 ],
                 stops: withStops
                     ? [
-                        PreviewStop(name: "Petronas Sungai Buloh", kind: .meet),
-                        PreviewStop(name: "R&R Tapah", kind: .fuel, minutes: 20),
-                        PreviewStop(name: "Kuala Kangsar", kind: .food, minutes: 60),
-                    ] : [])
+                        PreviewStop(
+                            name: "Petronas Jalan Duta", kind: .meet,
+                            coordinate: PreviewCoordinate(latitude: 3.1873, longitude: 101.6773),
+                            meetAt: Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Date())),
+                        PreviewStop(name: "R&R Tapah", kind: .fuel, minutes: 20,
+                                    coordinate: PreviewCoordinate(latitude: 4.2, longitude: 101.26)),
+                        PreviewStop(name: "Kuala Kangsar", kind: .food, minutes: 60,
+                                    coordinate: PreviewCoordinate(latitude: 4.77, longitude: 100.94)),
+                    ] : [],
+                organizerName: withRoute ? "Aqlan" : nil,
+                route: withRoute ? Polyline.encode(JoinDemo.route) : nil)
         }
 
         func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
@@ -32,12 +41,17 @@ enum JoinDemo {
         }
     }
 
+    /// From the meeting point north to Ipoh: the trip's line as the server sends it (never from anyone's start).
+    private nonisolated static var route: [CLLocationCoordinate2D] { [
+        (3.1873, 101.6773), (3.4, 101.62), (3.8, 101.5), (4.0, 101.38), (4.2, 101.26), (4.45, 101.12), (4.5975, 101.09),
+    ].map { CLLocationCoordinate2D(latitude: $0.0, longitude: $0.1) } }
+
     /// The fixed-data API, for previews: a ticket with stops for any code, or `failure` when set.
     static func api(withStops: Bool = false, failure: String? = nil) -> some JoinAPI {
         API(withStops: withStops, withCoordinate: false, failure: failure)
     }
 
-    /// Home with the join steps over its map, for the launch states `join-h3-empty`, `join-h3-found`, `join-h3-found-drive`,
+    /// Home with the join steps over its map, for the launch states `join-h1-name`, `join-h2-location`, `join-h3-empty`, `join-h3-found`, `join-h3-found-drive`,
     /// `join-h3-not-found`, `join-h4-car`, `join-h4-copilot` and `join-h4-own` (D58). The found states look the trip up
     /// from the fixed-data API a moment after they open, as the real one does.
     static func home(_ state: String) -> TripsHomeView? {
@@ -48,8 +62,12 @@ enum JoinDemo {
         let failure = state == "join-h3-not-found" ? JoinService.message(code: .notFound, serverMessage: "") : nil
         let model = JoinModel(
             displayName: "Nurul", initialCode: code,
-            api: API(withStops: true, withCoordinate: true, failure: failure), driveFromHere: { _ in drive })
-        let stepper = JoinStepper(model: model)
+            api: API(withStops: true, withCoordinate: true, withRoute: true, failure: failure), driveFromHere: { _ in drive })
+        if state == "join-h1-name" { model.displayName = "" }
+        // H1 and H2 come first for a person with no name and no answer to iOS yet; the other states are for someone with both.
+        let plan = state == "join-h1-name" ? JoinPlan(needsName: true, needsLocation: true)
+            : state == "join-h2-location" ? JoinPlan(needsName: false, needsLocation: true) : JoinPlan()
+        let stepper = JoinStepper(model: model, plan: plan)
         if state.hasPrefix("join-h4") {
             stepper.show(.car)
             Task { @MainActor in

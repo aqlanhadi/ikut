@@ -191,10 +191,10 @@ final class DemoOrganizerUITests: DemoBase {
 
         try step("2. lobby with the other cars; Start trip opens the map") {
             try waitMark("cars.joined", timeout: 420)
-            // The cars sit below the fold of the lobby's sheet (D50): pull it up once, then read "Cars · N of 4 ready".
+            // The cars sit below the fold of the lobby's sheet (D50): pull it up once, then read "Cars · N of N ready": three cars with Faiz riding in Aisha's, four with his own.
             pullLobbySheetUp()
-            soft("lobby shows the scripted cars, N of 4 ready", timeout: 60) {
-                labelled("label CONTAINS %@", "Hafiz").exists && labelled("label MATCHES %@", ".*Cars · [0-9] of 4 ready.*").exists
+            soft("lobby shows the scripted cars, all ready", timeout: 60) {
+                labelled("label CONTAINS %@", "Hafiz").exists && labelled("label MATCHES %@", ".*Cars · ([3-4]) of \\1 ready.*").exists
             }
             shot("lobby-full")
             openDemoMap()
