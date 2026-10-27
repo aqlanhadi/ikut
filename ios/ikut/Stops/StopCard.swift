@@ -69,6 +69,10 @@ struct StopCard: View {
 
     var body: some View {
         screen
+            .onAppear { cardSheetLog.debug("stop card appears on \(String(describing: model.screen), privacy: .public)") }
+            .onDisappear { cardSheetLog.debug("stop card disappears on \(String(describing: model.screen), privacy: .public)") }
+            .onChange(of: model.screen) { _, now in cardSheetLog.debug("stop card shows \(String(describing: now), privacy: .public)") }
+            .onChange(of: driving) { _, now in cardSheetLog.debug("stop card driving \(now)") }
             .task(id: model.sentWaiting) {
                 guard model.sentWaiting else { return }
                 try? await Task.sleep(for: .seconds(8))
@@ -77,6 +81,7 @@ struct StopCard: View {
             .task(id: PlacesKey(needs: needs, route: context.mainRoute)) { await model.places.keepFresh(reasons: needs, context: context) }
             .onChange(of: board.requests.map(\.eventId)) { _, ids in
                 guard !ids.isEmpty else { return }
+                cardSheetLog.debug("stop card back home: requests \(ids.count)")
                 // A request is open, mine or someone's: whatever was being asked is over.
                 model.sentWaiting = false
                 model.ask.clearReason()

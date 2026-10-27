@@ -88,8 +88,23 @@ enum PanelSheet {
 
     /// The card sheet's one detent: its content's measured height (nil until seen), capped at `room` like the
     /// convoy sheet and never under `minimumHeight`.
-    static func cardHeight(content: CGFloat?, room: CGFloat?) -> CGFloat {
-        min(content ?? cardEstimate, max(room ?? .greatestFiniteMagnitude, minimumHeight)).rounded()
+    /// With the keyboard up (a passenger typing a stop message), the sheet is taller by what the keyboard covers, so the
+    /// card sits above it with its field in view; the card's own layout never sees the keyboard (Q16).
+    static func cardHeight(content: CGFloat?, room: CGFloat?, keyboard: CGFloat = 0) -> CGFloat {
+        min((content ?? cardEstimate) + max(keyboard, 0), max(room ?? .greatestFiniteMagnitude, minimumHeight)).rounded()
+    }
+
+    /// How much of the screen's bottom the keyboard covers, from its end frame in screen coordinates: 0 when it is
+    /// gone or off screen.
+    static func keyboardCover(frame: CGRect, screenHeight: CGFloat) -> CGFloat {
+        guard !frame.isEmpty, !frame.isNull else { return 0 }
+        return max(0, screenHeight - frame.minY).rounded()
+    }
+
+    /// The card's bottom safe area, kept for its buttons' lift (`barLift`): a reading taken with the keyboard up is
+    /// the keyboard's, not the home indicator's, and would hang the buttons down under the keyboard, so it is ignored.
+    static func cardSafeBottom(reading: CGFloat, keyboard: CGFloat, last: CGFloat) -> CGFloat {
+        keyboard > 0 ? last : reading
     }
 
     /// The height of the map the sheets cover, for the camera: the convoy sheet's, or the card's when it is the taller.

@@ -163,6 +163,31 @@ struct PanelSheetTests {
         #expect(PanelSheet.cardHeight(content: 900, room: 40) == PanelSheet.minimumHeight)
     }
 
+    // Q16: a passenger typing a stop message on a phone with the software keyboard lost the field under it.
+    @Test func withTheKeyboardUpTheCardSheetGrowsByItSoTheFieldStaysAboveIt() {
+        // The message screen (about 300 pt) over a 336 pt keyboard: the sheet is 636 tall, the card in its top 300.
+        #expect(PanelSheet.cardHeight(content: 300, room: 716, keyboard: 336) == 636)
+        // Still never past the room under the pills: the card's body scrolls there.
+        #expect(PanelSheet.cardHeight(content: 420, room: 716, keyboard: 336) == 716)
+        #expect(PanelSheet.cardHeight(content: 300, room: 716, keyboard: 0) == 300)
+    }
+
+    @Test func theKeyboardCoverIsWhatItsEndFrameHidesOfTheScreen() {
+        #expect(PanelSheet.keyboardCover(frame: CGRect(x: 0, y: 538, width: 402, height: 336), screenHeight: 874) == 336)
+        // Going away: the end frame is below the screen.
+        #expect(PanelSheet.keyboardCover(frame: CGRect(x: 0, y: 874, width: 402, height: 336), screenHeight: 874) == 0)
+        // A hardware keyboard leaves only the shortcut bar.
+        #expect(PanelSheet.keyboardCover(frame: CGRect(x: 0, y: 819, width: 402, height: 55), screenHeight: 874) == 55)
+        #expect(PanelSheet.keyboardCover(frame: .zero, screenHeight: 874) == 0)
+    }
+
+    @Test func aSafeAreaReadWithTheKeyboardUpDoesNotLiftTheCardButtons() {
+        // The keyboard's 316 pt would hang the buttons 296 pt down, under the keyboard: the home indicator's 34 stays.
+        #expect(PanelSheet.cardSafeBottom(reading: 316, keyboard: 336, last: 34) == 34)
+        #expect(PanelSheet.cardSafeBottom(reading: 34, keyboard: 0, last: 316) == 34)
+        #expect(PanelSheet.barLift(safeBottom: PanelSheet.cardSafeBottom(reading: 316, keyboard: 336, last: 34)) == 18)
+    }
+
     @Test func theMapIsCoveredByWhicheverSheetIsTaller() {
         let h = heights()
         #expect(PanelSheet.covered(shown: .folded, in: h, card: nil) == 300)
