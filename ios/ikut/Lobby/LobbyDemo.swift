@@ -399,6 +399,8 @@ enum DemoScreens {
         case "road-skip-all-confirm": return AnyView(StopArrivalDemo(.skipAllConfirm))
         case "road-skip-all-others": return AnyView(StopArrivalDemo(.skipAllOthers))
         case "road-skip-all-meet": return AnyView(StopArrivalDemo(.skipAllMeeting))
+        // D57: the camera's long and short hops on the driving map, then the recap map's steps, looping.
+        case "camera-tour": return AnyView(CameraTourDemo().environment(LocationPermission()).environment(AuthModel()))
         // The recap as the pushed page: system Back, the trip name as the large title, Share in the bar (D34).
         case "recap":
             return AnyView(NavigationStack {

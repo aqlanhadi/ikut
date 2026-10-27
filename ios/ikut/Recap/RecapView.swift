@@ -92,9 +92,12 @@ struct RecapRouteMap: View {
     /// The map's bottom safe area, for a card over its bottom (`MapLegal`): the logo and Legal sit above it.
     var legalInset: CGFloat
     @Binding var camera: MapCameraPosition
+    /// Each frame of the camera as it moves (the recap map plans its next step from it).
+    var onCamera: ((MapCamera, Double) -> Void)?
 
     init(recap: Recap, snapshot: RecapSnapshot, interactive: Bool, selectedId: String? = nil, legalInset: CGFloat = 0,
-         camera: Binding<MapCameraPosition> = .constant(.automatic)) {
+         camera: Binding<MapCameraPosition> = .constant(.automatic), onCamera: ((MapCamera, Double) -> Void)? = nil) {
+        self.onCamera = onCamera
         self.legalInset = legalInset
         self.recap = recap
         self.snapshot = snapshot
@@ -140,6 +143,7 @@ struct RecapRouteMap: View {
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
+        .onMapCameraChange(frequency: .continuous) { onCamera?($0.camera, $0.region.span.latitudeDelta) }
         .safeAreaPadding(.bottom, legalInset)
         .allowsHitTesting(interactive)
     }

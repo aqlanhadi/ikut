@@ -171,6 +171,8 @@ final class TripMapStage {
     private(set) var tripId: String?
     /// The camera as it moves, frame by frame, outside observation so a glide redraws nothing (Home's settle check).
     let cameraBox = CameraBox()
+    /// The camera move in flight, paced by `CameraPace` (D57).
+    let flight = CameraFlight()
 
     init(mode: TripScreenMode = .lobby, tripId: String? = nil) {
         self.mode = mode
@@ -181,6 +183,7 @@ final class TripMapStage {
     func open(tripId: String, started: Bool) {
         self.tripId = tripId
         pulledUp = false
+        flight.cancel()
         mode = TripScreenLogic.mode(after: .open(started: started), from: mode)
     }
 
@@ -188,11 +191,35 @@ final class TripMapStage {
     func exit() {
         tripId = nil
         pulledUp = false
+        flight.cancel()
         mode = TripScreenLogic.mode(after: .exit, from: mode)
     }
 
     /// Something has placed the camera, so the next entry move is a flight from it.
     var hasCamera: Bool { camera != .automatic }
+
+    /// The camera as the map last drew it, mid-move or at rest; nil before it has drawn.
+    var seenView: CameraView? {
+        cameraBox.seen.map {
+            CameraView(latitude: $0.camera.centerCoordinate.latitude, longitude: $0.camera.centerCoordinate.longitude,
+                       latitudeSpan: $0.latitudeDelta)
+        }
+    }
+
+    /// A paced move to `position`, which shows `view` (`CameraPace`): from wherever the camera is now, taking over a
+    /// move in flight, and stopping if the person takes the map.
+    func fly(to position: MapCameraPosition, view: CameraView, reduceMotion: Bool) {
+        flight.fly(to: position, view: view, from: seenView, reduceMotion: reduceMotion,
+                   continues: { [weak self] in self?.camera.positionedByUser == false }) { [weak self] in
+            self?.camera = $0
+        }
+    }
+
+    /// Puts the camera at `position` at once, ending any move in flight.
+    func place(_ position: MapCameraPosition) {
+        flight.cancel()
+        camera = position
+    }
 }
 
 /// The trip screen: one full-screen map with one camera, the layer for the mode over it, and one sheet whose content

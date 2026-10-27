@@ -11,6 +11,8 @@ struct MapPickView: View {
     var onUse: (DestinationResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var flight = CameraFlight()
     @State private var position: MapCameraPosition
     @State private var center: CLLocationCoordinate2D
     @State private var span: MKCoordinateSpan
@@ -77,7 +79,12 @@ struct MapPickView: View {
                         .onEnded { value in
                             guard case .second(true, let drag?) = value,
                                   let spot = proxy.convert(drag.startLocation, from: .local) else { return }
-                            position = .region(MKCoordinateRegion(center: spot, span: span))
+                            // The map glides to the pressed spot at the pace of `CameraPace` instead of snapping.
+                            let region = MKCoordinateRegion(center: spot, span: span)
+                            flight.fly(to: .region(region), view: CameraView(region: region),
+                                       from: CameraView(region: MKCoordinateRegion(center: center, span: span)),
+                                       reduceMotion: reduceMotion,
+                                       continues: { position.positionedByUser == false }) { position = $0 }
                         })
                 .overlay { pin }
             }
