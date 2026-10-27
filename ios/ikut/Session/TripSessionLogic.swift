@@ -38,6 +38,26 @@ extension CarRouteService: CarRouteControlling {}
 /// Writes (a date) or clears (nil) `pausedAt` on the car doc; tests substitute a fake.
 typealias PauseWriter = @MainActor (_ carId: String, _ pausedAt: Date?) async throws -> Void
 
+/// One write of Leave trip: give up sharing for the car, then delete this phone's member doc.
+enum LeaveStep: Equatable {
+    case releaseTracker(carId: String)
+    case deleteMember
+}
+
+/// Does one Leave step against the server; tests substitute a fake.
+typealias LeaveWriter = @MainActor (LeaveStep) async throws -> Void
+
+/// Leave trip couldn't reach the server: the person stays in the trip and can try again.
+struct LeaveFailed: LocalizedError, Equatable {
+    var errorDescription: String? { "Couldn’t leave the trip. Check your signal and try again." }
+}
+
+extension TripSessionLogic {
+    /// A Leave write the server refuses because this phone is no longer a member (or the doc is gone) means it has
+    /// left: typically the delete went through but its reply was lost, and the resend was refused (D54 review).
+    static func leaveCountsAsLeft(_ error: Error) -> Bool { HomeNow.isGone(error) }
+}
+
 /// Builds the car-route service for one tracking session from the trip and car docs.
 /// `meetingPoint` is the trip's meeting point when it has one: cars still joining route to it.
 typealias CarRouteFactory = @MainActor (

@@ -816,3 +816,46 @@ struct SessionEmulatorTests {
         #expect(resumed.pausedAt == nil)
     }
 }
+
+/// Leave trip (D54 review): the member delete's reply can be lost and its resend refused, since this phone is no
+/// longer a member; that counts as left. Anything else keeps the person in the trip with a plain message.
+@MainActor
+struct SessionLeaveTests {
+    private func session(_ writer: @escaping LeaveWriter) -> (TripSession, FakeTrackingController) {
+        let tracker = FakeTrackingController()
+        let session = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker, carRouteFactory: { _, _, _, _, _ in FakeCarRoute() },
+            leaveWriter: writer)
+        session.applyForTesting(trip: testTrip(), member: testMember, car: testCar())
+        return (session, tracker)
+    }
+
+    private func firestoreError(_ code: FirestoreErrorCode.Code) -> NSError {
+        NSError(domain: FirestoreErrorDomain, code: code.rawValue)
+    }
+
+    @Test func aRefusedMemberDeleteStillLeaves() async throws {
+        var steps: [LeaveStep] = []
+        let refused = firestoreError(.permissionDenied)
+        let (session, tracker) = session { step in
+            steps.append(step)
+            if step == .deleteMember { throw refused }
+        }
+        try await session.leave()
+        #expect(steps == [.releaseTracker(carId: "c1"), .deleteMember])
+        #expect(!tracker.isTracking)
+    }
+
+    @Test func aRefusedTrackerReleaseStillLeaves() async throws {
+        let refused = firestoreError(.notFound)
+        let (session, _) = session { step in if case .releaseTracker = step { throw refused } }
+        try await session.leave()
+    }
+
+    @Test func anyOtherFailureSaysCheckYourSignal() async {
+        let offline = firestoreError(.unavailable)
+        let (session, _) = session { _ in throw offline }
+        await #expect(throws: LeaveFailed()) { try await session.leave() }
+        #expect(LeaveFailed().localizedDescription == "Couldn’t leave the trip. Check your signal and try again.")
+    }
+}
