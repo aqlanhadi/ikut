@@ -176,11 +176,15 @@ export interface PreviewCar {
   number?: number;
 }
 
-/** One planned stop on the ticket: only what a stranger with the code needs. Never ids, coordinates, offsets, notes or skipped fields. */
+/** One planned stop on the ticket: only what a stranger with the code needs. Never ids, offsets, notes or skipped fields. */
 export interface PreviewStop {
   name: string;
   kind: PlannedStopKind;
   minutes?: number;
+  /** So the map can draw the place. */
+  coordinate?: { latitude: number; longitude: number };
+  /** Epoch milliseconds; only on the meeting point ("Meets at Petronas Jalan Duta, 12:00"). */
+  meetAt?: number;
 }
 
 export interface PreviewTripResult {
@@ -189,6 +193,10 @@ export interface PreviewTripResult {
   destinationName: string;
   /** Where the trip ends, so a stranger's phone can work out its own drive time; the only coordinate a stranger gets (never the route or the start). */
   destinationCoordinate?: { latitude: number; longitude: number };
+  /** First name of the organiser; absent when unknown. */
+  organizerName?: string;
+  /** The trip's main route only, starting at the meeting point, or 3 km in; simplified (about 100 m, at most 400 points), precision-5 polyline; absent when the trip has none or it is under 6 km. Never a car's own route. */
+  route?: string;
   cars: PreviewCar[];
   /** Planned stops in order, skipped ones left out; absent when there are none. */
   stops?: PreviewStop[];

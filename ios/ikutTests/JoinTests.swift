@@ -99,6 +99,36 @@ struct JoinStopsTests {
         ])
     }
 
+    @Test func decodesOrganiserRouteAndMeetingPoint() throws {
+        var data = base
+        data["organizerName"] = "Aqlan"
+        data["route"] = "_p~iF~ps|U_ulLnnqC"
+        data["stops"] = [
+            ["name": "Petronas Jalan Duta", "kind": "meet", "coordinate": ["latitude": 3.17, "longitude": 101.68], "meetAt": 1_800_000_000_000],
+            ["name": "R&R Tapah", "kind": "fuel", "minutes": 20, "coordinate": ["latitude": 4.2, "longitude": 101.2]],
+            ["name": "Nowhere", "kind": "food", "coordinate": ["latitude": 999, "longitude": 0]],
+        ] as [[String: Any]]
+        let preview = try JoinService.parsePreview(data)
+        #expect(preview.organizerName == "Aqlan")
+        #expect(preview.route == "_p~iF~ps|U_ulLnnqC")
+        let meet = try #require(preview.meetingPoint)
+        #expect(meet.name == "Petronas Jalan Duta")
+        #expect(meet.meetAt == Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(meet.coordinate == PreviewCoordinate(latitude: 3.17, longitude: 101.68))
+        #expect(preview.stops[1].coordinate?.longitude == 101.2 && preview.stops[1].meetAt == nil)
+        #expect(preview.stops[2].coordinate == nil)
+    }
+
+    @Test func olderServerWithoutTheNewFieldsStillDecodes() throws {
+        let preview = try JoinService.parsePreview(base)
+        #expect(preview.organizerName == nil && preview.route == nil && preview.meetingPoint == nil)
+        var blank = base
+        blank["organizerName"] = "  "
+        blank["route"] = ""
+        let p = try JoinService.parsePreview(blank)
+        #expect(p.organizerName == nil && p.route == nil)
+    }
+
     @Test func previewWithoutStopsFieldStillDecodes() throws {
         #expect(try JoinService.parsePreview(base).stops.isEmpty)
         var empty = base

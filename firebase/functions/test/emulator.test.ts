@@ -8,6 +8,7 @@ import { endIdleTrips } from "../lib/endIdleTrips.js";
 import { purgeTripData } from "../lib/retention.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { previewTripData } from "../lib/previewTrip.js";
+import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
 
 const PROJECT = "ikut-b1083";
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
@@ -292,6 +293,7 @@ describe("previewTrip (emulator)", () => {
       name: "T",
       destinationName: "D",
       destinationCoordinate: { latitude: 1, longitude: 1 },
+      organizerName: "Org",
       cars: [
         { id: "lead", name: "Lead", color: "blue", hasTracker: true, number: 1 },
         { id: "second", name: "Alpha", color: "green", hasTracker: false },
@@ -300,35 +302,114 @@ describe("previewTrip (emulator)", () => {
     assert.ok(!JSON.stringify(r.body).includes(organizerId));
   });
 
-  it("gives a stranger the destination coordinate and nothing of the route or where it starts", async () => {
-    const { tripRef } = await seedTrip();
-    await tripRef.update({ route: "_p~iF~ps|U_ulLnnqC", destination: { name: "Ipoh", coordinate: new GeoPoint(4.5975, 101.0901) } });
+  it("gives the destination coordinate, the organiser's first name and the simplified main route", async () => {
+    const { tripRef, organizerId } = await seedTrip();
+    await tripRef.collection("members").doc(organizerId).set({ displayName: "Aqlan Nor Azman", carId: "lead", role: "organizer" });
+    // 200 points on a nearly straight line KL to Ipoh: simplifies to far fewer, ends kept.
+    const pts = Array.from({ length: 200 }, (_, i) => ({ latitude: 3.139 + (i / 199) * 1.4585, longitude: 101.6869 - (i / 199) * 0.5968 + (i % 2) * 0.00001 }));
+    const full = encodePolyline(pts);
+    await tripRef.update({ route: full, destination: { name: "Ipoh", coordinate: new GeoPoint(4.5975, 101.0901) } });
     const r = await previewTripData(db, tripRef.id);
     assert.deepEqual(r.destinationCoordinate, { latitude: 4.5975, longitude: 101.0901 });
-    const json = JSON.stringify(r);
-    assert.ok(!json.includes("_p~iF~ps|U_ulLnnqC"));
+    assert.equal(r.organizerName, "Aqlan");
+    const line = decodePolyline(r.route!);
+    assert.ok(line.length >= 2 && line.length < 20, String(line.length));
+    assert.ok(line[0].latitude > 3.139 + 0.02 && Math.abs(line[line.length - 1].latitude - 4.5975) < 1e-4);
+    assert.ok(r.route!.length < full.length);
+    assert.ok(!JSON.stringify(r).includes("Nor Azman"));
+  });
+
+  describe("where the route line starts", () => {
+    const HOME = { latitude: 3.0, longitude: 101.5 };
+    // Straight north from HOME, 0.001 deg (about 111 m) a step, 100 steps: about 11 km.
+    const line = (steps: number) => Array.from({ length: steps + 1 }, (_, i) => ({ latitude: HOME.latitude + i * 0.001, longitude: HOME.longitude }));
+    const meters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => Math.abs(a.latitude - b.latitude) * 111_320;
+
+    it("starts 3 km in when there is no meeting point, and nowhere near the organiser's start", async () => {
+      const { tripRef } = await seedTrip();
+      await tripRef.update({ route: encodePolyline(line(100)) });
+      const pts = decodePolyline((await previewTripData(db, tripRef.id)).route!);
+      assert.ok(Math.abs(meters(pts[0], HOME) - 3000) < 5, String(meters(pts[0], HOME)));
+      for (const p of pts) assert.ok(meters(p, HOME) > 500);
+    });
+
+    for (const left of [false, true]) {
+      it(`starts at the meeting point${left ? " even after it was left" : ""}`, async () => {
+        const { tripRef } = await seedTrip();
+        await tripRef.update({ route: encodePolyline(line(100)) });
+        // Maps snaps the start to a road, a few tens of metres off the line's first vertex.
+        const meet = new GeoPoint(3.0002, 101.5003);
+        await tripRef.collection("stops").doc("m").set({
+          name: "Petronas", kind: "meet", coordinate: meet, routeOffset: 0, order: 0, meetAt: Timestamp.now(),
+          ...(left ? { leftAt: Timestamp.now(), leftBy: "someone" } : {}),
+        });
+        const pts = decodePolyline((await previewTripData(db, tripRef.id)).route!);
+        assert.deepEqual(pts[0], { latitude: meet.latitude, longitude: meet.longitude });
+      });
+    }
+
+    it("has no route when the whole line is under 6 km", async () => {
+      const { tripRef } = await seedTrip();
+      await tripRef.update({ route: encodePolyline(line(45)) });
+      assert.ok(!("route" in (await previewTripData(db, tripRef.id))));
+    });
+  });
+
+  it("has no organiserName or route when the trip has neither", async () => {
+    const { tripRef } = await seedTrip();
+    await tripRef.collection("members").doc("org-" + (await tripRef.get()).data()!.code).delete();
+    const r = await previewTripData(db, tripRef.id);
+    assert.ok(!("organizerName" in r));
     assert.ok(!("route" in r));
+  });
+
+  it("sends nothing of a member's start, own route, position, phone or ids, for a trip that has all of them", async () => {
+    const { tripRef, organizerId } = await seedTrip();
+    const MAIN = encodePolyline([{ latitude: 3.14, longitude: 101.69 }, { latitude: 3.5, longitude: 101.5 }, { latitude: 4.6, longitude: 101.09 }]);
+    const OWN = encodePolyline([{ latitude: 2.9, longitude: 101.8 }, { latitude: 3.0, longitude: 101.75 }, { latitude: 3.3, longitude: 101.6 }]);
+    await tripRef.update({ route: MAIN });
+    await tripRef.collection("members").doc(organizerId).set({ displayName: "Aqlan Z", carId: "lead", role: "organizer", pushToken: "PUSH-ORG-SECRET" });
+    await tripRef.collection("members").doc("member-uid-77").set({ displayName: "Siti Bakar", carId: "second", role: "member", pushToken: "PUSH-MEMBER-SECRET" });
+    await tripRef.collection("cars").doc("second").set({
+      name: "Bezza", color: "green", isLead: false, state: "driving", trackerUserId: "member-uid-77", number: 2,
+      route: OWN, joinOffset: 31337, startName: "SIRI-HOME-AT-SEREMBAN",
+    });
+    await tripRef.collection("positions").doc("second").set({ location: new GeoPoint(2.7123, 101.9321), speed: 20, heading: 90, routeOffset: 4242, updatedAt: Timestamp.now() });
+    await tripRef.collection("stops").doc("s").set({ name: "Petronas Jalan Duta", kind: "meet", coordinate: new GeoPoint(3.17, 101.68), routeOffset: 0, order: 0, meetAt: Timestamp.fromMillis(1_800_000_000_000), note: "private note" });
+    const r = await previewTripData(db, tripRef.id);
+    assert.deepEqual(r.stops, [{ name: "Petronas Jalan Duta", kind: "meet", coordinate: { latitude: 3.17, longitude: 101.68 }, meetAt: 1_800_000_000_000 }]);
+    const json = JSON.stringify(r);
+    for (const secret of [
+      OWN, "member-uid-77", organizerId, "PUSH-ORG-SECRET", "PUSH-MEMBER-SECRET", "Siti", "Bakar", "SIRI-HOME", "31337", "4242",
+      "2.7123", "101.9321", "trackerUserId", "private note", "positions", "joinOffset", "pushToken",
+    ]) {
+      assert.ok(!json.includes(secret), secret);
+    }
+    assert.ok(json.includes(encodePolyline(decodePolyline(r.route!))), "main route present");
+    assert.deepEqual(Object.keys(r).sort(), ["cars", "destinationCoordinate", "destinationName", "name", "organizerName", "route", "stops", "tripId"]);
+    assert.deepEqual(r.cars.map((c) => Object.keys(c).sort()), [["color", "hasTracker", "id", "name", "number"], ["color", "hasTracker", "id", "name", "number"]]);
   });
 
   it("lists the planned stops in order as name, kind and minutes only, without skipped ones", async () => {
     const { tripRef } = await seedTrip();
+    const meetAt = Timestamp.fromMillis(1_800_000_000_000);
     // Doc ids sort opposite to `order` (Firestore returns by id), so this fails without the sort.
     const stop = (order: number, name: string, extra: object = {}) => ({
       name, kind: "fuel", coordinate: new GeoPoint(4.2, 101.2), routeOffset: 1000 * (order + 1), order, ...extra,
     });
     await tripRef.collection("stops").doc("y").set(stop(1, "R&R Tapah", { minutes: 20, note: "ask for Sam", kind: "food" }));
-    await tripRef.collection("stops").doc("z").set(stop(0, "Petronas SB", { meetAt: Timestamp.now(), kind: "meet" }));
+    await tripRef.collection("stops").doc("z").set(stop(0, "Petronas SB", { meetAt, kind: "meet" }));
     await tripRef.collection("stops").doc("x").set(stop(2, "Skipped one", { skipped: true, skippedBy: "someone", skippedAt: Timestamp.now() }));
     await tripRef.collection("stops").doc("w").set(stop(3, "Kuala Kangsar", { minutes: 10, kind: "toilet" }));
     await tripRef.collection("stops").doc("v").set(stop(4, "Left one", { leftAt: Timestamp.now(), leftBy: "someone" }));
     const r = await previewTripData(db, tripRef.id);
     assert.deepEqual(r.stops, [
-      { name: "Petronas SB", kind: "meet" },
-      { name: "R&R Tapah", kind: "food", minutes: 20 },
-      { name: "Kuala Kangsar", kind: "toilet", minutes: 10 },
+      { name: "Petronas SB", kind: "meet", coordinate: { latitude: 4.2, longitude: 101.2 }, meetAt: meetAt.toMillis() },
+      { name: "R&R Tapah", kind: "food", minutes: 20, coordinate: { latitude: 4.2, longitude: 101.2 } },
+      { name: "Kuala Kangsar", kind: "toilet", minutes: 10, coordinate: { latitude: 4.2, longitude: 101.2 } },
     ]);
     const json = JSON.stringify(r);
-    for (const secret of ["Left one", "coordinate", "routeOffset", "note", "skipped", "meetAt", "order", "ask for Sam"]) {
+    for (const secret of ["Left one", "routeOffset", "note", "skipped", "order", "ask for Sam"]) {
       assert.ok(!json.includes(secret), secret);
     }
   });
