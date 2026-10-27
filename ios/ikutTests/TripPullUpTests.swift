@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import ikut
 
-/// While driving, the convoy sheet at tall continues, by scrolling down, with the lobby (D53 piece 3, canvas row L): the
+/// While driving, the convoy sheet pulled to its tallest continues with the lobby (D53 piece 3, canvas row L): the
 /// journey still ahead with what was driven folded into one line, the code, the trip, the options and Leave or End.
 struct TripPullUpTests {
     private let utc = TimeZone(identifier: "UTC")!
@@ -125,8 +125,8 @@ struct TripPullUpTests {
     }
 
     @Test func theOrganiserAndAParticipantPullUpTheSameSectionsTheirRowsDecideTheRest() {
-        #expect(LobbyContent.drivingSections(rows(organizer: true)) == [.journey, .code, .trip, .options, .exit])
-        #expect(LobbyContent.drivingSections(rows(organizer: false)) == [.journey, .code, .trip, .options, .exit])
+        #expect(LobbyContent.pulledUp(rows(organizer: true)) == [.journey, .code, .trip, .options, .exit])
+        #expect(LobbyContent.pulledUp(rows(organizer: false)) == [.journey, .code, .trip, .options, .exit])
         // Inside them the lobby's rows decide: the organiser ends and changes the destination, a participant leaves.
         let organiser = rows(organizer: true)
         #expect(organiser.canEnd && organiser.canLeave && organiser.canChangeDestination && organiser.canPause)
@@ -135,14 +135,14 @@ struct TripPullUpTests {
     }
 
     @Test func noLongerInTheTripLeavesNothingToLeave() {
-        #expect(!LobbyContent.drivingSections(rows(organizer: false, live: false)).contains(.exit))
+        #expect(!LobbyContent.pulledUp(rows(organizer: false, live: false)).contains(.exit))
     }
 
     // MARK: What the convoy sheet steps aside for
 
     @Test func drivingTheSheetStaysUpForLeaveEndAndRenameAndStepsAsideForWhatTakesTheScreen() {
         func cover(_ change: (inout LobbySheet.Cover) -> Void) -> LobbySheet.Cover { var c = LobbySheet.Cover(); change(&c); return c }
-        // Presented from inside the convoy sheet: it stays up at tall, so Cancel leaves it there.
+        // Presented from inside the pulled-up sheet: it stays up, so Cancel leaves it pulled up.
         #expect(!LobbySheet.drivingCovered(cover { $0.confirmEnd = true }, lobbyOnScreen: true))
         #expect(!LobbySheet.drivingCovered(cover { $0.confirmLeave = true }, lobbyOnScreen: true))
         #expect(!LobbySheet.drivingCovered(cover { $0.renaming = true }, lobbyOnScreen: true))
@@ -153,12 +153,12 @@ struct TripPullUpTests {
         #expect(!LobbySheet.drivingCovered(LobbySheet.Cover(), lobbyOnScreen: true))
     }
 
-    @Test func theAsksInsideTheLobbyRowsGoWithThemAndNeverComeBackUntapped() {
-        let up = LobbySheet.DrivingAsks(confirmLeave: true, confirmEnd: true, renaming: true, showQR: true)
-        // Still at tall: kept.
-        #expect(LobbySheet.drivingAsks(up, continuationShown: true) == up)
-        // Folded to short by the grabber, the header or a hazard: all cleared.
-        #expect(LobbySheet.drivingAsks(up, continuationShown: false) == LobbySheet.DrivingAsks())
+    @Test func theAsksInsideThePulledUpSheetGoWithItAndNeverComeBackUntapped() {
+        let up = LobbySheet.PulledUpAsks(confirmLeave: true, confirmEnd: true, renaming: true, showQR: true)
+        // Still pulled up: kept.
+        #expect(LobbySheet.pulledUpAsks(up, continuationShown: true) == up)
+        // Folded by the grabber, the header, a stop request or a hazard: all cleared.
+        #expect(LobbySheet.pulledUpAsks(up, continuationShown: false) == LobbySheet.PulledUpAsks())
     }
 
     // MARK: No longer in the trip, driving (#403)
@@ -195,14 +195,14 @@ struct TripPullUpTests {
 
     // MARK: When the lobby listens
 
-    @Test func theLobbyListensInItsOwnModeAndWhileDrivingOnlyAtTall() {
-        #expect(TripScreenLogic.lobbyListens(onScreen: true, mode: .lobby, lobbyRowsShown: false))
-        #expect(TripScreenLogic.lobbyListens(onScreen: true, mode: .lobby, lobbyRowsShown: true))
-        // Driving with the convoy sheet short: the convoy listens, the lobby rests.
-        #expect(!TripScreenLogic.lobbyListens(onScreen: true, mode: .driving, lobbyRowsShown: false))
-        #expect(TripScreenLogic.lobbyListens(onScreen: true, mode: .driving, lobbyRowsShown: true))
+    @Test func theLobbyListensInItsOwnModeAndWhileDrivingOnlyWithTheSheetPulledUp() {
+        #expect(TripScreenLogic.lobbyListens(onScreen: true, mode: .lobby, pulledUp: false))
+        #expect(TripScreenLogic.lobbyListens(onScreen: true, mode: .lobby, pulledUp: true))
+        // Driving with the convoy sheet short or tall: the convoy listens, the lobby rests.
+        #expect(!TripScreenLogic.lobbyListens(onScreen: true, mode: .driving, pulledUp: false))
+        #expect(TripScreenLogic.lobbyListens(onScreen: true, mode: .driving, pulledUp: true))
         // Another screen pushed over the trip, or the trip screen gone: nothing listens.
-        #expect(!TripScreenLogic.lobbyListens(onScreen: false, mode: .lobby, lobbyRowsShown: false))
-        #expect(!TripScreenLogic.lobbyListens(onScreen: false, mode: .driving, lobbyRowsShown: true))
+        #expect(!TripScreenLogic.lobbyListens(onScreen: false, mode: .lobby, pulledUp: false))
+        #expect(!TripScreenLogic.lobbyListens(onScreen: false, mode: .driving, pulledUp: true))
     }
 }

@@ -145,9 +145,9 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
         row.tap()
     }
 
-    /// The convoy sheet at tall, scrolled to its End trip row (the lobby's, continuing below the convoy, D53).
+    /// The convoy sheet pulled up, then its End trip row (the lobby's, continuing below the convoy, D53).
     func endTripFromLobby() {
-        XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "no End trip row with the convoy sheet at tall")
+        XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "no End trip row with the convoy sheet pulled up")
     }
 
     /// Taps the destructive button of a confirmation dialog (it repeats the menu item's title).
@@ -419,8 +419,8 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             shot("11-stop-closed")
         }
 
-        try step("8. pauses sharing from the driving sheet at tall, then resumes") {
-            XCTAssertTrue(app.tapPulledUpRow("lobby.pause"), "no Pause sharing row with the convoy sheet at tall")
+        try step("8. pauses sharing from the pulled-up sheet, then resumes") {
+            XCTAssertTrue(app.tapPulledUpRow("lobby.pause"), "no Pause sharing row with the convoy sheet pulled up")
             try waitFor("paused banner", timeout: 20) { labelled("label CONTAINS %@", "Sharing paused").exists }
             shot("12-paused")
             mark("b.paused")
@@ -438,7 +438,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
 
         try step("9. leaves the trip") {
             try waitMark("a.sawResumed", timeout: 150)
-            XCTAssertTrue(app.tapPulledUpRow("lobby.leaveTrip"), "no Leave trip row with the convoy sheet at tall")
+            XCTAssertTrue(app.tapPulledUpRow("lobby.leaveTrip"), "no Leave trip row with the convoy sheet pulled up")
             confirm("Leave trip")
             let joinTrip = app.buttons["homeJoin"]
             XCTAssertTrue(joinTrip.waitForExistence(timeout: 30), "B didn't return Home after leaving")
