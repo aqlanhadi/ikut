@@ -205,3 +205,32 @@ struct PastTripsCacheTests {
         #expect(kept?.map(\.id) == ["a", "b"])
     }
 }
+
+@MainActor struct LeftTripSheetTests {
+    @Test func aLeftTripPickedGetsItsOwnShortDetent() {
+        #expect(HomeSheet.mode(flow: nil, leftTripPicked: true) == .leftTrip)
+        #expect(HomeSheet.mode(flow: nil) == .list)
+        // The note (two lines) plus the header: 186 pt at the default size, not the list's 300.
+        #expect(HomeSheet.height(.leftTrip, compact: 300) == 300 * HomeSheet.leftTripFraction)
+        #expect(HomeSheet.height(.leftTrip, compact: 300) > 150)
+    }
+
+    @Test func itStaysBelowTheListSheetSoLegalIsClearAtEveryTextSize() {
+        for compact in stride(from: HomeSheet.compactHeight, through: HomeSheet.compactHeight * 1.5, by: 25) {
+            let left = HomeSheet.height(.leftTrip, compact: compact)
+            #expect(left < compact)
+            #expect(HomeSheet.legalInset(compact: compact) > left)
+        }
+        // The map's bottom padding follows the list's height, so a left trip never moves it.
+        #expect(HomeSheet.legalInset(compact: 300) == HomeSheet.defaultReach)
+    }
+
+    @Test func itGrowsWithTheTextSizeAndOtherHeightsStay() {
+        #expect(HomeSheet.height(.leftTrip, compact: 450) > HomeSheet.height(.leftTrip, compact: 300))
+        #expect(HomeSheet.height(.list, compact: 300) == 300)
+        #expect(HomeSheet.height(.whereTo, compact: 450) == HomeSheet.whereToHeight)
+        #expect(HomeSheet.detent(expanded: false, mode: .leftTrip, compact: 300) == HomeSheet.short(300 * HomeSheet.leftTripFraction))
+        #expect(HomeSheet.detent(expanded: true, mode: .leftTrip, compact: 300) == HomeSheet.tall)
+        #expect(HomeSheet.expanded(true, from: .list, to: .leftTrip) == false)
+    }
+}

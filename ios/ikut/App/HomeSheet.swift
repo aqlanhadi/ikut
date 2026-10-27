@@ -31,14 +31,19 @@ enum HomeSheet {
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
     /// What Home's sheet shows: its list, or one of the two steps of making a trip over the same map (MapFirst B2, B3).
-    enum Mode: Equatable { case list, whereTo, newTrip }
+    enum Mode: Equatable { case list, whereTo, newTrip, leftTrip }
+
+    /// A trip you left early picked on Home: its header and the two-line note, nothing below. Its short detent is this
+    /// fraction of the list's (so it scales with the text size, as the list's does), and always below it, which keeps
+    /// the map's Legal (above the list's short sheet, `legalInset`) clear.
+    static let leftTripFraction: CGFloat = 0.62
 
     /// Where to? with the keyboard up (B2), and New trip with the route drawn (B3).
     static let whereToHeight: CGFloat = 560
     static let newTripHeight: CGFloat = 420
 
-    @MainActor static func mode(flow: NewTripFlow?) -> Mode {
-        guard let flow else { return .list }
+    @MainActor static func mode(flow: NewTripFlow?, leftTripPicked: Bool = false) -> Mode {
+        guard let flow else { return leftTripPicked ? .leftTrip : .list }
         return flow.ready == nil ? .whereTo : .newTrip
     }
 
@@ -48,6 +53,7 @@ enum HomeSheet {
         case .list: compact
         case .whereTo: whereToHeight
         case .newTrip: newTripHeight
+        case .leftTrip: compact * leftTripFraction
         }
     }
 
