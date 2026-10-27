@@ -20,6 +20,7 @@ struct JoinSheet: View {
     /// The name is being signed in, or iOS's location prompt is up.
     @State private var isWorking = false
     @State private var nameError: String?
+    @State private var locationNote: String?
 
     init(stepper: JoinStepper, onClose: @escaping () -> Void, onJoined: @escaping (_ tripId: String) -> Void) {
         self.stepper = stepper
@@ -98,7 +99,7 @@ struct JoinSheet: View {
         case .name:
             Button(action: submitName) {
                 Group {
-                    if isWorking { ProgressView().accessibilityLabel("Signing in") } else { Text("Continue") }
+                    if isWorking { ProgressView().accessibilityLabel("Signing in") } else { Text("Get started") }
                 }
                 .barActionLabel()
             }
@@ -142,6 +143,15 @@ struct JoinSheet: View {
                     .sheetActionBar(sides: false)
                     .padding(.bottom, PanelSheet.sideGap)
             } else {
+                if let line = locationOffLine {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(line).font(.footnote).foregroundStyle(.secondary)
+                        Button("Open Settings") { location.openSettings() }
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("joinLocationOff")
+                }
                 if JoinSteps.sharing(selectedCar: model.selectedCar, ownCar: model.selection == .newCar) != .none { sharingRow }
                 Button(action: join) {
                     Group {
@@ -180,7 +190,7 @@ struct JoinSheet: View {
     }
 
     /// Leads into iOS's own prompt (and the full-accuracy one when the person chose approximate); whatever the answer,
-    /// the sheet goes on: joining doesn't need location, driving does and asks again.
+    /// the sheet goes on. Joining to share is checked again on Join (`join`), which asks iOS once more if it can.
     private func askLocation() {
         guard !isWorking else { return }
         isWorking = true
@@ -218,10 +228,24 @@ struct JoinSheet: View {
         JoinSteps.joinLabel(car: model.selectedCar, ownCar: model.selection == .newCar, firstName: firstName)
     }
 
+    /// Sharing wanted (my own car, or the switch on) needs location: ask iOS on this tap; if it is still refused, join
+    /// as the co-pilot with the line saying why, never stuck.
     private func join() {
         Task {
-            if let result = await model.join() { onJoined(result.tripId) }
+            let wants = model.selection == .newCar || model.tracker
+            var status = location.status
+            if wants, status == .notDetermined { status = await location.requestWhenInUse() }
+            let decision = JoinSteps.tracker(wantsToShare: wants, authorization: status)
+            locationNote = decision.note
+            if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId) }
         }
+    }
+
+    /// Shown above Join when sharing is wanted but iOS already said no, and after a refusal on this tap.
+    private var locationOffLine: String? {
+        let wants = model.selection == .newCar || model.tracker
+        if let locationNote { return locationNote }
+        return location.status == .denied ? JoinSteps.tracker(wantsToShare: wants, authorization: .denied).note : nil
     }
 
     // MARK: H3 Code

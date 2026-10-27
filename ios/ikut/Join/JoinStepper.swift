@@ -160,6 +160,19 @@ enum JoinSteps {
         return ownCar ? .ownCar : .none
     }
 
+    /// Whether this phone can share: sharing wanted (My own car, or the share switch on) needs While Using or Always.
+    /// `authorization` is what iOS says after it has been asked on the Join tap; refused, or undecided, means the person
+    /// joins as the co-pilot, with the line to say why.
+    static func tracker(wantsToShare: Bool, authorization: LocationAccess.Status) -> (tracker: Bool, note: String?) {
+        guard wantsToShare else { return (false, nil) }
+        switch authorization {
+        case .whenInUse, .always: return (true, nil)
+        case .denied, .notDetermined: return (false, locationOffNote)
+        }
+    }
+
+    static let locationOffNote = "Location is off, so you’re joining as the co-pilot. Turn it on in Settings to share this car."
+
     /// The main button of the car step: "Join Aqlan’s Myvi as Nurul", "Join in my own car as Nurul", or plain
     /// "Join trip" before a car is picked.
     static func joinLabel(car: PreviewCar?, ownCar: Bool, firstName: String) -> String {

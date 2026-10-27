@@ -156,7 +156,8 @@ final class JoinModel {
     }
 
     /// Joins; returns the result unless a "tracker taken" note should be shown first.
-    func join() async -> JoinResult? {
+    /// `sharing` false joins as the co-pilot whatever the switch says (location is off).
+    func join(sharing: Bool = true) async -> JoinResult? {
         guard canJoin, let selection else { return nil }
         let car: JoinCarChoice
         switch selection {
@@ -171,7 +172,7 @@ final class JoinModel {
         defer { isJoining = false }
         do {
             let result = try await api.join(
-                code: code, displayName: firstName, car: car, tracker: tracker)
+                code: code, displayName: firstName, car: car, tracker: tracker && sharing)
             if result.trackerTaken {
                 trackerTakenResult = result
                 return nil

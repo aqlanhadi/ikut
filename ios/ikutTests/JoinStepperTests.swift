@@ -335,4 +335,39 @@ struct JoinStepperTests {
         api.finish()
         _ = await join.value
     }
+
+    @Test func sharingNeedsLocationElseTheCoPilotJoinsWithTheLine() {
+        let states: [LocationAccess.Status] = [.notDetermined, .denied, .whenInUse, .always]
+        for state in states {
+            // Not sharing never needs location and says nothing.
+            let quiet = JoinSteps.tracker(wantsToShare: false, authorization: state)
+            #expect(!quiet.tracker && quiet.note == nil)
+            let wants = JoinSteps.tracker(wantsToShare: true, authorization: state)
+            let allowed = state == .whenInUse || state == .always
+            #expect(wants.tracker == allowed)
+            #expect((wants.note == nil) == allowed)
+        }
+        #expect(JoinSteps.locationOffNote == "Location is off, so you’re joining as the co-pilot. Turn it on in Settings to share this car.")
+    }
+
+    @Test func joiningWithoutSharingSendsNoTracker() async {
+        final class Spy: JoinAPI, @unchecked Sendable {
+            var tracker: Bool?
+            func preview(code: String) async throws -> TripPreview {
+                TripPreview(tripId: "t", name: "T", destinationName: "Ipoh", cars: [])
+            }
+            func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
+                self.tracker = tracker
+                return JoinResult(tripId: "t", carId: "c", trackerTaken: false)
+            }
+        }
+        let spy = Spy()
+        let s = JoinStepper(displayName: "Nurul", code: "K7M2QX", api: spy)
+        s.model.start()
+        await waitUntil { s.model.preview != nil }
+        s.model.selectNewCar()
+        #expect(s.model.tracker)
+        _ = await s.model.join(sharing: false)
+        #expect(spy.tracker == false, "my own car still made, with no tracker")
+    }
 }

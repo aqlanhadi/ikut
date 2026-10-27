@@ -220,7 +220,8 @@ class ConvoyUITestCase: XCTestCase {
         while Date() < deadline, !code.exists {
             if nameField.exists {
                 nameField.tap()
-                nameField.typeText(name)
+                // Only type into an empty field: a retry after a missed Continue must not type the name twice.
+                if (nameField.value as? String ?? "").isEmpty || nameField.value as? String == "Your name" { nameField.typeText(name) }
                 let next = app.buttons["joinNameContinue"]
                 if next.isHittable { next.tap() }
                 _ = nameField.waitForNonExistence(timeout: 15)
