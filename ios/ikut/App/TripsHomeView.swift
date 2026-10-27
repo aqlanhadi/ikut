@@ -70,8 +70,6 @@ struct TripsHomeView: View {
     /// text size and nothing else.
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The app's location permission (absent in some previews): Home watches your location once it is granted.
-    @Environment(LocationPermission.self) private var location: LocationPermission?
     /// Where the camera last went to show you (`HomeCamera`); nil before the first fix.
     @State private var here: CLLocationCoordinate2D?
     /// Screenshot demo (`init(demo:)`): shows what it was given, and reads nothing from the phone or the server.
@@ -100,16 +98,13 @@ struct TripsHomeView: View {
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
         self.onOpenTrip = onOpenTrip
-        // Open on the cached past routes when there are any, else a fixed region: never MapKit's follow-the-user,
-        // which moved the camera on every fix (`HomeCamera`).
+        // Open on the cached past routes when there are any, else a fixed region: never MapKit's follow-the-user
+        // (`HomeCamera`). The phone's last known spot is read once the view is on screen (`onAppear`).
         let cache = PastTripsMapService.cachedRoutes()
         let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
         let insets = Self.obscured(mapHeight: 0)
         let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top)
-        let known = Self.lastKnownLocation()
-        _here = State(initialValue: known)
-        _listCamera = State(initialValue: HomeCamera.launch(cachedRoutes: region, here: known,
-                                                            bottomObscured: insets.bottom, topObscured: insets.top))
+        _listCamera = State(initialValue: HomeCamera.launch(cachedRoutes: region))
         if region != nil { _routes = State(initialValue: cached) }
     }
 
@@ -121,7 +116,6 @@ struct TripsHomeView: View {
          cameraTour: Bool = false,
          creating createFlow: NewTripFlow? = nil, joining joinStepper: JoinStepper? = nil, nowStatus: [String: String] = [:]) {
         self.init(onNewTrip: {}, onJoin: {})
-        _here = State(initialValue: nil)
         if let joinStepper {
             _joinFlow = State(initialValue: joinStepper)
             let insets = HomeSheet.createInsets(
@@ -182,6 +176,8 @@ struct TripsHomeView: View {
             // Coming back from a trip the camera flies from it to the list; the app's first frame just places it.
             .onAppear {
                 guard TripScreenLogic.entryCamera(.home) == .homeList else { return }
+                // Once per appearance (Home is new after a trip): where the phone last knew you were.
+                if here == nil, !isDemo, routes.isEmpty { here = Self.lastKnownLocation() }
                 let animated = TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera)
                 // Back from a trip the map already has its height: fit the routes to it (the list camera was worked
                 // out before, for a typical phone).
@@ -334,7 +330,7 @@ struct TripsHomeView: View {
             expanded = false
         }
         fetchedRoute = nil
-        if let before = cameraBeforePick { move(to: before, animated: true) }
+        goBack(to: cameraBeforePick)
         cameraBeforePick = nil
     }
 
@@ -476,7 +472,7 @@ struct TripsHomeView: View {
             expanded = false
         }
         creating.wrappedValue = false
-        if let before = cameraBeforeCreate { move(to: before, animated: true) }
+        goBack(to: cameraBeforeCreate)
         cameraBeforeCreate = nil
     }
 
@@ -547,8 +543,7 @@ struct TripsHomeView: View {
     }
 
     private var locationGranted: Bool {
-        let status = location?.status ?? LocationAccess.status(from: CLLocationManager().authorizationStatus)
-        return status == .whenInUse || status == .always
+        location.status == .whenInUse || location.status == .always
     }
 
     /// Whether a fix may move the camera now (`HomeCamera.followsFixes`).
@@ -574,6 +569,16 @@ struct TripsHomeView: View {
             }
         } catch {
             // The stream ended; the camera stays where it is.
+        }
+    }
+
+    /// Close or Back to trips: the view around you when the list has no routes and the camera showed you, else the
+    /// camera saved before (`HomeCamera.back`).
+    private func goBack(to saved: MapCameraPosition?) {
+        switch HomeCamera.back(hasRoutes: !routes.isEmpty, hereKnown: here != nil,
+                               positionedByUser: stage.camera.positionedByUser) {
+        case .here: showHere(animated: true)
+        case .saved: if let saved { move(to: saved, animated: true) }
         }
     }
 
@@ -616,7 +621,7 @@ struct TripsHomeView: View {
             expanded = false
         }
         joining.wrappedValue = nil
-        if let before = cameraBeforeJoin { move(to: before, animated: true) }
+        goBack(to: cameraBeforeJoin)
         cameraBeforeJoin = nil
     }
 

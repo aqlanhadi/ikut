@@ -3,10 +3,10 @@ import MapKit
 import SwiftUI
 
 /// Home's camera plan (D57), pure so it can be tested. Home never hands its camera to MapKit's follow-the-user
-/// (`.userLocation`): MapKit moved it on every location fix, so with a moving location the app never went idle and
-/// every UI test tap waited its 60 s (Q18). Home opens on a fixed region instead (the cached routes, or Kuala Lumpur);
-/// the first fix flies to a fixed region around you, and later fixes move it only once you have really moved, and only
-/// while it is Home's view of where you are. Every animated move is paced by `CameraPace`.
+/// (`.userLocation`), which moved it on every location fix (it was a suspect for the UI tests' never-idle stall, Q18;
+/// not confirmed, now Q21). Home opens on a fixed region instead (the cached routes, the phone's last known spot, or
+/// Kuala Lumpur); the first fix flies to a fixed region around you, and later fixes move it only once you have really
+/// moved, and only while it is Home's view of where you are. Every animated move is paced by `CameraPace`.
 enum HomeCamera {
     /// Where Home opens before it knows where you are, with no routes to show: Kuala Lumpur.
     static let fallback = MKCoordinateRegion(
@@ -62,6 +62,19 @@ enum HomeCamera {
         if let place { return place }
         guard follows, let here else { return nil }
         return around(here, bottomObscured: bottomObscured, topObscured: topObscured)
+    }
+
+    /// Where Close (Where to?, joining) or Back to trips takes the camera.
+    enum Back: Equatable {
+        /// The view around you: the list has no routes and the camera showed you (a fix may have come in meanwhile,
+        /// so the camera saved before can be the fallback).
+        case here
+        /// The camera saved before the flow or the pick.
+        case saved
+    }
+
+    static func back(hasRoutes: Bool, hereKnown: Bool, positionedByUser: Bool) -> Back {
+        !hasRoutes && hereKnown && !positionedByUser ? .here : .saved
     }
 
     /// What a position shows, for pacing: its region, or its camera; nil when it has neither (MapKit's own).

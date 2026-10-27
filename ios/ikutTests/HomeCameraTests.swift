@@ -141,4 +141,15 @@ struct HomeCameraTests {
         // It scales with the text size as the sheet does.
         #expect(HomeSheet.legalInset(.leftTrip, compact: 390) == 390 * HomeSheet.leftTripFraction + HomeSheet.detentExtra)
     }
+
+    /// Fresh install: the camera opened on the fallback, the first fix came in on Where to? and flew to you. Close
+    /// goes back to you, not to the fallback saved before (fixes within 550 m would never move it again).
+    @Test func closeOrBackReturnsToYouWhenTheListHasNoRoutes() {
+        #expect(HomeCamera.back(hasRoutes: false, hereKnown: true, positionedByUser: false) == .here)
+        // Routes on the list: the camera saved before (their fit).
+        #expect(HomeCamera.back(hasRoutes: true, hereKnown: true, positionedByUser: false) == .saved)
+        // Nothing known yet, or the person moved the map: where it was.
+        #expect(HomeCamera.back(hasRoutes: false, hereKnown: false, positionedByUser: false) == .saved)
+        #expect(HomeCamera.back(hasRoutes: false, hereKnown: true, positionedByUser: true) == .saved)
+    }
 }
