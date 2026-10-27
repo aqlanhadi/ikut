@@ -388,7 +388,7 @@ struct TripsHomeView: View {
 
     // MARK: Create flow
 
-    private var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow) }
+    private var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow, leftTripPicked: picked?.isLeft == true) }
 
     /// New trip's gates are through: Where to? takes over the sheet and the map.
     private func beginCreate() {
