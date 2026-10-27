@@ -268,10 +268,12 @@ struct LobbyMapLayer: View {
         let position = MapCameraPosition.region(region)
         if animated {
             stage.fly(to: position, view: CameraView(region: region), reduceMotion: reduceMotion)
-        } else if let flying = stage.flight.destination, CameraPace.isSmallAdjustment(from: flying, to: CameraView(region: region)) {
+        } else if CameraPace.decide(flyingTo: stage.flight.destination, seen: nil, to: CameraView(region: region)) == .hold {
             // A refit for the map's measured height while flying back from driving: land on it rather than cut the
             // flight short.
-            stage.flight.hold { withAnimation(.smooth(duration: CameraPace.minimum)) { stage.camera = position } }
+            stage.flight.hold { [reduceMotion] in
+                withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { stage.camera = position }
+            }
         } else {
             stage.place(position)
         }

@@ -100,6 +100,40 @@ struct CameraPaceTests {
         #expect(!CameraPace.isSmallAdjustment(from: street, to: johor))
     }
 
+    /// What arrives mid-flight on the driving map: the lobby-to-driving entry is in the air to your car.
+    @Test func midFlightAFollowStepOrARecentreWaitsAndAHazardTakesOver() {
+        let landing = street
+        // A follow step: 140 m on at 100 km/h.
+        let step = CameraView(latitude: landing.latitude + 0.00126, longitude: landing.longitude, latitudeSpan: landing.latitudeSpan)
+        #expect(CameraPace.decide(flyingTo: landing, seen: route, to: step) == .hold)
+        // The sheet folding: the aim moves a quarter of the view's height.
+        let recentre = CameraView(latitude: landing.latitude + landing.latitudeSpan / 4, longitude: landing.longitude,
+                                  latitudeSpan: landing.latitudeSpan)
+        #expect(CameraPace.decide(flyingTo: landing, seen: route, to: recentre) == .hold)
+        // The hazard approach: you and the debris 300 m ahead, framed tighter.
+        let hazard = CameraView(latitude: landing.latitude + 0.0014, longitude: landing.longitude, latitudeSpan: 0.01)
+        #expect(CameraPace.decide(flyingTo: landing, seen: route, to: hazard) == .fly)
+        // At rest: the follow step keeps the short glide, the hazard is paced.
+        #expect(CameraPace.decide(flyingTo: nil, seen: landing, to: step) == .nudge)
+        #expect(CameraPace.decide(flyingTo: nil, seen: landing, to: hazard) == .fly)
+        #expect(CameraPace.decide(flyingTo: nil, seen: nil, to: step) == .fly)
+    }
+
+    /// Review fix 5: the follow height re-aimed once the map's scale is read is held unless it's a whole halving off.
+    @Test func theFirstScaleReadingDoesNotRestartTheEntryFlight() {
+        let estimated = street
+        let measured = CameraView(latitude: street.latitude + 0.002, longitude: street.longitude, latitudeSpan: street.latitudeSpan * 1.6)
+        #expect(CameraPace.decide(flyingTo: estimated, seen: route, to: measured) == .fly)
+        #expect(CameraPace.decide(flyingTo: estimated, seen: route, to: measured, reaim: true) == .hold)
+        let wayOff = CameraView(latitude: street.latitude, longitude: street.longitude, latitudeSpan: street.latitudeSpan * 2.5)
+        #expect(CameraPace.decide(flyingTo: estimated, seen: route, to: wayOff, reaim: true) == .fly)
+    }
+
+    @Test func aHeldRefitEasesWithReduceMotion() {
+        #expect(CameraPace.nudgeAnimation(reduceMotion: true) == .easeInOut(duration: CameraPace.reduced))
+        #expect(CameraPace.nudgeAnimation(reduceMotion: false) == .smooth(duration: CameraPace.minimum))
+    }
+
     @Test func viewsComeFromRegionsAndCameras() {
         let region = MKCoordinateRegion(center: .init(latitude: 3, longitude: 101), span: .init(latitudeDelta: 0.5, longitudeDelta: 0.4))
         #expect(CameraView(region: region) == CameraView(latitude: 3, longitude: 101, latitudeSpan: 0.5))
@@ -140,7 +174,7 @@ struct CameraFlightTests {
         let rec = Recorder()
         flight.fly(to: .region(johor.region), view: johor, from: route, reduceMotion: false) { rec.set.append($0) }
         // Mid pull-out, the person asks for Ipoh: the Johor leg never runs.
-        #expect(flight.takesOver(ipoh))
+        #expect(CameraPace.decide(flyingTo: flight.destination, seen: route, to: ipoh) == .fly)
         flight.fly(to: .region(ipoh.region), view: ipoh, from: route, reduceMotion: false) { rec.set.append($0) }
         await waitUntil { !flight.isFlying }
         try? await Task.sleep(for: .milliseconds(100))
@@ -153,7 +187,7 @@ struct CameraFlightTests {
         let rec = Recorder()
         flight.fly(to: .region(johor.region), view: johor, from: route, reduceMotion: false) { rec.set.append($0) }
         let nudged = CameraView(latitude: johor.latitude + 0.001, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
-        #expect(!flight.takesOver(nudged))
+        #expect(CameraPace.decide(flyingTo: flight.destination, seen: route, to: nudged) == .hold)
         flight.hold { rec.set.append(.region(nudged.region)) }
         await waitUntil { !flight.isFlying }
         #expect(rec.set.suffix(2) == [.region(johor.region), .region(nudged.region)])
@@ -177,6 +211,25 @@ struct CameraFlightTests {
     }
 
     @Test func nothingIsInFlightToTakeOver() {
-        #expect(flight().takesOver(ipoh))
+        #expect(flight().destination == nil)
+        #expect(CameraPace.decide(flyingTo: flight().destination, seen: nil, to: ipoh) == .fly)
+    }
+
+    /// Review fix 1: a pan mid-flight ends it at once, so a Follow tap or a hazard after the pan runs, never held and
+    /// dropped at the landing.
+    @Test func aMoveAskedForAfterAPanRuns() async {
+        let flight = flight()
+        let rec = Recorder()
+        flight.fly(to: .region(johor.region), view: johor, from: route, reduceMotion: false,
+                   continues: { !rec.userMoved }) { rec.set.append($0) }
+        #expect(flight.isFlying)
+        rec.userMoved = true
+        #expect(!flight.isFlying)
+        // Follow, near the flight's landing: with the flight over it is paced from where the person left the map.
+        let follow = CameraView(latitude: johor.latitude + 0.001, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
+        #expect(CameraPace.decide(flyingTo: flight.destination, seen: route, to: follow) == .fly)
+        // And anything held runs now rather than at a landing that never comes.
+        flight.hold { rec.set.append(.region(follow.region)) }
+        #expect(rec.set.last == .region(follow.region))
     }
 }

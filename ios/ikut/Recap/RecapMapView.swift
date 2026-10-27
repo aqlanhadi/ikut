@@ -15,6 +15,8 @@ struct RecapMapView: View {
     @State private var index = 0
     @State private var camera: MapCameraPosition = .automatic
     @State private var flight = CameraFlight()
+    /// The camera as last drawn, mid-move or after a pan; outside observation so a move redraws nothing.
+    @State private var seen = CameraBox()
     /// The map's bottom safe area: up to the top of the stepper card, so the logo and Legal sit above it.
     @State private var legalReach: CGFloat = 0
     @State private var stepperTop: CGFloat = 0
@@ -26,7 +28,7 @@ struct RecapMapView: View {
 
     var body: some View {
         RecapRouteMap(recap: recap, snapshot: snapshot, interactive: true, selectedId: current?.id,
-                      legalInset: legalReach, camera: $camera)
+                      legalInset: legalReach, camera: $camera, onCamera: { seen.record($0, latitudeDelta: $1) })
             .ignoresSafeArea()
             .onGeometryChange(for: CGFloat.self, of: { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom }) { screenHeight = $0 }
             .overlay(alignment: .top) { header }
@@ -101,8 +103,13 @@ struct RecapMapView: View {
     private func step(to new: Int) {
         guard new != index, steps.indices.contains(new) else { return }
         let move = RecapLogic.stepMove(from: current?.coordinate, to: steps[new].coordinate)
-        // The map is moved by the steps (and the person's own pans): the step on screen is where the camera is.
-        let from = current?.coordinate.map { CameraView(region: Self.region(at: $0)) }
+        // From where the camera is: the landing of a flight still in the air, else the camera as drawn (after a pan
+        // too), else the step on screen.
+        let drawn = seen.seen.map {
+            CameraView(latitude: $0.camera.centerCoordinate.latitude, longitude: $0.camera.centerCoordinate.longitude,
+                       latitudeSpan: $0.latitudeDelta)
+        }
+        let from = flight.destination ?? drawn ?? current?.coordinate.map { CameraView(region: Self.region(at: $0)) }
         let cardMotion = reduceMotion ? Motion.reduced : Motion.camera(reduceMotion: false)
         withAnimation(cardMotion) { index = new }
         guard move == .fly, let center = steps[new].coordinate else {

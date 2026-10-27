@@ -206,7 +206,10 @@ struct TripMapView: View {
             .onChange(of: stage.reading, initial: true) { _, reading in measureCamera(reading) }
             // Any pan, pinch or rotate by the user hands the camera back to them.
             .onChange(of: stage.camera.positionedByUser) { _, byUser in
-                if byUser { model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode) }
+                // A pan ends a paced flight at once: nothing held lands on top of it.
+                guard byUser else { return }
+                stage.flight.cancel()
+                model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode)
             }
             .onChange(of: typeSize) { _, _ in
                 foldedContent = nil
@@ -282,7 +285,7 @@ struct TripMapView: View {
         guard fullHeight > 0, reading.distance > 0, reading.pitch == 0 else { return }
         let measured = latitudePerPointPerMeter
         latitudePerPointPerMeter = reading.latitudeDelta / Double(fullHeight) / reading.distance
-        if measured == 0 { move(to: model.cameraTarget, animated: true) }
+        if measured == 0 { move(to: model.cameraTarget, animated: true, reaim: true) }
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
@@ -328,21 +331,20 @@ struct TripMapView: View {
     /// Every camera move on the driving map. A nudge (a follow step, a re-centre for the sheet or a banner) keeps the
     /// short follow glide, and waits for a paced move in flight to land; anything bigger (into follow from the
     /// lobby, Fit, a hazard, a car) is paced by `CameraPace` and takes over whatever is in flight.
-    private func move(to target: CameraTarget?, animated: Bool) {
+    private func move(to target: CameraTarget?, animated: Bool, reaim: Bool = false) {
         guard let aimed = cameraRoom.target(target), let next = Self.position(for: aimed) else { return }
         guard animated else { stage.place(next); return }
         let view = cameraView(for: aimed)
         let nudge = { [stage, reduceMotion] in
             withAnimation(DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)) { stage.camera = next }
         }
-        if stage.flight.isFlying {
-            if stage.flight.takesOver(view) { stage.fly(to: next, view: view, reduceMotion: reduceMotion) } else { stage.flight.hold(nudge) }
-        } else if let from = stage.seenView, CameraPace.isSmallAdjustment(from: from, to: view) {
-            nudge()
-        } else {
-            stage.fly(to: next, view: view, reduceMotion: reduceMotion)
+        switch CameraPace.decide(flyingTo: stage.flight.destination, seen: stage.seenView, to: view, reaim: reaim) {
+        case .hold: stage.flight.hold(nudge)
+        case .nudge: nudge()
+        case .fly: stage.fly(to: next, view: view, reduceMotion: reduceMotion)
         }
     }
+
 
     // MARK: Top
 

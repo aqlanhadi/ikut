@@ -92,8 +92,9 @@ enum CameraPace {
     /// A pull-out that would move less than this is left out.
     static let skipWidths = 0.25
     static let skipHalvings = 0.3
-    /// Under these a change is a nudge (a follow step, a re-centre for a banner): it never takes over a flight.
-    static let nudgeWidths = 0.5
+    /// Under these a change is a nudge (a follow step; a re-centre for the sheet, up to a quarter of the view tall, 0.54
+    /// widths): it never takes over a flight.
+    static let nudgeWidths = 0.6
     static let nudgeHalvings = 0.5
 
     enum Curve: Equatable, Sendable {
@@ -140,6 +141,27 @@ enum CameraPace {
     /// Too small a change to pace as a move of its own: a follow step, a re-centre.
     static func isSmallAdjustment(from: CameraView, to: CameraView) -> Bool {
         travel(from: from, to: to) < nudgeWidths && zoom(from: from, to: to) < nudgeHalvings
+    }
+
+    /// What a move to `to` does now. `flyingTo`: the paced flight in the air (nil when none, or once the person has
+    /// taken the map); `seen`: the camera as last drawn. A nudge of the flight's landing waits for it (`hold`); a
+    /// nudge of a camera at rest keeps the short follow glide (`nudge`); anything else is paced and takes over
+    /// (`fly`). `reaim`: the same target re-aimed once the map's scale is known, held unless it is off by a whole
+    /// width or halving, so the first flight after launch isn't started again.
+    static func decide(flyingTo: CameraView?, seen: CameraView?, to: CameraView, reaim: Bool = false) -> Decision {
+        if let flyingTo {
+            if reaim, travel(from: flyingTo, to: to) < 1, zoom(from: flyingTo, to: to) < 1 { return .hold }
+            return isSmallAdjustment(from: flyingTo, to: to) ? .hold : .fly
+        }
+        if let seen, isSmallAdjustment(from: seen, to: to) { return .nudge }
+        return .fly
+    }
+
+    enum Decision: Equatable, Sendable { case nudge, hold, fly }
+
+    /// A nudge applied without pacing (a held refit): the shortest glide, or the Reduce Motion ease.
+    static func nudgeAnimation(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeInOut(duration: reduced) : .smooth(duration: minimum)
     }
 
     /// The pull-out: halfway between, tall enough to have both middles a margin in from its edges, and never closer
@@ -189,12 +211,18 @@ enum CameraPace {
 
 /// Runs one camera move at a time, leg after leg (`CameraPace`). A new move takes over the one in flight: its next
 /// leg never runs, and MapKit carries the camera on from wherever it is. A nudge during a flight (`hold`) waits for
-/// the landing instead of cutting it short. A placement without animation (`cancel`) or a gesture (`continues`
-/// turning false) ends the flight where it is.
+/// the landing instead of cutting it short (`CameraPace.decide`). A placement without animation (`cancel`) or a
+/// gesture (`continues` turning false) ends the flight where it is, at once.
 @MainActor
 final class CameraFlight {
-    /// The view the flight in progress lands on; nil when nothing is flying.
-    private(set) var destination: CameraView?
+    /// The view the flight in progress lands on; nil when nothing is flying, and from the moment the person takes
+    /// the map (`continues` false), so a move asked for after a pan always runs.
+    var destination: CameraView? {
+        guard let flyingTo, continues() else { return nil }
+        return flyingTo
+    }
+    private var flyingTo: CameraView?
+    private var continues: @MainActor () -> Bool = { true }
     private var task: Task<Void, Never>?
     private var held: (() -> Void)?
     private let timeScale: Double
@@ -203,12 +231,6 @@ final class CameraFlight {
     init(timeScale: Double = 1) { self.timeScale = timeScale }
 
     var isFlying: Bool { destination != nil }
-
-    /// Whether a move to `view` should take over the flight in progress, rather than wait for it (`hold`).
-    func takesOver(_ view: CameraView) -> Bool {
-        guard let destination else { return true }
-        return !CameraPace.isSmallAdjustment(from: destination, to: view)
-    }
 
     /// Flies to `position` (which shows `view`) from `from`. The first leg is set at once, in the caller's
     /// transaction; the rest follow each other's end. `continues` is asked before each later leg (false: the person
@@ -221,23 +243,25 @@ final class CameraFlight {
         func target(of index: Int) -> MapCameraPosition {
             index == legs.count - 1 ? position : .region(legs[index].to.region)
         }
-        destination = view
+        flyingTo = view
+        self.continues = continues
         withAnimation(CameraPace.animation(legs[0])) { set(target(of: 0)) }
         let scale = timeScale
         task = Task { [weak self] in
             for index in legs.indices {
                 try? await Task.sleep(for: .seconds(legs[index].duration * scale))
                 guard !Task.isCancelled else { return }
-                guard continues() else { self?.land(runningHeld: false); return }
+                guard continues() else { self?.cancel(); return }
                 if index + 1 < legs.count {
                     withAnimation(CameraPace.animation(legs[index + 1])) { set(target(of: index + 1)) }
                 }
             }
-            self?.land(runningHeld: true)
+            self?.land()
         }
     }
 
-    /// Runs `apply` once the flight lands (the latest one only), or now when nothing is flying.
+    /// Runs `apply` once the flight lands (the latest one only), or now when nothing is flying (or the person has
+    /// taken the map).
     func hold(_ apply: @escaping () -> Void) {
         if isFlying { held = apply } else { apply() }
     }
@@ -246,14 +270,16 @@ final class CameraFlight {
     func cancel() {
         task?.cancel()
         task = nil
-        destination = nil
+        flyingTo = nil
+        continues = { true }
         held = nil
     }
 
-    private func land(runningHeld: Bool) {
-        let apply = runningHeld ? held : nil
+    private func land() {
+        let apply = held
         task = nil
-        destination = nil
+        flyingTo = nil
+        continues = { true }
         held = nil
         apply?()
     }
