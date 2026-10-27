@@ -206,18 +206,7 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
 
     private func joinAndOpenMap(code: String, name: String) throws {
         openJoinForm(code: code, name: name, homeTimeout: 20)
-
-        let newCar = button(beginningWith: "A new car")
-        XCTAssertTrue(newCar.waitForExistence(timeout: 20), "Trip preview didn't load (is the code right and the emulator up?)")
-
-        let joinNameField = app.textFields["Your name"]
-        if joinNameField.exists, (joinNameField.value as? String) != name { replaceText(in: joinNameField, with: name) }
-
-        newCar.tap()
-        let carName = app.textFields["Car name"]
-        if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
-
-        app.buttons["Join trip"].tap()
+        chooseCarAndJoin(carName: "\(name)'s car", timeout: 20)
         XCTAssertTrue(waitForLobby(timeout: 20), "Didn't reach the lobby")
 
         // Tracking starts in the lobby; the Always explainer may come up once it does.

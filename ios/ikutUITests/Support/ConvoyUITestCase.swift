@@ -304,7 +304,8 @@ class ConvoyUITestCase: XCTestCase {
         return code
     }
 
-    /// Welcome or Home to the join form with `code` typed in (the name sheet comes first when signed out).
+    /// Welcome or Home to the join sheet's car step for `code`: the code typed in, the trip found, Continue (the name
+    /// sheet comes first when signed out).
     func openJoinForm(code: String, name: String, homeTimeout: TimeInterval = 30) {
         returnHomeFromAnOpenTrip()
         // Home's row, or Welcome's link on a fresh install.
@@ -314,23 +315,36 @@ class ConvoyUITestCase: XCTestCase {
         joinButton.tap()
         enterNameIfAsked(name)
         let codeField = app.textFields["Trip code"]
-        XCTAssertTrue(codeField.waitForExistence(timeout: 15), "Join screen didn't show the code field")
+        XCTAssertTrue(codeField.waitForExistence(timeout: 15), "Join sheet didn't show the code field")
         codeField.tap()
         codeField.typeText(code)
+        let next = app.buttons["joinContinue"]
+        XCTAssertTrue(next.waitForExistence(timeout: 30), "Trip preview didn't load for \(code) (is the code right and the emulator up?)")
+        next.tap()
     }
 
-    /// Home (or Welcome) to the lobby of `code`, as a new car named "<name>'s car".
+    /// On the car step: picks `tile` (a car whose label contains it) as a passenger, or my own car named `carName`, then Join.
+    /// `sharing`: the "Share this car’s location" switch for an existing car; nil leaves what the car's own state set.
+    func chooseCarAndJoin(ridingIn tile: String? = nil, carName: String, sharing: Bool? = nil, timeout: TimeInterval = 30) {
+        let choice = tile.map { app.buttons.matching(NSPredicate(format: "label CONTAINS %@", $0)).firstMatch }
+            ?? button(beginningWith: "My own car")
+        XCTAssertTrue(choice.waitForExistence(timeout: timeout), "The car step didn't show \(tile ?? "My own car")")
+        choice.tap()
+        if tile == nil {
+            let field = app.textFields["Car name"]
+            if field.waitForExistence(timeout: 5) { replaceText(in: field, with: carName) }
+        } else if let sharing {
+            let share = app.switches["joinShare"]
+            XCTAssertTrue(share.waitForExistence(timeout: 5), "The car step showed no share switch for \(tile ?? "")")
+            if (share.value as? String == "1") != sharing { share.tap() }
+        }
+        app.buttons["joinConfirm"].tap()
+    }
+
+    /// Home (or Welcome) to the lobby of `code`, as my own car named "<name>'s car".
     func join(code: String, name: String) throws {
         openJoinForm(code: code, name: name)
-        let newCar = button(beginningWith: "A new car")
-        XCTAssertTrue(newCar.waitForExistence(timeout: 30), "Trip preview didn't load for \(code) (is the code right and the emulator up?)")
-        let joinNameField = app.textFields["Your name"]
-        if joinNameField.exists, (joinNameField.value as? String) != name { replaceText(in: joinNameField, with: name) }
-        newCar.tap()
-        let carName = app.textFields["Car name"]
-        if carName.waitForExistence(timeout: 5) { replaceText(in: carName, with: "\(name)'s car") }
-
-        app.buttons["Join trip"].tap()
+        chooseCarAndJoin(carName: "\(name)'s car")
         XCTAssertTrue(waitForLobby(timeout: 30), "Didn't reach the lobby")
     }
 }
