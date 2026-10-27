@@ -216,8 +216,11 @@ class ConvoyUITestCase: XCTestCase {
             confirm.element(boundBy: confirm.count - 1).tap()
             if label == "End trip" { closeRecap() }
         } else if back.exists {
-            dismissAlwaysExplainerIfShown()
-            back.tap()
+            // Tracking starts as the lobby opens, and the Always explainer comes up once a moment later, with the
+            // lobby's sheet stepping aside for it: wait for it and answer it first, then tap Back on the sheet.
+            let notNow = app.buttons["Not now"]
+            if notNow.waitForExistence(timeout: 5) { notNow.tap() }
+            if back.waitForExistence(timeout: 10) { back.tap() }
         }
         if !home.waitForExistence(timeout: 15) {
             print("QA: no Home after closing the open trip:\n\(app.debugDescription)")
