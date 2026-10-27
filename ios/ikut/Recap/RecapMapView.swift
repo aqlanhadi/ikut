@@ -9,9 +9,12 @@ struct RecapMapView: View {
     var recap: Recap
     var snapshot: RecapSnapshot
     var onClose: () -> Void
+    /// The camera tour (`IKUT_SCREEN=camera-tour`) steps the map from outside.
+    var tourStep: Int? = nil
 
     @State private var index = 0
     @State private var camera: MapCameraPosition = .automatic
+    @State private var flight = CameraFlight()
     /// The map's bottom safe area: up to the top of the stepper card, so the logo and Legal sit above it.
     @State private var legalReach: CGFloat = 0
     @State private var stepperTop: CGFloat = 0
@@ -33,6 +36,7 @@ struct RecapMapView: View {
             .onChange(of: stepperTop) { _, _ in
                 legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
             }
+            .onChange(of: tourStep) { _, step in if let step { self.step(to: min(step, steps.count - 1)) } }
             .onChange(of: screenHeight) { _, _ in
                 legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
             }
@@ -92,21 +96,28 @@ struct RecapMapView: View {
     }
 
     /// One step: the card's text and height change on the camera's motion (a fade with Reduce Motion), and the
-    /// camera glides there on the same clock, or jumps when it is far or Reduce Motion is on.
+    /// camera flies there at the pace of `CameraPace`: a glide to a step nearby, out-across-and-in to a far one. A step
+    /// without a place, from or to, jumps.
     private func step(to new: Int) {
         guard new != index, steps.indices.contains(new) else { return }
-        let move = RecapLogic.stepMove(from: current?.coordinate, to: steps[new].coordinate, span: Self.span)
+        let move = RecapLogic.stepMove(from: current?.coordinate, to: steps[new].coordinate)
+        // The map is moved by the steps (and the person's own pans): the step on screen is where the camera is.
+        let from = current?.coordinate.map { CameraView(region: Self.region(at: $0)) }
         let cardMotion = reduceMotion ? Motion.reduced : Motion.camera(reduceMotion: false)
         withAnimation(cardMotion) { index = new }
-        let target = steps[new].coordinate.map {
-            MapCameraPosition.region(MKCoordinateRegion(center: $0, span: MKCoordinateSpan(latitudeDelta: Self.span, longitudeDelta: Self.span)))
-        } ?? .automatic
-        if move == .glide {
-            withAnimation(Motion.camera(reduceMotion: reduceMotion)) { camera = target }
-        } else {
+        guard move == .fly, let center = steps[new].coordinate else {
+            flight.cancel()
             var t = Transaction(); t.disablesAnimations = true
-            withTransaction(t) { camera = target }
+            withTransaction(t) { camera = steps[new].coordinate.map { .region(Self.region(at: $0)) } ?? .automatic }
+            return
         }
+        let region = Self.region(at: center)
+        flight.fly(to: .region(region), view: CameraView(region: region), from: from, reduceMotion: reduceMotion,
+                   continues: { camera.positionedByUser == false }) { camera = $0 }
+    }
+
+    private static func region(at center: CLLocationCoordinate2D) -> MKCoordinateRegion {
+        MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span))
     }
 
     private static let span = 0.15

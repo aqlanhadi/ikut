@@ -408,6 +408,8 @@ enum DemoScreens {
                     }
             })
         // The recap's full-screen route map, with the step card over its bottom (Q15: Legal sits above the card).
+        // D57: the camera's long and short hops on the driving map, then the recap map's steps, looping.
+        case "camera-tour": return AnyView(CameraTourDemo().environment(LocationPermission()).environment(AuthModel()))
         case "recap-map":
             let model = RecapModel(snapshot: .demo(), originName: "Tanjung Malim")
             if let recap = model.recap, let snapshot = model.snapshot {

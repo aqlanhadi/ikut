@@ -313,12 +313,34 @@ struct TripMapView: View {
         }
     }
 
+    /// The view `target` shows, for pacing: a follow camera's height from the map's own scale once it is read.
+    private func cameraView(for target: CameraTarget) -> CameraView {
+        switch target {
+        case .follow(let center, let distance):
+            return CameraView(center: center.clCoordinate, distance: distance,
+                              latitudePerMeter: latitudePerPointPerMeter * Double(mapFullHeight))
+        case .fit(let region):
+            return CameraView(latitude: region.center.latitude, longitude: region.center.longitude,
+                              latitudeSpan: region.latitudeSpan)
+        }
+    }
+
+    /// Every camera move on the driving map. A nudge (a follow step, a re-centre for the sheet or a banner) keeps the
+    /// short follow glide, and waits for a paced move in flight to land; anything bigger (into follow from the
+    /// lobby, Fit, a hazard, a car) is paced by `CameraPace` and takes over whatever is in flight.
     private func move(to target: CameraTarget?, animated: Bool) {
-        guard let next = Self.position(for: cameraRoom.target(target)) else { return }
-        if animated {
+        guard let aimed = cameraRoom.target(target), let next = Self.position(for: aimed) else { return }
+        guard animated else { stage.place(next); return }
+        let view = cameraView(for: aimed)
+        let nudge = { [stage, reduceMotion] in
             withAnimation(DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)) { stage.camera = next }
+        }
+        if stage.flight.isFlying {
+            if stage.flight.takesOver(view) { stage.fly(to: next, view: view, reduceMotion: reduceMotion) } else { stage.flight.hold(nudge) }
+        } else if let from = stage.seenView, CameraPace.isSmallAdjustment(from: from, to: view) {
+            nudge()
         } else {
-            stage.camera = next
+            stage.fly(to: next, view: view, reduceMotion: reduceMotion)
         }
     }
 
