@@ -318,12 +318,12 @@ private struct BannerGallery: View {
 /// `IKUT_SCREEN=slot-*`: one state of the banner slot each (MapBannerSlot.dc.html), on the demo map. Nothing speaks.
 /// `slot-hazard-stop-waiting` (frame a: the hazard shows, the stop approach waits), `slot-stop-approach` (b),
 /// `slot-stop-request` (b2), `slot-paused` (c), `slot-catchup` (d), `slot-route-notice` (d2), `slot-passed` (e),
-/// `slot-undo-toast` (f), `slot-error` (g), `slot-error-held` (i: the hazard shows, a red dot on the trip pill).
+/// `slot-undo-toast` (f), `slot-toast-over-pill` (D60), `slot-error` (g), `slot-error-held` (i: the hazard shows, a red dot on the trip pill).
 @MainActor
 enum BannerSlotDemo {
     static let names = [
         "slot-hazard-stop-waiting", "slot-stop-approach", "slot-stop-request", "slot-paused", "slot-catchup",
-        "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-error", "slot-error-held",
+        "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-toast-over-pill", "slot-error", "slot-error-held",
     ]
 
     private static let errorLine = "Couldn’t reach the convoy. Try again in a moment."
@@ -341,6 +341,10 @@ enum BannerSlotDemo {
             let toast = ReportToastModel()
             toast.showForDemo(.reported(label: "debris", eventId: "demo-debris"))
             return AnyView(map(toast: toast))
+        case "slot-toast-over-pill":  // D60: the report toast over the planned-stop approach pill
+            let toast = ReportToastModel()
+            toast.showForDemo(.reported(label: "debris", eventId: "demo-debris"))
+            return AnyView(map(plannedStop: true, toast: toast))
         case "slot-error": return AnyView(map(error: errorLine))
         case "slot-error-held": return AnyView(map(approach: true, error: errorLine))
         default: return nil

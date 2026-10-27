@@ -147,6 +147,19 @@ struct ReportToastModelTests {
         #expect(toast.submittedCount == 1)
     }
 
+    /// D60: the haptics are driven by these counts from the map's always-mounted banner slot, not by the toast view,
+    /// so a report made while a hazard or stop request has the slot still taps, succeeds or fails; Undo works too.
+    @Test func hapticCountsMoveWithNoToastViewAndUndoStillWorks() async {
+        let service = FakeReportService()
+        let toast = model(service)
+        await toast.submit(debris(), context: context, snapshot: snapshot).value
+        #expect(toast.submittedCount == 1 && toast.reportedCount == 1 && toast.failureCount == 0)
+        #expect(BannerSlot.resolve(present: [.hazardApproach, .toast]).shown == .hazardApproach)
+        #expect(toast.isUndoAvailable)
+        await toast.undo()
+        #expect(service.undone.count == 1)
+    }
+
     @Test func reportFailureIsSurfaced() async {
         let service = FakeReportService()
         service.failReport = URLError(.notConnectedToInternet)
