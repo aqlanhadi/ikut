@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, isEventPastGrace, shouldPurgeTripData } from "../src/retention.ts";
-import { decodePolyline, encodePolyline, simplifiedRoute } from "../src/previewRoute.ts";
+import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
 import { normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
@@ -144,6 +144,46 @@ describe("simplifiedRoute", () => {
     const d = Math.hypot((first.latitude - 3) * 111_320, (first.longitude - 101.7) * 111_320 * Math.cos((3 * Math.PI) / 180));
     assert.ok(Math.abs(d - 3000) < 5, String(d));
     assert.equal(simplifiedRoute(encodePolyline(line.slice(0, 15))), "");
+  });
+  describe("never near the organiser's own start", () => {
+    const HOME = { latitude: 3, longitude: 101.5 };
+    const m = (a: { latitude: number; longitude: number }) =>
+      Math.hypot((a.latitude - HOME.latitude) * 111_320, (a.longitude - HOME.longitude) * 111_320 * Math.cos((3 * Math.PI) / 180));
+    const north = (km: number, east = 0) => ({ latitude: HOME.latitude + (km * 1000) / 111_320, longitude: HOME.longitude + east / 111_320 });
+    const dense = (path: Array<{ latitude: number; longitude: number }>) => {
+      const out = [path[0]];
+      for (let i = 1; i < path.length; i++) {
+        for (let s = 1; s <= 20; s++) {
+          out.push({
+            latitude: path[i - 1].latitude + ((path[i].latitude - path[i - 1].latitude) * s) / 20,
+            longitude: path[i - 1].longitude + ((path[i].longitude - path[i - 1].longitude) * s) / 20,
+          });
+        }
+      }
+      return out;
+    };
+    it("a loop back past the start", () => {
+      const loop = dense([HOME, { latitude: 3, longitude: 101.5 + 1500 / (111_320 * Math.cos((3 * Math.PI) / 180)) }, { latitude: 3 + 150 / 111_320, longitude: 101.5 }, north(10.15)]);
+      const pts = decodePolyline(simplifiedRoute(encodePolyline(loop)));
+      assert.ok(pts.length >= 2);
+      for (const p of pts) assert.ok(m(p) > 500, String(m(p)));
+    });
+    it("a zigzag in the first 3.5 km", () => {
+      const zig = dense([HOME, north(0.5, 300), north(0.9, -300), north(1.3, 300), north(1.7, -300), north(2.1, 300), north(2.6, -250), north(3.5), north(12)]);
+      const pts = decodePolyline(simplifiedRoute(encodePolyline(zig)));
+      assert.ok(pts.length >= 2);
+      for (const p of pts) assert.ok(m(p) > 500, String(m(p)));
+    });
+    it("a straight line still starts exactly 3 km in", () => {
+      const pts = decodePolyline(simplifiedRoute(encodePolyline(dense([HOME, north(10)]))));
+      assert.ok(Math.abs(m(pts[0]) - 3000) < 5, String(m(pts[0])));
+    });
+    it("sends nothing when less than 3 km is left after the cut", () => {
+      assert.equal(simplifiedRoute(encodePolyline(dense([HOME, north(5), north(0.2), north(2.5, 2000)]))), "");
+    });
+  });
+  it("routeFrom with an offset past the end gives nothing", () => {
+    assert.deepEqual(routeFrom([{ latitude: 3, longitude: 101 }, { latitude: 3.1, longitude: 101 }], 99_999), []);
   });
   it("keeps the ends, drops points on a straight line and round-trips", () => {
     const out = decodePolyline(simplifiedRoute(encodePolyline(line)));

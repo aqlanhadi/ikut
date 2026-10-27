@@ -337,7 +337,8 @@ describe("previewTrip (emulator)", () => {
       it(`starts at the meeting point${left ? " even after it was left" : ""}`, async () => {
         const { tripRef } = await seedTrip();
         await tripRef.update({ route: encodePolyline(line(100)) });
-        const meet = new GeoPoint(3.0, 101.5);
+        // Maps snaps the start to a road, a few tens of metres off the line's first vertex.
+        const meet = new GeoPoint(3.0002, 101.5003);
         await tripRef.collection("stops").doc("m").set({
           name: "Petronas", kind: "meet", coordinate: meet, routeOffset: 0, order: 0, meetAt: Timestamp.now(),
           ...(left ? { leftAt: Timestamp.now(), leftBy: "someone" } : {}),

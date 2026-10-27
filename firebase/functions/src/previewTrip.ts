@@ -64,7 +64,7 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
   const meetDoc = stopsSnap.docs.map((d) => d.data() as PlannedStop).filter((s) => s.kind === "meet").sort((a, b) => a.order - b.order)[0];
   const mc = meetDoc?.coordinate;
   const route = simplifiedRoute(trip.route, {
-    meet: meetDoc && typeof meetDoc.routeOffset === "number"
+    meet: meetDoc && Number.isFinite(meetDoc.routeOffset)
       ? { routeOffset: meetDoc.routeOffset, ...(mc && typeof mc.latitude === "number" && typeof mc.longitude === "number" ? { coordinate: { latitude: mc.latitude, longitude: mc.longitude } } : {}) }
       : undefined,
   });

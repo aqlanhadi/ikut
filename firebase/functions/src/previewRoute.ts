@@ -122,6 +122,47 @@ export function routeFrom(points: LatLng[], startMeters: number, first?: LatLng,
   return [at, ...points.slice(i)];
 }
 
+export const ROUTE_HOME_CIRCLE_METERS = 1_000;
+
+/** Meters along the line where it last leaves the circle of `radius` round its first point; 0 when it never goes outside. */
+export function lastExitOffset(points: LatLng[], radius = ROUTE_HOME_CIRCLE_METERS): number {
+  if (points.length < 2) return 0;
+  const o = points[0];
+  const k = 111_320;
+  const cos = Math.cos((o.latitude * Math.PI) / 180);
+  const flat = (p: LatLng) => ({ x: (p.longitude - o.longitude) * cos * k, y: (p.latitude - o.latitude) * k });
+  let along = 0;
+  let exit = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = flat(points[i - 1]);
+    const b = flat(points[i]);
+    const seg = metersBetween(points[i - 1], points[i]);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const qa = dx * dx + dy * dy;
+    if (qa > 0 && Math.hypot(b.x, b.y) > radius) {
+      const qb = 2 * (a.x * dx + a.y * dy);
+      const qc = a.x * a.x + a.y * a.y - radius * radius;
+      const disc = qb * qb - 4 * qa * qc;
+      // Larger root: where this segment leaves the circle (0 if it starts outside and never touches it).
+      const t = disc >= 0 ? (-qb + Math.sqrt(disc)) / (2 * qa) : -1;
+      if (t >= 0 && t <= 1) exit = along + t * seg;
+    }
+    along += seg;
+  }
+  return exit;
+}
+
+/** No meeting point: start 3 km in, or where the line last leaves a 1 km circle round its first point if later; under 3 km left, nothing. */
+function cutOwnStart(points: LatLng[]): LatLng[] {
+  const start = Math.max(ROUTE_LEAD_CUT_METERS, lastExitOffset(points));
+  const out = routeFrom(points, start, undefined, ROUTE_MIN_METERS);
+  if (out.length < 2) return [];
+  let rest = 0;
+  for (let i = 1; i < out.length; i++) rest += metersBetween(out[i - 1], out[i]);
+  return rest < ROUTE_LEAD_CUT_METERS ? [] : out;
+}
+
 /** The main route as a precision-5 polyline of at most `maxPoints` points, widening the tolerance until it fits; "" when unreadable. */
 export function simplifiedRoute(
   encoded: unknown,
@@ -134,7 +175,7 @@ export function simplifiedRoute(
   // The line never starts at anyone's own start: at the meeting point, or 3 km in; under 6 km there is no line.
   points = meet
     ? routeFrom(points, Math.max(0, meet.routeOffset), meet.coordinate, ROUTE_MIN_METERS)
-    : routeFrom(points, ROUTE_LEAD_CUT_METERS, undefined, ROUTE_MIN_METERS);
+    : cutOwnStart(points);
   if (points.length < 2) return "";
   let tol = toleranceMeters;
   points = simplify(points, tol);
