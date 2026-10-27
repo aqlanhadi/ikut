@@ -201,6 +201,45 @@ final class CreateTripUITests: ConvoyUITestCase {
         XCTAssertTrue(home.waitForExistence(timeout: 30), "After ending the trip, Home didn't come back")
     }
 
+    /// Relaunch before Start (#401, D54): a trip created and left in its lobby, the app terminated and launched again,
+    /// opens straight in that lobby (Home never shows first); Back to trips then returns to Home.
+    func testRelaunchOpensTheLobbyOfATripNotStarted() throws {
+        app = XCUIApplication()
+        allowPermissionPrompts()
+        app.launch()
+        startNewTrip(as: "Organizer", homeTimeout: 15)
+        let search = app.textFields["Destination"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
+        search.tap()
+        search.typeText("Ipoh")
+        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
+        result.tap()
+        tapCreateTrip()
+        XCTAssertTrue(waitForLobby(timeout: 30), "Create trip didn't open the lobby")
+
+        app.terminate()
+        app.launch()
+        let home = app.buttons["homeWhereTo"]
+        let startTrip = app.buttons["Start trip"]
+        let deadline = Date().addingTimeInterval(30)
+        var sawHome = false
+        // Existence only while waiting: mid-transition a button can exist with no frame, and asking if it is
+        // hittable then fails the test.
+        while Date() < deadline, !startTrip.exists {
+            if home.exists { sawHome = true }
+            dismissAlwaysExplainerIfShown()
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        add(XCTAttachment(screenshot: app.screenshot()))
+        XCTAssertTrue(waitForLobby(timeout: 15), "Relaunch didn't open the lobby")
+        XCTAssertFalse(sawHome, "Home showed before the lobby on relaunch")
+        XCTAssertFalse(app.drivingReport.exists, "Relaunch before Start opened the driving map")
+
+        app.buttons["lobby.back"].tap()
+        XCTAssertTrue(home.waitForExistence(timeout: 15), "Back to trips didn't return to Home")
+    }
+
     private func waitForGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
         return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
