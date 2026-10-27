@@ -24,7 +24,7 @@
 // Options: --kmh N (default 90), --a-udid, --b-udid, --derived-data (default /tmp/ikut-dd-convoy2), --skip-build,
 // --host (emulators, default 127.0.0.1), --ask-location (phone B starts without location permission and answers
 // the system prompt in the UI), --deadline S (stop with RESULT: ABORT after S s; default 1800, plus 1800 for a
-// build). Screenshots: qa/screens/convoy2/. Logs: $TMPDIR/ikut-qa/convoy2-*.log. It holds both simulators while it
+// build). Screenshots: qa/screens/convoy2/ (--screens DIR). Logs: $TMPDIR/ikut-qa/convoy2-*.log (--logs DIR). It holds both simulators while it
 // runs (qa/simlock.sh), and the log always ends in one `RESULT: PASS|FAIL|ABORT` line.
 
 import { spawnSync } from 'node:child_process';
@@ -62,6 +62,8 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a === '--host') o.host = next();
   else if (a === '--ask-location') o.askLocation = true;
   else if (a === '--deadline') o.deadline = Number(next());
+  else if (a === '--logs') o.logs = next();
+  else if (a === '--screens') o.screens = next();
   else if (a === '-h' || a === '--help') { console.log(spawnSync('sed', ['-n', '2,28p', process.argv[1]], { encoding: 'utf8' }).stdout); process.exit(0); }
   else { console.error(`unknown option ${a}`); process.exit(64); }
 }
