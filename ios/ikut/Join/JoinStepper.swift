@@ -175,7 +175,8 @@ enum JoinSteps {
 
     /// The main button of the car step: "Join Aqlan’s Myvi as Nurul", "Join in my own car as Nurul", or plain
     /// "Join trip" before a car is picked.
-    static func joinLabel(car: PreviewCar?, ownCar: Bool, firstName: String) -> String {
+    static func joinLabel(car: PreviewCar?, ownCar: Bool, firstName: String, coPilot: Bool = false) -> String {
+        if coPilot { return car.map { "Join \($0.name) as co-pilot" } ?? "Join as co-pilot" }
         let suffix = firstName.isEmpty ? "" : " as \(firstName)"
         if let car { return "Join \(car.name)\(suffix)" }
         if ownCar { return "Join in my own car\(suffix)" }

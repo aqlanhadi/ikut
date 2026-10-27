@@ -370,4 +370,12 @@ struct JoinStepperTests {
         _ = await s.model.join(sharing: false)
         #expect(spy.tracker == false, "my own car still made, with no tracker")
     }
+
+    @Test func theButtonSaysCoPilotWhileTheLineShows() {
+        #expect(JoinSteps.joinLabel(car: myvi, ownCar: false, firstName: "Nurul", coPilot: true) == "Join Aqlan’s Myvi as co-pilot")
+        #expect(JoinSteps.joinLabel(car: nil, ownCar: true, firstName: "Nurul", coPilot: true) == "Join as co-pilot")
+        // Allowed in Settings: no note, so the button is the sharing one again.
+        #expect(JoinSteps.tracker(wantsToShare: true, authorization: .whenInUse).note == nil)
+        #expect(JoinSteps.joinLabel(car: myvi, ownCar: false, firstName: "Nurul", coPilot: false) == "Join Aqlan’s Myvi as Nurul")
+    }
 }

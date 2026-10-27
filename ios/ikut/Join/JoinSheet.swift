@@ -20,7 +20,8 @@ struct JoinSheet: View {
     /// The name is being signed in, or iOS's location prompt is up.
     @State private var isWorking = false
     @State private var nameError: String?
-    @State private var locationNote: String?
+    /// iOS was asked on the Join tap and refused: the line shows and the next tap joins as the co-pilot.
+    @State private var refusedOnTap = false
 
     init(stepper: JoinStepper, onClose: @escaping () -> Void, onJoined: @escaping (_ tripId: String) -> Void) {
         self.stepper = stepper
@@ -225,27 +226,35 @@ struct JoinSheet: View {
     private var firstName: String { (try? DisplayName.validate(model.displayName).get()) ?? model.displayName }
 
     private var joinLabel: String {
-        JoinSteps.joinLabel(car: model.selectedCar, ownCar: model.selection == .newCar, firstName: firstName)
+        JoinSteps.joinLabel(car: model.selectedCar, ownCar: model.selection == .newCar, firstName: firstName,
+                            coPilot: locationOffLine != nil)
     }
 
-    /// Sharing wanted (my own car, or the switch on) needs location: ask iOS on this tap; if it is still refused, join
-    /// as the co-pilot with the line saying why, never stuck.
+    private var wantsToShare: Bool { model.selection == .newCar || model.tracker }
+
+    /// Sharing wanted needs location: ask iOS on this tap. Refused on this tap: stay here with the line and the button
+    /// saying Join as co-pilot, and the next tap joins. Already denied before the tap: the line was showing, so it joins.
     private func join() {
         Task {
-            let wants = model.selection == .newCar || model.tracker
+            let lineShown = locationOffLine != nil
             var status = location.status
-            if wants, status == .notDetermined { status = await location.requestWhenInUse() }
-            let decision = JoinSteps.tracker(wantsToShare: wants, authorization: status)
-            locationNote = decision.note
+            if wantsToShare, status == .notDetermined { status = await location.requestWhenInUse() }
+            let decision = JoinSteps.tracker(wantsToShare: wantsToShare, authorization: status)
+            if decision.note != nil, !lineShown {
+                refusedOnTap = true
+                return
+            }
+            refusedOnTap = false
             if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId) }
         }
     }
 
-    /// Shown above Join when sharing is wanted but iOS already said no, and after a refusal on this tap.
+    /// The co-pilot line: while sharing is wanted and location is not allowed, after a refusal on the tap or when iOS
+    /// already said no. Allowing it in Settings turns it off again (the status refreshes when the app comes back).
     private var locationOffLine: String? {
-        let wants = model.selection == .newCar || model.tracker
-        if let locationNote { return locationNote }
-        return location.status == .denied ? JoinSteps.tracker(wantsToShare: wants, authorization: .denied).note : nil
+        let decision = JoinSteps.tracker(wantsToShare: wantsToShare, authorization: location.status)
+        guard refusedOnTap || location.status == .denied else { return nil }
+        return decision.note
     }
 
     // MARK: H3 Code
