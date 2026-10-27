@@ -16,7 +16,7 @@ An iOS app that keeps a group of cars traveling together in sync: a live convoy 
 
 ```sh
 cd firebase
-firebase emulators:start   # Auth :9099, Firestore :8080, UI http://localhost:4000
+firebase emulators:start   # Auth :9099, Firestore :8080, Functions :5001, UI http://localhost:4000
 ```
 
 Needs the Firebase CLI and Java 21 on `PATH`.
@@ -63,29 +63,32 @@ TTL does not cover positions, so the scheduled function remains the only thing t
 
 ```sh
 cd ios
-xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -collect-test-diagnostics never
-# Include the emulator integration tests (start the Auth emulator first):
-TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -collect-test-diagnostics never
+xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -collect-test-diagnostics never -only-testing:ikutTests   # unit suite, about 1.5 min
+# Include the emulator integration tests (start the emulators first):
+TEST_RUNNER_IKUT_EMULATOR_TESTS=1 xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -collect-test-diagnostics never -only-testing:ikutTests
 ```
+
+Without `-only-testing` the scheme also runs every UI suite on the simulator. Add `-only-testing:ikutUITests/<suite>` for one:
+`CreateTripUITests` takes about 5 min, `LobbyStopsUITests` about 1.
 
 Shared test code lives in `ios/ikutTests/Support/` (`Fixtures.swift`: the clock, `Trip.fixture`, `waitUntil`, `EmulatorTrip.make` and the
 `.emulator` suite trait; `Fakes.swift`: the tracking and car-route fakes) and `ios/ikutUITests/Support/ConvoyUITestCase.swift` (waits,
 screenshots, name sheet, New Trip and join flows). Add to those before copying a helper into a second test file.
 
 A simulator can stand in for a second person. This UI test signs in and joins an existing
-trip with a new car (it's skipped unless a code is given):
+trip with a new car (it's skipped unless a code is given; about 1 min):
 
 ```sh
 TEST_RUNNER_IKUT_JOIN_CODE=Y5REFN TEST_RUNNER_IKUT_JOIN_NAME=Wyna \
-  xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -collect-test-diagnostics never -only-testing:ikutUITests
+  xcodebuild test -scheme ikut -destination 'platform=iOS Simulator,id=C0A40D2A-0607-4B95-A1BE-F8C9190D81C1' -collect-test-diagnostics never -only-testing:ikutUITests/ConvoyScenarioUITests/testFifthCarInSimulatedConvoy
 ```
 
-Multi-car simulated drives (4 scripted cars plus a real simulator as the fifth) are in [`qa/`](qa/README.md).
+Multi-car simulated drives (4 scripted cars plus a real simulator as the fifth), the two-phone run and the live demos are in [`qa/`](qa/README.md).
 
 Security rules tests (Firestore emulator, needs Java):
 
 ```sh
-cd firebase/rules-tests && npm install && npm run test:emulator   # starts an emulator on :8080
+cd firebase/rules-tests && npm install && npm run test:emulator   # starts its own emulator on :8080, so not while the shared one is up
 tools/rules-tests.mjs [worktree]   # same tests on a free port and a scratch config: safe while the shared emulator is in use
 ```
 
