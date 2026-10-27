@@ -77,7 +77,9 @@ if (!fs.existsSync(path.join(dd, 'SourcePackages'))) {
     // it SwiftPM forgets the binary artifacts (their checksums) and downloads them again.
     const state = path.join(dd, 'SourcePackages', 'workspace-state.json');
     if (r.status === 0 && fs.existsSync(state)) {
-      fs.writeFileSync(state, fs.readFileSync(state, 'utf8').replaceAll(donors[0].d, path.join(dd, 'SourcePackages')));
+      // Any build folder's path, not only the donor's: a donor seeded by an older copy can still name a third folder.
+      const own = path.join(dd, 'SourcePackages');
+      fs.writeFileSync(state, fs.readFileSync(state, 'utf8').replace(/(\/private)?\/tmp\/ikut-dd-[^/"]+\/SourcePackages/g, own));
     }
     console.log(r.status === 0 ? `seeded ${dd}/SourcePackages from ${donors[0].d}` : `couldn't seed the packages (${r.stderr.trim()}); the first build fetches them`);
   } else {
