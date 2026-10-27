@@ -4,9 +4,9 @@ extension XCUIApplication {
     /// The driving mode's Report button, by identifier: it is there once Start or Show map has switched the trip screen
     /// to driving (the same screen, no push, D53).
     var drivingReport: XCUIElement { buttons["convoy.report"] }
-    /// The lobby's rows below the convoy when the driving sheet is at tall (the journey, code, trip, options, Leave or
-    /// End), by identifier; they are in the sheet's one scroll view, reached by scrolling down (D53, #409).
-    var lobbyRows: XCUIElement { otherElements["trip.lobbyRows"] }
+    /// What continues below the convoy when the driving sheet is pulled up to its tallest (the journey, code, trip,
+    /// options, Leave or End), by identifier. There is no Back to the lobby (D53, #424).
+    var pulledUpSheet: XCUIElement { otherElements["trip.pulledUp"] }
     /// The convoy panel's header button when the list is folded, and when it is unfolded.
     var expandConvoy: XCUIElement { buttons["Expand convoy list"] }
     var collapseConvoy: XCUIElement { buttons["Collapse convoy list"] }
@@ -14,21 +14,21 @@ extension XCUIApplication {
     var drivingSheetScroll: XCUIElement { scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch }
     var sheetGrabber: XCUIElement { descendants(matching: .any)["Sheet Grabber"].firstMatch }
 
-    /// Brings the convoy sheet to tall, its highest, by its grabber; true once the lobby's rows are below the convoy.
+    /// Drags the convoy sheet up by its grabber until the lobby continues below the convoy; true once it does.
     @discardableResult
-    func raiseTripSheet() -> Bool {
-        for _ in 0..<3 {
-            if lobbyRows.exists { return true }
+    func pullUpTripSheet() -> Bool {
+        for _ in 0..<4 {
+            if pulledUpSheet.exists { return true }
             guard sheetGrabber.waitForExistence(timeout: 5) else { return false }
             sheetGrabber.swipeUp()
-            _ = lobbyRows.waitForExistence(timeout: 2)
+            _ = pulledUpSheet.waitForExistence(timeout: 2)
         }
-        return lobbyRows.exists
+        return pulledUpSheet.exists
     }
 
-    /// Drags the convoy sheet down by its grabber, slowly and by about a third of the screen, from tall to short; a
-    /// quick swipe would spring back.
-    func lowerTripSheet() {
+    /// Drags the convoy sheet down by its grabber, slowly and by about a third of the screen, so it settles one
+    /// height lower (pulled up to tall, or tall to short); a quick swipe from tall to short would spring back.
+    func pullDownTripSheet() {
         guard sheetGrabber.waitForExistence(timeout: 5) else { return }
         let start = sheetGrabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
@@ -49,16 +49,16 @@ extension XCUIApplication {
                    withVelocity: .slow, thenHoldForDuration: 0.3)
     }
 
-    /// Brings the convoy sheet to tall, scrolls it down to the row with identifier `id` (lobby.endTrip,
-    /// lobby.leaveTrip, lobby.pause) and taps it; false when it never became hittable.
+    /// Pulls the convoy sheet up, scrolls it down to the row with identifier `id` (lobby.endTrip, lobby.leaveTrip,
+    /// lobby.pause) when it doesn't fit, and taps it; false when it never became hittable.
     @discardableResult
     func tapPulledUpRow(_ id: String) -> Bool {
-        guard raiseTripSheet() else { return false }
+        guard pullUpTripSheet() else { return false }
         let row = buttons[id]
         var scrolls = 0
         while !(row.exists && row.isHittable), scrolls < 20, drivingSheetScroll.exists {
-            // A hazard approach folds the sheet to short (and back to the top) while driving: raise it again.
-            if !lobbyRows.exists, !raiseTripSheet() { return false }
+            // A hazard approach or a stop request folds the sheet down while driving: pull it up again.
+            if !pulledUpSheet.exists, !pullUpTripSheet() { return false }
             scrollDrivingSheet(by: 150)
             scrolls += 1
         }

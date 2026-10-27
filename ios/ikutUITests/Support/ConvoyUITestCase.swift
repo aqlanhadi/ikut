@@ -184,8 +184,8 @@ class ConvoyUITestCase: XCTestCase {
     }
 
     /// The app opens straight into a trip this phone is still in (#401, D54), so a run that left one behind starts
-    /// there: from the lobby, Back to trips; from the driving map, End trip (the organiser) or Leave trip from the rows
-    /// below the convoy, then Done on the recap. Returns once Welcome, Home or neither shows (a fresh install).
+    /// there: from the lobby, Back to trips; from the driving map, End trip (the organiser) or Leave trip from the pulled-up
+    /// sheet below the convoy, then Done on the recap. Returns once Welcome, Home or neither shows (a fresh install).
     func returnHomeFromAnOpenTrip(timeout: TimeInterval = 15) {
         let back = app.buttons["lobby.back"]
         let home = app.buttons["homeWhereTo"]
@@ -198,14 +198,14 @@ class ConvoyUITestCase: XCTestCase {
         }
         if app.drivingReport.exists {
             app.dismissMapAsks(first: 2)
-            guard app.raiseTripSheet() else { return }
+            guard app.pullUpTripSheet() else { return }
             let end = app.buttons["lobby.endTrip"]
             let leave = app.buttons["lobby.leaveTrip"]
             // End trip whenever there is one (the organiser has both, and Leave sits above End); Leave only without it.
             var scrolls = 0
             while !(end.exists && end.isHittable), scrolls < 20 {
                 if end.exists == false, leave.exists, leave.isHittable, scrolls >= 3 { break }
-                if !app.lobbyRows.exists, !app.raiseTripSheet() { return }
+                if !app.pulledUpSheet.exists, !app.pullUpTripSheet() { return }
                 app.scrollDrivingSheet(by: 150)
                 scrolls += 1
             }
