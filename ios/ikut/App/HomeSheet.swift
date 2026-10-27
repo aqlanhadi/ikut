@@ -11,7 +11,8 @@ enum HomeSheet {
     /// Room the drag indicator takes above the content.
     static let indicatorRoom = BottomSheet.indicatorRoom
 
-    /// What every change of Home's content runs on, the camera's flight included, so they start and end together.
+    /// What every change of Home's content runs on. The camera keeps its own pace (`CameraPace`, D57): a far hop takes
+    /// longer than the sheet's swap.
     static func motion(reduceMotion: Bool) -> Animation? { Motion.sheet(reduceMotion: reduceMotion) }
 
     /// The short detent's height, the same for the list and a picked trip (so a pick never resizes the sheet).
@@ -30,12 +31,18 @@ enum HomeSheet {
     /// when the sheet is pulled up or down (owner 2026-10-25, #343).
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
+    /// The map's bottom safe area in `mode`: the list's, except a left trip's short sheet, which the logo and Legal
+    /// follow down so they sit just above it (#437). Where to?, New trip and joining keep the list's (`createInsets`).
+    static func legalInset(_ mode: Mode, compact: CGFloat) -> CGFloat {
+        mode == .leftTrip ? legalInset(compact: height(.leftTrip, compact: compact)) : legalInset(compact: compact)
+    }
+
     /// What Home's sheet shows: its list, or one of the two steps of making a trip over the same map (MapFirst B2, B3).
     enum Mode: Equatable { case list, whereTo, newTrip, leftTrip, join }
 
     /// A trip you left early picked on Home: its header and the two-line note, nothing below. Its short detent is this
-    /// fraction of the list's (so it scales with the text size, as the list's does), and always below it, which keeps
-    /// the map's Legal (above the list's short sheet, `legalInset`) clear.
+    /// fraction of the list's (so it scales with the text size, as the list's does). The map's padding follows it
+    /// (`legalInset(_:compact:)`), so Legal sits just above it.
     static let leftTripFraction: CGFloat = 0.62
 
     /// Where to? with the keyboard up (B2), and New trip with the route drawn (B3).

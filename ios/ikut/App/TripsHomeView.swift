@@ -70,6 +70,10 @@ struct TripsHomeView: View {
     /// text size and nothing else.
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The app's location permission (absent in some previews): Home watches your location once it is granted.
+    @Environment(LocationPermission.self) private var location: LocationPermission?
+    /// Where the camera last went to show you (`HomeCamera`); nil before the first fix.
+    @State private var here: CLLocationCoordinate2D?
     /// Screenshot demo (`init(demo:)`): shows what it was given, and reads nothing from the phone or the server.
     @State private var isDemo = false
     #if DEBUG
@@ -77,6 +81,9 @@ struct TripsHomeView: View {
     /// first trip and closes it again by itself (the second time pulling it up and down first), so a recording needs no taps.
     @State private var demoModel: RecapModel?
     @State private var tour = false
+    /// `home-camera-tour` (D57): plays Home's camera hops by itself, with a caption naming each.
+    @State private var cameraTour = false
+    @State private var tourCaption = ""
     #endif
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
@@ -93,17 +100,17 @@ struct TripsHomeView: View {
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
         self.onOpenTrip = onOpenTrip
-        // Open on the cached past routes when there are any: a later switch away from
-        // `.userLocation` can lose to the first location fix.
+        // Open on the cached past routes when there are any, else a fixed region: never MapKit's follow-the-user,
+        // which moved the camera on every fix (`HomeCamera`).
         let cache = PastTripsMapService.cachedRoutes()
         let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
         let insets = Self.obscured(mapHeight: 0)
-        if let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top) {
-            _listCamera = State(initialValue: .region(region))
-            _routes = State(initialValue: cached)
-        } else {
-            _listCamera = State(initialValue: .userLocation(fallback: .region(Self.fallback)))
-        }
+        let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top)
+        let known = Self.lastKnownLocation()
+        _here = State(initialValue: known)
+        _listCamera = State(initialValue: HomeCamera.launch(cachedRoutes: region, here: known,
+                                                            bottomObscured: insets.bottom, topObscured: insets.top))
+        if region != nil { _routes = State(initialValue: cached) }
     }
 
     #if DEBUG
@@ -111,8 +118,10 @@ struct TripsHomeView: View {
     /// picked (its route from `routes`), pulled up if `expanded`.
     init(demo past: [PastTrips.Entry], routes: [PastTripRoute], picked: PickedTrip? = nil,
          selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false,
+         cameraTour: Bool = false,
          creating createFlow: NewTripFlow? = nil, joining joinStepper: JoinStepper? = nil, nowStatus: [String: String] = [:]) {
         self.init(onNewTrip: {}, onJoin: {})
+        _here = State(initialValue: nil)
         if let joinStepper {
             _joinFlow = State(initialValue: joinStepper)
             let insets = HomeSheet.createInsets(
@@ -134,6 +143,7 @@ struct TripsHomeView: View {
         _nowStatus = State(initialValue: nowStatus)
         _demoModel = State(initialValue: tappable)
         _tour = State(initialValue: tour)
+        _cameraTour = State(initialValue: cameraTour)
         _past = State(initialValue: past)
         _routes = State(initialValue: routes)
         _expanded = State(initialValue: expanded)
@@ -155,11 +165,6 @@ struct TripsHomeView: View {
     }
     #endif
 
-    /// Where the map opens when location isn't available yet.
-    private static let fallback = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687),
-        span: MKCoordinateSpan(latitudeDelta: 1.2, longitudeDelta: 1.2))
-
     /// The map's height on screen (it runs under the status bar and the home indicator).
     private var mapHeight: CGFloat { stage.mapFrame.height }
 
@@ -180,12 +185,14 @@ struct TripsHomeView: View {
                 let animated = TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera)
                 // Back from a trip the map already has its height: fit the routes to it (the list camera was worked
                 // out before, for a typical phone).
-                if mapHeight > 0, !routes.isEmpty { fit(animated: animated) } else { move(to: listCamera, animated: animated) }
+                if mapHeight > 0, !routes.isEmpty { fit(animated: animated) } else if routes.isEmpty, here != nil { showHere(animated: animated) } else { move(to: listCamera, animated: animated) }
             }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
-                if flow != nil { refocusCreate(animated: false) } else if joinFlow != nil { refocusJoin(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) }
+                if flow != nil { refocusCreate(animated: false) } else if joinFlow != nil { refocusJoin(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
             }
+            // Your location, once it may be read: the first fix (and a real move after it) moves Home's view of you.
+            .task(id: locationGranted) { if !isDemo, locationGranted { await watchLocation() } }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
         #if DEBUG
@@ -203,6 +210,18 @@ struct TripsHomeView: View {
                     try? await Task.sleep(for: .seconds(2.5))
                 }
                 closePicked()
+            }
+        }
+        .task(id: cameraTour) { if cameraTour { await playCameraTour() } }
+        .overlay(alignment: .top) {
+            if cameraTour {
+                Text(tourCaption)
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.xs)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.top, 70)
+                    .accessibilityIdentifier("cameraTour.caption")
+                    .allowsHitTesting(false)
             }
         }
         #endif
@@ -271,7 +290,8 @@ struct TripsHomeView: View {
                 }),
             // The logo and Legal ride 10 pt above the short sheet instead of under it, from the first frame, and stay
             // there when the sheet is pulled up (it covers them, as in Apple Maps; owner 2026-10-25, #343).
-            bottomPadding: HomeSheet.legalInset(compact: compact),
+            // A left trip's short sheet takes them down with it (#437).
+            bottomPadding: HomeSheet.legalInset(mode, compact: compact),
             hidesControls: true,
             onTap: picked != nil ? { closePicked() } : nil)
     }
@@ -335,10 +355,20 @@ struct TripsHomeView: View {
     /// What the sheet's content change runs on: the camera's motion, or a short crossfade with Reduce Motion.
     private var sheetMotion: Animation? { HomeSheet.motion(reduceMotion: reduceMotion) }
 
-    /// Every camera move on Home goes through here: the same motion as the sheet's content change, and a jump
-    /// with Reduce Motion.
+    /// Every camera move on Home goes through here, paced by `CameraPace` (D57): a near move glides, a far one pulls
+    /// out, travels and settles, and with Reduce Motion each is one short ease. A placed refit while a flight is in the
+    /// air waits for it to land; a tiny change keeps the shortest glide.
     private func move(to position: MapCameraPosition, animated: Bool) {
-        if animated, !reduceMotion { withAnimation(sheetMotion) { stage.camera = position } } else { stage.camera = position }
+        let view = HomeCamera.view(of: position)
+        let glide = { [stage, reduceMotion] in
+            withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { stage.camera = position }
+        }
+        switch HomeCamera.step(animated: animated, flyingTo: stage.flight.destination, seen: stage.seenView, to: view) {
+        case .place: stage.place(position)
+        case .nudge: glide()
+        case .hold: stage.flight.hold(glide)
+        case .fly: if let view { stage.fly(to: position, view: view, reduceMotion: reduceMotion) }
+        }
     }
 
     /// Camera for the picked trip: the selected item's spot, else the whole route, above the short sheet.
@@ -346,7 +376,9 @@ struct TripsHomeView: View {
     /// nudge a picture that is already there.
     private func refocus(animated: Bool, settling: Bool = false) {
         guard let picked else { return }
-        let insets = Self.obscured(mapHeight: mapHeight, sheet: compact, padding: HomeSheet.legalInset(compact: compact))
+        // Above the short sheet, a left trip's included, whose padding follows it down.
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: HomeSheet.height(mode, compact: compact),
+                                   padding: HomeSheet.legalInset(mode, compact: compact))
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
             region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
@@ -449,12 +481,107 @@ struct TripsHomeView: View {
     }
 
     /// The camera for the step on screen: the pin at the top of the list, or the whole route above New trip's sheet.
+    /// Before there is a place, the view around you when the camera shows you, else the fixed region it has.
     private func refocusCreate(animated: Bool) {
         guard let flow else { return }
         let sheet = HomeSheet.height(mode, compact: compact)
         let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheet, compact: compact)
-        guard let region = flow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { return }
+        let place = flow.region(bottomObscured: insets.bottom, topObscured: insets.top)
+        guard let region = HomeCamera.create(place: place, here: here, follows: followsFixes(hasPlace: place != nil),
+                                             bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
+    }
+
+    #if DEBUG
+    /// Home's hops for `home-camera-tour`, looping: the first fix (the country to your street), the street to every
+    /// trip, a pick, a stop on it, the whole trip, back to trips, and a far hop to Johor Bahru and back.
+    private func playCameraTour() async {
+        func pause(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+        let insets = Self.obscured(mapHeight: mapHeight)
+        let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
+        let country = MKCoordinateRegion(center: .init(latitude: 4.2, longitude: 102.0), span: .init(latitudeDelta: 8, longitudeDelta: 6))
+        let johor = HomeCamera.around(.init(latitude: 1.4927, longitude: 103.7414), bottomObscured: insets.bottom, topObscured: insets.top)
+        while !Task.isCancelled {
+            tourCaption = "The country"
+            move(to: .region(country), animated: false)
+            await pause(2.5)
+            tourCaption = "First fix: the country to your street"
+            move(to: .region(HomeCamera.around(kl, bottomObscured: insets.bottom, topObscured: insets.top)), animated: true)
+            await pause(3.5)
+            tourCaption = "Your street to every trip"
+            fit(animated: true)
+            await pause(3)
+            guard let first = past.first else { return }
+            tourCaption = "Pick a trip"
+            open(first)
+            await pause(3)
+            if let stop = picked?.model.recap?.timeline.first(where: { $0.kind == .stop && $0.coordinate != nil }) {
+                tourCaption = "A stop on its route"
+                selectItem(stop)
+                await pause(3)
+                tourCaption = "The whole trip again"
+                showWholeTrip()
+                await pause(3)
+            }
+            tourCaption = "Back to trips"
+            closePicked()
+            await pause(3)
+            tourCaption = "To Johor Bahru: out, across and in"
+            move(to: .region(johor), animated: true)
+            await pause(4.5)
+            tourCaption = "Back to trips: out, across and in"
+            fit(animated: true)
+            await pause(4.5)
+        }
+    }
+    #endif
+
+    // MARK: Your location
+
+    /// Where the phone last knew you were, when location may be read: Home opens on it rather than on the fallback
+    /// (back from a trip this view is new, and the live updates take a moment to start).
+    private static func lastKnownLocation() -> CLLocationCoordinate2D? {
+        let manager = CLLocationManager()
+        guard [.authorizedWhenInUse, .authorizedAlways].contains(manager.authorizationStatus) else { return nil }
+        return manager.location?.coordinate
+    }
+
+    private var locationGranted: Bool {
+        let status = location?.status ?? LocationAccess.status(from: CLLocationManager().authorizationStatus)
+        return status == .whenInUse || status == .always
+    }
+
+    /// Whether a fix may move the camera now (`HomeCamera.followsFixes`).
+    private func followsFixes(hasPlace: Bool) -> Bool {
+        HomeCamera.followsFixes(mode: mode, hasRoutes: !routes.isEmpty, hasPlace: hasPlace,
+                                positionedByUser: stage.camera.positionedByUser)
+    }
+
+    /// Reads your location while Home is up. A fix moves the camera only when it is a real move from the last view of
+    /// you and the camera shows you; the rest are dropped without touching the view.
+    private func watchLocation() async {
+        do {
+            for try await update in CLLocationUpdate.liveUpdates() {
+                if Task.isCancelled { break }
+                guard let fix = update.location, fix.horizontalAccuracy >= 0,
+                      HomeCamera.isRealMove(from: here, to: fix.coordinate) else { continue }
+                here = fix.coordinate
+                if let flow {
+                    if followsFixes(hasPlace: flow.focusTarget != nil) { refocusCreate(animated: true) }
+                } else if followsFixes(hasPlace: false) {
+                    showHere(animated: stage.hasCamera)
+                }
+            }
+        } catch {
+            // The stream ended; the camera stays where it is.
+        }
+    }
+
+    /// The list's view of you above its short sheet, when it has no routes to show.
+    private func showHere(animated: Bool) {
+        guard let here, flow == nil, joinFlow == nil, picked == nil, routes.isEmpty else { return }
+        let insets = Self.obscured(mapHeight: mapHeight)
+        move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)), animated: animated)
     }
 
     // MARK: Join flow

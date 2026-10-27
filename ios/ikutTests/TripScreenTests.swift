@@ -175,4 +175,26 @@ struct TripScreenTests {
         #expect(!LobbySheet.isCovered(.init(), lobbyOnScreen: true))
         #expect(!PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: false))
     }
+
+    // MARK: Camera reading (D57)
+
+    /// A move that ends where it began writes nothing, so nothing that reads the heading or the scale redraws.
+    @MainActor @Test func theMapsReadingIsWrittenOnlyWhenItChanges() {
+        let stage = TripMapStage(mode: .home)
+        let reading = TripCameraReading(distance: 2_500, pitch: 0, latitudeDelta: 0.02)
+        stage.read(heading: 10, reading: reading)
+        final class Flag: @unchecked Sendable { var on = false }
+        let changed = Flag()
+        withObservationTracking { _ = stage.heading; _ = stage.reading } onChange: { changed.on = true }
+        stage.read(heading: 10, reading: reading)
+        #expect(!changed.on)
+        stage.read(heading: 12, reading: reading)
+        #expect(changed.on)
+        #expect(stage.heading == 12)
+        let again = Flag()
+        withObservationTracking { _ = stage.reading } onChange: { again.on = true }
+        stage.read(heading: 12, reading: TripCameraReading(distance: 3_000, pitch: 0, latitudeDelta: 0.025))
+        #expect(again.on)
+        #expect(stage.reading?.distance == 3_000)
+    }
 }
