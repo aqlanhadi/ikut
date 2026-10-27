@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Cleans up after a piece is merged into main (CLAUDE.md, Branches): its worktree and branch, and, once no other
-// branch of the same task is open, the task's review worktree, build folder and log folder.
+// Cleans up after a piece is merged into main (CLAUDE.md, Branches): its worktree and branch. The task's review
+// worktree, build folder and log folder (later pieces and fix rounds still use them) go only with the task's last
+// piece: pass --last, or the board already shows the task done; and only when no other branch of it is open.
 //
 //   tools/finish-task.mjs d21-stop-sounds
+//   tools/finish-task.mjs d21-stop-sounds --last      # the task's last piece: also remove its folders
 //   tools/finish-task.mjs d21-stop-sounds --dropped   # not merged: only when the owner agreed to drop it
 //
 // It doesn't merge; the overseer does that (git merge --no-ff) first.
@@ -14,8 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 const branch = process.argv.slice(2).find((a) => !a.startsWith('--'));
 const dropped = process.argv.includes('--dropped');
+const last = process.argv.includes('--last');
 if (!/^[a-z]+\d+[a-z]?-[a-z0-9-]+$/.test(branch ?? '')) {
-  console.error('usage: tools/finish-task.mjs <branch, e.g. d21-stop-sounds> [--dropped]');
+  console.error('usage: tools/finish-task.mjs <branch, e.g. d21-stop-sounds> [--dropped] [--last]');
   process.exit(64);
 }
 const git = (...args) => spawnSync('git', args, { encoding: 'utf8' });
@@ -45,9 +48,17 @@ console.log(`deleted branch ${branch}${dropped && !merged ? ' (dropped, not merg
 
 // ---- the task's folders, once its last piece is done
 const task = branch.split('-')[0];
+const onBoardDone = () => {
+  try {
+    const board = JSON.parse(fs.readFileSync(path.join(repo, 'planning', 'board.json'), 'utf8'));
+    return (board.tasks ?? board).some((t) => t.id.toLowerCase() === task && t.status === 'done');
+  } catch { return false; } // the board lives only in the main checkout
+};
 const others = g('branch', '--list', `${task}-*`, '--format=%(refname:short)').stdout.trim().split('\n').filter(Boolean);
 if (others.length) {
   console.log(`kept the ${task} folders: ${others.join(', ')} still open`);
+} else if (!last && !onBoardDone()) {
+  console.log(`kept the ${task} folders (/tmp/ikut-dd-${task}, /tmp/ikut-logs-${task}): pass --last with the task's last piece`);
 } else {
   const review = `/tmp/ikut-review-${task}`;
   if (fs.existsSync(review)) {
