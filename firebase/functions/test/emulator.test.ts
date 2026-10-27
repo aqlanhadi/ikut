@@ -288,13 +288,12 @@ describe("previewTrip (emulator)", () => {
     await tripRef.collection("cars").doc("second").set({ name: "Alpha", color: "green", isLead: false, state: "joining" });
     const r = await callFn("previewTrip", { code: ` ${code.toLowerCase().slice(0, 3)}-${code.slice(3)} ` }, user.token);
     assert.equal(r.status, 200, JSON.stringify(r.body));
-    // organizerName is asserted on previewTripData below; the shared functions emulator may still run the older code.
-    delete r.body.result.organizerName;
     assert.deepEqual(r.body.result, {
       tripId: tripRef.id,
       name: "T",
       destinationName: "D",
       destinationCoordinate: { latitude: 1, longitude: 1 },
+      organizerName: "Org",
       cars: [
         { id: "lead", name: "Lead", color: "blue", hasTracker: true, number: 1 },
         { id: "second", name: "Alpha", color: "green", hasTracker: false },
@@ -315,9 +314,44 @@ describe("previewTrip (emulator)", () => {
     assert.equal(r.organizerName, "Aqlan");
     const line = decodePolyline(r.route!);
     assert.ok(line.length >= 2 && line.length < 20, String(line.length));
-    assert.ok(Math.abs(line[0].latitude - 3.139) < 1e-4 && Math.abs(line[line.length - 1].latitude - 4.5975) < 1e-4);
+    assert.ok(line[0].latitude > 3.139 + 0.02 && Math.abs(line[line.length - 1].latitude - 4.5975) < 1e-4);
     assert.ok(r.route!.length < full.length);
     assert.ok(!JSON.stringify(r).includes("Nor Azman"));
+  });
+
+  describe("where the route line starts", () => {
+    const HOME = { latitude: 3.0, longitude: 101.5 };
+    // Straight north from HOME, 0.001 deg (about 111 m) a step, 100 steps: about 11 km.
+    const line = (steps: number) => Array.from({ length: steps + 1 }, (_, i) => ({ latitude: HOME.latitude + i * 0.001, longitude: HOME.longitude }));
+    const meters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => Math.abs(a.latitude - b.latitude) * 111_320;
+
+    it("starts 3 km in when there is no meeting point, and nowhere near the organiser's start", async () => {
+      const { tripRef } = await seedTrip();
+      await tripRef.update({ route: encodePolyline(line(100)) });
+      const pts = decodePolyline((await previewTripData(db, tripRef.id)).route!);
+      assert.ok(Math.abs(meters(pts[0], HOME) - 3000) < 5, String(meters(pts[0], HOME)));
+      for (const p of pts) assert.ok(meters(p, HOME) > 500);
+    });
+
+    for (const left of [false, true]) {
+      it(`starts at the meeting point${left ? " even after it was left" : ""}`, async () => {
+        const { tripRef } = await seedTrip();
+        await tripRef.update({ route: encodePolyline(line(100)) });
+        const meet = new GeoPoint(3.0, 101.5);
+        await tripRef.collection("stops").doc("m").set({
+          name: "Petronas", kind: "meet", coordinate: meet, routeOffset: 0, order: 0, meetAt: Timestamp.now(),
+          ...(left ? { leftAt: Timestamp.now(), leftBy: "someone" } : {}),
+        });
+        const pts = decodePolyline((await previewTripData(db, tripRef.id)).route!);
+        assert.deepEqual(pts[0], { latitude: meet.latitude, longitude: meet.longitude });
+      });
+    }
+
+    it("has no route when the whole line is under 6 km", async () => {
+      const { tripRef } = await seedTrip();
+      await tripRef.update({ route: encodePolyline(line(45)) });
+      assert.ok(!("route" in (await previewTripData(db, tripRef.id))));
+    });
   });
 
   it("has no organiserName or route when the trip has neither", async () => {

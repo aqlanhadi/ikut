@@ -10,7 +10,7 @@ import type { Car, Member, PlannedStop, PreviewCar, PreviewStop, PreviewTripResu
  * What a holder of the code can see (and nothing else):
  * - the trip's name and destination (name and coordinate);
  * - the organiser's first name (`organizerName`), the form the lobby shows to members;
- * - the trip's MAIN route only, simplified to about 100 m (`route`, precision-5 polyline, at most 400 points);
+ * - the trip's MAIN route only (`route`), starting at the meeting point, or 3 km in when there is none (never at anyone's own start), left out when the line is under 6 km, simplified to about 100 m, precision-5 polyline, at most 400 points;
  * - the planned stops not skipped or left: name, kind, minutes, coordinate, and `meetAt` (epoch ms) on the meeting point;
  * - each car's id, name, colour, badge number and whether a phone already shares it.
  * Never sent: any member's own start, own route (`cars/*.route`), position, join point, phone/push token, display name
@@ -60,7 +60,14 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
     });
   const stops: PreviewStop[] = plannedStops;
   const organizerName = await firstNameOf(tripRef, trip.organizerId);
-  const route = simplifiedRoute(trip.route);
+  // A meeting point that was left or skipped still marks where the line starts, so look at every stop document.
+  const meetDoc = stopsSnap.docs.map((d) => d.data() as PlannedStop).filter((s) => s.kind === "meet").sort((a, b) => a.order - b.order)[0];
+  const mc = meetDoc?.coordinate;
+  const route = simplifiedRoute(trip.route, {
+    meet: meetDoc && typeof meetDoc.routeOffset === "number"
+      ? { routeOffset: meetDoc.routeOffset, ...(mc && typeof mc.latitude === "number" && typeof mc.longitude === "number" ? { coordinate: { latitude: mc.latitude, longitude: mc.longitude } } : {}) }
+      : undefined,
+  });
   const { latitude, longitude } = trip.destination.coordinate;
   const destinationCoordinate = typeof latitude === "number" && typeof longitude === "number" ? { latitude, longitude } : undefined;
   return {

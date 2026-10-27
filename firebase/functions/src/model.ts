@@ -195,7 +195,7 @@ export interface PreviewTripResult {
   destinationCoordinate?: { latitude: number; longitude: number };
   /** First name of the organiser; absent when unknown. */
   organizerName?: string;
-  /** The trip's main route only, simplified (about 100 m, at most 400 points), precision-5 polyline; absent when the trip has none. Never a car's own route. */
+  /** The trip's main route only, starting at the meeting point, or 3 km in; simplified (about 100 m, at most 400 points), precision-5 polyline; absent when the trip has none or it is under 6 km. Never a car's own route. */
   route?: string;
   cars: PreviewCar[];
   /** Planned stops in order, skipped ones left out; absent when there are none. */

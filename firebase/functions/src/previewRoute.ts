@@ -94,10 +94,47 @@ export function simplify(points: LatLng[], toleranceMeters: number): LatLng[] {
   return points.filter((_, i) => keep[i]);
 }
 
+function metersBetween(a: LatLng, b: LatLng): number {
+  const k = 111_320;
+  const cos = Math.cos((((a.latitude + b.latitude) / 2) * Math.PI) / 180);
+  return Math.hypot((b.longitude - a.longitude) * cos * k, (b.latitude - a.latitude) * k);
+}
+
+export const ROUTE_LEAD_CUT_METERS = 3_000;
+export const ROUTE_MIN_METERS = 6_000;
+
+/**
+ * The route from `startMeters` along it onward, beginning exactly at `first` (default: the point at that distance).
+ * Empty when the line is shorter than `minTotalMeters` or the cut leaves nothing.
+ */
+export function routeFrom(points: LatLng[], startMeters: number, first?: LatLng, minTotalMeters = 0): LatLng[] {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + metersBetween(points[i - 1], points[i]));
+  const total = cum[cum.length - 1] ?? 0;
+  if (points.length < 2 || total < minTotalMeters || startMeters >= total) return [];
+  let i = 1;
+  while (i < points.length && cum[i] <= startMeters) i++;
+  const a = points[i - 1];
+  const b = points[i];
+  const seg = cum[i] - cum[i - 1];
+  const t = seg === 0 ? 0 : (startMeters - cum[i - 1]) / seg;
+  const at = first ?? { latitude: a.latitude + (b.latitude - a.latitude) * t, longitude: a.longitude + (b.longitude - a.longitude) * t };
+  return [at, ...points.slice(i)];
+}
+
 /** The main route as a precision-5 polyline of at most `maxPoints` points, widening the tolerance until it fits; "" when unreadable. */
-export function simplifiedRoute(encoded: unknown, toleranceMeters = 100, maxPoints = 400): string {
+export function simplifiedRoute(
+  encoded: unknown,
+  opts: { toleranceMeters?: number; maxPoints?: number; meet?: { routeOffset: number; coordinate?: LatLng } } = {},
+): string {
+  const { toleranceMeters = 100, maxPoints = 400, meet } = opts;
   if (typeof encoded !== "string" || encoded.length === 0) return "";
   let points = decodePolyline(encoded);
+  if (points.length < 2) return "";
+  // The line never starts at anyone's own start: at the meeting point, or 3 km in; under 6 km there is no line.
+  points = meet
+    ? routeFrom(points, Math.max(0, meet.routeOffset), meet.coordinate, ROUTE_MIN_METERS)
+    : routeFrom(points, ROUTE_LEAD_CUT_METERS, undefined, ROUTE_MIN_METERS);
   if (points.length < 2) return "";
   let tol = toleranceMeters;
   points = simplify(points, tol);

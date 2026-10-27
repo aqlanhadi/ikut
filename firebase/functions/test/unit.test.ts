@@ -139,6 +139,12 @@ describe("pickCarColor", () => {
 
 describe("simplifiedRoute", () => {
   const line = Array.from({ length: 500 }, (_, i) => ({ latitude: 3 + i * 0.003, longitude: 101.7 - i * 0.001 }));
+  it("starts 3 km in, and leaves the line out under 6 km", () => {
+    const first = decodePolyline(simplifiedRoute(encodePolyline(line)))[0];
+    const d = Math.hypot((first.latitude - 3) * 111_320, (first.longitude - 101.7) * 111_320 * Math.cos((3 * Math.PI) / 180));
+    assert.ok(Math.abs(d - 3000) < 5, String(d));
+    assert.equal(simplifiedRoute(encodePolyline(line.slice(0, 15))), "");
+  });
   it("keeps the ends, drops points on a straight line and round-trips", () => {
     const out = decodePolyline(simplifiedRoute(encodePolyline(line)));
     assert.equal(out.length, 2);
@@ -150,7 +156,7 @@ describe("simplifiedRoute", () => {
   });
   it("caps the number of points", () => {
     const wiggle = Array.from({ length: 5000 }, (_, i) => ({ latitude: 3 + i * 0.0005, longitude: 101 + Math.sin(i / 7) * 0.05 }));
-    assert.ok(decodePolyline(simplifiedRoute(encodePolyline(wiggle), 100, 400)).length <= 400);
+    assert.ok(decodePolyline(simplifiedRoute(encodePolyline(wiggle), { maxPoints: 400 })).length <= 400);
   });
   it("gives an empty line for nothing readable", () => {
     for (const bad of ["", undefined, 5, "?"]) assert.equal(simplifiedRoute(bad), "");
