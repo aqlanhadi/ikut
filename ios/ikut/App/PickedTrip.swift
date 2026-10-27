@@ -161,7 +161,7 @@ enum HomePickedDemo {
             left.leftAt = now.addingTimeInterval(-day)
             return TripsHomeView(demo: [left] + older, routes: [thin],
                                  picked: PickedTrip(entry: left, model: RecapModel(tripId: "demo-never-loaded")))
-        case "tap", "tour":
+        case "tap", "tour", "camera-tour":
             // Two more routes, so the list's fit is wider than the picked trip's and picking moves the camera.
             func line(_ id: String, _ name: String, _ to: String, _ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> PastTripRoute {
                 PastTripsMapLogic.route(id: id, name: name, destinationName: to, destination: b, encodedRoute: Polyline.encode([a, b]))
@@ -170,7 +170,7 @@ enum HomePickedDemo {
             let drawn = [thin,
                          line("sample-2", "Makan trip", "Melaka", kl, .init(latitude: 2.196, longitude: 102.25)),
                          line("sample-3", "Cameron weekend", "Tanah Rata", kl, .init(latitude: 4.47, longitude: 101.38))]
-            return TripsHomeView(demo: past, routes: drawn, tappable: model, tour: name == "tour")
+            return TripsHomeView(demo: past, routes: drawn, tappable: model, tour: name == "tour", cameraTour: name == "camera-tour")
         case "where-to", "new-trip":
             // The create flow over Home's map: Ipoh's results as pins (the second one at the top of the list), or the
             // route to Ipoh drawn with the Name field.
