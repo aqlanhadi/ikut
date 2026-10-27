@@ -92,27 +92,9 @@ class DemoBase: TwoPhoneConvoyBase {
     /// Joins `code` from Home. `ridingIn`: the car tile to pick as a passenger; otherwise a new car named `carName`.
     func joinDemo(code: String, name: String, ridingIn tile: String? = nil, carName: String? = nil) throws {
         openJoinForm(code: code, name: name)
-
-        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", tile ?? "A new car")).firstMatch
-        if !choice.waitForExistence(timeout: 30) { shot("FAILED-no-tile") }
-        XCTAssertTrue(choice.exists, "Trip preview didn't show \(tile ?? "A new car") for \(code)")
-        let joinNameField = app.textFields["Your name"]
-        if joinNameField.exists, (joinNameField.value as? String) != name { replaceText(in: joinNameField, with: name) }
-        choice.tap()
-        if tile != nil {
-            // The car's tile sets the role from whether it is tracked already; say Passenger either way.
-            let passenger = labelled("label == %@", "Passenger")
-            if passenger.waitForExistence(timeout: 5) { passenger.tap() }
-            shot("join-as-passenger")
-            let joinIn = button(beginningWith: "Join in ")
-            XCTAssertTrue(joinIn.waitForExistence(timeout: 5), "No Join in … button")
-            joinIn.tap()
-        } else {
-            let carField = app.textFields["Car name"]
-            if carField.waitForExistence(timeout: 5), let carName { replaceText(in: carField, with: carName) }
-            shot("join-as-new-car")
-            app.buttons["Join trip"].tap()
-        }
+        shot(tile == nil ? "join-as-own-car" : "join-as-passenger")
+        // Passenger either way when riding in a car: the car's own state sets the share switch, so say off.
+        chooseCarAndJoin(ridingIn: tile, carName: carName ?? "\(name)'s car", sharing: tile == nil ? nil : false, timeout: 30)
         XCTAssertTrue(waitForLobby(timeout: 60), "Didn't reach the lobby")
     }
 

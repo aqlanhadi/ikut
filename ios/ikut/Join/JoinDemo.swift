@@ -1,7 +1,7 @@
 #if DEBUG
 import SwiftUI
 
-/// Launch states for the Join ticket (`IKUT_SCREEN=join-stops`, `join-no-stops`, `join-with-location`, `join-without-location`).
+/// Fixed-data trips for the join steps' launch states and previews.
 @MainActor
 enum JoinDemo {
     private struct API: JoinAPI {
@@ -37,13 +37,31 @@ enum JoinDemo {
         API(withStops: withStops, withCoordinate: false, failure: failure)
     }
 
-    /// `drive` is what MapKit would answer from the phone's location; nil is a phone without location.
-    static func ticket(withStops: Bool, drive: TicketDrive? = nil) -> some View {
-        JoinTripView(
-            model: JoinModel(
-                displayName: "Daniel", initialCode: "K7M2QX", api: API(withStops: withStops, withCoordinate: drive != nil),
-                driveFromHere: { _ in drive })
-        ) { _, _ in }
+    /// Home with the join steps over its map, for the launch states `join-h3-empty`, `join-h3-found`, `join-h3-found-drive`,
+    /// `join-h3-not-found`, `join-h4-car`, `join-h4-copilot` and `join-h4-own` (D58). The found states look the trip up
+    /// from the fixed-data API a moment after they open, as the real one does.
+    static func home(_ state: String) -> TripsHomeView? {
+        guard state.hasPrefix("join-h") else { return nil }
+        let drive = state == "join-h3-found-drive"
+            ? TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60) : nil
+        let code: String? = state == "join-h3-empty" ? nil : "K7M2QX"
+        let failure = state == "join-h3-not-found" ? JoinService.message(code: .notFound, serverMessage: "") : nil
+        let model = JoinModel(
+            displayName: "Nurul", initialCode: code,
+            api: API(withStops: true, withCoordinate: true, failure: failure), driveFromHere: { _ in drive })
+        let stepper = JoinStepper(model: model)
+        if state.hasPrefix("join-h4") {
+            stepper.show(.car)
+            Task { @MainActor in
+                for _ in 0..<100 where model.preview == nil { try? await Task.sleep(for: .milliseconds(50)) }
+                switch state {
+                case "join-h4-copilot": if let car = model.cars.first { model.select(car) }
+                case "join-h4-own": model.selectNewCar()
+                default: break
+                }
+            }
+        }
+        return TripsHomeView(demo: [], routes: [], joining: stepper)
     }
 }
 #endif

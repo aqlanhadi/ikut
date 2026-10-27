@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Root navigation: the welcome screen until "Get Started", then the app's one map (`TripScreenHost`, D54) with Home
 /// (`TripsHomeView`) or a trip (`LobbyView`: its lobby or the driving map) over it. Opening a trip and leaving it are a
-/// camera move and a sheet change on that map; Join and the recap are pushed over it.
+/// camera move and a sheet change on that map; Join is Home's sheet too (its steps, D58), and the recap is pushed over it.
 /// Signed-out visitors give a name (sheet) before Create or Join.
 /// Gets location access good enough for a trip before opening Create Trip, Join or a trip.
 struct HomeView: View {
@@ -32,6 +32,9 @@ struct HomeView: View {
     @State private var tripSession: TripSession?
     /// New trip's gates are through: Home's sheet becomes Where to? over its own map (no pushed screen).
     @State private var creating = false
+    /// Join's gates are through: Home's sheet becomes the join steps over its own map, with the code from a link or QR
+    /// filled in (D58; no pushed screen).
+    @State private var joining: JoinStart?
     @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
     @State private var showDenied = false
     @State private var showName = false
@@ -93,12 +96,9 @@ struct HomeView: View {
                 case .create:
                     // Never pushed: creating a trip happens in Home's sheet (see `creating`).
                     EmptyView()
-                case .join(let code):
-                    JoinTripView(initialCode: code) { tripId, _ in
-                        // Join pops back to the one map, which opens the trip: not a second trip screen.
-                        path = []
-                        openTrip(tripId, started: false)
-                    }
+                case .join:
+                    // Never pushed: joining happens in Home's sheet (see `joining`).
+                    EmptyView()
                 case .trip:
                     // Never pushed: a trip opens on the one map (see `openTrip`).
                     EmptyView()
@@ -215,7 +215,9 @@ struct HomeView: View {
                 covered: homeSheetCovered,
                 sheetUp: $homeSheetUp,
                 creating: $creating,
-                onCreated: { tripId in openTrip(tripId, started: false) }
+                onCreated: { tripId in openTrip(tripId, started: false) },
+                joining: $joining,
+                onJoined: { tripId in openTrip(tripId, started: false) }
             )
         }
     }
@@ -223,6 +225,7 @@ struct HomeView: View {
     /// The trip takes over the one map: Home's sheet becomes the lobby's (or the convoy's) and the camera flies to it.
     private func openTrip(_ tripId: String, started: Bool) {
         creating = false
+        joining = nil
         prepareSession(tripId)
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
     }
@@ -280,6 +283,12 @@ struct HomeView: View {
                 return
             case .ready, .showAlwaysExplainer:
                 if case .create = route { creating = true; return }
+                if case .join(let code) = route {
+                    // A link on a fresh install opens Home first: there is no Welcome to push Join over any more.
+                    hasSeenWelcome = true
+                    joining = JoinStart(code: code)
+                    return
+                }
                 if case .trip(let tripId, let started) = route { openTrip(tripId, started: started); return }
                 if replacing { path = [route] } else { path.append(route) }
                 return

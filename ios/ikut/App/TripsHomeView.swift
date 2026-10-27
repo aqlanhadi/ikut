@@ -25,6 +25,18 @@ struct TripsHomeView: View {
     var creating: Binding<Bool> = .constant(false)
     /// The trip was made: its id, to open its lobby.
     var onCreated: (String) -> Void = { _ in }
+    /// Join was opened and its gates (name, location) are through: the sheet becomes the join steps over this map (D58).
+    /// Cleared again when the sheet closes or the trip is joined.
+    var joining: Binding<JoinStart?> = .constant(nil)
+    /// The trip was joined: its id, to open its lobby.
+    var onJoined: (String) -> Void = { _ in }
+
+    /// The join steps over this map; nil while the sheet shows its list.
+    @State private var joinFlow: JoinStepper?
+    /// Where the camera was before joining, for Close.
+    @State private var cameraBeforeJoin: MapCameraPosition?
+    /// The trip was joined and its lobby is opening: the steps stay until the lobby replaces this view, so the list never flashes.
+    @State private var finishingJoin = false
 
     /// The create flow (Where to?, then New trip) over this map; nil while the sheet shows its list.
     @State private var flow: NewTripFlow?
@@ -69,7 +81,10 @@ struct TripsHomeView: View {
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, covered: Bool = false,
          sheetUp: Binding<Bool> = .constant(false), creating: Binding<Bool> = .constant(false),
-         onCreated: @escaping (String) -> Void = { _ in }) {
+         onCreated: @escaping (String) -> Void = { _ in },
+         joining: Binding<JoinStart?> = .constant(nil), onJoined: @escaping (String) -> Void = { _ in }) {
+        self.joining = joining
+        self.onJoined = onJoined
         self.covered = covered
         self.sheetUp = sheetUp
         self.creating = creating
@@ -95,8 +110,16 @@ struct TripsHomeView: View {
     /// picked (its route from `routes`), pulled up if `expanded`.
     init(demo past: [PastTrips.Entry], routes: [PastTripRoute], picked: PickedTrip? = nil,
          selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false,
-         creating createFlow: NewTripFlow? = nil, nowStatus: [String: String] = [:]) {
+         creating createFlow: NewTripFlow? = nil, joining joinStepper: JoinStepper? = nil, nowStatus: [String: String] = [:]) {
         self.init(onNewTrip: {}, onJoin: {})
+        if let joinStepper {
+            _joinFlow = State(initialValue: joinStepper)
+            let insets = HomeSheet.createInsets(
+                mapHeight: 0, sheet: HomeSheet.joinHeight, compact: HomeSheet.compactHeight)
+            if let region = JoinSteps.region(for: joinStepper.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) {
+                _listCamera = State(initialValue: .region(region))
+            }
+        }
         if let createFlow {
             _flow = State(initialValue: createFlow)
             let insets = HomeSheet.createInsets(
@@ -160,7 +183,7 @@ struct TripsHomeView: View {
             }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
-                if flow != nil { refocusCreate(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) }
+                if flow != nil { refocusCreate(animated: false) } else if joinFlow != nil { refocusJoin(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) }
             }
         .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
@@ -185,6 +208,10 @@ struct TripsHomeView: View {
         .onChange(of: creating.wrappedValue) { _, now in
             if now { beginCreate() } else if flow != nil, !finishingCreate { closeCreate() }
         }
+        .onChange(of: joining.wrappedValue, initial: true) { _, now in
+            if let now { beginJoin(now) } else if joinFlow != nil, !finishingJoin { closeJoin() }
+        }
+        .onChange(of: joinFlow?.model.preview) { _, _ in refocusJoin(animated: true) }
         .onChange(of: mode) { old, new in
             let keep = HomeSheet.expanded(expanded, from: old, to: new)
             if keep != expanded { withAnimation(sheetMotion) { expanded = keep } }
@@ -207,6 +234,11 @@ struct TripsHomeView: View {
                     flow = nil
                     cameraBeforeCreate = nil
                 }
+                if finishingJoin {
+                    finishingJoin = false
+                    joinFlow = nil
+                    cameraBeforeJoin = nil
+                }
             }
         }
     }
@@ -218,7 +250,9 @@ struct TripsHomeView: View {
     /// picks that trip). A tap on the map away from a picked trip's route goes back to the list.
     private var mapSpec: TripMapSpec {
         let input: TripMapInput
-        if let flow {
+        if let joinFlow {
+            input = joinFlow.mapInput
+        } else if let flow {
             input = .newTrip(places: flow.pins, focusedId: flow.focusTarget?.id,
                              route: flow.ready.map { Polyline.decode($0.route.polyline) } ?? [])
         } else if let picked {
@@ -364,7 +398,7 @@ struct TripsHomeView: View {
 
     /// Points the camera at every drawn route, above the compact sheet.
     private func fit(animated: Bool) {
-        guard flow == nil else { return }
+        guard flow == nil, joinFlow == nil else { return }
         let insets = Self.obscured(mapHeight: mapHeight)
         guard let region = PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom,
                                                     topObscured: insets.top) else { return }
@@ -388,7 +422,7 @@ struct TripsHomeView: View {
 
     // MARK: Create flow
 
-    private var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow, leftTripPicked: picked?.isLeft == true) }
+    private var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow, leftTripPicked: picked?.isLeft == true, joining: joinFlow != nil) }
 
     /// New trip's gates are through: Where to? takes over the sheet and the map.
     private func beginCreate() {
@@ -419,6 +453,54 @@ struct TripsHomeView: View {
         let sheet = HomeSheet.height(mode, compact: compact)
         let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheet, compact: compact)
         guard let region = flow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { return }
+        move(to: .region(region), animated: animated)
+    }
+
+    // MARK: Join flow
+
+    /// Join's gates are through (or a link brought a code): the sheet becomes the join steps and the map shows the trip
+    /// once its code is found. A second start (another link) replaces the steps with the new code.
+    private func beginJoin(_ start: JoinStart) {
+        if joinFlow == nil {
+            cameraBeforeJoin = cameraBeforeCreate ?? cameraBeforePick ?? stage.camera
+        }
+        flow?.cancel()
+        if picked != nil { picked = nil }
+        creating.wrappedValue = false
+        let stepper = JoinStepper(displayName: auth.displayName ?? "", code: start.code)
+        withAnimation(sheetMotion) {
+            expanded = false
+            flow = nil
+            joinFlow = stepper
+        }
+        cameraBeforeCreate = nil
+        cameraBeforePick = nil
+    }
+
+    /// Back to Home's list, the camera where it was. Nothing was written.
+    private func closeJoin() {
+        withAnimation(sheetMotion) {
+            joinFlow = nil
+            expanded = false
+        }
+        joining.wrappedValue = nil
+        if let before = cameraBeforeJoin { move(to: before, animated: true) }
+        cameraBeforeJoin = nil
+    }
+
+    private func joined(_ tripId: String) {
+        finishingJoin = true
+        joining.wrappedValue = nil
+        onJoined(tripId)
+        // Demo and tests have no parent to cover the sheet.
+        if !covered, isDemo { finishingJoin = false; joinFlow = nil }
+    }
+
+    /// The camera for a found code: the trip's end above the sheet; nothing before that.
+    private func refocusJoin(animated: Bool) {
+        guard let joinFlow else { return }
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: HomeSheet.joinHeight, compact: compact)
+        guard let region = JoinSteps.region(for: joinFlow.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
 
@@ -456,7 +538,10 @@ struct TripsHomeView: View {
         // The header and the scrolling body are one page that crossfades in place, so the sheet (always at the
         // same short height) keeps its size and only its contents change.
         return ZStack(alignment: .top) {
-            if let flow {
+            if let joinFlow {
+                JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: joined)
+                    .transition(.opacity)
+            } else if let flow {
                 Group {
                     if let ready = flow.ready {
                         NewTripSheet(flow: flow, ready: ready, onBack: { withAnimation(sheetMotion) { flow.back() } },

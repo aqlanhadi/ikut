@@ -132,6 +132,7 @@ final class PickedTrip {
 @MainActor
 enum HomePickedDemo {
     static func view(_ name: String) -> TripsHomeView {
+        if let join = JoinDemo.home(name) { return join }
         let snapshot = RecapSnapshot.demo()
         let day: TimeInterval = 86_400
         let now = Date()

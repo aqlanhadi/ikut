@@ -353,8 +353,6 @@ enum DemoScreens {
         case "lobby-sharing": return trip(LobbyStopsDemo.lobby(.sharing))
         // Driving, no longer in the trip: "You’re no longer in this trip" and Back to trips on top of the sheet (#403).
         case "road-no-longer-in-trip": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.drivingLost) })
-        case "join-stops": return nav(JoinDemo.ticket(withStops: true))
-        case "join-no-stops": return nav(JoinDemo.ticket(withStops: false))
         case "road-markers": return AnyView(MapMarkersDemo())
         case "road-header-moving": return AnyView(PanelHeaderDemo(.moving))
         case "road-header-parked": return AnyView(PanelHeaderDemo(.parked))
@@ -377,8 +375,11 @@ enum DemoScreens {
         case "road-hazard-pass": return AnyView(MapDemo.hazardPass())
         case "road-next-stop": return AnyView(NextStopDemo())
         case "road-next-stop-joining-after-leave": return AnyView(NextStopDemo(afterLeave: true))
-        case "join-with-location": return nav(JoinDemo.ticket(withStops: true, drive: TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60)))
-        case "join-without-location": return nav(JoinDemo.ticket(withStops: true))
+        // Joining in Home's sheet (D58): the code (empty, found, found with the drive from here, not found), then which
+        // car (nothing picked, someone else's car, my own car). The sheet is the same height on all of them.
+        case "join-h3-empty", "join-h3-found", "join-h3-found-drive", "join-h3-not-found",
+             "join-h4-car", "join-h4-copilot", "join-h4-own":
+            return home(name)
         case "lobby-own-merges": return trip(OwnWayDemo.lobby(.merges))
         case "lobby-own-main": return trip(OwnWayDemo.lobby(.onMain))
         case "lobby-own-never": return trip(OwnWayDemo.lobby(.neverMerges))
