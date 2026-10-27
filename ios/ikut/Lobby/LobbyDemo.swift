@@ -245,6 +245,28 @@ struct TripStartSwapDemo: View {
     }
 }
 
+/// `home-create-swap`: Home's New trip over the one map, and 2 s later Create trip, so the switch to the lobby can be
+/// watched: the same map, the camera from New trip's route to the whole trip above the lobby's sheet, New trip's sheet
+/// becoming the lobby's (D54). Nothing is written.
+struct HomeCreateSwapDemo: View {
+    @Environment(TripMapStage.self) private var stage
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if stage.tripId == nil {
+                HomePickedDemo.view("new-trip")
+            } else {
+                LobbyStopsDemo.lobby(.organizer)
+            }
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: "demo", started: false) }
+        }
+    }
+}
+
 /// Screens for screenshots and UI tests, opened by launching with `IKUT_SCREEN=<name>` (debug builds only).
 @MainActor
 enum DemoScreens {
@@ -255,7 +277,8 @@ enum DemoScreens {
         /// A lobby is the trip screen's lobby mode, over the screen's one map.
         func trip<V: View>(_ view: V) -> AnyView { nav(TripScreenHost { view }) }
         func home(_ state: String) -> AnyView {
-            AnyView(HomePickedDemo.view(state).environment(AuthModel()))
+            // Home is the Home mode of the app's one map (D54).
+            AnyView(TripScreenHost(mode: .home) { HomePickedDemo.view(state) }.environment(AuthModel()))
         }
         let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
         func search(_ model: CreateTripModel) -> AnyView { nav(CreateTripView(model: model) { _ in }) }
@@ -411,7 +434,11 @@ enum DemoScreens {
         case "home-now-failed": return home("now-failed")
         case "home-where-to": return home("where-to")
         case "home-new-trip": return home("new-trip")
+        // New trip, then Create trip 2 s later: the switch to the lobby on the same map (D54).
+        case "home-create-swap": return nav(TripScreenHost(mode: .home) { HomeCreateSwapDemo() })
         case "home-picked-failed": return home("failed")
+        // A trip left early, picked: its route, and no recap (D54, #421).
+        case "home-picked-left": return home("left")
         case "stop-request-places": return AnyView(StopCardPreview(scene: "responder", screen: "places"))
         case "stop-request-places-two-reasons": return AnyView(StopCardPreview(scene: "two", screen: "places-two-reasons"))
         case "stop-request-no-places": return AnyView(StopCardPreview(scene: "responder", screen: "no-places"))

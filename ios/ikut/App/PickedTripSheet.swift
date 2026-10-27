@@ -43,7 +43,17 @@ struct PickedTripHeader: View {
             }
             .padding(.top, Spacing.xxs)
 
-            if model.recap != nil {
+            if picked.isLeft {
+                // A trip left early: its route only, and why there is no recap. Nothing to retry.
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(PickedTripLogic.leftTitle).font(.subheadline.weight(.semibold))
+                    Text(PickedTripLogic.leftLine).font(.footnote).foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.gap)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("picked.left")
+            } else if model.recap != nil {
                 if let item = picked.selectedItem {
                     selectedCard(item)
                 } else if let line = picked.statsLine {
@@ -110,7 +120,7 @@ struct PickedTripBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let recap = picked.model.recap, let snapshot = picked.model.snapshot {
+            if !picked.isLeft, let recap = picked.model.recap, let snapshot = picked.model.snapshot {
                 RecapContent(recap: recap, snapshot: snapshot, layout: .sheet, filter: $picked.filter, onSelect: onSelect)
             }
         }

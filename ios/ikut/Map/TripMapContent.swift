@@ -15,6 +15,16 @@ struct TripMapInput {
         static let pins = Layers(rawValue: 16)
         static let hazards = Layers(rawValue: 32)
         static let cars = Layers(rawValue: 64)
+        /// Home (D54): the routes of your past trips.
+        static let pastRoutes = Layers(rawValue: 128)
+        /// Home: the past trip picked, with its start and destination.
+        static let pickedRoute = Layers(rawValue: 256)
+        /// Home: the picked trip's stops and road reports from its recap.
+        static let recapDots = Layers(rawValue: 512)
+        /// Where to?'s results (or the dropped pin), or New trip's destination.
+        static let places = Layers(rawValue: 1024)
+        /// New trip's route, before the trip is made.
+        static let newTripRoute = Layers(rawValue: 2048)
     }
 
     var showsUser = false
@@ -28,6 +38,8 @@ struct TripMapInput {
     var pins: [LobbyPin] = []
     var hazards: [HazardMarker] = []
     var cars: [MapMarker] = []
+    /// Home: what it draws over the same map (`home`, `picked`, `newTrip`).
+    var home = HomeMapInput()
 
     var layers: Layers {
         var result: Layers = []
@@ -38,6 +50,11 @@ struct TripMapInput {
         if !pins.isEmpty { result.insert(.pins) }
         if !hazards.isEmpty { result.insert(.hazards) }
         if !cars.isEmpty { result.insert(.cars) }
+        if !home.pastRoutes.isEmpty { result.insert(.pastRoutes) }
+        if home.pickedRoute != nil { result.insert(.pickedRoute) }
+        if !home.recapDots.isEmpty { result.insert(.recapDots) }
+        if !home.places.isEmpty { result.insert(.places) }
+        if home.newTripRoute.count > 1 { result.insert(.newTripRoute) }
         return result
     }
 
@@ -54,6 +71,23 @@ struct TripMapInput {
         TripMapInput(route: route, overlays: overlays, hazards: hazards, cars: cars)
     }
 
+    /// Home's list: your position and the routes of your past trips, newest first (`names`: the name Home lists for
+    /// each, which may be newer than the cached route's).
+    static func home(routes: [PastTripRoute], names: [String: String]) -> TripMapInput {
+        TripMapInput(showsUser: true, home: HomeMapInput(pastRoutes: routes, pastNames: names))
+    }
+
+    /// A past trip picked on Home: only its route, with its stops and road reports.
+    static func picked(route: PastTripRoute?, dots: [RecapTimelineItem], selectedId: String?) -> TripMapInput {
+        TripMapInput(home: HomeMapInput(pickedRoute: route, recapDots: dots, selectedDotId: selectedId))
+    }
+
+    /// Where to? (the results as pins, `focusedId` the one at the top of the list) or New trip (`route` drawn to its
+    /// one destination).
+    static func newTrip(places: [DestinationResult], focusedId: String?, route: [CLLocationCoordinate2D]) -> TripMapInput {
+        TripMapInput(showsUser: true, home: HomeMapInput(places: places, focusedPlaceId: focusedId, newTripRoute: route))
+    }
+
     /// Pins in drawing order: the chosen R&R last, so it is on top.
     var orderedPins: [LobbyPin] { pins.sorted { !$0.isSelectedCandidate && $1.isSelectedCandidate } }
 }
@@ -65,6 +99,10 @@ struct TripMapStyle {
     /// The hazard that pings because an alert for it is up.
     var pingingEventId: String?
     var onCandidateTap: (String) -> Void = { _ in }
+    /// Home: a past trip's destination flag (its id).
+    var onPastTripTap: (String) -> Void = { _ in }
+    /// Home: one of the picked trip's stops or road reports (its timeline id).
+    var onRecapDotTap: (String) -> Void = { _ in }
 }
 
 /// The one map layer both screens draw with. The camera, gestures and padding stay in each view.
@@ -74,6 +112,7 @@ struct TripMapContent: MapContent {
 
     var body: some MapContent {
         if input.showsUser { UserAnnotation() }
+        HomeMapContent(input: input.home, style: style)
         if input.route.count > 1 {
             MapPolyline(coordinates: input.route)
                 .stroke(MapPalette.routeCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))

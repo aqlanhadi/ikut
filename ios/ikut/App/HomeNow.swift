@@ -43,19 +43,62 @@ enum HomeNow {
         var endedAt: Date?
         var name: String?
         var destination: String?
+        /// The trip has started (`LobbyLogic.isStarted`): opening it goes to the driving map.
+        var started = false
+        /// The server said this phone can't read the trip: it left, was removed, or the trip is gone. Home moves it to
+        /// Past trips and the app no longer opens into it. A read that failed for any other reason (no signal) is not
+        /// this: the trip stays in Now.
+        var gone = false
+    }
+
+    /// When a trip read from Now moves to Past trips, with the date it is listed under: it ended (its end), or this
+    /// phone is no longer in it (now, when it found out). Signed out every read is refused, so that says nothing.
+    static func movesToPast(_ read: Read, signedIn: Bool, now: Date = Date()) -> Date? {
+        if let endedAt = read.endedAt { return endedAt }
+        return read.gone && signedIn ? now : nil
+    }
+
+    /// Gone before it ended: this phone left or was removed, so Past trips shows it as left (route, no recap).
+    static func wasLeft(_ read: Read) -> Bool { read.gone && read.endedAt == nil }
+
+    /// Whether a failed read means this phone is no longer in the trip: the rules refuse a trip to anyone not a member
+    /// (or a trip that doesn't exist), so a refusal or a missing trip is "gone"; anything else (offline) is not known.
+    static func isGone(_ error: Error?) -> Bool {
+        guard let error = error as NSError?, error.domain == FirestoreErrorDomain else { return false }
+        return error.code == FirestoreErrorCode.permissionDenied.rawValue || error.code == FirestoreErrorCode.notFound.rawValue
+    }
+
+    /// The phone's own copy of the trip (no server), for a launch whose read didn't answer in time: whether it ended
+    /// or started as last seen. Nil when the phone has none.
+    @MainActor
+    static func loadCached(tripId: String, db: Firestore = Firestore.firestore()) async -> Read? {
+        guard let snapshot = try? await db.document(FirestorePaths.trip(tripId)).getDocument(source: .cache),
+              snapshot.exists, let trip = try? snapshot.data(as: Trip.self) else { return nil }
+        return Read(line: fallbackStatus, endedAt: trip.status == .ended ? (trip.endedAt ?? Date()) : nil,
+                    name: trip.name, destination: trip.destination.name, started: LobbyLogic.isStarted(trip: trip))
     }
 
     /// One read of the trip, its cars and its stops, as a member can (no listener). A trip that can't be read says
-    /// "In progress"; cars or stops that can't be read are left out of the line.
+    /// "In progress" (and is `gone` when the server refused it); cars or stops that can't be read are left out of the
+    /// line. `line: false` reads the trip alone (the app's launch only needs whether it ended or started).
     @MainActor
-    static func load(tripId: String, db: Firestore = Firestore.firestore()) async -> Read {
-        guard let trip = try? await db.document(FirestorePaths.trip(tripId)).getDocument(as: Trip.self) else {
-            return Read(line: fallbackStatus)
+    static func load(tripId: String, line: Bool = true, db: Firestore = Firestore.firestore()) async -> Read {
+        let trip: Trip
+        do {
+            let snapshot = try await db.document(FirestorePaths.trip(tripId)).getDocument()
+            guard snapshot.exists else { return Read(line: fallbackStatus, gone: true) }
+            trip = try snapshot.data(as: Trip.self)
+        } catch {
+            return Read(line: fallbackStatus, gone: isGone(error))
         }
-        let cars = (try? await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments().decoded(Car.self)) ?? []
-        let stops = (try? await db.collection(FirestorePaths.stops(tripId: tripId)).getDocuments().decoded(PlannedStop.self)) ?? []
-        return Read(line: status(trip: trip, cars: cars, stops: stops),
+        var cars: [Car] = []
+        var stops: [PlannedStop] = []
+        if line {
+            cars = (try? await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments().decoded(Car.self)) ?? []
+            stops = (try? await db.collection(FirestorePaths.stops(tripId: tripId)).getDocuments().decoded(PlannedStop.self)) ?? []
+        }
+        return Read(line: line ? status(trip: trip, cars: cars, stops: stops) : fallbackStatus,
                     endedAt: trip.status == .ended ? (trip.endedAt ?? Date()) : nil,
-                    name: trip.name, destination: trip.destination.name)
+                    name: trip.name, destination: trip.destination.name, started: LobbyLogic.isStarted(trip: trip))
     }
 }

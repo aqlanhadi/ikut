@@ -106,6 +106,11 @@ final class AlertCenter {
         }
     }
 
+    /// This phone's car, once its member doc has loaded: its stop requests are not announced from then on.
+    func setMyCar(_ carId: String?) {
+        policy?.myCarId = carId
+    }
+
     func stop() {
         listenTask?.cancel()
         listenTask = nil

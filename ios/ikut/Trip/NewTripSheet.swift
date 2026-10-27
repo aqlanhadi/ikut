@@ -144,49 +144,6 @@ struct NewTripSheet: View {
     }
 }
 
-/// The pins and the route of the create flow, as content for Home's map.
-@MainActor
-enum NewTripMapContent {
-    @MapContentBuilder
-    static func content(_ flow: NewTripFlow) -> some MapContent {
-        UserAnnotation()
-        if let ready = flow.ready {
-            let line = Polyline.decode(ready.route.polyline)
-            if line.count > 1 {
-                MapPolyline(coordinates: line)
-                    .stroke(.white.opacity(0.9), style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
-                MapPolyline(coordinates: line)
-                    .stroke(Color.ikutAccent, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-            }
-            Annotation(ready.place.name, coordinate: ready.place.coordinate, anchor: .bottom) {
-                pin(focused: false, color: Color(.label))
-            }
-            .annotationTitles(.visible)
-        } else {
-            let target = flow.focusTarget?.id
-            ForEach(flow.pins) { place in
-                let focused = place.id == target
-                Annotation(place.name, coordinate: place.coordinate, anchor: .bottom) {
-                    pin(focused: focused, color: .red)
-                }
-                .annotationTitles(focused ? .visible : .hidden)
-            }
-        }
-    }
-
-    private static func pin(focused: Bool, color: Color) -> some View {
-        let size: CGFloat = focused ? 36 : 28
-        return Image(systemName: "mappin")
-            .font(.system(size: focused ? 16 : 13, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(color, in: Circle())
-            .overlay(Circle().stroke(.white, lineWidth: 2.5))
-            .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-            .accessibilityHidden(true)
-    }
-}
-
 extension NewTripFlow {
     /// The map region for this step: the whole route above the sheet on New trip, else the pin at the top of the
     /// list. Nil when there is nothing to show.

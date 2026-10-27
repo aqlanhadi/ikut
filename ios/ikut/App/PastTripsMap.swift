@@ -92,6 +92,13 @@ enum PastTripsMapService {
         try? data.write(to: url, options: .atomic)
     }
 
+    /// Keeps `route` for Home, as the trip is left: once out of it, this phone can no longer read the trip.
+    static func remember(_ route: PastTripRoute) {
+        var cache = cachedRoutes()
+        cache[route.id] = route
+        save(Array(cache.values))
+    }
+
     /// What to write to the file cache after a load: the routes Home still lists, or nothing when the load
     /// was for one trip outside them (`keeping: false`), which must not shrink the 12-trip cache.
     static func routesToKeep(_ entries: [PastTrips.Entry], cache: [String: PastTripRoute], keeping: Bool) -> [PastTripRoute]? {
@@ -107,6 +114,9 @@ enum PastTripsMapService {
         for entry in entries {
             if let hit = cache[entry.id] {
                 result.append(hit)
+            } else if !PickedTripLogic.readsServer(entry) {
+                // Left early: only a route cached on Leave; the trip is members-only.
+                continue
             } else if let recap = RecapService.cached(tripId: entry.id) {
                 let r = PastTripsMapLogic.route(id: entry.id, name: recap.name, destinationName: recap.destinationName,
                                                 destination: recap.destination, encodedRoute: recap.route)

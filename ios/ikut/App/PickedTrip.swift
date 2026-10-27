@@ -13,6 +13,14 @@ enum PickedTripLogic {
         return "To \(entry.destination) · \(ended.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale)))"
     }
 
+    /// A trip this phone left before it ended (`PastTrips.Entry.leftAt`): only its cached route is shown; the trip
+    /// and its recap are members-only, so neither is read.
+    static func readsServer(_ entry: PastTrips.Entry) -> Bool { entry.leftAt == nil }
+
+    /// What a left trip's sheet says where the recap would be (D54, owner's answer to #421).
+    static let leftTitle = "You left while the trip was in progress"
+    static let leftLine = "No recap for trips you leave early."
+
     /// "205 km · 2 h 47 min · 4 cars · 1 stop". A part the recap can't give is left out: no route, no
     /// duration, no cars, and no stops (positions and events are purged 7 days after the end, so none
     /// can mean none kept).
@@ -99,6 +107,8 @@ final class PickedTrip {
     }
 
     var title: String { model.recap?.title ?? entry.name }
+    /// This phone left the trip before it ended: the route only, no recap.
+    var isLeft: Bool { !PickedTripLogic.readsServer(entry) }
     var subtitle: String { PickedTripLogic.subtitle(entry) }
     var statsLine: String? { model.recap.flatMap(PickedTripLogic.statsLine) }
 
@@ -145,6 +155,11 @@ enum HomePickedDemo {
             return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model), selecting: stop)
         case "loading": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(tripId: "demo-never-loaded")))
         case "failed": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: RecapModel(failedTripId: entry.id)))
+        case "left":
+            var left = entry
+            left.leftAt = now.addingTimeInterval(-day)
+            return TripsHomeView(demo: [left] + older, routes: [thin],
+                                 picked: PickedTrip(entry: left, model: RecapModel(tripId: "demo-never-loaded")))
         case "tap", "tour":
             // Two more routes, so the list's fit is wider than the picked trip's and picking moves the camera.
             func line(_ id: String, _ name: String, _ to: String, _ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> PastTripRoute {

@@ -55,7 +55,7 @@ final class CreateTripUITests: ConvoyUITestCase {
     /// Home's row to the lobby (the lobby's sheet and bar), Start to driving, a Pit stop card opened and closed, the
     /// convoy sheet raised to tall with the lobby's rows below it and down again, twice (there is no Back to the lobby,
     /// D53), a swipe at tall that scrolls and keeps the height, then End trip from the rows: Cancel leaves the sheet at
-    /// tall, confirming opens the recap.
+    /// tall, confirming opens the recap, and Done on it returns to Home's list on the same map.
     func testLobbyAndHomeSheetsHandOver() throws {
         app = XCUIApplication()
         allowPermissionPrompts()
@@ -152,6 +152,92 @@ final class CreateTripUITests: ConvoyUITestCase {
         let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "End trip"))
         confirm.element(boundBy: confirm.count - 1).tap()
         XCTAssertTrue(app.buttons["Share recap"].waitForExistence(timeout: 30), "Ending the trip didn't open the recap")
+
+        // Done on the recap: Home's list on the one map, its sheet back and hittable (D54).
+        closeRecap()
+        let home = app.buttons["homeWhereTo"]
+        XCTAssertTrue(home.waitForExistence(timeout: 15), "Done on the recap didn't return to Home")
+        XCTAssertTrue(home.isHittable, "After the recap, Home's Where to? isn't hittable")
+    }
+
+    /// Relaunch mid-trip (#401, D54): a trip created and started, the app terminated and launched again, opens straight
+    /// on the driving map (Home never shows first), and the trip is still there to end.
+    func testRelaunchOpensTheDrivingMapOfTheTripInProgress() throws {
+        app = XCUIApplication()
+        allowPermissionPrompts()
+        app.launch()
+        startNewTrip(as: "Organizer", homeTimeout: 15)
+        let search = app.textFields["Destination"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
+        search.tap()
+        search.typeText("Ipoh")
+        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
+        result.tap()
+        tapCreateTrip()
+        XCTAssertTrue(waitForLobby(timeout: 30), "Create trip didn't open the lobby")
+        lobbyActionButton.tap()
+        app.dismissMapAsks(first: 3)
+        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Start trip didn't switch to the driving map")
+
+        app.terminate()
+        app.launch()
+        // Straight into the trip: Home's Where to? never shows on the way.
+        let home = app.buttons["homeWhereTo"]
+        let deadline = Date().addingTimeInterval(30)
+        var sawHome = false
+        while Date() < deadline, !app.drivingReport.exists {
+            if home.exists { sawHome = true }
+            app.buttons["Not now"].firstMatch.tapIfHittable()
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        add(XCTAttachment(screenshot: app.screenshot()))
+        XCTAssertTrue(app.drivingReport.exists, "Relaunch didn't open the driving map")
+        XCTAssertFalse(sawHome, "Home showed before the trip on relaunch")
+        XCTAssertFalse(app.buttons["lobby.back"].exists, "Relaunch opened the lobby, not the driving map")
+
+        // The trip is the one in progress: End trip from its rows, the recap, then Home.
+        returnHomeFromAnOpenTrip()
+        XCTAssertTrue(home.waitForExistence(timeout: 30), "After ending the trip, Home didn't come back")
+    }
+
+    /// Relaunch before Start (#401, D54): a trip created and left in its lobby, the app terminated and launched again,
+    /// opens straight in that lobby (Home never shows first); Back to trips then returns to Home.
+    func testRelaunchOpensTheLobbyOfATripNotStarted() throws {
+        app = XCUIApplication()
+        allowPermissionPrompts()
+        app.launch()
+        startNewTrip(as: "Organizer", homeTimeout: 15)
+        let search = app.textFields["Destination"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
+        search.tap()
+        search.typeText("Ipoh")
+        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
+        result.tap()
+        tapCreateTrip()
+        XCTAssertTrue(waitForLobby(timeout: 30), "Create trip didn't open the lobby")
+
+        app.terminate()
+        app.launch()
+        let home = app.buttons["homeWhereTo"]
+        let startTrip = app.buttons["Start trip"]
+        let deadline = Date().addingTimeInterval(30)
+        var sawHome = false
+        // Existence only while waiting: mid-transition a button can exist with no frame, and asking if it is
+        // hittable then fails the test.
+        while Date() < deadline, !startTrip.exists {
+            if home.exists { sawHome = true }
+            dismissAlwaysExplainerIfShown()
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        add(XCTAttachment(screenshot: app.screenshot()))
+        XCTAssertTrue(waitForLobby(timeout: 15), "Relaunch didn't open the lobby")
+        XCTAssertFalse(sawHome, "Home showed before the lobby on relaunch")
+        XCTAssertFalse(app.drivingReport.exists, "Relaunch before Start opened the driving map")
+
+        app.buttons["lobby.back"].tap()
+        XCTAssertTrue(home.waitForExistence(timeout: 15), "Back to trips didn't return to Home")
     }
 
     private func waitForGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
@@ -159,4 +245,11 @@ final class CreateTripUITests: ConvoyUITestCase {
         return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
     }
 
+}
+
+private extension XCUIElement {
+    /// Taps it when it is there and can be tapped; nothing otherwise.
+    func tapIfHittable() {
+        if exists, isHittable { tap() }
+    }
 }

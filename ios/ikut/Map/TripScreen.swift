@@ -1,12 +1,13 @@
 import MapKit
 import SwiftUI
 
-/// The trip screen's two modes over its one map (D53): the lobby (the whole route, the lobby's sheet) and driving
-/// (following your car, the pill, the banners and the convoy sheet). Start trip and Show map are a camera move and a
-/// sheet change, not a new screen. There is no way back to the lobby's mode: while driving, the lobby's rows continue
-/// below the convoy at the sheet's tall height (canvas row L, #409).
+/// The app's modes over its one map (D53, D54): Home (its list, a picked past trip, Where to? and New trip), the lobby
+/// (the whole route, the lobby's sheet) and driving (following your car, the pill, the banners and the convoy sheet).
+/// Create trip, a trip in Now, Start trip and Show map are a camera move and a sheet change, not a new screen; Leave,
+/// End and Back to trips return to Home's list the same way. There is no way back to the lobby's mode: while driving,
+/// the lobby's rows continue below the convoy at the sheet's tall height (canvas row L, #409).
 enum TripScreenMode: Equatable {
-    case lobby, driving
+    case home, lobby, driving
 }
 
 /// What decides the trip screen's mode, which layer draws, where the camera goes and the sheet's sizes; pure, so it
@@ -17,11 +18,19 @@ enum TripScreenLogic {
         case start
         /// A trip already under way: Show map.
         case showMap
+        /// A trip opened from Home (Create trip, a row in Now, Join, or the app opening into it): its lobby, or driving
+        /// when it has started.
+        case open(started: Bool)
+        /// Leave trip, End trip (after the recap), Back to trips: Home's list.
+        case exit
     }
 
     static func mode(after event: Event, from mode: TripScreenMode) -> TripScreenMode {
         switch event {
-        case .start, .showMap: .driving
+        // Home has no trip open: nothing to start or show.
+        case .start, .showMap: mode == .home ? .home : .driving
+        case .open(let started): started ? .driving : .lobby
+        case .exit: .home
         }
     }
 
@@ -32,6 +41,7 @@ enum TripScreenLogic {
     static func lobbyListens(onScreen: Bool, mode: TripScreenMode, lobbyRowsShown: Bool) -> Bool {
         guard onScreen else { return false }
         switch mode {
+        case .home: return false
         case .lobby: return true
         case .driving: return lobbyRowsShown
         }
@@ -39,10 +49,11 @@ enum TripScreenLogic {
 
     /// The layer on screen in `mode`: it alone draws its chrome, publishes what the map draws (`TripMapSpec`) and fills
     /// the sheet (`TripSheetSpec`).
-    enum Layer: Equatable { case lobby, driving }
+    enum Layer: Equatable { case home, lobby, driving }
 
     static func layer(in mode: TripScreenMode) -> Layer {
         switch mode {
+        case .home: .home
         case .lobby: .lobby
         case .driving: .driving
         }
@@ -50,6 +61,8 @@ enum TripScreenLogic {
 
     /// Where the camera goes as a mode comes on screen.
     enum EntryCamera: Equatable {
+        /// Home's own: every past route drawn above its short sheet, or where you are when there are none.
+        case homeList
         /// The whole route with its pins, above the lobby's sheet (`LobbyMapTarget.wholeTrip`).
         case wholeTrip
         /// Your car, in the driving map's follow camera (`MapMode.follow`, `MapCameraLogic`).
@@ -58,6 +71,7 @@ enum TripScreenLogic {
 
     static func entryCamera(_ mode: TripScreenMode) -> EntryCamera {
         switch mode {
+        case .home: .homeList
         case .lobby: .wholeTrip
         case .driving: .follow
         }
@@ -70,13 +84,16 @@ enum TripScreenLogic {
     /// first frame just places it.
     static func animatesEntry(mapHasCamera: Bool) -> Bool { mapHasCamera }
 
-    /// The one sheet's sizes in each mode: the lobby's medium and tall, or the convoy panel's short and tall.
+    /// The one sheet's sizes in each mode: Home's short (the list's, or Where to?'s and New trip's own) and tall, the
+    /// lobby's medium and tall, or the convoy panel's short and tall.
     enum Sheet: Equatable {
+        case home(HomeSheet.Mode, compact: CGFloat)
         case lobby(compact: CGFloat)
         case driving(PanelSheet.Heights)
 
         var mode: TripScreenMode {
             switch self {
+            case .home: .home
             case .lobby: .lobby
             case .driving: .driving
             }
@@ -84,6 +101,7 @@ enum TripScreenLogic {
 
         var detents: Set<PresentationDetent> {
             switch self {
+            case .home(let mode, let compact): HomeSheet.detents(mode, compact: compact)
             case .lobby(let compact): LobbySheet.detents(compact: compact)
             case .driving(let heights): PanelSheet.detents(in: heights)
             }
@@ -93,6 +111,7 @@ enum TripScreenLogic {
         /// tall, its highest, so the map, the pill, the banners and the round buttons answer at both heights (#402).
         var touchableUpThrough: PresentationDetent {
             switch self {
+            case .home(let mode, let compact): HomeSheet.short(HomeSheet.height(mode, compact: compact))
             case .lobby(let compact): LobbySheet.medium(compact)
             case .driving(let heights): .height(heights.tall)
             }
@@ -107,6 +126,8 @@ struct TripMapSpec {
     var style = TripMapStyle()
     var bottomPadding: CGFloat = 0
     var hidesControls = false
+    /// A tap on the map away from its annotations (Home: back from a picked trip to the list); nil, the map keeps it.
+    var onTap: (() -> Void)?
 }
 
 /// The one sheet's content and whether it is up now (the cover rules: `LobbySheet`, `PanelSheet`).
@@ -146,8 +167,29 @@ final class TripMapStage {
     var mapFrame: CGRect = .zero
     /// Driving: the convoy sheet is at tall and the lobby's rows continue below the convoy (`PanelSheet.showsLobbyRows`).
     var lobbyRowsShown = false
+    /// The trip on screen in the lobby's and driving modes; nil on Home.
+    private(set) var tripId: String?
+    /// The camera as it moves, frame by frame, outside observation so a glide redraws nothing (Home's settle check).
+    let cameraBox = CameraBox()
 
-    init(mode: TripScreenMode = .lobby) { self.mode = mode }
+    init(mode: TripScreenMode = .lobby, tripId: String? = nil) {
+        self.mode = mode
+        self.tripId = tripId
+    }
+
+    /// Home hands the map to a trip: its lobby, or driving when it has started (`TripScreenLogic.Event.open`).
+    func open(tripId: String, started: Bool) {
+        self.tripId = tripId
+        lobbyRowsShown = false
+        mode = TripScreenLogic.mode(after: .open(started: started), from: mode)
+    }
+
+    /// Leave, End or Back to trips: Home's list on the same map.
+    func exit() {
+        tripId = nil
+        lobbyRowsShown = false
+        mode = TripScreenLogic.mode(after: .exit, from: mode)
+    }
 
     /// Something has placed the camera, so the next entry move is a flight from it.
     var hasCamera: Bool { camera != .automatic }
@@ -161,6 +203,12 @@ struct TripScreenHost<Content: View>: View {
 
     init(mode: TripScreenMode = .lobby, @ViewBuilder content: () -> Content) {
         _stage = State(initialValue: TripMapStage(mode: mode))
+        self.content = content()
+    }
+
+    /// The app's one host (`HomeView`), whose stage it keeps to open and close trips on it.
+    init(stage: TripMapStage, @ViewBuilder content: () -> Content) {
+        _stage = State(initialValue: stage)
         self.content = content()
     }
 
@@ -190,12 +238,17 @@ struct TripScreenHost<Content: View>: View {
         .mapControlVisibility(spec.hidesControls ? .hidden : .automatic)
         // MapKit fits and centres inside the safe area: the logo and Legal ride above what the layer keeps clear.
         .safeAreaPadding(.bottom, spec.bottomPadding)
+        .onMapCameraChange(frequency: .continuous) { context in
+            stage.cameraBox.record(context.camera, latitudeDelta: context.region.span.latitudeDelta)
+        }
         .onMapCameraChange { context in
             stage.heading = context.camera.heading
             stage.reading = TripCameraReading(
                 distance: context.camera.distance, pitch: context.camera.pitch,
                 latitudeDelta: context.region.span.latitudeDelta)
         }
+        // Home: a tap away from the picked trip's route goes back to the list. Elsewhere the map keeps its taps.
+        .gesture(TapGesture().onEnded { spec.onTap?() }, including: spec.onTap == nil ? .subviews : .all)
         .ignoresSafeArea()
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stage.mapFrame = $0 }
     }

@@ -151,6 +151,9 @@ enum PastTrips {
         var seenAt: Date
         /// The other members' display names (nil for entries saved before this was kept, or not known yet).
         var others: [String]?
+        /// When this phone left the trip (Leave trip, or found it was no longer a member) before it ended: Home lists
+        /// it in Past trips with its route, and no recap (D54).
+        var leftAt: Date?
     }
 
     private static let key = "ikut.pastTrips"
@@ -161,9 +164,11 @@ enum PastTrips {
         return list
     }
 
-    static func record(tripId: String, name: String, destination: String, endedAt: Date?, others: [String]? = nil, now: Date = Date(), defaults: UserDefaults = .standard) {
+    static func record(tripId: String, name: String, destination: String, endedAt: Date?, others: [String]? = nil,
+                       left: Bool = false, now: Date = Date(), defaults: UserDefaults = .standard) {
         var list = all(defaults: defaults)
-        list = upsert(list, Entry(id: tripId, name: name, destination: destination, endedAt: endedAt, seenAt: now, others: others))
+        list = upsert(list, Entry(id: tripId, name: name, destination: destination, endedAt: endedAt, seenAt: now, others: others,
+                                  leftAt: left ? now : nil))
         if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: key) }
     }
 
@@ -173,6 +178,7 @@ enum PastTrips {
         if let old = list.first(where: { $0.id == entry.id }) {
             if entry.endedAt == nil { entry.endedAt = old.endedAt }
             if entry.others == nil { entry.others = old.others }
+            if entry.leftAt == nil { entry.leftAt = old.leftAt }
         }
         return Array(([entry] + list.filter { $0.id != entry.id }).prefix(limit))
     }

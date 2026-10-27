@@ -80,6 +80,7 @@ final class TripSession {
     private var localPausedAt: Date?
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let pauseWriter: PauseWriter?
+    @ObservationIgnored private let leaveWriter: LeaveWriter?
     @ObservationIgnored private var expiryTask: Task<Void, Never>?
     @ObservationIgnored private var expiryFor: Date?
 
@@ -104,8 +105,10 @@ final class TripSession {
         },
         ensureTimeout: Duration = .seconds(8),
         clock: @escaping () -> Date = { Date() },
-        pauseWriter: PauseWriter? = nil
+        pauseWriter: PauseWriter? = nil,
+        leaveWriter: LeaveWriter? = nil
     ) {
+        self.leaveWriter = leaveWriter
         self.clock = clock
         self.pauseWriter = pauseWriter
         self.tripId = tripId
@@ -205,22 +208,38 @@ final class TripSession {
     func leave() async throws {
         stopTrackingNow()
         isClosing = true
-        // Offline, the writes stay queued and the phone leaves anyway (ServerWrite).
+        // Offline, the writes stay queued and the phone leaves anyway (ServerWrite). A step the server refuses because
+        // this phone is no longer a member has already happened (`leaveCountsAsLeft`); anything else keeps the person
+        // in the trip with a plain message.
         do {
             if car?.trackerUserId == userId, let carId = member?.carId ?? car?.id {
+                try await leaveStep(.releaseTracker(carId: carId))
+            }
+            try await leaveStep(.deleteMember)
+        } catch {
+            isClosing = false
+            reevaluate()
+            throw LeaveFailed()
+        }
+        stop()
+    }
+
+    private func leaveStep(_ step: LeaveStep) async throws {
+        do {
+            if let leaveWriter { return try await leaveWriter(step) }
+            switch step {
+            case .releaseTracker(let carId):
                 let carRef = db.document(FirestorePaths.car(tripId: tripId, carId: carId))
                 try await ServerWrite.commit {
                     try await carRef.updateData(["trackerUserId": FieldValue.delete(), "pausedAt": FieldValue.delete()])
                 }
+            case .deleteMember:
+                let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
+                try await ServerWrite.commit { try await memberRef.delete() }
             }
-            let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
-            try await ServerWrite.commit { try await memberRef.delete() }
-        } catch {
-            isClosing = false
-            reevaluate()
-            throw error
+        } catch where TripSessionLogic.leaveCountsAsLeft(error) {
+            return
         }
-        stop()
     }
 
     // MARK: - Pause
