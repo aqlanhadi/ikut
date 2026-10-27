@@ -203,13 +203,13 @@ class ConvoyUITestCase: XCTestCase {
             let leave = app.buttons["lobby.leaveTrip"]
             // End trip whenever there is one (the organiser has both, and Leave sits above End); Leave only without it.
             var scrolls = 0
-            while !(end.exists && end.isHittable), scrolls < 20 {
-                if end.exists == false, leave.exists, leave.isHittable, scrolls >= 3 { break }
+            while !app.clearOfDrivingBar(end), scrolls < 20 {
+                if end.exists == false, app.clearOfDrivingBar(leave), scrolls >= 3 { break }
                 if !app.pulledUpSheet.exists, !app.pullUpTripSheet() { return }
-                app.scrollDrivingSheet(by: 150)
+                app.scrollDrivingSheet(by: 100)
                 scrolls += 1
             }
-            let label = end.exists && end.isHittable ? "End trip" : "Leave trip"
+            let label = app.clearOfDrivingBar(end) ? "End trip" : "Leave trip"
             (label == "End trip" ? end : leave).tap()
             let confirm = app.buttons.matching(NSPredicate(format: "label == %@", label))
             _ = confirm.element(boundBy: 1).waitForExistence(timeout: 10)

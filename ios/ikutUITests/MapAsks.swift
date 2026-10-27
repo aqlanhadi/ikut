@@ -39,7 +39,7 @@ extension XCUIApplication {
     func scrollDrivingSheet(by points: CGFloat) {
         // From just above the bottom bar, and never past the sheet's top, so the drag stays on the rows.
         let sheet = drivingSheetScroll.frame
-        let barTop = drivingReport.exists ? drivingReport.frame.minY : sheet.maxY - 70
+        let barTop = drivingBarTop ?? sheet.maxY - 70
         let startY = barTop - 12
         let distance = min(points, startY - sheet.minY - 24)
         guard distance > 10 else { return }
@@ -49,20 +49,43 @@ extension XCUIApplication {
                    withVelocity: .slow, thenHoldForDuration: 0.3)
     }
 
-    /// Pulls the convoy sheet up, scrolls it down to the row with identifier `id` (lobby.endTrip, lobby.leaveTrip,
-    /// lobby.pause) when it doesn't fit, and taps it; false when it never became hittable.
+    /// The top of the driving sheet's bottom bar (Report and Pit stop), which the rows scroll under; nil without one.
+    var drivingBarTop: CGFloat? {
+        let tops = [drivingReport, buttons["stop.button"]].filter(\.exists).map(\.frame.minY)
+        return tops.min()
+    }
+
+    /// Whether `row` is wholly in the sheet's rows: below the sheet's top and above its bottom bar, so a tap on it
+    /// lands on it and not on Report or Pit stop (`isHittable` is true under the bar too).
+    func clearOfDrivingBar(_ row: XCUIElement) -> Bool {
+        guard row.exists, row.isHittable else { return false }
+        let frame = row.frame
+        if let barTop = drivingBarTop, frame.maxY > barTop - 1 { return false }
+        return frame.minY >= drivingSheetScroll.frame.minY
+    }
+
+    /// Pulls the convoy sheet up, scrolls it down in small steps until the row with identifier `id` (lobby.endTrip,
+    /// lobby.leaveTrip, lobby.pause) is wholly above the bottom bar, and taps it; false when it never got there.
     @discardableResult
     func tapPulledUpRow(_ id: String) -> Bool {
         guard pullUpTripSheet() else { return false }
         let row = buttons[id]
         var scrolls = 0
-        while !(row.exists && row.isHittable), scrolls < 20, drivingSheetScroll.exists {
+        while !clearOfDrivingBar(row), scrolls < 24, drivingSheetScroll.exists {
             // A hazard approach or a stop request folds the sheet down while driving: pull it up again.
             if !pulledUpSheet.exists, !pullUpTripSheet() { return false }
-            scrollDrivingSheet(by: 150)
+            // Just far enough to bring a row in sight above the bar, so it stops there rather than past it.
+            var step: CGFloat = 120
+            if row.exists, let barTop = drivingBarTop, row.frame.maxY > barTop {
+                step = min(120, row.frame.maxY - barTop + 24)
+            }
+            scrollDrivingSheet(by: step)
             scrolls += 1
         }
-        guard row.exists, row.isHittable else { return false }
+        guard clearOfDrivingBar(row) else {
+            print("QA: \(id) never cleared the bottom bar: row \(row.exists ? "\(row.frame)" : "missing"), bar top \(drivingBarTop.map { "\($0)" } ?? "none")")
+            return false
+        }
         row.tap()
         return true
     }
