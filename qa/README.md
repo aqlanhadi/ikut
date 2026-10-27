@@ -1,14 +1,14 @@
 # qa: simulated multi-car drives
 
 Repeatable drives that push the whole data flow (rules, callables, positions, events, stops, the convoy panel,
-approach alerts) before a real drive. Everything runs against the Firebase emulators (project `ikut-b1083`);
-start them first (`cd firebase && firebase emulators:start`). Node 20+.
+approach alerts) before a real drive. The drives run against the Firebase emulators (project `ikut-b1083`);
+start them first (`cd firebase && firebase emulators:start`, or `tools/emulators.mjs`). Only `prod-smoke` and `demo --backend production` can touch the real project. Node 20+.
 
 ```sh
 cd qa && npm install
 node convoy-sim.mjs                  # 4 simulated cars, fast (about 3 min), prints TRIP CODE: XXXXXX, PASS/FAIL per check
 node convoy-sim.mjs --speed 1        # real time (15 min), for watching
-node run-ui.mjs                      # everything at 2x, with the app on simulator C0A40D2A (iPhone 17 #1) as the fifth car
+node run-ui.mjs                      # everything at 2x (about 8.5 min), with the app on simulator C0A40D2A (iPhone 17 #1) as the fifth car
 ```
 
 Nobody watches an agent's run, so the defaults are as fast as the checks allow, and `--speed 1` (real time) is for
@@ -20,7 +20,7 @@ drop, the one stretch that has to last in real seconds (see Things to know). Wit
 `ConvoyScenarioUITests` (`ios/ikutUITests`) with `TEST_RUNNER_IKUT_JOIN_CODE`, and feeds
 `gpx/car5-app.gpx` to the simulator with `xcrun simctl location start`. Options: `--speed N`, `--skip-build`,
 `--udid`, `--derived-data` (default `/tmp/ikut-dd-q1`, seed it from another derived-data folder's `SourcePackages`),
-`--deadline S`. Screenshots land in `qa/screens/`, logs in `$TMPDIR/ikut-qa/`.
+`--deadline S`, `--scenario parked`, `--name` (the joining car's name), `--screens DIR` (default `qa/screens/`), `--logs DIR` (default `$TMPDIR/ikut-qa/`).
 
 To join by hand instead: `node convoy-sim.mjs --speed 1 --wait-app` (or `--setup-only`), join with the printed code
 from any simulator or phone (only the organizer starts a trip, so the script starts it once your car shares its
@@ -48,7 +48,7 @@ How agents wait on a run is in `CLAUDE.md`, *Long runs and waiting*.
 
 ## Drive one trip by hand
 
-`node drive-trip.mjs [CODE]` plays a trip's main route on the simulator (the newest active trip in the emulators if no code
+`node drive-trip.mjs [CODE]` (`--udid`, `--host` too) plays a trip's main route on the simulator (the newest active trip in the emulators if no code
 is given), so you can create a trip in the app, tap Start trip and watch yourself drive to the destination. `--kmh 100`,
 `--speed 20` (time multiplier), `--from 30` (start 30 km along). Set the simulator's location first
 (`xcrun simctl location C0A40D2A-0607-4B95-A1BE-F8C9190D81C1 set 3.139,101.687`), since Where to? builds the route from it.
@@ -63,10 +63,12 @@ Debug > Simulate Location > Add GPX File to Workspace... and pick it. For a prod
 ## Two-phone convoy
 
 ```sh
-node run-convoy2.mjs                 # builds, then about 4-5 minutes of test; RESULT: PASS / FAIL
+node run-convoy2.mjs                 # builds, then about 5 minutes of test, real time; RESULT: PASS / FAIL
 node run-convoy2.mjs --skip-build    # reuse /tmp/ikut-dd-convoy2
 node run-convoy2.mjs --ask-location  # phone B starts without location permission and answers the system prompt
 ```
+
+Other options: `--kmh N` (default 90), `--a-udid`, `--b-udid`, `--derived-data`, `--host`, `--deadline S`, `--screens DIR`, `--logs DIR`.
 
 Two real app instances plus two scripted cars. Phone A (organizer, car 1) is the shared iPhone 17 #1 (`C0A40D2A`), phone B
 (car 2) a second simulator, iPhone 17 #2 (`FD0ACD10`, an iPhone 17 Pro; it must already exist, the script never creates one). The script boots
@@ -99,7 +101,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
 7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
    the map menu and lands on the recap, B's lobby says "Trip ended", the trip doc is `ended`.
 
-Screenshots: `qa/screens/convoy2/A-*.png`, `B-*.png`. Logs: `$TMPDIR/ikut-qa/convoy2-A.log`, `convoy2-B.log` (and the
+Screenshots: `qa/screens/convoy2/A-*.png`, `B-*.png` (`--screens`). Logs: `$TMPDIR/ikut-qa/convoy2-A.log` (`--logs`), `convoy2-B.log` (and the
 `.xcresult` bundles next to them). To watch, open Xcode > Window > Devices and Simulators (or the Simulator app with both
 devices shown) while it runs. It holds both simulators while it runs (see Waiting on a run).
 
@@ -232,20 +234,9 @@ three; then the lead passes and the pill goes.
   (the app asks MapKit; the sim never does).
 - Emulator data is not wiped; each run leaves an active trip behind (`--end-trip` ends it).
 
-## Bugs this found
-
-1. **Crash on opening the map as tracker**: `CLMonitor` names with dots threw. Fixed in `0fd1e3a`.
-2. **Stop button icon missing** on iOS 27 (`minus.octagon.fill`): now `octagon.fill`.
-3. **Alert banner hidden behind the stop card**: fixed in `15f5cdc`.
-4. **First-run Join/New Trip went back to Home after Allow** (two-phone run): on iOS 27 the location prompt doesn't always
-   make the app resign active, so `LocationPermission` gave up after 1 s with the status still undetermined. It now keeps
-   waiting for the answer while the status is undetermined.
-5. Open question: a GPS-only gap never makes a car stale (the heartbeat re-writes the last position),
-   see Things to know. Probably intended; worth a decision.
-
 ## Battery watch (real drives)
 
-`node battery-watch.mjs <TRIP CODE>` records a real tracker phone's battery and position writes
+`node battery-watch.mjs <TRIP CODE> [--car NAME] [--out FILE]` records a real tracker phone's battery and position writes
 during a drive (L5, Q2). It joins the trip as a passenger named "Battery watch" in the tracked car
 (add `--car "<name>"` when more than one car is tracked), writes every update to
 `qa/battery/<CODE>-<time>.csv`, and flags silences over 60 s as they happen. Ctrl-C or ending the
@@ -293,7 +284,7 @@ node demo.mjs                  # 1. the organizer demo: phone 2 = Faiz, a PASSEN
 node demo-two-cars.mjs         # 2. phone 2 = Faiz in his own car ("Faiz’s Axia") behind Aisha
 node demo.mjs --dry-run        # print the timeline and check the geometry (osrm-main.json stands in for the route)
 node demo.mjs --skip-build     # reuse the build in --derived-data (default /tmp/ikut-dd-q4)
-node demo.mjs --udid U1 --udid2 U2 --end-trip --host H
+node demo.mjs --udid U1 --udid2 U2 --end-trip --host H --logs DIR   # --end-trip: about 13 min with the build
 node demo.mjs --backend production   # against the real Firebase project (see below)
 ```
 
@@ -306,7 +297,7 @@ Timeline (T = seconds after go; the same shape in both, differences marked):
 | 150-270 | Hafiz loses signal; both phones show "Last seen" from about T+210; he comes back | same |
 | 300 | **Highlight.** Faiz (a passenger in Aisha's car) taps Pit stop > Fuel > Add a message (the passenger check first), types "Low on fuel, next R&R please" and taps Tell the convoy on phone 2; Hafiz and Daniel tap OK | same, but Faiz drives his own car |
 | about 340 | Phone 1: Aisha opens the stop from the Pit stop button and watches the OKs come in (her car asked, so she has none to give) | Phone 1: the pill asks Aisha for an OK, she taps it, then the card shows the OKs |
-| about 390 | The request has been open 45 s; Aisha taps We've stopped and the button is Pit stop again on both phones | same |
+| about 385 | The request has been open 45 s; Aisha taps We've stopped and the button is Pit stop again on both phones | same |
 | 560 | End; the maps stay open until then | same |
 
 Handshake: the phones' tests and the script take turns through marker files in `$TMPDIR/ikut-qa/<demo|demo2>-sync`
@@ -327,7 +318,7 @@ needed). The trip is always ended at the end (also on Ctrl-C/SIGTERM) and the sc
 
 ## Playground
 
-`node dashboard/server.mjs --port 4324`, then the **Playground** tab (a full-height Google map with a side panel; see "The page" below). For trying one event at a time
+`node dashboard/server.mjs` (port 4322, `--port` changes it), then the **Playground** tab (a full-height Google map with a side panel; see "The page" below). For trying one event at a time
 on the real app without a 9 minute scripted demo: **you tap the phones**, the playground only provides a playable route.
 (`demo-playground.mjs` is the script behind it; it takes `CMD {json}` lines on stdin and prints `DEMO {"type":"state"}` once a second.)
 

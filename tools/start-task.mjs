@@ -10,7 +10,7 @@
 // - The task's build folder /tmp/ikut-dd-<id>, with SourcePackages cloned from the newest other build folder (an
 //   APFS clone: instant, and no extra disk until files change), so the first build doesn't fetch the packages
 //   (its workspace-state.json is rewritten to this folder's paths).
-// - A log folder /tmp/ikut-logs-<id> for this task's run logs (tools/finish-task.mjs removes both).
+// - A log folder /tmp/ikut-logs-<id> for this task's run logs (tools/finish-task.mjs --last removes both).
 // - The task marked `doing` on the board (not with --no-board).
 
 import { spawnSync } from 'node:child_process';
