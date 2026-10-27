@@ -258,9 +258,25 @@ A gap means no signal or a suspended app; the two look the same from here.
 ## Production smoke test
 
 `node prod-smoke.mjs` runs one short trip against the real Firebase project (from
-`ios/ikut/Resources/GoogleService-Info.plist`): anonymous sign-in, create, `previewTrip`, `joinTrip`,
-positions, end. Whatever fails, it ends the trip and deletes its two anonymous users, and it ends in a `RESULT` line
-(300 s deadline); the ended trip is purged by `purgeTripDataJob`.
+`ios/ikut/Resources/GoogleService-Info.plist`), writing what main's app writes, field for field, so it fails against
+rules or functions older than the build. `node prod-smoke.mjs --emulators` runs the same script against the emulators
+(Auth :9099, Firestore :8080, Functions :5001, project `ikut-b1083`); test it there, never point a change at production.
+It checks, in order (the Swift each step mirrors is in the script's comments):
+
+- anonymous sign-in; **Create trip** with `routeSeconds` (`TripService.createTrip`), the organiser's car;
+- the lobby's stop batch (`TripService.write`): `route`, `routeSeconds`, `stopCount: 1` and a planned **meeting stop**
+  (`kind meet`, `coordinate`, `meetAt`, `order 0`);
+- `previewTrip`: the organiser's first name, a route that starts at the meeting point (not the organiser's start),
+  and the meet stop with its coordinate and `meetAt`; `joinTrip` makes car 2; both cars write a position;
+- **only the organiser can start** (D39): a participant's Start is an expected denial (`permission-denied` is a PASS),
+  then the organiser's Start; the second car's **stop answer** (`stops/{s}/answers/{carId}`), read by the organiser;
+- a participant's **Leave** is refused (expected denial); the organiser marks `arrivedAt` and taps Leave; the car
+  takes its answer back; the organiser ends the trip.
+
+Whatever fails, it takes back the answer, deletes the stop if the trip has not started, ends the trip and deletes its
+two anonymous users, and it ends in a `RESULT` line (300 s deadline). The ended trip is purged by `purgeTripDataJob`,
+which also clears the stop's `arrivedAt`/`leftAt`/`leftBy` and any answer a failed run left (D35 X1); the stop and
+trip documents themselves stay, as they do for the app.
 
 ## Live demo
 
