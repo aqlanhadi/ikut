@@ -201,8 +201,10 @@ class ConvoyUITestCase: XCTestCase {
             guard app.raiseTripSheet() else { return }
             let end = app.buttons["lobby.endTrip"]
             let leave = app.buttons["lobby.leaveTrip"]
+            // End trip whenever there is one (the organiser has both, and Leave sits above End); Leave only without it.
             var scrolls = 0
-            while !(end.exists && end.isHittable), !(leave.exists && leave.isHittable), scrolls < 20 {
+            while !(end.exists && end.isHittable), scrolls < 20 {
+                if end.exists == false, leave.exists, leave.isHittable, scrolls >= 3 { break }
                 if !app.lobbyRows.exists, !app.raiseTripSheet() { return }
                 app.scrollDrivingSheet(by: 150)
                 scrolls += 1
