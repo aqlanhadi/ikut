@@ -12,11 +12,15 @@ struct PreviewCar: Sendable, Equatable, Identifiable {
     var number: Int? = nil
 }
 
-/// A planned stop as a non-member sees it: name, kind and planned length, nothing else.
+/// A planned stop as a non-member sees it: name, kind, planned length, place and (meeting point only) time.
 struct PreviewStop: Sendable, Equatable {
     var name: String
     var kind: PlannedStopKind
     var minutes: Int? = nil
+    /// Where the place is, so the map can draw it; nil from an older server.
+    var coordinate: PreviewCoordinate? = nil
+    /// When the convoy meets; only on the meeting point, and nil from an older server.
+    var meetAt: Date? = nil
 
     /// "R&R Tapah · fuel · 20 min", or "R&R Tapah · fuel" without a length. A meeting point reads
     /// "· meeting point": "meet" alone reads like a verb to someone with only the code (owner, #204).
@@ -27,7 +31,7 @@ struct PreviewStop: Sendable, Equatable {
     }
 }
 
-/// Where the trip ends: the only coordinate `previewTrip` gives someone who has only the code.
+/// A coordinate `previewTrip` gives someone who has only the code: where the trip ends or a planned stop (never a member's).
 struct PreviewCoordinate: Sendable, Equatable {
     var latitude: Double
     var longitude: Double
@@ -44,6 +48,13 @@ struct TripPreview: Sendable, Equatable {
     var cars: [PreviewCar]
     /// In the organizer's order, skipped ones already left out; empty on trips without stops.
     var stops: [PreviewStop] = []
+    /// First name of the organiser ("Aqlan organises"); nil from an older server or when unknown.
+    var organizerName: String? = nil
+    /// The trip's main route only, simplified, as an encoded polyline (precision 5); nil from an older server.
+    var route: String? = nil
+
+    /// The trip's meeting point with its time: "Meets at Petronas Jalan Duta, 12:00".
+    var meetingPoint: PreviewStop? { stops.first { $0.kind == .meet } }
 }
 
 enum JoinCarChoice: Sendable, Equatable {
@@ -137,6 +148,14 @@ enum JoinService {
         return ["code": code, "displayName": displayName, "car": carPayload, "tracker": tracker]
     }
 
+    private static func parseCoordinate(_ value: Any?) -> PreviewCoordinate? {
+        guard let raw = value as? [String: Any],
+            let lat = (raw["latitude"] as? NSNumber)?.doubleValue, let lng = (raw["longitude"] as? NSNumber)?.doubleValue,
+            abs(lat) <= 90, abs(lng) <= 180
+        else { return nil }
+        return PreviewCoordinate(latitude: lat, longitude: lng)
+    }
+
     static func parsePreview(_ data: Any) throws -> TripPreview {
         guard let root = data as? [String: Any],
             let tripId = root["tripId"] as? String,
@@ -157,16 +176,17 @@ enum JoinService {
             guard let name = raw["name"] as? String, let kindRaw = raw["kind"] as? String,
                 let kind = PlannedStopKind(rawValue: kindRaw)
             else { return nil }
-            return PreviewStop(name: name, kind: kind, minutes: (raw["minutes"] as? NSNumber)?.intValue)
+            return PreviewStop(
+                name: name, kind: kind, minutes: (raw["minutes"] as? NSNumber)?.intValue,
+                coordinate: parseCoordinate(raw["coordinate"]),
+                meetAt: (raw["meetAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) })
         }
-        let coordinate = (root["destinationCoordinate"] as? [String: Any]).flatMap { raw -> PreviewCoordinate? in
-            guard let lat = (raw["latitude"] as? NSNumber)?.doubleValue, let lng = (raw["longitude"] as? NSNumber)?.doubleValue,
-                abs(lat) <= 90, abs(lng) <= 180
-            else { return nil }
-            return PreviewCoordinate(latitude: lat, longitude: lng)
-        }
+        let organizer = (root["organizerName"] as? String)?.trimmingCharacters(in: .whitespaces)
+        let route = (root["route"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         return TripPreview(
-            tripId: tripId, name: name, destinationName: destination, destinationCoordinate: coordinate, cars: cars, stops: stops)
+            tripId: tripId, name: name, destinationName: destination,
+            destinationCoordinate: parseCoordinate(root["destinationCoordinate"]), cars: cars, stops: stops,
+            organizerName: organizer?.isEmpty == false ? organizer : nil, route: route)
     }
 
     static func parseJoinResult(_ data: Any) throws -> JoinResult {

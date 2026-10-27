@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, isEventPastGrace, shouldPurgeTripData } from "../src/retention.ts";
+import { decodePolyline, encodePolyline, simplifiedRoute } from "../src/previewRoute.ts";
 import { normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
@@ -133,5 +134,25 @@ describe("pickCarColor", () => {
   it("cycles by car count when the palette is exhausted", () => {
     const all = ["#2563EB", "#D9480F", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
     assert.equal(pickCarColor("#2563EB", all), "#2563EB");
+  });
+});
+
+describe("simplifiedRoute", () => {
+  const line = Array.from({ length: 500 }, (_, i) => ({ latitude: 3 + i * 0.003, longitude: 101.7 - i * 0.001 }));
+  it("keeps the ends, drops points on a straight line and round-trips", () => {
+    const out = decodePolyline(simplifiedRoute(encodePolyline(line)));
+    assert.equal(out.length, 2);
+    assert.ok(Math.abs(out[1].latitude - line[499].latitude) < 1e-5);
+  });
+  it("keeps a corner", () => {
+    const corner = [{ latitude: 3, longitude: 101 }, { latitude: 3.5, longitude: 101 }, { latitude: 3.5, longitude: 101.5 }];
+    assert.equal(decodePolyline(simplifiedRoute(encodePolyline(corner))).length, 3);
+  });
+  it("caps the number of points", () => {
+    const wiggle = Array.from({ length: 5000 }, (_, i) => ({ latitude: 3 + i * 0.0005, longitude: 101 + Math.sin(i / 7) * 0.05 }));
+    assert.ok(decodePolyline(simplifiedRoute(encodePolyline(wiggle), 100, 400)).length <= 400);
+  });
+  it("gives an empty line for nothing readable", () => {
+    for (const bad of ["", undefined, 5, "?"]) assert.equal(simplifiedRoute(bad), "");
   });
 });
