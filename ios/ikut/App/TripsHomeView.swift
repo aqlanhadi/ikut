@@ -210,7 +210,7 @@ struct TripsHomeView: View {
             if now { beginCreate() } else if flow != nil, !finishingCreate { closeCreate() }
         }
         .onChange(of: joining.wrappedValue, initial: true) { _, now in
-            if let now { beginJoin(now) } else if joinFlow != nil, !finishingJoin { closeJoin() }
+            if let now { beginJoin(now) } else if joinFlow != nil, !finishingJoin, !isDemo { closeJoin() }
         }
         .onChange(of: joinFlow?.model.preview) { _, _ in refocusJoin(animated: true) }
         .onChange(of: mode) { old, new in
