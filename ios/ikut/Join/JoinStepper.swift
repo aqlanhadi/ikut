@@ -79,6 +79,15 @@ enum JoinSteps {
         return PickedTripLogic.focus(on: end.coordinate, span: 0.2, bottomObscured: bottomObscured, topObscured: topObscured)
     }
 
+    /// What the car step shows about sharing once a car is picked, always pinned above Join (never in the scrolling list):
+    /// nothing before a pick, a switch for someone else's car, a line for my own.
+    enum Sharing: Equatable { case none, switchRow, ownCar }
+
+    static func sharing(selectedCar: PreviewCar?, ownCar: Bool) -> Sharing {
+        if selectedCar != nil { return .switchRow }
+        return ownCar ? .ownCar : .none
+    }
+
     /// The main button of the car step: "Join Aqlan’s Myvi as Nurul", "Join in my own car as Nurul", or plain
     /// "Join trip" before a car is picked.
     static func joinLabel(car: PreviewCar?, ownCar: Bool, firstName: String) -> String {
@@ -100,6 +109,14 @@ final class JoinStepper {
     /// A code from a link or QR lands on the code step with the code filled in (and looked up on `start`).
     convenience init(displayName: String, code: String? = nil, api: any JoinAPI = LiveJoinAPI()) {
         self.init(model: JoinModel(displayName: displayName, initialCode: code, api: api))
+    }
+
+    /// What Home does for a join request (a link, a QR code or the Join row): the steps with the code filled in, and
+    /// its lookup already started when the code is complete.
+    static func begin(_ start: JoinStart, displayName: String, api: any JoinAPI = LiveJoinAPI()) -> JoinStepper {
+        let stepper = JoinStepper(displayName: displayName, code: start.code, api: api)
+        stepper.model.start()
+        return stepper
     }
 
     var title: String { JoinSteps.title(step) }

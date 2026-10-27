@@ -8,7 +8,7 @@
 //
 // Cast: phone 1 is Aisha, the organizer, driving the lead car (car 1): she creates the trip in the app ("Where to?
 // Ipoh") from the start of a piece of the E1 and the script reads that route back from Firestore, so everyone drives
-// the app's own route. Phone 2 is Faiz, a PASSENGER in Aisha's car (join with the code, her car tile, role Passenger):
+// the app's own route. Phone 2 is Faiz, a PASSENGER in Aisha's car (join with the code, her car tile, share switch off: the co-pilot):
 // its simulator follows the same track. Scripted cars (Firebase clients) behind the lead: Daniel, and Hafiz, the
 // slowest, who loses signal. The UI tests are in ios/ikutUITests/DemoUITests.swift (DemoOrganizerUITests,
 // DemoPassengerUITests); the script and they take turns through marker files, see lib/demo-common.mjs.

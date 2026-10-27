@@ -69,7 +69,7 @@ struct JoinSheet: View {
     }
 
     private func back() {
-        withAnimation(HomeSheet.motion(reduceMotion: reduceMotion)) { stepper.goBack() }
+        withAnimation(HomeSheet.motion(reduceMotion: reduceMotion)) { _ = stepper.goBack() }
     }
 
     // MARK: Bottom bar
@@ -94,6 +94,7 @@ struct JoinSheet: View {
                     .sheetActionBar(sides: false)
                     .padding(.bottom, PanelSheet.sideGap)
             } else {
+                if JoinSteps.sharing(selectedCar: model.selectedCar, ownCar: model.selection == .newCar) != .none { sharingRow }
                 Button(action: join) {
                     Group {
                         if model.isJoining {
@@ -294,8 +295,6 @@ struct JoinSheet: View {
                     .onChange(of: model.newCarName) { model.newCarNameDidEdit() }
             }
 
-            if model.selectedCar != nil { shareRow }
-
             if let message = model.errorMessage {
                 InlineNote(message, tone: .alert, inset: 0)
                     .accessibilityIdentifier("joinError")
@@ -335,27 +334,33 @@ struct JoinSheet: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    /// In someone else's car: share this car's location too (off when someone already does), or ride as the co-pilot.
-    private var shareRow: some View {
+    /// Pinned above Join, so it is on screen whatever the list's scroll: what this phone will share. In someone else's car
+    /// a switch (off when someone already shares, where the person rides as the co-pilot); in my own car a plain line.
+    @ViewBuilder private var sharingRow: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: Spacing.s) {
+        switch JoinSteps.sharing(selectedCar: model.selectedCar, ownCar: model.selection == .newCar) {
+        case .none:
+            EmptyView()
+        case .ownCar:
+            Label("Your phone shares this car’s location, even with the screen off.", systemImage: "location.fill")
+                .font(.footnote).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, Spacing.s)
+                .accessibilityIdentifier("joinShareNote")
+        case .switchRow:
             Toggle(isOn: $model.tracker) {
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text("Share this car’s location")
-                    Text(model.selectedCarHasTracker
-                         ? "Someone is already sharing this car’s location."
-                         : "Keeps sharing with the screen off.")
+                    Text(model.tracker
+                         ? "Keeps sharing with the screen off."
+                         : "You’re the co-pilot: call stops and report hazards for the driver.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .tint(Color(.systemGreen))
-            .padding(.horizontal, Spacing.l)
-            .padding(.vertical, Spacing.s)
             .disabled(model.isJoining)
-            .surfaceTile(radius: Radius.control)
-            if !model.tracker {
-                InlineNote("You’re the co-pilot: call stops and report hazards for the driver.", inset: 0)
-            }
+            .accessibilityIdentifier("joinShare")
+            .padding(.top, Spacing.s)
         }
     }
 }

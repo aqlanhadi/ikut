@@ -334,8 +334,9 @@ class ConvoyUITestCase: XCTestCase {
             let field = app.textFields["Car name"]
             if field.waitForExistence(timeout: 5) { replaceText(in: field, with: carName) }
         } else if let sharing {
-            let share = app.switches["Share this car’s location"]
-            if share.waitForExistence(timeout: 5), (share.value as? String == "1") != sharing { share.tap() }
+            let share = app.switches["joinShare"]
+            XCTAssertTrue(share.waitForExistence(timeout: 5), "The car step showed no share switch for \(tile ?? "")")
+            if (share.value as? String == "1") != sharing { share.tap() }
         }
         app.buttons["joinConfirm"].tap()
     }

@@ -1,4 +1,5 @@
 import CoreLocation
+import SwiftUI
 import Testing
 
 @testable import ikut
@@ -153,21 +154,43 @@ struct JoinStepperTests {
 
     // MARK: Sheet
 
-    @Test func theSheetKeepsOneHeightForEveryStepAndTheKeyboard() {
+    @Test func theSheetAsksForTheSameDetentOnEveryStepAndSizeOfText() {
         let s = stepper()
-        let mode = HomeSheet.mode(flow: nil, joining: true)
-        #expect(mode == .join)
-        // The mode, and so the height, doesn't read the step, the code, the preview or the keyboard.
-        for step in JoinSteps.sequence() {
+        let asked = Set(JoinSteps.sequence().flatMap { step -> [PresentationDetent] in
             s.show(step)
-            #expect(HomeSheet.mode(flow: nil, joining: true) == .join)
-            #expect(HomeSheet.height(.join, compact: 300) == HomeSheet.joinHeight)
-        }
-        // At every text size the short detent is the same (it doesn't follow the list's).
-        for compact in [300.0, 360, 450] {
-            #expect(HomeSheet.height(.join, compact: compact) == HomeSheet.joinHeight)
-        }
+            let mode = HomeSheet.mode(flow: nil, joining: true)
+            // The keyboard isn't an input to the sheet's detents: it is the same call with it up or down.
+            return [300.0, 360, 450].map { HomeSheet.detent(expanded: false, mode: mode, compact: $0) }
+        })
+        #expect(asked == [HomeSheet.short(HomeSheet.joinHeight)])
         #expect(HomeSheet.detents(.join, compact: 300) == [HomeSheet.short(HomeSheet.joinHeight), HomeSheet.tall])
+    }
+
+    @Test func aLinkOrQrCodeLandsOnTheCodeStepWithTheLookupStarted() async {
+        let s = JoinStepper.begin(JoinStart(code: "k7m-2qx"), displayName: "Nurul", api: FakeJoinAPI(preview: trip()))
+        #expect(s.step == .code && s.model.code == "K7M2QX")
+        #expect(s.model.isLoadingPreview)
+        await waitUntil { s.model.preview != nil }
+        #expect(s.canContinue)
+        let typed = JoinStepper.begin(JoinStart(code: nil), displayName: "Nurul", api: FakeJoinAPI(preview: trip()))
+        #expect(typed.model.code.isEmpty && !typed.model.isLoadingPreview)
+    }
+
+    @Test func pickingACarNeverLeavesSharingHidden() async {
+        let many = (1...5).map { PreviewCar(id: "c\($0)", name: "Car \($0)", color: TripService.palette[$0 % 3], hasTracker: $0 == 1, number: $0) }
+        let s = stepper(code: "K7M2QX", preview: trip(cars: many))
+        s.model.start()
+        await waitUntil { s.model.preview != nil }
+        #expect(JoinSteps.sharing(selectedCar: s.model.selectedCar, ownCar: false) == .none)
+        for car in many {
+            s.model.select(car)
+            // Always a pinned switch, whichever of the five is picked, nobody-shares ones included.
+            #expect(JoinSteps.sharing(selectedCar: s.model.selectedCar, ownCar: s.model.selection == .newCar) == .switchRow)
+        }
+        s.model.select(many[1])
+        #expect(s.model.tracker)
+        s.model.selectNewCar()
+        #expect(JoinSteps.sharing(selectedCar: s.model.selectedCar, ownCar: s.model.selection == .newCar) == .ownCar)
     }
 
     @Test func joiningTakesOverFromEveryOtherMode() {

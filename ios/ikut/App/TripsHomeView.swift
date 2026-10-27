@@ -467,7 +467,7 @@ struct TripsHomeView: View {
         flow?.cancel()
         if picked != nil { picked = nil }
         creating.wrappedValue = false
-        let stepper = JoinStepper(displayName: auth.displayName ?? "", code: start.code)
+        let stepper = JoinStepper.begin(start, displayName: auth.displayName ?? "")
         withAnimation(sheetMotion) {
             expanded = false
             flow = nil
