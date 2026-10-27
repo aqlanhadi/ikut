@@ -217,6 +217,9 @@ struct TripMapView: View {
             .onChange(of: scenePhase) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, ended in if ended { onEnded() } }
+            // Opened on the app's first frame (a relaunch, a Now row read as started) the member doc comes after the
+            // alerts started: from then on this car's own stop requests are not announced.
+            .onChange(of: session.member?.carId) { _, carId in alerts.setMyCar(carId) }
             .onAppear(perform: appear)
             .onDisappear(perform: disappear)
             .task { await model.convoy.run() }

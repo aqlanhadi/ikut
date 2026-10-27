@@ -7,8 +7,9 @@ struct AlertPolicy {
     static let backlogWindow: TimeInterval = 2 * 60
 
     let myUserId: String
-    /// This phone's car: a stop request from it is already known to everyone in it.
-    let myCarId: String?
+    /// This phone's car: a stop request from it is already known to everyone in it. Set when the member doc arrives,
+    /// which can be after the map started listening (a driving map opened on the app's first frame).
+    var myCarId: String?
     private(set) var seen: Set<String> = []
     private var primed = false
 

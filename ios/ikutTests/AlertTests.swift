@@ -352,6 +352,20 @@ struct AlertCenterTests {
         #expect(rig.speaker.spoken.count == 1)
     }
 
+    /// A driving map opened on the app's first frame starts listening before its member doc loads (D54): once the car is
+    /// known, a stop request from it is not announced.
+    @Test func myCarArrivingAfterStartStillSkipsItsStopRequests() async {
+        let rig = Rig()
+        rig.center.start(tripId: "t", myUserId: "me")
+        rig.source.emit([])
+        rig.center.setMyCar("c")
+        rig.source.emit([alertEvent(.stopFuel, id: "1")])
+        rig.source.emit([alertEvent(.stopFuel, id: "1"), alertEvent(.debris, id: "2")])
+        await waitUntil { rig.center.current != nil }
+        #expect(rig.center.current?.id == "2")
+        #expect(rig.speaker.spoken.count == 1)
+    }
+
     @Test func backgroundPostsNotificationAndKeepsBannerEmpty() async {
         let rig = Rig()
         rig.state.foreground = false
