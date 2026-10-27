@@ -1,5 +1,9 @@
 import MapKit
+import OSLog
 import SwiftUI
+
+/// The card sheet's comings and goings (`log stream --predicate 'category == "CardSheet"'`): what a flaky UI test needs.
+let cardSheetLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ikut", category: "CardSheet")
 
 /// The live convoy map, following design/project/Map.dc.html: the main route in blue, joining cars'
 /// own routes dashed up to where they merge, a numbered marker per car, a trip pill at the top,
@@ -88,6 +92,8 @@ struct TripMapView: View {
     @State private var sheetSafeBottom: CGFloat = 34
     /// The card sheet's own bottom safe area, which its buttons hang into.
     @State private var cardSafeBottom: CGFloat = 34
+    /// What the keyboard covers of the screen's bottom while a card's field is being typed in (`PanelSheet.keyboardCover`).
+    @State private var cardKeyboard: CGFloat = 0
     @State private var mapMaxY: CGFloat = 0
     @State private var mapMinY: CGFloat = 0
     @State private var mapWidth: CGFloat = 0
@@ -573,7 +579,10 @@ struct TripMapView: View {
 
     private func openStopCard() { stopCardOpen = true }
 
-    private func closeStopCard() { stopCardOpen = false }
+    private func closeStopCard() {
+        cardSheetLog.debug("stop card closed")
+        stopCardOpen = false
+    }
 
     private func closeArrivalCard() { arrivalStopId = nil }
 
@@ -581,12 +590,14 @@ struct TripMapView: View {
     /// its way out to be gone (`cardDismissed`), and a card changing into another (a stop closes, its arrival card
     /// follows) swaps in the sheet that is up.
     private func syncCard(_ want: MapCard?) {
+        cardSheetLog.debug("want \(String(describing: want), privacy: .public), presented \(presentedCard != nil), dismissing \(cardDismissing)")
         if let want { lastCard = want }
         let before = PanelSheet.CardSheet(presented: presentedCard != nil, dismissing: cardDismissing)
         applyCard(PanelSheet.cardSync(before, wanted: want != nil), wanting: want)
     }
 
     private func cardDismissed() {
+        cardSheetLog.debug("dismissed; want \(String(describing: cardNow), privacy: .public)")
         let before = PanelSheet.CardSheet(presented: presentedCard != nil, dismissing: cardDismissing)
         applyCard(PanelSheet.cardDismissed(before, wanted: cardNow != nil), wanting: cardNow)
     }
@@ -634,6 +645,9 @@ struct TripMapView: View {
 
     /// The card sheet's detent: its content's height, up to the room under the pills.
     private var cardHeight: CGFloat { PanelSheet.cardHeight(content: cardContent, room: sheetRoom) }
+
+    /// The card sheet's detent: `cardHeight`, taller by the keyboard while one is up, so the card stays above it.
+    private var cardDetent: CGFloat { PanelSheet.cardHeight(content: cardContent, room: sheetRoom, keyboard: cardKeyboard) }
 
     /// The map's height under the pills and banners, where the sheet may reach to at most (the stop pill, a
     /// banner and the trip pill always stay visible above it, at any text size).
@@ -704,6 +718,7 @@ struct TripMapView: View {
 
     /// The convoy sheet went (the trip ended, the Always sheet): the card went with it.
     private func panelDismissed() {
+        cardSheetLog.debug("convoy sheet dismissed")
         panelUp = false
         session.mapSheetUp = false
         // The card went with the convoy sheet; it comes back with it if it is still wanted.
@@ -833,6 +848,7 @@ struct TripMapView: View {
     /// `presentedCard` ourselves has nothing left to clear.
     private func cardSetByTheSystem(_ card: MapCard?) {
         guard card == nil, presentedCard != nil else { return }
+        cardSheetLog.debug("card dismissed by the system")
         presentedCard = nil
         cardDismissing = true
         showReport = false
@@ -847,13 +863,30 @@ struct TripMapView: View {
         return ScrollView {
             cardView(card)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { cardContent = $0 }
+                // The keyboard's share of the taller sheet, under the card (Q16).
+                .padding(.bottom, cardKeyboard)
         }
         .scrollBounceBehavior(.basedOnSize)
+        // The sheet grows by the keyboard instead (`cardDetent`): left to the system, the keyboard covered the whole card,
+        // pushed its body out of the scroll view and took its buttons' lift with it, so the message field was gone.
+        .ignoresSafeArea(.keyboard)
         .environment(\.inPanelSheet, true)
         // The buttons sit as far above the sheet's bottom edge as every sheet's bottom bar (`PanelSheet.sideGap`).
         .environment(\.cardActionLift, PanelSheet.barLift(safeBottom: cardSafeBottom))
-        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { cardSafeBottom = $0 }
-        .presentationDetents([.height(cardHeight)])
+        .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) {
+            cardSafeBottom = PanelSheet.cardSafeBottom(reading: $0, keyboard: cardKeyboard, last: cardSafeBottom)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                  let screen = note.object as? UIScreen else { return }
+            cardKeyboard = PanelSheet.keyboardCover(frame: frame, screenHeight: screen.bounds.height)
+            cardSheetLog.debug("keyboard covers \(cardKeyboard)")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            cardKeyboard = 0
+        }
+        .onDisappear { cardKeyboard = 0 }
+        .presentationDetents([.height(cardDetent)])
         .presentationDragIndicator(.hidden)
         .presentationBackgroundInteraction(.enabled)
         // The stop cards have no swipe down (#123): their body scrolls, and Close is the way out.

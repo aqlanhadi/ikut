@@ -369,6 +369,8 @@ enum DemoScreens {
         // The card sheets over the convoy sheet (D44): Pit stop, "Fuel chosen" in it, and Report.
         case "road-card-pit-stop": return AnyView(MapDemo.view(card: "home"))
         case "road-card-pit-stop-reason": return AnyView(MapDemo.view(card: "reason"))
+        // The message field with the keyboard up: the card sits above the keyboard (Q16).
+        case "road-card-pit-stop-message": return AnyView(MapDemo.view(card: "message"))
         case "road-card-report": return AnyView(MapDemo.view(report: true))
         case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true))
         // The list unfolded; the debris approach folds it 3 s in, and my car passes the debris about 9 s later (D42).

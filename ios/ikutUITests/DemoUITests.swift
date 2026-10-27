@@ -65,7 +65,10 @@ class DemoBase: TwoPhoneConvoyBase {
             ok = condition()
         }
         note(name, ok, core: core)
-        if !ok { shot("MISSING-\(name.replacingOccurrences(of: " ", with: "-"))") }
+        if !ok {
+            shot("MISSING-\(name.replacingOccurrences(of: " ", with: "-"))")
+            dumpScreen(name)
+        }
         return ok
     }
 

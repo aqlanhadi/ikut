@@ -73,6 +73,7 @@ export function parseArgs(argv, usage = '') {
     else if (a === '--backend') o.backend = next();
     else if (a === '--describe') o.describe = true;
     else if (a === '--deadline') o.deadline = Number(next());
+    else if (a === '--logs') o.logs = next();
     else if (a === '-h' || a === '--help') { console.log(usage); process.exit(0); }
     else { console.error(`unknown option ${a}`); process.exit(64); }
   }

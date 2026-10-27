@@ -48,8 +48,34 @@ class ConvoyUITestCase: XCTestCase {
         }
         if condition() { return }
         shot("FAILED-\(what.replacingOccurrences(of: " ", with: "-"))")
+        dumpScreen(what)
         XCTFail("Timed out after \(Int(timeout)) s waiting for: \(what). Convoy order: \(convoyOrder())")
         throw WaitFailure()
+    }
+
+    /// What was on screen when a wait gave up: every element whose identifier starts with one of `prefixes`
+    /// (with its label, frame and whether it can be tapped), then the app's element tree trimmed to `limit`
+    /// characters. Printed to the log, so a flake says what the phone held even when no screenshot survives.
+    func dumpScreen(_ what: String, prefixes: [String] = ["stop.", "hazard.", "sheet.", "lobby.", "convoy."], limit: Int = 20000) {
+        guard app != nil, let root = try? app.snapshot() else {
+            print("QA DUMP (\(what)): no snapshot of the app")
+            return
+        }
+        var lines: [String] = []
+        func collect(_ e: XCUIElementSnapshot) {
+            if prefixes.contains(where: { e.identifier.hasPrefix($0) }) {
+                let f = e.frame
+                lines.append("  \(e.identifier) '\(e.label)' at \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))\(e.isEnabled ? "" : " disabled")")
+            }
+            e.children.forEach(collect)
+        }
+        collect(root)
+        print("QA DUMP (\(what)): \(lines.count) identified elements\n" + lines.joined(separator: "\n"))
+        // The map's own features and annotations fill the tree; leave them out so the sheets and the keyboard fit.
+        let tree = app.debugDescription.split(separator: "\n")
+            .filter { !$0.contains("VKPointFeature") && !$0.contains("AnnotationContainer") }
+            .joined(separator: "\n")
+        print("QA DUMP TREE (\(what)):\n" + (tree.count > limit ? String(tree.prefix(limit)) + "\n  …" : tree))
     }
 
     func shot(_ name: String) {

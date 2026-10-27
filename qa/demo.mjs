@@ -4,7 +4,7 @@
 //   node demo.mjs                 # build, then the show (phone 1 = "iPhone 17 #1", phone 2 = "iPhone 17 #2")
 //   node demo.mjs --skip-build    # reuse the build in --derived-data (default /tmp/ikut-dd-q4)
 //   node demo.mjs --dry-run       # no Firebase, no simulator: print the timeline, check the geometry
-//   node demo.mjs --udid U1 --udid2 U2 --end-trip --derived-data DIR --host H
+//   node demo.mjs --udid U1 --udid2 U2 --end-trip --derived-data DIR --host H --logs DIR (default $TMPDIR/ikut-qa; screens in DIR/<tag>-screens)
 //
 // Cast: phone 1 is Aisha, the organizer, driving the lead car (car 1): she creates the trip in the app ("Where to?
 // Ipoh") from the start of a piece of the E1 and the script reads that route back from Firestore, so everyone drives
