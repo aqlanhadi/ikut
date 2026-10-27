@@ -215,6 +215,13 @@ final class TripMapStage {
         }
     }
 
+    /// What the map reports once a move ends. Each is written only when it changed, so a move that ends where it began
+    /// redraws nothing that reads them (the driving map's heading and scale).
+    func read(heading: Double, reading: TripCameraReading) {
+        if self.heading != heading { self.heading = heading }
+        if self.reading != reading { self.reading = reading }
+    }
+
     /// Puts the camera at `position` at once, ending any move in flight.
     func place(_ position: MapCameraPosition) {
         flight.cancel()
@@ -269,10 +276,9 @@ struct TripScreenHost<Content: View>: View {
             stage.cameraBox.record(context.camera, latitudeDelta: context.region.span.latitudeDelta)
         }
         .onMapCameraChange { context in
-            stage.heading = context.camera.heading
-            stage.reading = TripCameraReading(
+            stage.read(heading: context.camera.heading, reading: TripCameraReading(
                 distance: context.camera.distance, pitch: context.camera.pitch,
-                latitudeDelta: context.region.span.latitudeDelta)
+                latitudeDelta: context.region.span.latitudeDelta))
         }
         // Home: a tap away from the picked trip's route goes back to the list. Elsewhere the map keeps its taps.
         .gesture(TapGesture().onEnded { spec.onTap?() }, including: spec.onTap == nil ? .subviews : .all)

@@ -229,6 +229,8 @@
 		D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59B3CC045531B01304008A /* BannerSlot.swift */; };
 		D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D7B5FA67D691851818F691 /* ConvoyTests.swift */; };
 		D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991414E381145C07351D7F20 /* LocationDeniedView.swift */; };
+		D2524C7FCC6D0876AC013798 /* HomeCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */; };
+		D4001445E5CE74D71F3D5092 /* HomeCameraTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */; };
 		D49427546FD65AE88660ED3E /* StopLeave.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EE01CC4EDE188E0718E364 /* StopLeave.swift */; };
 		D4CA5EDCC3B15AAA09EEE71E /* StopApproachTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0A6F66D5580C1001E9842E /* StopApproachTests.swift */; };
 		D53034881D28E618144A5117 /* CatchUpHeadsUp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */; };
@@ -500,12 +502,14 @@
 		BEA9EED0F6538FAD356A6D9F /* sungai-buloh-north.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sungai-buloh-north.json"; sourceTree = "<group>"; };
 		C04CCEA528ABC4C37CC45074 /* StopLeaveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLeaveService.swift; sourceTree = "<group>"; };
 		C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreLocationSource.swift; sourceTree = "<group>"; };
+		C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCameraTests.swift; sourceTree = "<group>"; };
 		C3E80CE011C8490310C42F29 /* StopLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLogic.swift; sourceTree = "<group>"; };
 		C456C99B4E7723AFF06FB58C /* StopCardParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCardParts.swift; sourceTree = "<group>"; };
 		C46CA4198406B579655640C1 /* FirestoreDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDecoding.swift; sourceTree = "<group>"; };
 		C46D1C04BC5842435C33213A /* TripSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSession.swift; sourceTree = "<group>"; };
 		C963869E69413A0E655BFED4 /* SpeechQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueue.swift; sourceTree = "<group>"; };
 		CA192F79FB2F9166FBD454E4 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCamera.swift; sourceTree = "<group>"; };
 		CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportOption.swift; sourceTree = "<group>"; };
 		CBAB9007352FC219EF36852D /* README-places.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README-places.md"; sourceTree = "<group>"; };
 		CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPullUpTests.swift; sourceTree = "<group>"; };
@@ -577,6 +581,7 @@
 			children = (
 				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
 				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
+				CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */,
 				2B2B86DD84637F94BD8CD6C9 /* HomeMapContent.swift */,
 				84D5E973FCE988F061DA7D83 /* HomeNow.swift */,
 				F56D59AA9467F430D986EC9F /* HomeSheet.swift */,
@@ -940,6 +945,7 @@
 				28F201EC357C45D84BC4395C /* EventTests.swift */,
 				67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */,
 				3444E323182FDDB4B67D7428 /* HazardTests.swift */,
+				C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */,
 				43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */,
 				9A4E6220545874C63A72429B /* HomeNowTests.swift */,
 				4B89CD36B48802E9292F07AF /* JoinStepperTests.swift */,
@@ -1295,6 +1301,7 @@
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
 				27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */,
 				5626212E868D041FB840F37F /* HazardRegionMonitor.swift in Sources */,
+				D2524C7FCC6D0876AC013798 /* HomeCamera.swift in Sources */,
 				76C148E268AE2ACA0726EA9B /* HomeMapContent.swift in Sources */,
 				ECFB40507E2C0ED0F4BEDE8E /* HomeNow.swift in Sources */,
 				BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */,
@@ -1461,6 +1468,7 @@
 				934D513F0C9E2DFAE1B60D1C /* Fixtures.swift in Sources */,
 				92645091B22B66E6182B8677 /* Geometry.swift in Sources */,
 				079075CB6B156BCB6CBF0CEA /* HazardTests.swift in Sources */,
+				D4001445E5CE74D71F3D5092 /* HomeCameraTests.swift in Sources */,
 				A773017CB9C9B79C20C393FC /* HomeNowEmulatorTests.swift in Sources */,
 				3E3947EE2E72D11FC40409C1 /* HomeNowTests.swift in Sources */,
 				FDFF2E6CAE8C2F8A39EF06AE /* JoinStepperTests.swift in Sources */,

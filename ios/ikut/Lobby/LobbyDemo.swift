@@ -428,6 +428,8 @@ enum DemoScreens {
         case "home-tall": return home("list-tall")
         case "home-tap": return home("tap")
         case "home-tour": return home("tour")
+        // D57: Home's camera hops (first fix, every trip, a pick, a stop, back, a far hop), paced, looping.
+        case "home-camera-tour": return home("camera-tour")
         case "home-picked": return home("short")
         case "home-picked-tall": return home("tall")
         case "home-picked-item": return home("item")

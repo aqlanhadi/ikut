@@ -228,6 +228,8 @@ final class CreateTripUITests: ConvoyUITestCase {
         XCTAssertFalse(sawHome, "Home showed before the lobby on relaunch")
         XCTAssertFalse(app.drivingReport.exists, "Relaunch before Start opened the driving map")
 
+        // The Always sheet can come up over the lobby just now and take the tap.
+        dismissAlwaysExplainerIfShown()
         app.buttons["lobby.back"].tap()
         XCTAssertTrue(home.waitForExistence(timeout: 15), "Back to trips didn't return to Home")
     }
