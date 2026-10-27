@@ -18,8 +18,8 @@ struct BannerSlotTests {
         for message in M.allCases { #expect(shown([message]) == message) }
     }
 
-    @Test func theRankingIsHazardStopStopApproachToastPassedErrorPausedThenTheRest() {
-        let order: [M] = [.hazardApproach, .stopPill, .stopApproach, .toast, .passed, .error, .paused]
+    @Test func theRankingIsHazardStopToastStopApproachPassedErrorPausedThenTheRest() {
+        let order: [M] = [.hazardApproach, .stopPill, .toast, .stopApproach, .passed, .error, .paused]
         for (i, higher) in order.enumerated() {
             for lower in order[(i + 1)...] + [.catchUp, .alertBanner, .routeNotice] {
                 #expect(shown([higher, lower]) == higher, "\(higher) over \(lower)")
@@ -67,7 +67,7 @@ struct BannerSlotTests {
     }
 
     @Test func anErrorBehindAHazardStopOrTimedMessageGetsTheDot() {
-        for top in [M.hazardApproach, .stopPill, .stopApproach, .toast, .passed] {
+        for top in [M.hazardApproach, .stopPill, .toast, .stopApproach, .passed] {
             #expect(BannerSlot.resolve(present: [.paused, .error, top]) == .init(shown: top, errorHeld: true), "\(top)")
         }
     }
@@ -95,6 +95,23 @@ struct BannerSlotTests {
         #expect(BannerSlot.present(inputs) == [.toast: "Reported debris. You can undo it."])
         inputs = BannerSlot.Inputs(stopApproachId: "s", toast: .sending(label: "debris"), catchUpId: "c")
         #expect(Set(BannerSlot.present(inputs).keys) == [.toast, .stopApproach, .catchUp])
+    }
+
+    @Test func yourReportShowsOverTheStopApproachButUnderAHazardAndAStopRequest() {
+        for state in [ReportToastModel.State.sending(label: "debris"), .reported(label: "debris", eventId: "e"), .failed(message: "No signal")] {
+            let present = Set(BannerSlot.present(BannerSlot.Inputs(stopApproachId: "s", toast: state)).keys)
+            #expect(shown(present) == .toast)
+        }
+        #expect(shown([.toast, .stopApproach, .hazardApproach]) == .hazardApproach)
+        #expect(shown([.toast, .stopApproach, .stopPill]) == .stopPill)
+    }
+
+    @MainActor @Test func theStopApproachComesBackAfterTheToastsEightSeconds() {
+        var present: Set<M> = [.toast, .stopApproach]
+        #expect(shown(present) == .toast)
+        present.remove(.toast)  // the model hides it after `ReportToastModel.undoTime`
+        #expect(shown(present) == .stopApproach)
+        #expect(ReportToastModel.undoTime == .seconds(8))
     }
 
     @Test func aWaitingMessageComesBackWhenTheTopOneGoes() {

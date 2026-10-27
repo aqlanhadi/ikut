@@ -13,12 +13,14 @@ enum BannerSlot {
         case hazardApproach
         /// A car asking to stop: the OK pill.
         case stopPill
+        /// The driver's own report ("Sending…", "Reported debris · Undo", or a failure) runs a timer (8 s), so it goes
+        /// over the planned-stop approach, which can stand for minutes (D60, decision #330): waiting behind it would
+        /// let the Undo window run out unseen. A hazard ahead or a car asking to stop still outrank it. Its haptic
+        /// does not depend on it being shown (`reportHaptics`).
+        case toast
         /// The planned stop coming up.
         case stopApproach
-        /// "Passed the debris" and the report toast ("Reported debris · Undo") keep their own timers (3 s, 5 s), so
-        /// they go over the standing messages below: waiting behind one that can last half an hour would let
-        /// their time run out unseen.
-        case toast
+        /// "Passed the debris" keeps its own 3 s timer, so it goes over the standing messages below too.
         case passed
         /// An error stays until it is fixed or closed, and the driver has to see it: it goes over the standing
         /// messages below (a failed Resume would otherwise hide behind the pause it failed to end).
@@ -35,8 +37,8 @@ enum BannerSlot {
             switch self {
             case .hazardApproach: 0
             case .stopPill: 1
-            case .stopApproach: 2
-            case .toast: 3
+            case .toast: 2
+            case .stopApproach: 3
             case .passed: 4
             case .error: 5
             case .paused: 6
