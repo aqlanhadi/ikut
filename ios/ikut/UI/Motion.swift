@@ -70,8 +70,8 @@ struct CameraView: Equatable, Sendable {
 ///     duration = 0.35 s + 0.3 s × log2(1 + widths) + 0.15 s × |log2(span ratio)|, clamped to 0.5…1.6 s
 ///
 /// A long hop (the target more than 1.5 widths away, or a zoom of 3 halvings or more) pulls out to a view with both
-/// ends in it, travels there, and settles in: two legs, each paced the same way (Apple Maps' fly). When the start
-/// already shows the target the pull-out is left out and it zooms straight in. With Reduce Motion every move is one
+/// ends in it, travels there, and settles in: two legs, each paced the same way (Apple Maps' fly). When one view
+/// already has the other's middle in it (your street in the country) the pull-out is left out: one straight zoom. With Reduce Motion every move is one
 /// 0.3 s ease, no pull-out.
 enum CameraPace {
     /// The shortest and longest leg, seconds.
@@ -153,13 +153,22 @@ enum CameraPace {
                           latitudeSpan: min(span, 170))
     }
 
+    /// Whether the closer view's middle is already inside the wider view: then the long hop is one straight zoom (in
+    /// or out), with nothing to pull out to.
+    static func nests(_ a: CameraView, _ b: CameraView) -> Bool {
+        let (wide, close) = a.latitudeSpan >= b.latitudeSpan ? (a, b) : (b, a)
+        let cosLat = max(cos(wide.latitude * .pi / 180), 0.01)
+        return abs(close.latitude - wide.latitude) <= wide.latitudeSpan / 2
+            && abs(close.longitude - wide.longitude) * cosLat <= wide.latitudeSpan * aspect / 2
+    }
+
     /// The legs from `from` (nil when the map hasn't reported a camera yet) to `to`; the last leg ends on `to`.
     static func legs(from: CameraView?, to: CameraView, reduceMotion: Bool) -> [Leg] {
         if reduceMotion { return [Leg(to: to, duration: reduced, curve: .reduced)] }
         guard let from else { return [Leg(to: to, duration: minimum, curve: .glide)] }
         guard isLong(from: from, to: to) else { return [Leg(to: to, duration: duration(from: from, to: to), curve: .glide)] }
         let top = peak(from: from, to: to)
-        if travel(from: from, to: top) < skipWidths, zoom(from: from, to: top) < skipHalvings {
+        if nests(from, to) || (travel(from: from, to: top) < skipWidths && zoom(from: from, to: top) < skipHalvings) {
             return [Leg(to: to, duration: duration(from: from, to: to), curve: .settle)]
         }
         return [Leg(to: top, duration: duration(from: from, to: top), curve: .pullOut),

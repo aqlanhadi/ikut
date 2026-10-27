@@ -54,6 +54,14 @@ struct CameraPaceTests {
         #expect(CameraPace.isLong(from: route, to: johor))
     }
 
+    @Test func aZoomOutToAViewThatHasYouInItIsOneLeg() {
+        // Your car to the whole route: the car is inside the route's view, so it zooms straight out.
+        let car = CameraView(latitude: 4.2, longitude: 101.26, latitudeSpan: 0.022)
+        #expect(CameraPace.nests(car, route))
+        #expect(CameraPace.legs(from: car, to: route, reduceMotion: false).map(\.curve) == [.settle])
+        #expect(!CameraPace.nests(route, johor))
+    }
+
     @Test func countryToStreetInViewZoomsStraightIn() {
         // Your street is already in the country view: no pull-out first, one slow zoom in.
         let legs = CameraPace.legs(from: country, to: street, reduceMotion: false)
