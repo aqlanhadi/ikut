@@ -5,7 +5,7 @@ import SwiftUI
 /// (the whole route, the lobby's sheet) and driving (following your car, the pill, the banners and the convoy sheet).
 /// Create trip, a trip in Now, Start trip and Show map are a camera move and a sheet change, not a new screen; Leave,
 /// End and Back to trips return to Home's list the same way. There is no way back to the lobby's mode: while driving,
-/// the lobby's rows continue below the convoy at the sheet's tall height (canvas row L, #409).
+/// the lobby's rows continue below the convoy when its sheet is pulled up to its tallest height (canvas row L, #424).
 enum TripScreenMode: Equatable {
     case home, lobby, driving
 }
@@ -35,15 +35,15 @@ enum TripScreenLogic {
     }
 
     /// Whether the lobby's own listeners (the trip, cars, members and stops: `LobbyModel`) run: while the trip screen
-    /// is on screen, in the lobby's mode, or while driving with the convoy sheet at tall, where the lobby's rows
-    /// continue below the convoy. Short, only the convoy's own listeners run; what the lobby last read stays on screen
-    /// until it listens again.
-    static func lobbyListens(onScreen: Bool, mode: TripScreenMode, lobbyRowsShown: Bool) -> Bool {
+    /// is on screen, in the lobby's mode, or while driving with the convoy sheet pulled up, where the lobby continues
+    /// below the convoy. Short or tall, the convoy has its own listeners and the lobby's rest, so the trip is read by
+    /// one listener set at a time; what the lobby last read stays on screen until it listens again.
+    static func lobbyListens(onScreen: Bool, mode: TripScreenMode, pulledUp: Bool) -> Bool {
         guard onScreen else { return false }
         switch mode {
         case .home: return false
         case .lobby: return true
-        case .driving: return lobbyRowsShown
+        case .driving: return pulledUp
         }
     }
 
@@ -108,12 +108,12 @@ enum TripScreenLogic {
         }
 
         /// The map stays touchable (and undimmed) with the sheet up to this detent: the lobby's medium; the convoy's
-        /// tall, its highest, so the map, the pill, the banners and the round buttons answer at both heights (#402).
+        /// tallest, so the map, the pill, the banners and the round buttons answer at every height (#402).
         var touchableUpThrough: PresentationDetent {
             switch self {
             case .home(let mode, let compact): HomeSheet.short(HomeSheet.height(mode, compact: compact))
             case .lobby(let compact): LobbySheet.medium(compact)
-            case .driving(let heights): .height(heights.tall)
+            case .driving(let heights): .height(heights.full)
             }
         }
     }
@@ -165,8 +165,8 @@ final class TripMapStage {
     var reading: TripCameraReading?
     /// The map's frame on screen (it runs under the status bar and the home indicator).
     var mapFrame: CGRect = .zero
-    /// Driving: the convoy sheet is at tall and the lobby's rows continue below the convoy (`PanelSheet.showsLobbyRows`).
-    var lobbyRowsShown = false
+    /// Driving: the convoy sheet is pulled up and the lobby continues below the convoy (`PanelSheet.showsContinuation`).
+    var pulledUp = false
     /// The trip on screen in the lobby's and driving modes; nil on Home.
     private(set) var tripId: String?
     /// The camera as it moves, frame by frame, outside observation so a glide redraws nothing (Home's settle check).
@@ -180,14 +180,14 @@ final class TripMapStage {
     /// Home hands the map to a trip: its lobby, or driving when it has started (`TripScreenLogic.Event.open`).
     func open(tripId: String, started: Bool) {
         self.tripId = tripId
-        lobbyRowsShown = false
+        pulledUp = false
         mode = TripScreenLogic.mode(after: .open(started: started), from: mode)
     }
 
     /// Leave, End or Back to trips: Home's list on the same map.
     func exit() {
         tripId = nil
-        lobbyRowsShown = false
+        pulledUp = false
         mode = TripScreenLogic.mode(after: .exit, from: mode)
     }
 
