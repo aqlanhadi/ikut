@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Joining a trip as the content of Home's sheet (D58): the code (H3), then which car (H4), one step at a time.
+/// Joining a trip as the content of Home's sheet (D58): the name (H1) and the location ask (H2) when this person still
+/// needs them, then the code (H3) and which car (H4), one step at a time.
 /// The sheet keeps one height for every step (`HomeSheet.joinHeight`); only the content changes. The map behind it
 /// draws the found trip (Home's map, fed by `JoinStepper.mapInput`).
 struct JoinSheet: View {
     @Environment(AuthModel.self) private var auth
+    @Environment(LocationPermission.self) private var location
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var stepper: JoinStepper
     var onClose: () -> Void
@@ -14,6 +16,12 @@ struct JoinSheet: View {
     @State private var showScanner = false
     @ScaledMetric(relativeTo: .title2) private var codeBoxSize: CGFloat = 26
     @FocusState private var codeFocused: Bool
+    @FocusState private var nameFocused: Bool
+    /// The name is being signed in, or iOS's location prompt is up.
+    @State private var isWorking = false
+    @State private var nameError: String?
+    /// iOS was asked on the Join tap and refused: the line shows and the next tap joins as the co-pilot.
+    @State private var refusedOnTap = false
 
     init(stepper: JoinStepper, onClose: @escaping () -> Void, onJoined: @escaping (_ tripId: String) -> Void) {
         self.stepper = stepper
@@ -27,7 +35,7 @@ struct JoinSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTopRow(title: stepper.title, subtitle: stepper.indicator, subtitleIdentifier: "joinStep") {
-                if JoinSteps.previous(before: stepper.step) != nil {
+                if stepper.canGoBack {
                     RoundGlassIconButton(systemImage: "chevron.left", label: "Back", action: back)
                         .accessibilityIdentifier("joinBack").disabled(model.isJoining)
                 }
@@ -40,6 +48,8 @@ struct JoinSheet: View {
             ScrollView {
                 Group {
                     switch stepper.step {
+                    case .name: nameStep
+                    case .location: LocationAskContent().padding(.top, Spacing.m)
                     case .code: codeStep
                     case .car: carStep
                     }
@@ -58,14 +68,25 @@ struct JoinSheet: View {
         .environment(\.inPanelSheet, true)
         .task {
             if model.displayName.isEmpty { model.displayName = auth.displayName ?? "" }
-            if model.code.isEmpty { codeFocused = true }
-            model.start()
+            focusForStep()
+            // The lookup waits for the name step: the server wants a signed-in person.
+            if stepper.step != .name { model.start() }
         }
+        .onChange(of: stepper.step) { focusForStep() }
         .sheet(isPresented: $showScanner) {
             QRScannerView { codeText = $0 }
         }
         // The keyboard goes once the trip is found, so the card has the room.
         .onChange(of: model.preview != nil) { _, found in if found { codeFocused = false } }
+    }
+
+    private func focusForStep() {
+        nameFocused = stepper.step == .name
+        codeFocused = stepper.step == .code && model.code.isEmpty
+    }
+
+    private func goNext() {
+        withAnimation(HomeSheet.motion(reduceMotion: reduceMotion)) { stepper.goNext() }
     }
 
     private func back() {
@@ -76,9 +97,38 @@ struct JoinSheet: View {
 
     @ViewBuilder private var bottomBar: some View {
         switch stepper.step {
+        case .name:
+            Button(action: submitName) {
+                Group {
+                    if isWorking { ProgressView().accessibilityLabel("Signing in") } else { Text("Get started") }
+                }
+                .barActionLabel()
+            }
+            .actionBarStyle(prominent: true)
+            .disabled(!stepper.canContinue || isWorking)
+            .accessibilityIdentifier("joinNameContinue")
+            .sheetActionBar(sides: false)
+            .padding(.bottom, PanelSheet.sideGap)
+        case .location:
+            Button(action: askLocation) {
+                Group {
+                    if isWorking { ProgressView().accessibilityLabel("Asking") } else { Text("Continue") }
+                }
+                .barActionLabel()
+            }
+            .actionBarStyle(prominent: true)
+            .disabled(isWorking)
+            .accessibilityIdentifier("joinLocationContinue")
+            .sheetActionBar(sides: false)
+            Button("Not now") { goNext() }
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .disabled(isWorking)
+                .accessibilityIdentifier("joinLocationSkip")
+                .padding(.bottom, PanelSheet.sideGap)
         case .code:
             if stepper.canContinue {
-                Button { withAnimation(HomeSheet.motion(reduceMotion: reduceMotion)) { stepper.goNext() } } label: {
+                Button { goNext() } label: {
                     Text("Continue").barActionLabel()
                 }
                 .actionBarStyle(prominent: true)
@@ -94,6 +144,15 @@ struct JoinSheet: View {
                     .sheetActionBar(sides: false)
                     .padding(.bottom, PanelSheet.sideGap)
             } else {
+                if let line = locationOffLine {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(line).font(.footnote).foregroundStyle(.secondary)
+                        Button("Open Settings") { location.openSettings() }
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("joinLocationOff")
+                }
                 if JoinSteps.sharing(selectedCar: model.selectedCar, ownCar: model.selection == .newCar) != .none { sharingRow }
                 Button(action: join) {
                     Group {
@@ -114,16 +173,88 @@ struct JoinSheet: View {
         }
     }
 
+    /// Signs in with the name, then on to the next step.
+    private func submitName() {
+        guard stepper.canContinue, !isWorking else { return }
+        isWorking = true
+        nameError = nil
+        Task {
+            do {
+                try await auth.signInAsGuest(name: model.displayName)
+                isWorking = false
+                goNext()
+            } catch {
+                nameError = error.localizedDescription
+                isWorking = false
+            }
+        }
+    }
+
+    /// Leads into iOS's own prompt (and the full-accuracy one when the person chose approximate); whatever the answer,
+    /// the sheet goes on. Joining to share is checked again on Join (`join`), which asks iOS once more if it can.
+    private func askLocation() {
+        guard !isWorking else { return }
+        isWorking = true
+        Task {
+            if await location.requestWhenInUse() != .denied { _ = await location.requestFullAccuracy() }
+            isWorking = false
+            goNext()
+        }
+    }
+
+    // MARK: H1 Name
+
+    private var nameStep: some View {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text("Drive together. Arrive together.")
+                .font(.title3).foregroundStyle(.secondary)
+                .padding(.top, Spacing.s)
+            NameFieldCard(name: $model.displayName, focused: $nameFocused, disabled: isWorking, onSubmit: submitName)
+            Text("What the convoy sees in new trips. Joining needs only a name, no account.")
+                .font(.footnote).foregroundStyle(.secondary)
+                .padding(.top, Spacing.s)
+            if let nameError {
+                InlineNote(nameError, tone: .alert, inset: 0)
+                    .padding(.top, Spacing.s)
+                    .accessibilityIdentifier("nameError")
+            }
+        }
+        .onChange(of: model.displayName) { nameError = nil }
+    }
+
     private var firstName: String { (try? DisplayName.validate(model.displayName).get()) ?? model.displayName }
 
     private var joinLabel: String {
-        JoinSteps.joinLabel(car: model.selectedCar, ownCar: model.selection == .newCar, firstName: firstName)
+        JoinSteps.joinLabel(car: model.selectedCar, ownCar: model.selection == .newCar, firstName: firstName,
+                            coPilot: locationOffLine != nil)
     }
 
+    private var wantsToShare: Bool { model.selection == .newCar || model.tracker }
+
+    /// Sharing wanted needs location: ask iOS on this tap. Refused on this tap: stay here with the line and the button
+    /// saying Join as co-pilot, and the next tap joins. Already denied before the tap: the line was showing, so it joins.
     private func join() {
         Task {
-            if let result = await model.join() { onJoined(result.tripId) }
+            let lineShown = locationOffLine != nil
+            var status = location.status
+            if wantsToShare, status == .notDetermined { status = await location.requestWhenInUse() }
+            let decision = JoinSteps.tracker(wantsToShare: wantsToShare, authorization: status)
+            if decision.note != nil, !lineShown {
+                refusedOnTap = true
+                return
+            }
+            refusedOnTap = false
+            if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId) }
         }
+    }
+
+    /// The co-pilot line: while sharing is wanted and location is not allowed, after a refusal on the tap or when iOS
+    /// already said no. Allowing it in Settings turns it off again (the status refreshes when the app comes back).
+    private var locationOffLine: String? {
+        let decision = JoinSteps.tracker(wantsToShare: wantsToShare, authorization: location.status)
+        guard refusedOnTap || location.status == .denied else { return nil }
+        return decision.note
     }
 
     // MARK: H3 Code
@@ -244,7 +375,7 @@ struct JoinSheet: View {
             if let meet = JoinSteps.meetLine(preview) {
                 Text(meet).font(.subheadline)
             }
-            Text("The map shows where the trip ends. Nobody’s start is shown.")
+            Text(JoinSteps.mapCaption(preview))
                 .font(.footnote).foregroundStyle(.secondary)
                 .padding(.top, Spacing.xs)
         }

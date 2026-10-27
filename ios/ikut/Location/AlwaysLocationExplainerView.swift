@@ -14,7 +14,7 @@ struct AlwaysLocationExplainerView: View {
                     .padding(.top, 32)
 
                 VStack(spacing: Spacing.m) {
-                    Text("Keep sharing while the screen is off or another app is open")
+                    Text(LocationAskContent.heading)
                         .font(.title2.bold())
                         .multilineTextAlignment(.center)
                     Text("Your car keeps showing on the map for everyone in your trip, even when your screen is off. Sharing stops when the trip ends.")

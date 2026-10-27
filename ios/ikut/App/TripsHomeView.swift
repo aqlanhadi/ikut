@@ -33,6 +33,7 @@ struct TripsHomeView: View {
 
     /// The join steps over this map; nil while the sheet shows its list.
     @State private var joinFlow: JoinStepper?
+    @Environment(LocationPermission.self) private var location
     /// Where the camera was before joining, for Close.
     @State private var cameraBeforeJoin: MapCameraPosition?
     /// The trip was joined and its lobby is opening: the steps stay until the lobby replaces this view, so the list never flashes.
@@ -209,7 +210,7 @@ struct TripsHomeView: View {
             if now { beginCreate() } else if flow != nil, !finishingCreate { closeCreate() }
         }
         .onChange(of: joining.wrappedValue, initial: true) { _, now in
-            if let now { beginJoin(now) } else if joinFlow != nil, !finishingJoin { closeJoin() }
+            if let now { beginJoin(now) } else if joinFlow != nil, !finishingJoin, !isDemo { closeJoin() }
         }
         .onChange(of: joinFlow?.model.preview) { _, _ in refocusJoin(animated: true) }
         .onChange(of: mode) { old, new in
@@ -461,13 +462,17 @@ struct TripsHomeView: View {
     /// Join's gates are through (or a link brought a code): the sheet becomes the join steps and the map shows the trip
     /// once its code is found. A second start (another link) replaces the steps with the new code.
     private func beginJoin(_ start: JoinStart) {
+        // A link arriving mid-join must not swap the steps from under the person; they keep joining this trip.
+        guard JoinStepper.shouldReplace(joinFlow) else { return }
         if joinFlow == nil {
             cameraBeforeJoin = cameraBeforeCreate ?? cameraBeforePick ?? stage.camera
         }
         flow?.cancel()
         if picked != nil { picked = nil }
         creating.wrappedValue = false
-        let stepper = JoinStepper.begin(start, displayName: auth.displayName ?? "")
+        let hasName = auth.state == .signedIn && !(auth.displayName ?? "").isEmpty
+        let stepper = JoinStepper.begin(start, displayName: auth.displayName ?? "",
+                                        plan: JoinSteps.plan(hasName: hasName, location: location.status))
         withAnimation(sheetMotion) {
             expanded = false
             flow = nil
