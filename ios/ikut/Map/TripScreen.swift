@@ -173,9 +173,18 @@ final class TripMapStage {
     let cameraBox = CameraBox()
     /// The camera move in flight, paced by `CameraPace` (D57).
     let flight = CameraFlight()
-    /// Where the driving map draws each car (D70), set by the driving layer in a linear glide per fix, so the
-    /// markers move smoothly between fixes as the camera does; a car missing here is drawn where it is.
-    var drawnCars: [String: MapCoordinate] = [:]
+    /// The follow camera's glide to the next fix (D70): a keyframe animation the map runs on `glides` changing, so
+    /// MapKit plays it over its whole time (a `withAnimation` move this small it plays as its own short ease).
+    private(set) var glides = 0
+    @ObservationIgnored private(set) var glideTo: MapCamera?
+    @ObservationIgnored private(set) var glideTime: TimeInterval = 0
+
+    /// Glides the camera to `camera` linearly over `duration` seconds, from wherever it is drawn now.
+    func glide(to camera: MapCamera, duration: TimeInterval) {
+        glideTo = camera
+        glideTime = duration
+        glides &+= 1
+    }
 
     init(mode: TripScreenMode = .lobby, tripId: String? = nil) {
         self.mode = mode
@@ -268,11 +277,21 @@ struct TripScreenHost<Content: View>: View {
         var style = spec.style
         style.cameraHeading = stage.heading
         style.containerWidth = stage.mapFrame.maxX
+        if let reading = stage.reading, stage.mapFrame.height > 0 {
+            style.degreesPerPoint = reading.latitudeDelta / Double(stage.mapFrame.height)
+        }
         return Map(position: $stage.camera) {
-            TripMapContent(input: spec.input.drawing(cars: stage.drawnCars), style: style)
+            TripMapContent(input: spec.input, style: style)
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
         .mapControlVisibility(spec.hidesControls ? .hidden : .automatic)
+        // The follow glide (D70): only the middle and the height move; the rest stays as the camera is.
+        .mapCameraKeyframeAnimator(trigger: stage.glides) { [stage] initial in
+            let to = stage.glideTo ?? initial
+            let time = max(stage.glideTime, 0.01)
+            KeyframeTrack(\MapCamera.centerCoordinate) { LinearKeyframe(to.centerCoordinate, duration: time) }
+            KeyframeTrack(\MapCamera.distance) { LinearKeyframe(to.distance, duration: time) }
+        }
         // MapKit fits and centres inside the safe area: the logo and Legal ride above what the layer keeps clear.
         .safeAreaPadding(.bottom, spec.bottomPadding)
         .onMapCameraChange(frequency: .continuous) { context in

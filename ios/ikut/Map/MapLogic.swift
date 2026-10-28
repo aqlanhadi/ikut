@@ -49,6 +49,8 @@ struct MapMarker: Identifiable, Equatable, Sendable {
     var isPaused = false
     /// Reached the destination: the badge shows a small check.
     var hasArrived = false
+    /// Seconds the marker glides to `coordinate` from where it was drawn (D70, `MarkerGlide`); 0 places it.
+    var glide: TimeInterval = 0
 
     /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
     var label: String {

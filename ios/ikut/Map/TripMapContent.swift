@@ -88,18 +88,6 @@ struct TripMapInput {
         TripMapInput(showsUser: true, home: HomeMapInput(places: places, focusedPlaceId: focusedId, newTripRoute: route))
     }
 
-    /// The cars drawn at `drawn` (the driving layer's glide, D70) where it has them.
-    func drawing(cars drawn: [String: MapCoordinate]) -> TripMapInput {
-        guard !drawn.isEmpty else { return self }
-        var input = self
-        input.cars = cars.map { car in
-            var car = car
-            if let spot = drawn[car.id] { car.coordinate = spot }
-            return car
-        }
-        return input
-    }
-
     /// Pins in drawing order: the chosen R&R last, so it is on top.
     var orderedPins: [LobbyPin] { pins.sorted { !$0.isSelectedCandidate && $1.isSelectedCandidate } }
 }
@@ -108,6 +96,8 @@ struct TripMapInput {
 struct TripMapStyle {
     var cameraHeading = 0.0
     var containerWidth: CGFloat = 0
+    /// Degrees of latitude per point of the map as last read (0 before), for the cars' glide (`MarkerGlide`).
+    var degreesPerPoint = 0.0
     /// The hazard that pings because an alert for it is up.
     var pingingEventId: String?
     var onCandidateTap: (String) -> Void = { _ in }
@@ -166,8 +156,49 @@ struct TripMapContent: MapContent {
         ForEach(input.cars) { marker in
             Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
                 MapMarkerView(marker: marker, cameraHeading: style.cameraHeading, containerWidth: style.containerWidth)
+                    .modifier(MarkerGlide(coordinate: marker.coordinate, duration: marker.glide,
+                                          degreesPerPoint: style.degreesPerPoint, cameraHeading: style.cameraHeading))
             }
             .annotationTitles(.hidden)
         }
+    }
+}
+
+/// A car's marker gliding to its new place (D70). MapKit plays its own short ease for an annotation that moves, whatever
+/// animation it is given, so the annotation is moved at once and its view starts back where the car was drawn, offset
+/// by the step in points, and slides to it linearly over `duration`, a SwiftUI animation MapKit leaves alone. A step
+/// with Reduce Motion, before the map's scale is read, or for a car placed rather than glided (`duration` 0).
+struct MarkerGlide: ViewModifier {
+    var coordinate: MapCoordinate
+    var duration: TimeInterval
+    var degreesPerPoint: Double
+    var cameraHeading: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var offset = CGSize.zero
+
+    func body(content: Content) -> some View {
+        content
+            .offset(offset)
+            .onChange(of: coordinate) { old, new in
+                var still = Transaction()
+                still.disablesAnimations = true
+                guard !reduceMotion, duration > 0, degreesPerPoint > 0 else {
+                    withTransaction(still) { offset = .zero }
+                    return
+                }
+                withTransaction(still) {
+                    offset = Self.offset(from: old, to: new, degreesPerPoint: degreesPerPoint, heading: cameraHeading)
+                }
+                withAnimation(.linear(duration: duration)) { offset = .zero }
+            }
+    }
+
+    /// Where `from` is drawn relative to `to`, in points on a map turned `heading` degrees.
+    static func offset(from: MapCoordinate, to: MapCoordinate, degreesPerPoint: Double, heading: Double) -> CGSize {
+        let cosLat = cos(to.latitude * .pi / 180)
+        let north = (from.latitude - to.latitude) / degreesPerPoint
+        let east = (from.longitude - to.longitude) * cosLat / degreesPerPoint
+        let h = heading * .pi / 180
+        return CGSize(width: east * cos(h) - north * sin(h), height: -(east * sin(h) + north * cos(h)))
     }
 }

@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import SwiftUI
 
 /// Where the driving map draws a car, and the follow camera aims, on each new fix, and how long the glide there takes
 /// (D70). My car moves on this phone's own fixes (about one a second), every other car on its written positions
@@ -69,5 +70,15 @@ enum FollowGlide {
         let cosLat = max(cos(coordinate.latitude * .pi / 180), 0.01)
         return MapCoordinate(latitude: coordinate.latitude + meters * cos(rad) / 111_195,
                              longitude: coordinate.longitude + meters * sin(rad) / (111_195 * cosLat))
+    }
+}
+
+/// Whether the driving map's own location stream runs (D70, decision #469): a passenger's always, as before the
+/// tracker's too; the tracker's only while the app is not in the background, since its map follows the fixes only
+/// to draw them and what the tracker writes comes from its own stream. Used as the stream's task id, so a passenger's
+/// never restarts, and the tracker's not on Control Center or a call banner (inactive).
+enum MapLocationStream {
+    static func runs(isTracker: Bool, phase: ScenePhase) -> Bool {
+        !isTracker || phase != .background
     }
 }

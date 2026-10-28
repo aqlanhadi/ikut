@@ -103,7 +103,10 @@ struct CameraTourDemo: View {
 /// with a fix every second, the camera following; Wyna and Daniel write their positions every 5 s, as the tracker
 /// does. The map should glide on steadily, with no step every 5 s, and the other cars move smoothly between their
 /// writes. Tap Fit to watch the cars move within the frame; a pan stops the camera and leaves the cars moving.
+/// `follow-drive-still`: the same drive with the map held still on the convoy, to watch the cars alone.
 struct FollowDriveDemo: View {
+    var still = false
+
     @State private var model: TripMapModel = {
         let model = MapDemo.model()
         model.mode = .follow
@@ -117,7 +120,10 @@ struct FollowDriveDemo: View {
                             alerts: AlertCenter(bannerDuration: .seconds(3_600)), stopService: DemoStopService())
             }
         }
-        .task { await drive() }
+        .task {
+            if still { model.mode = .fit }
+            await drive()
+        }
     }
 
     private func drive() async {
@@ -136,6 +142,7 @@ struct FollowDriveDemo: View {
         let begin = Date()
         var second = 0.0
         while !Task.isCancelled {
+            if still, second == 2 { model.mode = .free }
             let now = Date()
             if let (here, course, _) = spot("c1", second) {
                 model.receive(DeviceFix(coordinate: here, course: course, speed: cars["c1"]!.speed, at: now), now: now)

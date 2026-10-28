@@ -96,6 +96,15 @@ struct FollowGlideTests {
         #expect(stillStanding.heading == nil)
     }
 
+    @Test func aMarkerStartsBackWhereTheCarWasDrawnInPoints() {
+        // 1e-5 degrees a point: a car 28 m north (2.5e-4 degrees) starts 25 points below its new place.
+        let back = MarkerGlide.offset(from: start, to: next, degreesPerPoint: 1e-5, heading: 0)
+        #expect(abs(back.height - 25) < 0.1 && abs(back.width) < 1e-6)
+        // The map turned to face east: north is to the left, so the old place is to the right.
+        let turned = MarkerGlide.offset(from: start, to: next, degreesPerPoint: 1e-5, heading: 90)
+        #expect(abs(turned.width - 25) < 0.1 && abs(turned.height) < 1e-6)
+    }
+
     @Test func theGlideIsLinearWithoutReduceMotionAndAStepWithIt() {
         #expect(Motion.follow(interval: 0.9, reduceMotion: false) == .linear(duration: 0.9))
         #expect(Motion.follow(interval: 0.9, reduceMotion: true) == nil)
@@ -169,6 +178,23 @@ struct FollowGlideModelTests {
         #expect(abs((model.lastGlide ?? 0) - 0.9) < 1e-9)
     }
 
+    @Test func aFixTakenBeforeTheOneDrawnIsDropped() {
+        let model = model(isTracker: true, carAt: tapah)
+        model.receive(DeviceFix(coordinate: tapah, course: -1, at: t0 + 2), now: t0 + 2)
+        model.receive(DeviceFix(coordinate: bidor, course: -1, at: t0 + 1), now: t0 + 2.5)
+        #expect(model.myCoordinate == tapah)
+        #expect(model.device?.at == t0 + 2)
+    }
+
+    @Test func anOutOfOrderWriteIsPlacedNotGlidedBackwards() {
+        let model = model(isTracker: false, carAt: tapah)
+        let on = MapCoordinate(latitude: tapah.latitude + 0.001, longitude: tapah.longitude)
+        model.apply(trip: nil, myCar: model.myCar, myCarId: "c1", positions: ["c1": position(on, at: t0 + 5)], isTracker: false)
+        #expect(model.glideTime(for: "c1") > 0)
+        model.apply(trip: nil, myCar: model.myCar, myCarId: "c1", positions: ["c1": position(tapah, at: t0 + 2)], isTracker: false)
+        #expect(model.glideTime(for: "c1") == 0)
+    }
+
     @Test func anotherCarGlidesOverTheTimeBetweenItsWrites() {
         let model = model(isTracker: true, carAt: tapah)
         let car2 = Car(id: "c2", name: "Wyna’s X70", color: "#D9480F", trackerUserId: "u2", isLead: false, route: nil,
@@ -182,5 +208,23 @@ struct FollowGlideModelTests {
         model.apply(trip: nil, myCar: model.myCar, myCarId: "c1",
                     positions: ["c1": mine, "c2": position(on, at: t0 + 5)], isTracker: true)
         #expect(abs(model.glideTime(for: "c2") - 4.5) < 1e-9)
+    }
+}
+
+/// D70, decision #469: when the driving map's own location stream runs.
+struct MapLocationStreamTests {
+    @Test func theTrackersStreamRunsInFrontAndStopsInTheBackground() {
+        #expect(MapLocationStream.runs(isTracker: true, phase: .active))
+        #expect(MapLocationStream.runs(isTracker: true, phase: .inactive))
+        #expect(!MapLocationStream.runs(isTracker: true, phase: .background))
+    }
+
+    @Test func aPassengersStreamRunsInEveryPhaseAndNeverRestarts() {
+        let phases: [ScenePhase] = [.active, .inactive, .background]
+        #expect(phases.allSatisfy { MapLocationStream.runs(isTracker: false, phase: $0) })
+        // The rule is the stream's task id: the same id in every phase, so the task is never started again.
+        #expect(Set(phases.map { MapLocationStream.runs(isTracker: false, phase: $0) }).count == 1)
+        // Control Center (inactive) doesn't restart the tracker's either.
+        #expect(MapLocationStream.runs(isTracker: true, phase: .active) == MapLocationStream.runs(isTracker: true, phase: .inactive))
     }
 }

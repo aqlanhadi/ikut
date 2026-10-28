@@ -328,6 +328,7 @@ final class TripMapModel {
         let online = youOnline
         return MapMarkerBuilder.markers(from: convoy.snapshot, myCarId: myCarId).map {
             var marker = $0
+            marker.glide = glideTime(for: marker.id)
             if marker.isMine {
                 marker.youOnline = online
                 // The tracker's phone is the car: its marker moves on the phone's own fixes, where the camera aims.
@@ -364,6 +365,8 @@ final class TripMapModel {
 
     /// A new fix from this phone: where it puts me, and the glide there from the last one.
     func receive(_ fix: DeviceFix, now: Date = Date()) {
+        // A fix taken before the one already drawn would glide the car backwards: dropped.
+        if let device, let before = device.at, let at = fix.at, at < before { return }
         let aim = FollowGlide.aim(previous: device.map { Self.glideFix($0, now: now) },
                                   latest: Self.glideFix(fix, now: now), now: now)
         device = fix
@@ -382,6 +385,8 @@ final class TripMapModel {
         for (id, position) in new {
             guard let before = old[id] else { glideTimes[id] = 0; continue }
             guard before.location != position.location else { continue }
+            // Older than the position before it (out of order): drawn where it says at once, never glided backwards.
+            if let was = before.updatedAt, let at = position.updatedAt, at < was { glideTimes[id] = 0; continue }
             // Another car's time is the server's: nothing carried on (`maxLead` 0).
             let aim = FollowGlide.aim(previous: Self.glideFix(before, now: now), latest: Self.glideFix(position, now: now),
                                       now: now, maxLead: 0)
@@ -541,7 +546,6 @@ final class TripMapModel {
     /// writes is unchanged. Does nothing without When In Use or Always permission; the permission flow elsewhere
     /// asks for it. Ends when its task is cancelled.
     func runDeviceLocation() async {
-        device = nil
         switch CLLocationManager().authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways: break
         default: return
