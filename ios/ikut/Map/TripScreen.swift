@@ -34,10 +34,9 @@ enum TripScreenLogic {
         }
     }
 
-    /// Whether the lobby's own listeners (the trip, cars, members and stops: `LobbyModel`) run: while the trip screen
-    /// is on screen, in the lobby's mode, or while driving with the convoy sheet pulled up, where the lobby continues
-    /// below the convoy. Short or tall, the convoy has its own listeners and the lobby's rest, so the trip is read by
-    /// one listener set at a time; what the lobby last read stays on screen until it listens again.
+    /// Whether the lobby reads the trip's cars and members (rule #396): while the trip screen is on screen, in the
+    /// lobby's mode, or while driving with the convoy sheet pulled up, where the lobby continues below the convoy. Short
+    /// or tall, only the convoy reads the cars and the members listener rests; what the lobby last read stays on screen.
     static func lobbyListens(onScreen: Bool, mode: TripScreenMode, pulledUp: Bool) -> Bool {
         guard onScreen else { return false }
         switch mode {
@@ -45,6 +44,21 @@ enum TripScreenLogic {
         case .lobby: return true
         case .driving: return pulledUp
         }
+    }
+
+    /// How much of the join-town work the lobby does (rule #396): in its own mode it works out how each car joins and
+    /// looks the towns up; below the pulled-up convoy only how each car joins (its rows show it); otherwise nothing,
+    /// even while the convoy's cars listener keeps changing the cars.
+    enum JoinWork: Equatable { case none, joins, joinsAndTowns }
+
+    static func joinWork(onScreen: Bool, mode: TripScreenMode, pulledUp: Bool) -> JoinWork {
+        guard lobbyListens(onScreen: onScreen, mode: mode, pulledUp: pulledUp) else { return .none }
+        return mode == .lobby ? .joinsAndTowns : .joins
+    }
+
+    /// What the lobby reads from the session (`TripSession.read`) in `mode`: the cars and members while it listens.
+    static func lobbyReads(onScreen: Bool, mode: TripScreenMode, pulledUp: Bool) -> Set<TripRead> {
+        lobbyListens(onScreen: onScreen, mode: mode, pulledUp: pulledUp) ? [.cars, .members] : []
     }
 
     /// The layer on screen in `mode`: it alone draws its chrome, publishes what the map draws (`TripMapSpec`) and fills

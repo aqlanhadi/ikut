@@ -85,10 +85,10 @@ struct LobbyView: View {
          onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
         self.onEnded = onEnded
-        _model = State(initialValue: LobbyModel(tripId: tripId))
+        let session = session ?? TripSession(tripId: tripId, userId: Auth.auth().currentUser?.uid ?? "")
+        _model = State(initialValue: LobbyModel(session: session))
         _joinTowns = State(initialValue: JoinTowns.shared(for: tripId))
-        _session = State(initialValue: session ?? TripSession(
-            tripId: tripId, userId: Auth.auth().currentUser?.uid ?? ""))
+        _session = State(initialValue: session)
         _planner = State(initialValue: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
     }
 
@@ -124,23 +124,22 @@ struct LobbyView: View {
     }
     #endif
 
-    var isOrganizer: Bool {
-        if isSample { return sampleOrganizer }
-        guard let trip = model.trip else { return false }
-        return trip.organizerId == Auth.auth().currentUser?.uid
+    var isOrganizer: Bool { isSample ? sampleOrganizer : session.isOrganizer }
+
+    /// Started by anyone (the session's trip), or by this phone a moment ago. A sample lobby has no session: its trip says.
+    var isStarted: Bool {
+        guard !isEnded else { return false }
+        return (isSample ? LobbyLogic.isStarted(trip: model.trip) : session.isStarted) || startedHere
     }
 
-    /// Started by anyone (trip doc / cars), or by this phone a moment ago.
-    var isStarted: Bool {
-        !session.isEnded && (LobbyLogic.isStarted(trip: model.trip) || startedHere)
-    }
+    var isEnded: Bool { isSample ? model.trip?.status == .ended : session.isEnded }
 
     /// Organiser: Start trip, with the line above it while a car isn't sharing yet. Participant: a plain waiting line
     /// until the trip starts, then Show map (D39).
     @ViewBuilder var bottomBar: some View {
         let bar = LobbyLogic.bottomBar(
             isOrganizer: isOrganizer, tripLoaded: model.trip != nil, isMember: !session.membershipLost,
-            started: isStarted, ended: session.isEnded || model.trip?.status == .ended,
+            started: isStarted, ended: isEnded,
             organizerName: LobbyLogic.organizerName(trip: model.trip, members: model.members))
         ZStack { barContent(bar) }
             .animation(Motion.quick(reduceMotion: reduceMotion), value: bar)
@@ -334,8 +333,8 @@ struct LobbyView: View {
         }
         // The trip started from another phone: no more stop edits.
         .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
-        // One listener set at a time (`TripScreenLogic.lobbyListens`): driving, the lobby listens only while the
-        // convoy sheet is pulled up and shows the lobby below the convoy.
+        // Rule #396 (`TripScreenLogic.lobbyReads`): driving, the lobby reads the session's cars and members only while
+        // the convoy sheet is pulled up and shows the lobby below the convoy.
         .onChange(of: stage.mode) { _, _ in updateListening() }
         .onChange(of: stage.pulledUp) { _, pulledUp in
             updateListening()
@@ -352,7 +351,7 @@ struct LobbyView: View {
         .navigationDestination(isPresented: $showChangeDestination) {
             CreateTripView(
                 changingTripId: model.trip?.id, keepingStops: planner.items,
-                midTrip: LobbyLogic.isStarted(trip: model.trip) ? { [session] in try await session.rebuilder.changeDestination(to: $0) } : nil
+                midTrip: session.isStarted ? { [session] in try await session.rebuilder.changeDestination(to: $0) } : nil
             ) { _ in showChangeDestination = false }
         }
         // The header (Back, the trip's name, Share) is in the sheet, so the map runs to the top of the screen.
@@ -471,19 +470,25 @@ struct LobbyView: View {
         }
     }
 
-    /// Starts or rests the lobby's listeners (`TripScreenLogic.lobbyListens`) and the join towns, which only the lobby's
-    /// own mode shows. What was last read stays on screen while they rest.
+    /// Starts or rests the lobby's reads of the cars and members from the session (`TripScreenLogic.lobbyReads`) and
+    /// the join towns, which only the lobby's own mode shows. What was last read stays on screen while they rest.
     func updateListening() {
         guard !isSample else { return }
-        if TripScreenLogic.lobbyListens(onScreen: onScreen, mode: stage.mode, pulledUp: stage.pulledUp) {
-            model.start()
-        } else {
-            model.stop()
+        session.read(TripScreenLogic.lobbyReads(onScreen: onScreen, mode: stage.mode, pulledUp: stage.pulledUp), by: .lobby)
+        let work = joinWork
+        let towns = work == .joinsAndTowns
+        if towns != townsOpen {
+            townsOpen = towns
+            if towns { joinTowns.open() } else { joinTowns.cancel() }
         }
-        let towns = onScreen && stage.mode == .lobby
-        guard towns != townsOpen else { return }
-        townsOpen = towns
-        if towns { joinTowns.open() } else { joinTowns.cancel() }
+        // Back in the lobby (or pulled up): catch up on the cars that changed while it wasn't asking.
+        if work != .none { askJoinTowns() }
+    }
+
+    /// How much join-town work the lobby does now (`TripScreenLogic.joinWork`); a sample lobby does all of it.
+    var joinWork: TripScreenLogic.JoinWork {
+        isSample ? .joinsAndTowns
+            : TripScreenLogic.joinWork(onScreen: onScreen, mode: stage.mode, pulledUp: stage.pulledUp)
     }
 
     /// The lobby's map (route, pins, the whole-trip button) and its sheet, handed to the host's one map and one sheet.
@@ -629,8 +634,10 @@ struct LobbyView: View {
 
     /// Works out how each car meets the route (decoding routes and finding the merge: not for every redraw), then asks
     /// for the towns of the cars that join along the way.
+    /// Nothing while driving folded: the convoy's cars listener keeps changing the cars, but no row shows them.
     func askJoinTowns() {
-        guard let mainLine else { return }
+        let work = joinWork
+        guard work != .none, let mainLine else { return }
         let meeting = TripSessionLogic.meetingPoint(in: model.stops) != nil
         var found: [String: LobbyContent.CarJoin] = [:]
         for item in model.groupedCars {
@@ -638,6 +645,7 @@ struct LobbyView: View {
             found[id] = LobbyContent.carJoin(of: item.car, main: mainLine, hasMeetingPoint: meeting)
         }
         joins = found
+        guard work == .joinsAndTowns else { return }
         joinTowns.request(cars: model.groupedCars.filter { !isMine($0) }, joins: found, main: mainLine)
     }
 

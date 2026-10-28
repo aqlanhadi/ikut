@@ -3,12 +3,13 @@ import FirebaseFirestore
 import Foundation
 import Observation
 
-/// Everything the live map shows, derived from the trip session plus a listener on all the trip's
-/// cars (the session only tracks my own).
+/// Everything the live map shows, derived from the trip session: its trip, stops, positions and every car (read from
+/// the session's one cars listener, which the lobby shares).
 ///
 /// Feeds `ConvoyModel` (`setMainRoute`, then `update(cars:positions:)`), decodes routes once per
 /// change, and exposes marker view-models, route overlays and the camera target. The inputs go in
-/// through `apply(...)` and `setCars(_:)`, so previews and tests can drive it without Firestore.
+/// through `apply(...)` and `setCars(_:)` (`sync()` feeds both from the session), so previews and tests can drive it
+/// without Firestore.
 ///
 /// Lifecycle: call `start()` when the map appears and `stop()` when it goes away; run
 /// `convoy.run()` and `runDeviceLocation()` from `.task`.
@@ -47,14 +48,15 @@ final class TripMapModel {
     private(set) var isEnded = false
     /// This phone has a network path (`NetworkStatus`, after its hold); with my car's freshness it makes the "You" tag.
     var networkUp = true
-    /// The trip has started (`startedAt`): stops can then be left, and the lead car marks when it arrived.
+    /// The trip has started (`TripSessionLogic.isStarted`, as the session and the lobby read it): stops can then be left,
+    /// and the lead car marks when it arrived. The demos set it by hand.
     var tripStarted = false
     /// The trip's organizer (user id), for naming who can skip a stop for everyone.
     private(set) var organizerId: String?
 
     @ObservationIgnored private let session: TripSession?
-    @ObservationIgnored private let db: Firestore?
-    @ObservationIgnored private var listener: ListenerRegistration?
+    /// The map reads the session's cars (`start()` to `stop()`).
+    @ObservationIgnored private var reading = false
     @ObservationIgnored private var positions: [String: Position] = [:]
     @ObservationIgnored private var mainRouteString: String?
     @ObservationIgnored private var allOverlays: [RouteOverlay] = []
@@ -101,44 +103,41 @@ final class TripMapModel {
 
     /// `session` nil makes a model that is only fed through `apply` (previews, tests).
     init(
-        session: TripSession?, db: Firestore? = nil, convoy: ConvoyModel = ConvoyModel(),
+        session: TripSession?, convoy: ConvoyModel = ConvoyModel(),
         hazards: HazardModel = HazardModel(),
         eventSource: @escaping @Sendable (String) -> AsyncStream<[TripEvent]> = { EventService.listen(tripId: $0) }
     ) {
         self.session = session
-        self.db = db
         self.convoy = convoy
         self.hazards = hazards
         self.eventSource = eventSource
     }
 
     isolated deinit {
-        listener?.remove()
         eventsTask?.cancel()
     }
 
     // MARK: Lifecycle
 
-    /// Listens to every car in the trip and pulls the session's current state.
+    /// Reads every car in the trip from the session and pulls its current state.
     func start() {
         sync()
-        guard listener == nil, let session else { return }
+        guard !reading, let session else { return }
+        reading = true
         listenToEvents(tripId: session.tripId)
-        let db = db ?? Firestore.firestore()
-        listener = db.collection(FirestorePaths.cars(tripId: session.tripId))
-            .addSnapshotListener { [weak self] snapshot, _ in
-                guard let cars = snapshot?.decoded(Car.self) else { return }
-                Task { @MainActor in self?.setCars(cars) }
-            }
+        session.read([.cars], by: .map)
     }
 
+    /// The trip's events listener runs (the listener-count test).
+    var listensToEvents: Bool { eventsTask != nil }
+
     func stop() {
-        listener?.remove()
-        listener = nil
+        if reading { session?.read([], by: .map) }
+        reading = false
         stopHazards()
     }
 
-    /// Reads trip, my car and positions from the session. Call when any of them changes.
+    /// Reads trip, my car, every car and positions from the session. Call when any of them changes.
     func sync() {
         guard let session else { return }
         setStops(session.stops)
@@ -146,6 +145,7 @@ final class TripMapModel {
         apply(
             trip: session.trip, myCar: session.car, myCarId: session.member?.carId ?? session.car?.id,
             positions: session.positions, isTracker: session.isTracking, isEnded: session.isEnded)
+        if session.cars != cars { setCars(session.cars) }
     }
 
     // MARK: Inputs
@@ -163,7 +163,7 @@ final class TripMapModel {
         self.positions = positions
         var routeChanged = false
         if let trip {
-            tripStarted = trip.startedAt != nil
+            tripStarted = TripSessionLogic.isStarted(trip)
             organizerId = trip.organizerId
             routeSeconds = trip.routeSeconds
             tripName = trip.name

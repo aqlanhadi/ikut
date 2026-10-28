@@ -45,10 +45,7 @@ enum LobbyLogic {
     /// The trip is underway: someone already tapped Start Trip (`startedAt`). A car already in the
     /// convoy doesn't count: an organizer parked on the route is in it before anyone starts the trip.
     /// Never true once the trip has ended.
-    static func isStarted(trip: Trip?) -> Bool {
-        guard let trip, trip.status == .active else { return false }
-        return trip.startedAt != nil
-    }
+    static func isStarted(trip: Trip?) -> Bool { TripSessionLogic.isStarted(trip) }
 
     /// What the lobby's bottom bar offers (D39): only the organizer starts the trip; a participant waits in the
     /// lobby, with no way to the map, until `startedAt` is set; then everyone gets Show map.

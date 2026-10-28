@@ -90,7 +90,8 @@ final class TrackingDuty {
             return
         }
         let trip = wanted.trip, car = wanted.car, carId = wanted.carId
-        let started = trip.startedAt != nil
+        // The session wants tracking only on an active trip, so this is the same as `startedAt != nil` there.
+        let started = TripSessionLogic.isStarted(trip)
         if wanted.waitsForAnswer {
             isTracking = tracker.isTracking
             return
@@ -109,7 +110,7 @@ final class TrackingDuty {
             stopNow()
             beginSession(
                 key, trip: trip,
-                car: TripSessionLogic.carForNewSession(car, hasMeetingPoint: meetingPoint != nil, tripStarted: trip.startedAt != nil),
+                car: TripSessionLogic.carForNewSession(car, hasMeetingPoint: meetingPoint != nil, tripStarted: started),
                 meetingPoint: meetingPoint)
         } else if tracker.isTracking {
             let docRoute = TripSessionLogic.routeLine(from: car.route)
