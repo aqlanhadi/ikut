@@ -281,7 +281,11 @@ struct LobbyView: View {
     static let asks = TripSheetCover.trip.subtracting([.tripOffScreen])
     /// The one sheet is at its tall detent (the lobby's).
     var expanded: Bool { stage.sheet.size == .lobby(tall: true) }
-    func setExpanded(_ tall: Bool) { stage.sheet.resize(to: .lobby(tall: tall)) }
+    /// Medium or tall, through the one map (D63 C4): the camera keeps the trip above the medium sheet at either size
+    /// (`LobbySheet.cover`), so the change writes the same cover and moves nothing, in this or a later update.
+    func setExpanded(_ tall: Bool) {
+        stage.sheetChange(in: .lobby, { stage.sheet.resize(to: .lobby(tall: tall)) }, cover: { LobbySheet.cover(compact: compact) })
+    }
     var compact: CGFloat { LobbySheet.compact(scaled: mediumHeight) }
 
     /// What the sheet's content change runs on, and what a stop tap's camera flight uses.

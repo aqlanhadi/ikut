@@ -39,6 +39,24 @@ enum CameraInsetMove {
     /// My car counts as comfortably in view while it is inside this middle share of the visible strip.
     static let comfort: CGFloat = 0.6
 
+    /// The inputs from the one map (D63 C4), as the driving layer measured them: what covers it (`cover`: the banner
+    /// stack from the layer's top, the sheet from the bottom) in a layer `layerHeight` tall starting `above` below the
+    /// map's top, shrunk together when they would leave less than `MapObscuredInsets.minimumVisible`, and the top
+    /// counted from the map's own top edge (`MapSpace.layerHeight`, `MapSpace.above`).
+    static func inputs(target: CameraTarget?, layerHeight: CGFloat, above: CGFloat, cover: MapCover) -> Inputs {
+        let insets = MapObscuredInsets.insets(mapHeight: layerHeight, top: cover.top, bottom: cover.bottom)
+        return Inputs(target: target, top: insets.top + above, bottom: insets.bottom)
+    }
+
+    /// The change to act on for `new`, from the last inputs acted on (`handled`): nil when those are `new` already (the
+    /// sheet's own change moved the camera in its transaction, and the watcher now sees the same inputs), the first
+    /// look (`new` twice) before any. Watching from the last handled rather than the last seen keeps D67's one
+    /// decision per update for whatever else changed meanwhile, such as a banner in the same update.
+    static func unhandled(_ handled: Inputs?, _ new: Inputs) -> (old: Inputs, new: Inputs)? {
+        guard let handled else { return (new, new) }
+        return handled == new ? nil : (handled, new)
+    }
+
     /// Whether `new` needs a camera move after `old`, and which. `frameHeight`: the map's height, which `top` and `bottom`
     /// are measured in. `aimedTop`: the top cover the camera was last aimed with; a banner that came
     /// without a move left the car where it was, so this is where the car is in the strip.
@@ -106,6 +124,32 @@ enum CameraInsetMove {
     }
 }
 
+/// The driving camera's bookkeeping of the inputs it has acted on (D63 C4), shared by the convoy sheet's own resize and
+/// the D67 watcher, so a move made inside the resize is not made again when the watcher sees the same inputs.
+struct CameraInputsWatch: Equatable {
+    private(set) var handled: CameraInsetMove.Inputs?
+
+    /// The change to act on for `new` (`CameraInsetMove.unhandled`), marked handled; nil when there is none.
+    mutating func take(_ new: CameraInsetMove.Inputs) -> (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)? {
+        guard let change = CameraInsetMove.unhandled(handled, new) else { return nil }
+        handled = new
+        return change
+    }
+
+    /// A fold, unfold or pull-up of the convoy sheet: the resize and the cover it leaves (`cover`), in one call on the
+    /// screen (`TripScreenModel.sheetChange`); when that changed what the camera keeps clear, the change of `inputs` the
+    /// camera must decide on now, marked handled. The caller keeps this watch, then acts on the change, still inside
+    /// its one sheet motion. Nil: nothing for the camera (or driving is not on screen).
+    @MainActor
+    mutating func resize(_ screen: TripScreenModel, to shown: PanelSheet.Shown, cover: () -> MapCover,
+                         inputs: () -> CameraInsetMove.Inputs) -> (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)? {
+        var change: (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)?
+        screen.sheetChange(in: .driving, { screen.sheet.resize(to: .driving(shown)) }, cover: cover,
+                           aim: { _ in change = take(inputs()) })
+        return change
+    }
+}
+
 #if DEBUG
 import os
 
@@ -118,6 +162,13 @@ enum CameraMoveLog {
     static func note(_ text: String) {
         guard on else { return }
         log.notice("camera note: \(text)")
+    }
+
+    /// A move on the one camera, from any mode (Home's and the lobby's have no plan of their own to log).
+    static func step(_ kind: String, mode: TripScreenMode, to view: CameraView?) {
+        guard on else { return }
+        let to = view.map { String(format: "%.5f,%.5f span %.5f", $0.latitude, $0.longitude, $0.latitudeSpan) } ?? "?"
+        log.notice("camera step: \(String(describing: mode)) \(kind) -> \(to)")
     }
 
     static func record(inputs: CameraInsetMove.Inputs, plan: CameraInsetMove.Plan?) {

@@ -95,8 +95,16 @@ struct TripsHomeView: View {
     }
     #endif
 
-    /// The map's height on screen (it runs under the status bar and the home indicator).
-    var mapHeight: CGFloat { stage.mapFrame.height }
+    /// The map's height on screen (it runs under the status bar and the home indicator), from the one map (D63 C4).
+    var mapHeight: CGFloat { stage.space.frame.height }
+
+    /// What Home's sheet covers now, as the one cover holds it (written here first, so a camera move made in the same
+    /// transaction as a sheet change reads the new one).
+    private func sheetCover() -> MapCover {
+        let cover = HomeSheet.cover(model.mode, compact: compact)
+        stage.cover(cover, from: .home)
+        return stage.space.cover(in: .home) ?? cover
+    }
 
     var body: some View {
         Color.clear
@@ -112,14 +120,15 @@ struct TripsHomeView: View {
                     model.sheet = stage.sheet
                     model.expanded = tall
                 }
-                guard stage.entryCamera == .homeList else { return }
+                guard stage.entryCamera == .homeList, !stage.entryMoved else { return }
                 // Once per appearance (Home is new after a trip): where the phone last knew you were.
                 if model.here == nil, !model.isDemo, model.routes.isEmpty { model.here = Self.lastKnownLocation() }
-                let animated = TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera)
-                // Back from a trip the map already has its height: fit the routes to it (the list camera was worked
-                // out before, for a typical phone).
-                if mapHeight > 0, !model.routes.isEmpty { fit(animated: animated) } else if model.routes.isEmpty, model.here != nil { showHere(animated: animated) } else { move(to: model.listCamera, animated: animated) }
+                // The app's first frame (back from a trip, HomeView flies it with the switch, `enteredWithCamera`).
+                if let camera = model.entryCamera(mapHeight: mapHeight) {
+                    move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
+                }
             }
+            .onChange(of: HomeSheet.cover(model.mode, compact: compact), initial: true) { _, cover in stage.cover(cover, from: .home) }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
                 if model.flow != nil { refocusCreate(animated: false) } else if model.joinFlow != nil { refocusJoin(animated: false) } else if model.picked != nil { refocus(animated: false) } else if !model.routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if model.here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
@@ -224,22 +233,19 @@ struct TripsHomeView: View {
         #if DEBUG
         recap = demoModel
         #endif
-        model.pick(entry, camera: stage.camera, recap: recap)
-        refocus(animated: true)
+        // The change and its camera move in one call on the screen (D63 C4), as for every Home change below.
+        model.pick(entry, camera: stage.camera, recap: recap, on: stage) { refocus(animated: true) }
         AccessibilityNotification.Announcement("Showing \(entry.name) on the map. Back to trips is at the top of the sheet.").post()
     }
 
     /// Back to the list, with the camera where it was.
     func closePicked() {
-        if let back = model.closePicked(camera: stage.camera) { goBack(back) }
+        model.closePicked(camera: stage.camera, on: stage) { goBack($0) }
     }
 
     /// A timeline item: the map goes to it, and the sheet drops to short with the item in it.
     func selectItem(_ item: RecapTimelineItem) {
-        guard let picked = model.picked else { return }
-        picked.select(item)
-        withAnimation(sheetMotion) { model.expanded = false }
-        refocus(animated: true)
+        model.select(item, on: stage) { refocus(animated: true) }
     }
 
     /// The X on the item: back to the whole route.
@@ -251,20 +257,9 @@ struct TripsHomeView: View {
     /// What the sheet's content change runs on: the camera's motion, or a short crossfade with Reduce Motion.
     private var sheetMotion: Animation? { HomeSheet.motion(reduceMotion: reduceMotion) }
 
-    /// Every camera move on Home goes through here, paced by `CameraPace` (D57): a near move glides, a far one pulls
-    /// out, travels and settles, and with Reduce Motion each is one short ease. A placed refit while a flight is in the
-    /// air waits for it to land; a tiny change keeps the shortest glide.
+    /// Every camera move on Home goes through the one model's (`TripScreenModel.move`, paced by `CameraPace`, D57).
     func move(to position: MapCameraPosition, animated: Bool) {
-        let view = HomeCamera.view(of: position)
-        let glide = { [stage, reduceMotion] in
-            withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { stage.camera = position }
-        }
-        switch HomeCamera.step(animated: animated, flyingTo: stage.flight.destination, seen: stage.seenView, to: view) {
-        case .place: stage.place(position)
-        case .nudge: glide()
-        case .hold: stage.flight.hold(glide)
-        case .fly: if let view { stage.fly(to: position, view: view, reduceMotion: reduceMotion) }
-        }
+        stage.move(to: position, animated: animated, reduceMotion: reduceMotion)
     }
 
     /// Camera for the picked trip: the selected item's spot, else the whole route, above the short sheet.
@@ -273,7 +268,7 @@ struct TripsHomeView: View {
     private func refocus(animated: Bool, settling: Bool = false) {
         guard let picked = model.picked else { return }
         // Above the short sheet, a left trip's included, whose padding follows it down.
-        let insets = Self.obscured(mapHeight: mapHeight, sheet: HomeSheet.height(model.mode, compact: compact),
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: sheetCover().bottom,
                                    padding: HomeSheet.legalInset(model.mode, compact: compact))
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
@@ -353,20 +348,19 @@ struct TripsHomeView: View {
 
     /// New trip's gates are through: Where to? takes over the sheet and the map.
     private func beginCreate() {
-        model.beginCreate(camera: stage.camera, goBack: goBack)
+        model.beginCreate(camera: stage.camera, goBack: goBack, on: stage) { refocusCreate(animated: true) }
     }
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeCreate() {
-        goBack(model.closeCreate(camera: stage.camera))
+        model.closeCreate(camera: stage.camera, on: stage) { goBack($0) }
     }
 
     /// The camera for the step on screen: the pin at the top of the list, or the whole route above New trip's sheet.
     /// Before there is a place, the view around you when the camera shows you, else the fixed region it has.
     private func refocusCreate(animated: Bool) {
         guard let flow = model.flow else { return }
-        let sheet = HomeSheet.height(model.mode, compact: compact)
-        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheet, compact: compact)
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact)
         let place = flow.region(bottomObscured: insets.bottom, topObscured: insets.top)
         guard let region = HomeCamera.create(place: place, here: model.here, follows: followsFixes(hasPlace: place != nil),
                                              bottomObscured: insets.bottom, topObscured: insets.top) else { return }
@@ -377,7 +371,7 @@ struct TripsHomeView: View {
 
     /// Where the phone last knew you were, when location may be read: Home opens on it rather than on the fallback
     /// (back from a trip this view is new, and the live updates take a moment to start).
-    private static func lastKnownLocation() -> CLLocationCoordinate2D? {
+    static func lastKnownLocation() -> CLLocationCoordinate2D? {
         let manager = CLLocationManager()
         guard [.authorizedWhenInUse, .authorizedAlways].contains(manager.authorizationStatus) else { return nil }
         return manager.location?.coordinate
@@ -440,7 +434,7 @@ struct TripsHomeView: View {
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeJoin() {
-        goBack(model.closeJoin(camera: stage.camera))
+        model.closeJoin(camera: stage.camera, on: stage) { goBack($0) }
     }
 
     private func joined(_ tripId: String, tracks: Bool) {
@@ -451,7 +445,7 @@ struct TripsHomeView: View {
     /// The camera for a found code: the trip's end above the sheet; nothing before that.
     private func refocusJoin(animated: Bool) {
         guard let joinFlow = model.joinFlow else { return }
-        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: HomeSheet.joinHeight, compact: compact)
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact)
         guard let region = JoinSteps.region(for: joinFlow.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }

@@ -209,7 +209,13 @@ enum TripSheetCover: Hashable, CaseIterable {
 @Observable @MainActor
 final class TripSheet {
     private(set) var size: TripSheetSize {
-        didSet { if size != oldValue { changes &+= 1 } }
+        didSet {
+            guard size != oldValue else { return }
+            changes &+= 1
+            #if DEBUG
+            CameraMoveLog.note("sheet \(String(describing: size))")
+            #endif
+        }
     }
     /// The sheet is on screen (the host's sheet reports its appear and dismiss); what else is presented waits for it to go.
     var up = false
@@ -333,8 +339,13 @@ final class TripScreenModel {
     var camera: MapCameraPosition = .automatic
     var heading = 0.0
     var reading: TripCameraReading?
-    /// The map's frame on screen (it runs under the status bar and the home indicator).
-    var mapFrame: CGRect = .zero
+    /// The one map's frame, the status bar over it and what covers it (D63 C4), for every mode's camera.
+    let space = MapSpace()
+    /// Home's list camera for this entry has been set (`HomeView` flies it in the exit's own transaction), so Home's
+    /// layer appearing does not move it again.
+    private(set) var entryMoved = false
+    /// Where the camera was last sent (a flight, a nudge, a placement), so a second ask for the same view is no move.
+    @ObservationIgnored private(set) var aimed: MapCameraPosition?
     /// Driving: the convoy sheet is pulled up and the lobby continues below the convoy (`PanelSheet.showsContinuation`).
     var pulledUp = false
     /// The trip on screen in the lobby's and driving modes, with its objects; nil on Home.
@@ -433,6 +444,51 @@ final class TripScreenModel {
         mode = next
         sheet.enter(next)
         entryCamera = TripScreenLogic.entryCamera(next)
+        entryMoved = false
+        // Driving sets the camera itself; what the last mode aimed at says nothing about the next one's.
+        aimed = nil
+    }
+
+    /// The entry's camera move was made with the switch, in its transaction.
+    func enteredWithCamera() { entryMoved = true }
+
+    /// A change of the one sheet within the mode on screen (D63 C4): `change` resizes it (or changes what it shows),
+    /// then the layer's `cover` says what covers the map now, and when that changed what the camera keeps clear, `aim`
+    /// moves the camera for it, all inside the caller's one transaction: the camera rides the sheet's own motion rather
+    /// than following it in a later update. A change from a mode not on screen changes nothing. True when it aimed.
+    @discardableResult
+    func sheetChange(in mode: TripScreenMode, _ change: () -> Void, cover: () -> MapCover,
+                     aim: (MapCover) -> Void = { _ in }) -> Bool {
+        guard mode == self.mode else { return false }
+        change()
+        guard space.write(cover(), mode: mode) else { return false }
+        aim(space.cover)
+        return true
+    }
+
+    /// A change of the one sheet that always brings a camera move (Home's pick, Back, an item, Where to?, Close; D63
+    /// C4): `change`, then `aim`, both inside this one call and so inside the caller's one transaction, whether or not
+    /// the cover changed (an item picked on a short sheet still moves the camera). A call from a mode not on screen does
+    /// nothing. True when it ran.
+    @discardableResult
+    func sheetMove(in mode: TripScreenMode, _ change: () -> Void, aim: () -> Void) -> Bool {
+        guard mode == self.mode else { return false }
+        movingWithSheet = true
+        defer { movingWithSheet = false }
+        change()
+        aim()
+        return true
+    }
+
+    /// A sheet move is running (`sheetMove`): a camera move made now rides the sheet's change.
+    @ObservationIgnored private(set) var movingWithSheet = false
+
+    /// The mode's layer writes what covers the map (a banner came, a height was measured); one from a mode not on
+    /// screen (a layer on its way out, the lobby under driving) is ignored. True when it changed.
+    @discardableResult
+    func cover(_ cover: MapCover, from mode: TripScreenMode) -> Bool {
+        guard mode == self.mode else { return false }
+        return space.write(cover, mode: mode)
     }
 
     /// Leave, End or Back to trips: Home's list on the same map. The trip's session stops here (tracking and its
@@ -467,12 +523,25 @@ final class TripScreenModel {
     /// A paced move to `position`, which shows `view` (`CameraPace`): from wherever the camera is now, taking over a
     /// move in flight, and stopping if the person takes the map.
     func fly(to position: MapCameraPosition, view: CameraView, reduceMotion: Bool) {
+        #if DEBUG
+        CameraMoveLog.step("fly", mode: mode, to: view)
+        #endif
+        aimed = position
         endGlide()
         placeSlides &+= 1
         flight.fly(to: position, view: view, from: seenView, reduceMotion: reduceMotion,
                    continues: { [weak self] in self?.camera.positionedByUser == false }) { [weak self] in
             self?.camera = $0
         }
+    }
+
+    /// The shortest glide to `position` (`CameraPace.nudgeAnimation`): Home's and the lobby's small moves.
+    func nudge(to position: MapCameraPosition, reduceMotion: Bool) {
+        #if DEBUG
+        CameraMoveLog.step("nudge", mode: mode, to: HomeCamera.view(of: position))
+        #endif
+        aimed = position
+        withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { camera = position }
     }
 
     /// What the map reports once a move ends. Each is written only when it changed, so a move that ends where it began
@@ -484,8 +553,29 @@ final class TripScreenModel {
 
     /// Puts the camera at `position` at once, ending any move in flight.
     func place(_ position: MapCameraPosition) {
+        #if DEBUG
+        CameraMoveLog.step("place", mode: mode, to: HomeCamera.view(of: position))
+        #endif
+        aimed = position
         flight.cancel()
-        camera = position
+        // At once even inside a sheet change's animation (D63 C4 runs the camera in the sheet's transaction).
+        withTransaction(Transaction(animation: nil)) { camera = position }
+    }
+
+    /// Every camera move on Home and the lobby's held refit (D57): a near move glides, a far one pulls out, travels and
+    /// settles, and with Reduce Motion each is one short ease. A placed refit while a flight is in the air waits for it
+    /// to land; a tiny change keeps the shortest glide. The view already aimed at, with the map not moved since, is no
+    /// move, so a change and the watcher after it ask once.
+    func move(to position: MapCameraPosition, animated: Bool, reduceMotion: Bool) {
+        if position == aimed, !camera.positionedByUser { return }
+        let view = HomeCamera.view(of: position)
+        let glide = { [weak self] in self?.nudge(to: position, reduceMotion: reduceMotion) ?? () }
+        switch HomeCamera.step(animated: animated, flyingTo: flight.destination, seen: seenView, to: view) {
+        case .place: place(position)
+        case .nudge: glide()
+        case .hold: flight.hold(glide)
+        case .fly: if let view { fly(to: position, view: view, reduceMotion: reduceMotion) }
+        }
     }
 }
 
@@ -509,6 +599,13 @@ struct TripScreenHost<Content: View>: View {
 
     var body: some View {
         content
+            // The status bar (and a navigation bar) over the map and the home indicator under it, measured on the layers
+            // (the map ignores the safe area, so in it these read 0).
+            .onGeometryChange(for: LayerFrame.self) {
+                let frame = $0.frame(in: .global)
+                return LayerFrame(minY: frame.minY, bottomEdge: frame.maxY + $0.safeAreaInsets.bottom, height: frame.height,
+                                  safeTop: $0.safeAreaInsets.top)
+            } action: { stage.space.measure(layer: $0) }
             .backgroundPreferenceValue(TripMapSpecKey.self) { spec in map(spec ?? TripMapSpec()) }
             .overlayPreferenceValue(TripSheetSpecKey.self) { spec in
                 Color.clear
@@ -532,7 +629,7 @@ struct TripScreenHost<Content: View>: View {
         @Bindable var stage = stage
         var style = spec.style
         style.cameraHeading = stage.heading
-        style.containerWidth = stage.mapFrame.maxX
+        style.containerWidth = stage.space.frame.maxX
         style.placeSlides = stage.placeSlides
         return MapReader { proxy in
             Map(position: $stage.camera) {
@@ -573,6 +670,6 @@ private struct TripMapBehaviour: ViewModifier {
             // Home: a tap away from the picked trip's route goes back to the list. Elsewhere the map keeps its taps.
             .gesture(TapGesture().onEnded { spec.onTap?() }, including: spec.onTap == nil ? .subviews : .all)
             .ignoresSafeArea()
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stage.mapFrame = $0 }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stage.space.measure(frame: $0) }
     }
 }

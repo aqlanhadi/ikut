@@ -260,6 +260,7 @@
 		E0DA5017D0F92CF49077EA02 /* AlertBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9750682AB19CEB7CFF2B6B /* AlertBannerView.swift */; };
 		E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */; };
 		E2D3E899D1D27546D9CB2795 /* CameraInsetMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EDC4EED1F9D343E5BE454B /* CameraInsetMoveTests.swift */; };
+		E2FCCBB1CF2BBD8C192CD0D9 /* MapSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 306F5AEDCCE78A9D7B55FE90 /* MapSpace.swift */; };
 		E4ADF72C82298F5582A60C2B /* StopFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65A002CD84457A0B4A1CF7DC /* StopFormat.swift */; };
 		E4DC35787F05705E2D68F628 /* PlacePinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159E03084DFC4F56C746756E /* PlacePinTests.swift */; };
 		E4EF98D0A5B5842B9FC8EA69 /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A479378058FCF0288AE028C1 /* Fakes.swift */; };
@@ -380,6 +381,7 @@
 		301CCB7DC568D10AFB1C2B1B /* AlertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertTests.swift; sourceTree = "<group>"; };
 		30345C006D29E7B55E755058 /* SheetChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetChrome.swift; sourceTree = "<group>"; };
 		30373103D4B59BAB60C163E5 /* StopDriving.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopDriving.swift; sourceTree = "<group>"; };
+		306F5AEDCCE78A9D7B55FE90 /* MapSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSpace.swift; sourceTree = "<group>"; };
 		3077A797F64E10D19A3B4D36 /* StopLeaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLeaveTests.swift; sourceTree = "<group>"; };
 		30B30BE299BB81EFCED8F1A8 /* NextStop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextStop.swift; sourceTree = "<group>"; };
 		322ED2F251FFDF594FC7D83E /* PickedTrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedTrip.swift; sourceTree = "<group>"; };
@@ -773,6 +775,7 @@
 				E32B7A73296BE953B6A5F8B1 /* MapMarkersDemo.swift */,
 				EE50F5D10052B6F1F9BB3997 /* MapMarkerView.swift */,
 				D1BBE8E3EE194663BF0A67F1 /* MapModeControl.swift */,
+				306F5AEDCCE78A9D7B55FE90 /* MapSpace.swift */,
 				9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */,
 				12ADDCF865D1A7029BE6E299 /* PanelSheet.swift */,
 				4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */,
@@ -1394,6 +1397,7 @@
 				965FDD2E1064F3BFA30E3A02 /* MapMarkersDemo.swift in Sources */,
 				11327790D090376570F14A7F /* MapModeControl.swift in Sources */,
 				F2C6459F43100013C9AEBA20 /* MapPickView.swift in Sources */,
+				E2FCCBB1CF2BBD8C192CD0D9 /* MapSpace.swift in Sources */,
 				6C9407949E903A1B7BD7E03E /* Member.swift in Sources */,
 				FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */,
 				7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */,

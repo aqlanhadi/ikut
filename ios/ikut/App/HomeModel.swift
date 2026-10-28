@@ -145,6 +145,71 @@ final class HomeModel {
         }
     }
 
+    /// Where the camera goes as Home's list comes on screen (D63 C4): every drawn route above the short sheet once the map
+    /// has a height, else the view around you when there are no routes, else the list's camera (worked out before, for a
+    /// typical phone). Nil, no move: a flow (Where to?, joining) or a picked trip keeps its own camera, or the routes make
+    /// no region.
+    func entryCamera(mapHeight: CGFloat) -> MapCameraPosition? {
+        let insets = TripsHomeView.obscured(mapHeight: mapHeight)
+        if mapHeight > 0, !routes.isEmpty {
+            guard flow == nil, joinFlow == nil else { return nil }
+            return PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) }
+        }
+        if routes.isEmpty, let here {
+            guard flow == nil, joinFlow == nil, picked == nil else { return nil }
+            return .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top))
+        }
+        return listCamera
+    }
+
+    // MARK: Each change with its camera move (D63 C4)
+
+    /// One change of Home's sheet and the camera move it brings, as one call on the screen inside the sheet's motion
+    /// (`TripScreenModel.sheetMove`); nothing while Home is not on screen. `aim` is Home's camera for the result.
+    private func moving(on screen: TripScreenModel, _ change: () -> Void, aim: () -> Void) {
+        withAnimation(motion) { _ = screen.sheetMove(in: .home, change, aim: aim) }
+    }
+
+    /// A past trip picked on the map, and the camera on it.
+    func pick(_ entry: PastTrips.Entry, camera: MapCameraPosition, recap: RecapModel? = nil, on screen: TripScreenModel,
+              aim: () -> Void) {
+        moving(on: screen, { pick(entry, camera: camera, recap: recap) }, aim: aim)
+    }
+
+    /// Back to the list, and the camera back where it was (`aim` gets where).
+    func closePicked(camera: MapCameraPosition, on screen: TripScreenModel, aim: (CameraReturn) -> Void) {
+        var back: CameraReturn?
+        moving(on: screen, { back = closePicked(camera: camera) }) { if let back { aim(back) } }
+    }
+
+    /// A timeline item: the sheet drops to short with it, and the camera goes to it.
+    func select(_ item: RecapTimelineItem, on screen: TripScreenModel, aim: () -> Void) {
+        guard let picked else { return }
+        moving(on: screen, {
+            picked.select(item)
+            expanded = false
+        }, aim: aim)
+    }
+
+    /// Where to? takes over the sheet, and the camera its first view. Already in Where to? (a demo seeds it): nothing.
+    func beginCreate(camera: MapCameraPosition, goBack: (CameraReturn) -> Void, on screen: TripScreenModel,
+                     aim: () -> Void) {
+        guard flow == nil else { return }
+        moving(on: screen, { beginCreate(camera: camera, goBack: goBack) }, aim: aim)
+    }
+
+    /// Close on Where to? or New trip, and the camera back where it was.
+    func closeCreate(camera: MapCameraPosition, on screen: TripScreenModel, aim: (CameraReturn) -> Void) {
+        var back = CameraReturn.stay
+        moving(on: screen, { back = closeCreate(camera: camera) }) { aim(back) }
+    }
+
+    /// Close on joining, and the camera back where it was.
+    func closeJoin(camera: MapCameraPosition, on screen: TripScreenModel, aim: (CameraReturn) -> Void) {
+        var back = CameraReturn.stay
+        moving(on: screen, { back = closeJoin(camera: camera) }) { aim(back) }
+    }
+
     // MARK: Picked trip
 
     /// An ended trip is picked: the sheet shows its recap, short. `recap` is a demo's ready-made one.

@@ -243,6 +243,17 @@ struct HomeView: View {
     private func closeTrip() {
         stage.exit()
         home = HomeModel.launching(sheet: stage.sheet)
+        enterHome()
+    }
+
+    /// Home's list camera, flown in the same transaction as the switch back to Home (D63 C4) instead of when its layer
+    /// appears an update later: the routes, where you are and the map's height are all known here.
+    private func enterHome() {
+        if home.here == nil, home.routes.isEmpty { home.here = TripsHomeView.lastKnownLocation() }
+        if let camera = home.entryCamera(mapHeight: stage.space.frame.height) {
+            stage.move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera), reduceMotion: reduceMotion)
+        }
+        stage.enteredWithCamera()
     }
 
     /// Done on the recap: back to the one map, which is Home's list again (the ended trip's lobby or map closes in the
