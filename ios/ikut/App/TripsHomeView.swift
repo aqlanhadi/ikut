@@ -256,9 +256,7 @@ struct TripsHomeView: View {
     /// air waits for it to land; a tiny change keeps the shortest glide.
     func move(to position: MapCameraPosition, animated: Bool) {
         let view = HomeCamera.view(of: position)
-        let glide = { [stage, reduceMotion] in
-            withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { stage.camera = position }
-        }
+        let glide = { [stage, reduceMotion] in stage.nudge(to: position, reduceMotion: reduceMotion) }
         switch HomeCamera.step(animated: animated, flyingTo: stage.flight.destination, seen: stage.seenView, to: view) {
         case .place: stage.place(position)
         case .nudge: glide()

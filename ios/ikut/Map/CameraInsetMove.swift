@@ -120,6 +120,13 @@ enum CameraMoveLog {
         log.notice("camera note: \(text)")
     }
 
+    /// A move on the one camera, from any mode (Home's and the lobby's have no plan of their own to log).
+    static func step(_ kind: String, mode: TripScreenMode, to view: CameraView?) {
+        guard on else { return }
+        let to = view.map { String(format: "%.5f,%.5f span %.5f", $0.latitude, $0.longitude, $0.latitudeSpan) } ?? "?"
+        log.notice("camera step: \(String(describing: mode)) \(kind) -> \(to)")
+    }
+
     static func record(inputs: CameraInsetMove.Inputs, plan: CameraInsetMove.Plan?) {
         guard on else { return }
         log.notice("camera inputs: top \(Int(inputs.top)) bottom \(Int(inputs.bottom)) -> \(plan == nil ? "no move" : "move")")

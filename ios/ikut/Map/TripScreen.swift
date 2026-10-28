@@ -209,7 +209,13 @@ enum TripSheetCover: Hashable, CaseIterable {
 @Observable @MainActor
 final class TripSheet {
     private(set) var size: TripSheetSize {
-        didSet { if size != oldValue { changes &+= 1 } }
+        didSet {
+            guard size != oldValue else { return }
+            changes &+= 1
+            #if DEBUG
+            CameraMoveLog.note("sheet \(String(describing: size))")
+            #endif
+        }
     }
     /// The sheet is on screen (the host's sheet reports its appear and dismiss); what else is presented waits for it to go.
     var up = false
@@ -467,12 +473,23 @@ final class TripScreenModel {
     /// A paced move to `position`, which shows `view` (`CameraPace`): from wherever the camera is now, taking over a
     /// move in flight, and stopping if the person takes the map.
     func fly(to position: MapCameraPosition, view: CameraView, reduceMotion: Bool) {
+        #if DEBUG
+        CameraMoveLog.step("fly", mode: mode, to: view)
+        #endif
         endGlide()
         placeSlides &+= 1
         flight.fly(to: position, view: view, from: seenView, reduceMotion: reduceMotion,
                    continues: { [weak self] in self?.camera.positionedByUser == false }) { [weak self] in
             self?.camera = $0
         }
+    }
+
+    /// The shortest glide to `position` (`CameraPace.nudgeAnimation`): Home's and the lobby's small moves.
+    func nudge(to position: MapCameraPosition, reduceMotion: Bool) {
+        #if DEBUG
+        CameraMoveLog.step("nudge", mode: mode, to: HomeCamera.view(of: position))
+        #endif
+        withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { camera = position }
     }
 
     /// What the map reports once a move ends. Each is written only when it changed, so a move that ends where it began
@@ -484,6 +501,9 @@ final class TripScreenModel {
 
     /// Puts the camera at `position` at once, ending any move in flight.
     func place(_ position: MapCameraPosition) {
+        #if DEBUG
+        CameraMoveLog.step("place", mode: mode, to: HomeCamera.view(of: position))
+        #endif
         flight.cancel()
         camera = position
     }
