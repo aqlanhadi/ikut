@@ -291,6 +291,39 @@ struct TripScreenModelTests {
         #expect(rig.tracker.onFix == nil)
     }
 
+    /// LobbyView keeps the session in its @State through the exit animation: exit() itself stops tracking, not the
+    /// release.
+    @Test func exitStopsTheSessionEvenWhileAViewStillHoldsIt() async throws {
+        let rig = Rig()
+        let screen = rig.model()
+        screen.open(tripId: "t1", started: true)
+        let held = try #require(screen.trip?.session)
+        held.applyForTesting(trip: Self.trip, member: Self.member, car: Self.car)
+        await waitUntil(.seconds(2)) { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+
+        screen.exit()
+        #expect(!rig.tracker.isTracking)
+        #expect(held.runningListeners.isEmpty)
+        #expect(!held.isTracking)
+    }
+
+    @Test func openingAnotherTripStopsTheOneThatWasOpen() async throws {
+        let rig = Rig()
+        let screen = rig.model()
+        screen.open(tripId: "t1", started: true)
+        let held = try #require(screen.trip?.session)
+        held.applyForTesting(trip: Self.trip, member: Self.member, car: Self.car)
+        await waitUntil(.seconds(2)) { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+
+        screen.open(tripId: "t2", started: false)
+        #expect(screen.trip?.id == "t2")
+        #expect(!rig.tracker.isTracking)
+        #expect(!held.isTracking)
+        #expect(held.runningListeners.isEmpty)
+    }
+
     @Test func reopeningAnotherTripGivesFreshObjects() throws {
         let rig = Rig()
         let screen = rig.model()

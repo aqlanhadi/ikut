@@ -188,6 +188,14 @@ struct OpenTrip {
                         planner: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
     }
 
+    #if DEBUG
+    /// The demos': a session that is never started (no reads, no tracking) and a planner that saves nothing.
+    static func sample(tripId: String) -> OpenTrip {
+        OpenTrip(id: tripId, session: TripSession(tripId: tripId, userId: "u-c1"),
+                 planner: StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in }))
+    }
+    #endif
+
     init(id: String, session: TripSession, planner: StopPlanner) {
         self.id = id
         self.session = session
@@ -340,8 +348,9 @@ struct TripScreenHost<Content: View>: View {
     @State private var stage: TripScreenModel
     private let content: Content
 
-    init(mode: TripScreenMode = .lobby, @ViewBuilder content: () -> Content) {
-        _stage = State(initialValue: TripScreenModel(mode: mode))
+    init(mode: TripScreenMode = .lobby, makeTrip: (@MainActor (String) -> OpenTrip)? = nil,
+         @ViewBuilder content: () -> Content) {
+        _stage = State(initialValue: makeTrip.map { TripScreenModel(mode: mode, makeTrip: $0) } ?? TripScreenModel(mode: mode))
         self.content = content()
     }
 

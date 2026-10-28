@@ -406,8 +406,8 @@ struct LobbyView: View {
             if !isSample { session.start() }
             updateListening()
         }
-        // The session keeps running while driving and when another screen is pushed on top; it stops when the trip
-        // screen is popped and the session is released.
+        // The session keeps running while driving and when another screen is pushed on top; it stops when the
+        // screen's model closes the trip (`TripScreenModel.exit`).
         .onDisappear {
             onScreen = false
             updateListening()

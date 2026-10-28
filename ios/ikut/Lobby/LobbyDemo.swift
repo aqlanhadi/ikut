@@ -442,7 +442,9 @@ enum DemoScreens {
         case "home-where-to": return home("where-to")
         case "home-new-trip": return home("new-trip")
         // New trip, then Create trip 2 s later: the switch to the lobby on the same map (D54).
-        case "home-create-swap": return nav(TripScreenHost(mode: .home) { HomeCreateSwapDemo() })
+        case "home-create-swap":
+            // Its Create trip opens a sample trip: nothing is read, tracked or saved.
+            return nav(TripScreenHost(mode: .home, makeTrip: { OpenTrip.sample(tripId: $0) }) { HomeCreateSwapDemo() })
         case "home-picked-failed": return home("failed")
         // A trip left early, picked: its route, and no recap (D54, #421).
         case "home-picked-left": return home("left")
