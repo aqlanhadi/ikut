@@ -26,8 +26,8 @@ struct TripsHomeView: View {
     var covered: Bool { stage.sheet.covered(by: TripSheetCover.home) }
     /// The trip was made: its id, to open its lobby.
     var onCreated: (String) -> Void = { _ in }
-    /// The trip was joined: its id, to open its lobby.
-    var onJoined: (String) -> Void = { _ in }
+    /// The trip was joined: its id, to open its lobby, and whether this phone tracks its car.
+    var onJoined: (String, Bool) -> Void = { _, _ in }
 
     @State private var renaming = false
     @State private var newName = ""
@@ -48,7 +48,7 @@ struct TripsHomeView: View {
 
     init(model: HomeModel = HomeModel.launching(), onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, onCreated: @escaping (String) -> Void = { _ in },
-         onJoined: @escaping (String) -> Void = { _ in }) {
+         onJoined: @escaping (String, Bool) -> Void = { _, _ in }) {
         given = model
         self.onJoined = onJoined
         self.onCreated = onCreated
@@ -443,9 +443,9 @@ struct TripsHomeView: View {
         goBack(model.closeJoin(camera: stage.camera))
     }
 
-    private func joined(_ tripId: String) {
+    private func joined(_ tripId: String, tracks: Bool) {
         model.joined(covered: covered)
-        onJoined(tripId)
+        onJoined(tripId, tracks)
     }
 
     /// The camera for a found code: the trip's end above the sheet; nothing before that.
@@ -479,7 +479,7 @@ struct TripsHomeView: View {
         // same short height) keeps its size and only its contents change.
         return ZStack(alignment: .top) {
             if let joinFlow = model.joinFlow {
-                JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: joined)
+                JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: { joined($0, tracks: $1) })
                     .transition(.opacity)
             } else if let flow = model.flow {
                 Group {

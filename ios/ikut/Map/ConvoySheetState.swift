@@ -7,9 +7,10 @@ enum MapCard: Equatable, Identifiable {
     var id: String { "card" }
 }
 
-/// The motion and hand-over state of the driving screen's convoy sheet (D63 B3): the panel's measured heights and the ones it holds while it moves, and the card sheet over it (which card is wanted, which is
-/// up, which is on its way out, what the keyboard covers). A value type with no view in it, so every transition is a
-/// plain mutation that a test can run; `TripMapView` keeps it in one `@State`, wraps a change in `withAnimation`
+/// The motion and hand-over state of the driving screen's convoy sheet (D63 B3): the panel's measured heights and the
+/// ones it holds while it moves, and the card sheet over it (which card is wanted, which is up, which is on its way
+/// out, what the keyboard covers). A value type with no view in it, so every transition is a plain mutation that a
+/// test can run; `TripMapView` keeps it in one `@State`, wraps a change in `withAnimation`
 /// (`Motion.sheet`) and runs the timers (the held heights' release, the dismissal fallback), which are the only parts
 /// that need a clock. The sizes and rules themselves stay in `PanelSheet`; which size the sheet shows, and whether it is
 /// up, are the one sheet's (`TripSheet`, D63 C3).

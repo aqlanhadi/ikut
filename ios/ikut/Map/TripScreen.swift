@@ -405,13 +405,20 @@ final class TripScreenModel {
     }
 
     /// Home hands the map to a trip: its lobby, or driving when it has started (`TripScreenLogic.Event.open`). The
-    /// trip's objects are made here, once: opening the trip already open keeps them.
-    func open(tripId: String, started: Bool) {
+    /// trip's objects are made here, once: opening the trip already open keeps them. `asksAlways`: this phone will
+    /// track the trip and still has only When In Use (`TripSessionLogic.asksAlwaysOnOpen`), so the Always explainer
+    /// comes now, before the lobby: Home's sheet steps aside in this same transaction, and the lobby's comes up once,
+    /// after the answer, instead of coming up and stepping aside for the ask when tracking starts.
+    func open(tripId: String, started: Bool, asksAlways: Bool = false) {
         let fresh = trip?.id != tripId
         if fresh {
             trip?.session.stop()
             trip = makeTrip(tripId)
             sheet.cover([], among: TripSheetCover.trip)
+        }
+        if asksAlways, let session = trip?.session, session.consumeAlwaysExplainer(action: .showAlwaysExplainer) {
+            session.alwaysExplainerShowing = true
+            sheet.cover([.alwaysExplainer], among: [.alwaysExplainer])
         }
         pulledUp = false
         flight.cancel()
@@ -437,6 +444,13 @@ final class TripScreenModel {
         pulledUp = false
         flight.cancel()
         go(to: TripScreenLogic.mode(after: .exit, from: mode))
+    }
+
+    /// The open trip's layer went off screen (a screen pushed over it, or the trip closing): the sheet steps aside. A
+    /// layer of a trip no longer open (its write landing after a newer `open`) changes nothing.
+    func tripLayer(of session: TripSession, onScreen: Bool) {
+        guard trip == nil || trip?.session === session else { return }
+        sheet.cover(onScreen ? [] : [.tripOffScreen], among: [.tripOffScreen])
     }
 
     /// Something has placed the camera, so the next entry move is a flight from it.

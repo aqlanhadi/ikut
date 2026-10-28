@@ -412,7 +412,7 @@ struct LobbyView: View {
         }
         .onAppear {
             onScreen = true
-            stage.sheet.cover([], among: [.tripOffScreen])
+            stage.tripLayer(of: session, onScreen: true)
             if sampleTall { setExpanded(true) }
             if !isSample { session.start() }
             updateListening()
@@ -421,7 +421,7 @@ struct LobbyView: View {
         // screen's model closes the trip (`TripScreenModel.exit`).
         .onDisappear {
             onScreen = false
-            stage.sheet.cover([.tripOffScreen], among: [.tripOffScreen])
+            stage.tripLayer(of: session, onScreen: false)
             updateListening()
         }
         .onChange(of: session.isTracking) { _, tracking in

@@ -505,6 +505,65 @@ struct TripSheetTests {
         #expect(screen.sheet.size == .home(tall: false))
     }
 
+    // MARK: The Always explainer at open (C3 review, #496)
+
+    @Test func aTripThatWillAskForAlwaysHoldsTheSheetBackUntilAnsweredThenTheLobbyComesOnce() throws {
+        let screen = Rig().model(mode: .home)
+        #expect(changes(screen) { screen.open(tripId: "t1", started: false, asksAlways: true) } == 1)
+        let session = try #require(screen.trip?.session)
+        // Home's sheet steps aside in the same transaction: the explainer comes first.
+        #expect(session.alwaysExplainerShowing)
+        #expect(!screen.sheet.presented)
+        #expect(screen.sheet.size == .lobby(tall: false))
+        // Not now (or Allow): the lobby's own write of its asks clears the reason, and its sheet comes up at medium.
+        let answered = changes(screen) {
+            session.alwaysExplainerShowing = false
+            screen.sheet.cover([], among: LobbyView.asks)
+        }
+        #expect(answered == 0)
+        #expect(screen.sheet.presented)
+        // Tracking starting later does not ask again over the lobby.
+        #expect(!session.consumeAlwaysExplainer(action: .showAlwaysExplainer))
+    }
+
+    @Test func aTripThatWillNotAskOpensItsLobbyAtOnce() throws {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        #expect(screen.sheet.presented)
+        #expect(try #require(screen.trip?.session).alwaysExplainerShowing == false)
+    }
+
+    @Test func alwaysIsAskedAtOpenOnlyByAPhoneThatWillTrackWithWhenInUse() {
+        #expect(TripSessionLogic.asksAlwaysOnOpen(willTrack: true, action: .showAlwaysExplainer))
+        // A joiner riding in someone else's car, or a trip reopened from Home: tracking is not known, so not now.
+        #expect(!TripSessionLogic.asksAlwaysOnOpen(willTrack: false, action: .showAlwaysExplainer))
+        // Always already given (or nothing to ask).
+        #expect(!TripSessionLogic.asksAlwaysOnOpen(willTrack: true, action: .ready))
+    }
+
+    @Test func theLastTripsLobbyGoingOffScreenAfterANewOpenLeavesTheNewLobbyUp() throws {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        let old = try #require(screen.trip?.session)
+        screen.exit()
+        screen.open(tripId: "t2", started: false)
+        let new = try #require(screen.trip?.session)
+        screen.tripLayer(of: new, onScreen: true)
+        // The old lobby's onDisappear lands now.
+        screen.tripLayer(of: old, onScreen: false)
+        #expect(screen.sheet.presented)
+        // The new lobby's own going off screen still steps the sheet aside.
+        screen.tripLayer(of: new, onScreen: false)
+        #expect(!screen.sheet.presented)
+    }
+
+    @Test func theLobbyIgnoresTheTripEnding() {
+        // The lobby's sheet stays: the recap pushed over it takes the lobby off screen instead.
+        let sheet = TripSheet(size: .lobby(tall: false))
+        sheet.cover([.tripEnded], among: TripSheetCover.trip)
+        #expect(sheet.presented)
+    }
+
     /// The mode, the size and the camera's target are written by the one call, synchronously, so the caller's one
     /// `withAnimation` carries all three: none is left for a later update to change.
     @Test(arguments: [TripScreenMode.lobby, .driving])

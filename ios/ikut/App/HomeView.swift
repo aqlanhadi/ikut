@@ -213,18 +213,26 @@ struct HomeView: View {
                 onJoin: { begin(.join(code: nil)) },
                 // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
                 onOpenTrip: { entry, started in begin(.trip(tripId: entry.id, started: started)) },
-                onCreated: { tripId in openTrip(tripId, started: false) },
-                onJoined: { tripId in openTrip(tripId, started: false) }
+                // The organiser tracks their own car; a joiner when they share theirs.
+                onCreated: { tripId in openTrip(tripId, started: false, tracks: true) },
+                onJoined: { tripId, tracks in openTrip(tripId, started: false, tracks: tracks) }
             )
         }
     }
 
     /// The trip takes over the one map: Home's sheet becomes the lobby's (or the convoy's) at its entry size, and the
     /// camera's target changes, in one transaction (`TripScreenModel.go`).
-    private func openTrip(_ tripId: String, started: Bool) {
+    /// `tracks`: this phone will track the trip (made or joined sharing), so Always is asked before the lobby comes up
+    /// when it has only When In Use. A trip reopened from Home or at launch is not known to track yet: it asks once
+    /// tracking starts, over the lobby.
+    private func openTrip(_ tripId: String, started: Bool, tracks: Bool = false) {
         home.creating = false
         home.joining = nil
-        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
+        let asks = TripSessionLogic.asksAlwaysOnOpen(willTrack: tracks, action: LocationAccess.nextAction(
+            status: location.status, accuracy: location.accuracy, context: .goingToBackground))
+        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) {
+            stage.open(tripId: tripId, started: started, asksAlways: asks)
+        }
     }
 
     /// Leave, End or Back to trips: the trip's sheet becomes Home's list and the camera flies back to it.
