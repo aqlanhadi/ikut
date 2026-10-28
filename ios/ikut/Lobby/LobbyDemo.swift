@@ -359,6 +359,10 @@ enum DemoScreens {
         // Home's name alert (with its field) and the one saying it couldn't be saved.
         case "home-rename": return home("rename")
         case "home-rename-error": return home("rename-error")
+        // D72 (Debug): Home's name button opens Settings: on You, on Design, and Design with the font sizes list pushed.
+        case "settings": return home("settings")
+        case "settings-design": return home("settings-design")
+        case "settings-design-fonts": return home("settings-design-fonts")
         // The lobby with an ask already up: Start with a car not sharing, Leave, End, Trip name, the QR code.
         case "lobby-confirm-start": return trip(lobbyAsking(.notReady, "start"))
         case "lobby-confirm-leave": return trip(lobbyAsking(.member, "leave"))

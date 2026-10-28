@@ -35,6 +35,9 @@ struct TripsHomeView: View {
     #if DEBUG
     /// A launch state opens with a name alert up: `rename` (the field) or `rename-error` (it couldn't be saved).
     var demoAlert: String?
+    @State private var settingsShown = false
+    /// `settings-design-fonts` opens Settings on Design with the font sizes list pushed.
+    static func settingsDrill(_ demo: String?) -> DesignDrill? { demo == "settings-design-fonts" ? .literals(.font) : nil }
     #endif
     /// The short sheet's height, the same for the list and a picked trip so a pick never resizes it. Follows the
     /// text size and nothing else.
@@ -510,7 +513,11 @@ struct TripsHomeView: View {
                 } else {
                     HomeHeader(onNewTrip: onNewTrip, onJoin: onJoin, profileName: profileName, barHeight: $barHeight) { name in
                         newName = name
+                        #if DEBUG
+                        settingsShown = true
+                        #else
                         renaming = true
+                        #endif
                     }
                 }
             }
@@ -530,8 +537,17 @@ struct TripsHomeView: View {
         .interactiveDismissDisabled()
         .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
         #if DEBUG
+        // Debug builds: the name button opens Settings (D72). Its own alerts, since this view's are blocked while it is up.
+        .sheet(isPresented: $settingsShown) {
+            SettingsSheet(name: profileName ?? "", tab: demoAlert?.hasPrefix("settings-design") == true ? .design : .you,
+                          drill: Self.settingsDrill(demoAlert), onRename: { newName = profileName ?? ""; renaming = true },
+                          onClose: { settingsShown = false })
+                .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
+                .presentationDetents([.large])
+        }
         .onAppear {
             switch demoAlert {
+            case "settings", "settings-design", "settings-design-fonts": settingsShown = true
             case "rename": newName = "Nurul"; renaming = true
             case "rename-error": renameError = "Use 1 to \(DisplayName.maxLength) characters."
             default: break
