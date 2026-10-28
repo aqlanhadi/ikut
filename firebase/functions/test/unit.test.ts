@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
-import { EVENT_GRACE_MS, POSITION_RETENTION_MS, isEventPastGrace, shouldPurgeTripData } from "../src/retention.ts";
+import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
 import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
 import { normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
@@ -107,21 +107,24 @@ describe("shouldPurgeTripData", () => {
   });
 });
 
-describe("isEventPastGrace", () => {
+describe("eventExpiryCutoff", () => {
   const now = new Date("2026-01-20T12:00:00Z");
-  const at = (ms: number) => ({ toMillis: () => now.getTime() + ms });
   const HOUR = 3_600_000;
+  // The purge query deletes events whose expiresAt is strictly before the cutoff.
+  const pastGrace = (expiresAtMs: number) => expiresAtMs < eventExpiryCutoff(now).toMillis();
 
   it("removes an event 2 hours past expiresAt", () => {
-    assert.equal(isEventPastGrace({ expiresAt: at(-2 * HOUR) }, now), true);
+    assert.equal(pastGrace(now.getTime() - 2 * HOUR), true);
   });
   it("keeps an event inside the 1-hour grace period", () => {
-    assert.equal(isEventPastGrace({ expiresAt: at(-30 * 60_000) }, now), false);
-    assert.equal(isEventPastGrace({ expiresAt: at(-EVENT_GRACE_MS) }, now), false);
+    assert.equal(pastGrace(now.getTime() - 30 * 60_000), false);
+    assert.equal(pastGrace(now.getTime() - EVENT_GRACE_MS), false);
   });
-  it("keeps a future event and one without expiresAt", () => {
-    assert.equal(isEventPastGrace({ expiresAt: at(HOUR) }, now), false);
-    assert.equal(isEventPastGrace({}, now), false);
+  it("keeps a future event", () => {
+    assert.equal(pastGrace(now.getTime() + HOUR), false);
+  });
+  it("puts the cutoff one grace period before now", () => {
+    assert.equal(eventExpiryCutoff(now).toMillis(), now.getTime() - EVENT_GRACE_MS);
   });
 });
 
