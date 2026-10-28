@@ -66,7 +66,7 @@ struct TripMapView: View {
     @State private var panelHeader: ConvoyHeader.Text?
     /// The camera inputs last acted on, by the sheet's own change (`setShown`) or by the watcher, so the watcher seeing
     /// the same ones after a sheet change makes no second move (D63 C4).
-    @State private var handledInputs: CameraInsetMove.Inputs?
+    @State private var inputsWatch = CameraInputsWatch()
     /// The bottom inset the map keeps as safe area: the folded panel's, so the Legal label sits
     /// above it. The rest of what covers the map goes into the camera (`cameraRoom`).
     @State private var legalInset: CGFloat = 0
@@ -320,10 +320,9 @@ struct TripMapView: View {
     /// What covers the map, as the one cover holds it; this layer's own until its first write lands.
     private var cover: MapCover { stage.space.cover(in: .driving) ?? drivingCover }
 
-    /// Hands the camera inputs it has not acted on yet (`CameraInsetMove.unhandled`).
+    /// Hands the camera inputs it has not acted on yet (`CameraInputsWatch`).
     private func takeCameraInputs(_ new: CameraInsetMove.Inputs) {
-        guard let (old, new) = CameraInsetMove.unhandled(handledInputs, new) else { return }
-        handledInputs = new
+        guard let (old, new) = inputsWatch.take(new) else { return }
         cameraInputsChanged(from: old, to: new)
     }
 
@@ -885,8 +884,9 @@ struct TripMapView: View {
         guard value != shown else { return }
         // The camera's move for the new cover in the same transaction as the resize (D63 C4), on the sheet's motion.
         moveSheet {
-            stage.sheetChange(in: .driving, { stage.sheet.resize(to: .driving(value)) }, cover: { drivingCover },
-                              aim: { _ in takeCameraInputs(cameraInputs) })
+            inputsWatch.resize(stage, to: value, cover: { drivingCover }, inputs: { cameraInputs }) {
+                cameraInputsChanged(from: $0, to: $1)
+            }
         }
     }
 

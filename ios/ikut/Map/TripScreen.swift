@@ -458,13 +458,30 @@ final class TripScreenModel {
     /// than following it in a later update. A change from a mode not on screen changes nothing. True when it aimed.
     @discardableResult
     func sheetChange(in mode: TripScreenMode, _ change: () -> Void, cover: () -> MapCover,
-                     aim: ((MapCover) -> Void)? = nil) -> Bool {
+                     aim: (MapCover) -> Void = { _ in }) -> Bool {
         guard mode == self.mode else { return false }
         change()
-        guard space.write(cover(), mode: mode), let aim else { return false }
+        guard space.write(cover(), mode: mode) else { return false }
         aim(space.cover)
         return true
     }
+
+    /// A change of the one sheet that always brings a camera move (Home's pick, Back, an item, Where to?, Close; D63
+    /// C4): `change`, then `aim`, both inside this one call and so inside the caller's one transaction, whether or not
+    /// the cover changed (an item picked on a short sheet still moves the camera). A call from a mode not on screen does
+    /// nothing. True when it ran.
+    @discardableResult
+    func sheetMove(in mode: TripScreenMode, _ change: () -> Void, aim: () -> Void) -> Bool {
+        guard mode == self.mode else { return false }
+        movingWithSheet = true
+        defer { movingWithSheet = false }
+        change()
+        aim()
+        return true
+    }
+
+    /// A sheet move is running (`sheetMove`): a camera move made now rides the sheet's change.
+    @ObservationIgnored private(set) var movingWithSheet = false
 
     /// The mode's layer writes what covers the map (a banner came, a height was measured); one from a mode not on
     /// screen (a layer on its way out, the lobby under driving) is ignored. True when it changed.

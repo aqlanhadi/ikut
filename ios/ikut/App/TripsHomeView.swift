@@ -106,15 +106,6 @@ struct TripsHomeView: View {
         return stage.space.cover(in: .home) ?? cover
     }
 
-    /// A change of Home's sheet and the camera move it brings, in one transaction (D63 C4): `aim` runs inside the
-    /// sheet's own motion instead of in a later update.
-    private func withSheet(_ change: () -> Void, aim: () -> Void) {
-        withAnimation(sheetMotion) {
-            change()
-            aim()
-        }
-    }
-
     var body: some View {
         Color.clear
             .allowsHitTesting(false)
@@ -242,23 +233,19 @@ struct TripsHomeView: View {
         #if DEBUG
         recap = demoModel
         #endif
-        withSheet { model.pick(entry, camera: stage.camera, recap: recap) } aim: { refocus(animated: true) }
+        // The change and its camera move in one call on the screen (D63 C4), as for every Home change below.
+        model.pick(entry, camera: stage.camera, recap: recap, on: stage) { refocus(animated: true) }
         AccessibilityNotification.Announcement("Showing \(entry.name) on the map. Back to trips is at the top of the sheet.").post()
     }
 
     /// Back to the list, with the camera where it was.
     func closePicked() {
-        var back: HomeModel.CameraReturn?
-        withSheet { back = model.closePicked(camera: stage.camera) } aim: { if let back { goBack(back) } }
+        model.closePicked(camera: stage.camera, on: stage) { goBack($0) }
     }
 
     /// A timeline item: the map goes to it, and the sheet drops to short with the item in it.
     func selectItem(_ item: RecapTimelineItem) {
-        guard let picked = model.picked else { return }
-        withSheet {
-            picked.select(item)
-            model.expanded = false
-        } aim: { refocus(animated: true) }
+        model.select(item, on: stage) { refocus(animated: true) }
     }
 
     /// The X on the item: back to the whole route.
@@ -361,15 +348,12 @@ struct TripsHomeView: View {
 
     /// New trip's gates are through: Where to? takes over the sheet and the map.
     private func beginCreate() {
-        // Already in Where to? (a demo seeds it): nothing begins, nothing moves.
-        guard model.flow == nil else { return }
-        withSheet { model.beginCreate(camera: stage.camera, goBack: goBack) } aim: { refocusCreate(animated: true) }
+        model.beginCreate(camera: stage.camera, goBack: goBack, on: stage) { refocusCreate(animated: true) }
     }
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeCreate() {
-        var back = HomeModel.CameraReturn.stay
-        withSheet { back = model.closeCreate(camera: stage.camera) } aim: { goBack(back) }
+        model.closeCreate(camera: stage.camera, on: stage) { goBack($0) }
     }
 
     /// The camera for the step on screen: the pin at the top of the list, or the whole route above New trip's sheet.
@@ -450,8 +434,7 @@ struct TripsHomeView: View {
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeJoin() {
-        var back = HomeModel.CameraReturn.stay
-        withSheet { back = model.closeJoin(camera: stage.camera) } aim: { goBack(back) }
+        model.closeJoin(camera: stage.camera, on: stage) { goBack($0) }
     }
 
     private func joined(_ tripId: String, tracks: Bool) {

@@ -124,6 +124,34 @@ enum CameraInsetMove {
     }
 }
 
+/// The driving camera's bookkeeping of the inputs it has acted on (D63 C4), shared by the convoy sheet's own resize and
+/// the D67 watcher, so a move made inside the resize is not made again when the watcher sees the same inputs.
+struct CameraInputsWatch: Equatable {
+    private(set) var handled: CameraInsetMove.Inputs?
+
+    /// The change to act on for `new` (`CameraInsetMove.unhandled`), marked handled; nil when there is none.
+    mutating func take(_ new: CameraInsetMove.Inputs) -> (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)? {
+        guard let change = CameraInsetMove.unhandled(handled, new) else { return nil }
+        handled = new
+        return change
+    }
+
+    /// A fold, unfold or pull-up of the convoy sheet: the resize, the cover it leaves (`cover`) and, when that changed
+    /// what the camera keeps clear, the camera's decision for the new `inputs` (`act`), all in this one call on the
+    /// screen (`TripScreenModel.sheetChange`), so inside the caller's one sheet motion. True when it acted.
+    @MainActor @discardableResult
+    mutating func resize(_ screen: TripScreenModel, to shown: PanelSheet.Shown, cover: () -> MapCover,
+                         inputs: () -> CameraInsetMove.Inputs,
+                         act: (CameraInsetMove.Inputs, CameraInsetMove.Inputs) -> Void) -> Bool {
+        var change: (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)?
+        screen.sheetChange(in: .driving, { screen.sheet.resize(to: .driving(shown)) }, cover: cover,
+                           aim: { _ in change = take(inputs()) })
+        guard let change else { return false }
+        act(change.old, change.new)
+        return true
+    }
+}
+
 #if DEBUG
 import os
 

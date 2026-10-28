@@ -718,7 +718,7 @@ struct OneMapTests {
         let before = screen.sheet.changes
         let cover = screen.space.cover
         let moved = cameraWrites(screen) {
-            _ = withAnimation(Motion.sheet(reduceMotion: false)) { home.expanded = tall }
+            withAnimation(Motion.sheet(reduceMotion: false)) { home.expanded = tall }
             // What TripsHomeView's cover watcher then writes.
             screen.cover(HomeSheet.cover(home.mode, compact: compact), from: .home)
         }
@@ -726,15 +726,76 @@ struct OneMapTests {
         #expect(screen.space.cover == cover && !moved)
     }
 
-    @Test func homesListToWhereToAimsOnceInsideTheChange() {
-        let screen = Rig().model(mode: .home)
-        screen.cover(HomeSheet.cover(.list, compact: HomeSheet.compactHeight), from: .home)
-        var aimedWith: [MapCover] = []
-        let aimed = screen.sheetChange(in: .home, {}, cover: { HomeSheet.cover(.whereTo, compact: HomeSheet.compactHeight) }) {
-            aimedWith.append($0)
+    /// Home's six changes that bring a camera move, each as Home's layer makes it (`HomeModel` with the screen): the
+    /// aim runs inside the one call on the screen (`TripScreenModel.sheetMove`) and writes the camera there, once.
+    enum HomeChange: CaseIterable { case pick, closePicked, selectItem, beginCreate, closeCreate, closeJoin }
+
+    private static let somewhere = MapCameraPosition.region(MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 4.6, longitude: 101.1), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)))
+
+    private func entry() -> PastTrips.Entry {
+        PastTrips.Entry(id: "a", name: "Trip a", destination: "Ipoh", endedAt: Date(), seenAt: Date(), others: nil, leftAt: nil)
+    }
+
+    /// A Home model ready for `change`, on a screen in `mode`.
+    private func home(for change: HomeChange, on screen: TripScreenModel) -> HomeModel {
+        let home = HomeModel(past: [entry()], sheet: screen.sheet)
+        let wasThere = MapCameraPosition.region(MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 3.1, longitude: 101.6), span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)))
+        switch change {
+        case .pick, .beginCreate: break
+        case .closePicked, .selectItem: home.pick(entry(), camera: wasThere)
+        case .closeCreate:
+            home.beginCreate(camera: wasThere, flow: NewTripFlow(search: CreateTripModel(route: { _ in
+                BuiltRoute(distance: 1, travelTime: 1, name: "", polyline: "") })), goBack: { _ in })
+        case .closeJoin:
+            home.beginJoin(JoinStart(code: "K7M2QX"), camera: wasThere, displayName: "Sam", signedIn: true, location: .whenInUse,
+                           api: FakeJoinAPI(preview: TripPreview(tripId: "t1", name: "T", destinationName: "Ipoh", cars: [])))
         }
-        // Synchronously, with the new sheet's cover: the caller's one withAnimation carries it.
-        #expect(aimed && aimedWith == [MapCover(top: 0, bottom: HomeSheet.whereToHeight)])
+        return home
+    }
+
+    /// Runs `change` as Home's layer does, with an aim that moves the camera; returns whether each aim ran inside the
+    /// screen's sheet move.
+    private func run(_ change: HomeChange, _ home: HomeModel, on screen: TripScreenModel) -> [Bool] {
+        var inside: [Bool] = []
+        let aim = {
+            inside.append(screen.movingWithSheet)
+            screen.move(to: Self.somewhere, animated: false, reduceMotion: true)
+        }
+        let item = RecapTimelineItem(id: "i", kind: .stop, time: Date(), title: "Stop", detail: "", symbol: "fuelpump",
+                                     latitude: 4.5, longitude: 101.2)
+        switch change {
+        case .pick: home.pick(entry(), camera: .automatic, on: screen, aim: aim)
+        case .closePicked: home.closePicked(camera: .automatic, on: screen) { _ in aim() }
+        case .selectItem: home.select(item, on: screen, aim: aim)
+        case .beginCreate: home.beginCreate(camera: .automatic, goBack: { _ in }, on: screen, aim: aim)
+        case .closeCreate: home.closeCreate(camera: .automatic, on: screen) { _ in aim() }
+        case .closeJoin: home.closeJoin(camera: .automatic, on: screen) { _ in aim() }
+        }
+        return inside
+    }
+
+    @Test(arguments: HomeChange.allCases)
+    func eachHomeChangeMovesTheCameraInsideItsOneCall(change: HomeChange) {
+        let screen = Rig().model(mode: .home)
+        let home = home(for: change, on: screen)
+        var inside: [Bool] = []
+        let moved = cameraWrites(screen) { inside = run(change, home, on: screen) }
+        #expect(inside == [true])
+        #expect(moved && screen.camera == Self.somewhere)
+    }
+
+    @Test(arguments: HomeChange.allCases)
+    func aHomeChangeWhileHomeIsNotOnScreenDoesNothing(change: HomeChange) {
+        let screen = Rig().model(mode: .home)
+        let home = home(for: change, on: screen)
+        screen.open(tripId: "t1", started: false)
+        let before = (home.picked?.entry.id, home.flow == nil, home.joinFlow == nil, home.picked?.selectedItem?.id)
+        var inside: [Bool] = []
+        let moved = cameraWrites(screen) { inside = run(change, home, on: screen) }
+        #expect(inside.isEmpty && !moved)
+        #expect(before == (home.picked?.entry.id, home.flow == nil, home.joinFlow == nil, home.picked?.selectedItem?.id))
     }
 
     @Test(arguments: [true, false])
@@ -752,8 +813,9 @@ struct OneMapTests {
         #expect(aims == 0 && !moved)
     }
 
-    /// Fold, unfold and pull-up: the resize, the new cover and the camera's move in one call, then the watcher seeing the
-    /// same inputs makes no second move; a banner landing in that update is still its own decision.
+    /// Fold, unfold and pull-up through the view's own call (`CameraInputsWatch.resize`): the resize, the new cover and
+    /// the camera's decision in that one call; the watcher then seeing the same inputs makes no second decision, and a
+    /// banner landing after it is still its own.
     @Test(arguments: [(PanelSheet.Shown.folded, PanelSheet.Shown.unfolded, CGFloat(500)),
                       (.unfolded, .folded, 255), (.unfolded, .pulledUp, 700), (.pulledUp, .folded, 255)])
     func aConvoyResizeMovesTheCameraOnceInItsOwnTransaction(from: PanelSheet.Shown, to: PanelSheet.Shown, bottom: CGFloat) throws {
@@ -765,28 +827,38 @@ struct OneMapTests {
         func inputs() -> CameraInsetMove.Inputs {
             CameraInsetMove.inputs(target: target, layerHeight: 778, above: 0, cover: screen.space.cover)
         }
-        var handled: CameraInsetMove.Inputs? = inputs()
-        var moves: [CameraInsetMove.Plan] = []
-        func take(_ new: CameraInsetMove.Inputs) {
-            guard let (old, new) = CameraInsetMove.unhandled(handled, new) else { return }
-            handled = new
-            if let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: 812, aimedTop: 68) { moves.append(plan) }
-        }
+        var watch = CameraInputsWatch()
+        _ = watch.take(inputs())
+        var plans: [CameraInsetMove.Plan] = []
+        var sizeSeen: [TripSheetSize] = []
         let before = screen.sheet.changes
         _ = withAnimation(Motion.sheet(reduceMotion: false)) {
-            screen.sheetChange(in: .driving, { screen.sheet.resize(to: .driving(to)) },
-                               cover: { MapCover(top: 6, bottom: bottom) }) { _ in take(inputs()) }
+            watch.resize(screen, to: to, cover: { MapCover(top: 6, bottom: bottom) }, inputs: inputs) { old, new in
+                sizeSeen.append(screen.sheet.size)
+                if let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: 812, aimedTop: 68) { plans.append(plan) }
+            }
         }
         #expect(screen.sheet.changes - before == 1)
-        #expect(moves == [CameraInsetMove.Plan(targetChanged: false, cause: .sheet)])
-        // The watcher's update after it: the same inputs, no second move.
-        take(inputs())
-        #expect(moves.count == 1)
-        // A banner after the resize: still its own decision for the watcher (D67), from the inputs the resize left
-        // (whether it moves is the banner rule's; over a pulled-up sheet both covers shrink to leave the map's 120 pt).
+        #expect(sizeSeen == [.driving(to)])
+        #expect(plans == [CameraInsetMove.Plan(targetChanged: false, cause: .sheet)])
+        // The watcher's update after it: the same inputs, nothing to act on.
+        #expect(watch.take(inputs()) == nil)
+        // A banner after the resize: its own decision, from the inputs the resize left (whether it moves is the banner
+        // rule's; over a pulled-up sheet both covers shrink to leave the map its 120 pt).
+        let handled = try #require(watch.handled)
         screen.cover(MapCover(top: 140, bottom: bottom), from: .driving)
-        let banner = try #require(CameraInsetMove.unhandled(handled, inputs()))
+        let next = watch.take(inputs())
+        let banner = try #require(next)
         #expect(banner.old == handled && banner.old.top != banner.new.top)
+    }
+
+    @Test func aConvoyResizeWhileDrivingIsNotOnScreenIsNoDecision() {
+        let screen = Rig().model(mode: .lobby)
+        var watch = CameraInputsWatch()
+        var acted = 0
+        let did = watch.resize(screen, to: .unfolded, cover: { MapCover(top: 6, bottom: 500) },
+                               inputs: { CameraInsetMove.Inputs(target: nil, top: 0, bottom: 0) }) { _, _ in acted += 1 }
+        #expect(!did && acted == 0 && screen.sheet.size == .lobby(tall: false) && watch.handled == nil)
     }
 
     @Test func aSheetChangeFromAModeNotOnScreenChangesNothing() {
