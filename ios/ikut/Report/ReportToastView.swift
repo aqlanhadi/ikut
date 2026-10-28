@@ -5,6 +5,8 @@ struct ReportToastView: View {
     @Bindable var model: ReportToastModel
     /// Where it comes from: the top on the map, the bottom in the report sheet.
     var edge: Edge = .top
+    /// True under the map's banner slot, which owns the coming and going.
+    var inSlot = false
     /// The map plays them from its banner slot instead (`reportHaptics`), since the toast is only drawn while it has the slot.
     var haptics = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -20,7 +22,7 @@ struct ReportToastView: View {
                 } trailing: {
                     EmptyView()
                 }
-                .modifier(Placement(edge: edge))
+                .modifier(Placement(edge: edge, inSlot: inSlot))
             case .reported(let label, _):
                 DarkBanner(title: "Reported \(label)", symbol: "checkmark", circle: .green) {
                     Button("Undo") { Task { await model.undo() } }
@@ -31,7 +33,7 @@ struct ReportToastView: View {
                         .foregroundStyle(.white)
                         .accessibilityHint("Removes the report")
                 }
-                .modifier(Placement(edge: edge))
+                .modifier(Placement(edge: edge, inSlot: inSlot))
                 .announces("Reported \(label). You can undo it.")
                 .accessibilityAction(named: "Close") { model.dismiss() }
             case .failed(let message):
@@ -42,12 +44,20 @@ struct ReportToastView: View {
                     }
                     .accessibilityLabel("Close")
                 }
-                .modifier(Placement(edge: edge))
+                .modifier(Placement(edge: edge, inSlot: inSlot))
                 .announces(message)
             }
         }
         .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: model.state)
         .modifier(HapticsIf(model: model, on: haptics))
+    }
+
+    private struct OptionalTransition: ViewModifier {
+        let edge: Edge
+        let on: Bool
+        @ViewBuilder func body(content: Content) -> some View {
+            if on { content.glanceTransition(edge: edge) } else { content }
+        }
     }
 
     private struct HapticsIf: ViewModifier {
@@ -61,9 +71,10 @@ struct ReportToastView: View {
     /// How each state comes and goes; the host places and pads the toast.
     private struct Placement: ViewModifier {
         let edge: Edge
+        let inSlot: Bool
         func body(content: Content) -> some View {
             content
-                .glanceTransition(edge: edge)
+                .modifier(OptionalTransition(edge: edge, on: !inSlot))
                 .accessibilityElement(children: .contain)
         }
     }

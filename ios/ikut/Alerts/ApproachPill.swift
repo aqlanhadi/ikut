@@ -27,7 +27,6 @@ struct ApproachPill: View {
             .accessibilityLabel("\(alert.title), \(ConvoyFormat.distance(distance)). Show it on the map")
         }
         .announces(alert.title, id: alert.id)
-        .glanceTransition(edge: .top)
     }
 }
 
@@ -53,7 +52,6 @@ struct StopApproachPill: View {
             .accessibilityIdentifier("stopapproach.pill")
         }
         .announces("\(alert.title), \(alert.body)", id: alert.id)
-        .glanceTransition(edge: .top)
     }
 }
 
@@ -81,7 +79,6 @@ struct CatchUpPill: View {
             .accessibilityIdentifier("catchup.pill")
         }
         .announces(alert.title, id: alert.id)
-        .glanceTransition(edge: .top)
     }
 }
 
@@ -94,7 +91,6 @@ struct PassedBanner: View {
     var body: some View {
         DarkBanner(title: text, symbol: "checkmark", circle: .green)
             .accessibilityAction(named: "Close", onClose)
-            .glanceTransition(edge: .top)
             .accessibilityAddTraits(.updatesFrequently)
             .announces(text)
     }
@@ -109,7 +105,6 @@ struct RouteNoticeBanner: View {
         DarkBanner(
             title: notice.text, symbol: notice.waiting ? "antenna.radiowaves.left.and.right.slash" : "arrow.triangle.turn.up.right.diamond.fill",
             circle: notice.waiting ? .white.opacity(0.7) : .green)
-            .glanceTransition(edge: .top)
             .announces(notice.text)
             .accessibilityIdentifier("route.notice")
     }

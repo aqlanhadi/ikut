@@ -88,7 +88,6 @@ struct GlanceErrorBanner: View {
         .padding(.leading, Spacing.l).padding(.trailing, Spacing.xs).padding(.vertical, Spacing.xs)
         .background(Color.red.opacity(0.9), in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-        .glanceTransition(edge: .top)
         .announces(message)
         .accessibilityIdentifier("map.error")
     }
