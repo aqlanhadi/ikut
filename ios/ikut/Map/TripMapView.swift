@@ -397,7 +397,7 @@ struct TripMapView: View {
               let hold = DrivingGlance.passedDuration(voiceOver: UIAccessibility.isVoiceOverRunning) else { return }
         try? await Task.sleep(for: hold)
         guard !Task.isCancelled else { return }
-        withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { passedText = nil }
+        withAnimation(Motion.banner(reduceMotion: reduceMotion)) { passedText = nil }
     }
 
     /// A hazard approach alert (one with a distance) brings my car and the hazard into view, with
@@ -444,7 +444,7 @@ struct TripMapView: View {
                 return
             }
             if distance == nil, Date().timeIntervalSince(started) > 180 {
-                withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { approach = nil }
+                withAnimation(Motion.banner(reduceMotion: reduceMotion)) { approach = nil }
                 endHazardFocus(.gaveUp)
                 return
             }
@@ -466,26 +466,48 @@ struct TripMapView: View {
     /// the transitions run and it adds nothing to the stack. Stays at one place, under the pill.
     private var bannerSlotView: some View {
         ZStack(alignment: .top) {
+            slotMessage
+                // One motion for every message: a new one comes in as the slot's transition, and the old one leaves.
+                .id(bannerSlot.shown)
+                .transition(bannerTransition)
+        }
+        .frame(maxWidth: .infinity)
+        .environment(\.spokenBanners, spokenBanners)
+        // Always mounted, unlike the toast: a report made while another message has the slot still gives its haptics.
+        .reportHaptics(toast)
+        .animation(Motion.banner(reduceMotion: reduceMotion), value: bannerSlot.shown)
+        .animation(Motion.banner(reduceMotion: reduceMotion), value: alerts.current?.id)
+        .onChange(of: bannerPresent, initial: true) { _, present in
+            bannerArrivals.update(present: present, now: Date())
+            spokenBanners.keep(Set(present.values))
+        }
+    }
+
+    private var bannerTransition: AnyTransition {
+        reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity)
+    }
+
+    @ViewBuilder private var slotMessage: some View {
+        Group {
             switch bannerSlot.shown {
             case .hazardApproach:
                 if let approach { ApproachPill(alert: approach, model: model) { focusHazard(approach.eventId) } }
             case .stopPill:
                 if let stopPill, !stopCardOpen {
-                    StopPillView(pill: stopPill, onButton: pillTapped).glanceTransition(edge: .top)
+                    StopPillView(pill: stopPill, onButton: pillTapped)
                 }
             case .stopApproach:
                 if let stopApproach = model.stopApproach, let kind = stopApproachKind {
                     StopApproachPill(alert: stopApproach, kind: kind, model: model)
                 }
             case .toast:
-                ReportToastView(model: toast, haptics: false)
+                ReportToastView(model: toast, inSlot: true, haptics: false)
             case .passed:
                 if let passed = passedText { PassedBanner(text: passed) { passedText = nil } }
             case .paused:
                 PausedBanner(session: session, onError: { message in
                     glanceError.show(message, cause: .pause)
                 })
-                .glanceTransition(edge: .top)
             case .catchUp:
                 if let catchUp = model.catchUp { CatchUpPill(alert: catchUp, model: model) }
             case .alertBanner:
@@ -497,15 +519,6 @@ struct TripMapView: View {
             case nil:
                 EmptyView()
             }
-        }
-        .frame(maxWidth: .infinity)
-        .environment(\.spokenBanners, spokenBanners)
-        // Always mounted, unlike the toast: a report made while another message has the slot still gives its haptics.
-        .reportHaptics(toast)
-        .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: bannerSlot.shown)
-        .onChange(of: bannerPresent, initial: true) { _, present in
-            bannerArrivals.update(present: present, now: Date())
-            spokenBanners.keep(Set(present.values))
         }
     }
 
@@ -1017,8 +1030,10 @@ struct TripMapView: View {
         return StopRequestActions(
             ok: { eventId in
                 if let request = stopBoard.requests.first(where: { $0.eventId == eventId }) {
-                    pillMemory.noteOK(request, now: Date())
-                    pillNow = Date()
+                    withAnimation(Motion.banner(reduceMotion: reduceMotion)) {
+                        pillMemory.noteOK(request, now: Date())
+                        pillNow = Date()
+                    }
                 }
                 live.ok(eventId)
             },
@@ -1056,7 +1071,7 @@ struct TripMapView: View {
         guard liveServices, let next = StopPillPlanner.nextChange(requests: stopBoard.requests, memory: pillMemory, now: Date()) else { return }
         try? await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
         guard !Task.isCancelled else { return }
-        withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) { pillNow = Date() }
+        withAnimation(Motion.banner(reduceMotion: reduceMotion)) { pillNow = Date() }
     }
 
     /// Feeds the driving detector once a second from this phone's own speed.

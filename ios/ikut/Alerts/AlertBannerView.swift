@@ -11,7 +11,6 @@ struct AlertBannerView: View {
     /// One alert shown elsewhere (the approach pill).
     var hidingAlertId: String?
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var shown: TripAlert? {
         // "Aisha’s car is 3.3 km behind you" is always its own pill at the top (`CatchUpPill`), never a banner.
@@ -27,11 +26,9 @@ struct AlertBannerView: View {
             if let alert = shown {
                 banner(alert)
                     .announces([alert.title, alert.body].joined(separator: ", "), id: alert.id)
-                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity)
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.82), value: shown)
     }
 
     private func banner(_ alert: TripAlert) -> some View {

@@ -19,7 +19,6 @@ struct StopPillView: View {
             }
         }
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-        .glanceTransition(edge: .top)
         .announces(announcement, id: pill.id)
     }
 
