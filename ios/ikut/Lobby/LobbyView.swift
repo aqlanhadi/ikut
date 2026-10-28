@@ -423,13 +423,21 @@ struct LobbyView: View {
             stage.tripLayer(of: session, onScreen: true)
             if sampleTall { setExpanded(true) }
             #if DEBUG
-            switch demoAsk {
-            case "start": confirmStart = true
-            case "leave": confirmLeave = true
-            case "end": confirmEnd = true
-            case "rename": renameText = "Balik kampung raya"; renaming = true
-            case "qr": showQR = true
-            default: break
+            // Asked a moment after the screen is up, as a tap does: the sheet is on screen first, steps aside for the ask
+            // (`covers`), and the alert presents once it is gone. Set at appear, the sheet's own presentation and its
+            // cover race and UIKit drops the alert.
+            if let ask = demoAsk {
+                Task {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    switch ask {
+                    case "start": confirmStart = true
+                    case "leave": confirmLeave = true
+                    case "end": confirmEnd = true
+                    case "rename": renameText = "Balik kampung raya"; renaming = true
+                    case "qr": showQR = true
+                    default: break
+                    }
+                }
             }
             #endif
             if !isSample { session.start() }
