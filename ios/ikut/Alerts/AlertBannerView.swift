@@ -11,7 +11,6 @@ struct AlertBannerView: View {
     /// One alert shown elsewhere (the approach pill).
     var hidingAlertId: String?
 
-
     private var shown: TripAlert? {
         // "Aisha’s car is 3.3 km behind you" is always its own pill at the top (`CatchUpPill`), never a banner.
         guard let alert = center.current, alert.kind == .event, !hiding.contains(alert.category),
