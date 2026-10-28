@@ -14,13 +14,14 @@ final class LobbyModel {
     private var sampleCars: [Car] = []
     private var sampleMembers: [Member] = []
     private var sampleStops: [PlannedStop] = []
+    private var sampleError: String?
 
     var trip: Trip? { session?.trip ?? sampleTrip }
     var cars: [Car] { session?.cars ?? sampleCars }
     var members: [Member] { session?.members ?? sampleMembers }
     /// The planned stops, in driving order.
     var stops: [PlannedStop] { session?.stops ?? sampleStops }
-    var errorMessage: String? { session?.errorMessage }
+    var errorMessage: String? { session?.errorMessage ?? sampleError }
 
     var groupedCars: [LobbyCar] { LobbyLogic.group(cars: cars, members: members) }
 
@@ -38,6 +39,13 @@ final class LobbyModel {
         sampleCars = cars
         sampleMembers = members
         sampleStops = stops
+    }
+
+    /// A trip that couldn't be read: no trip, and the message the session would hold.
+    init(sampleError message: String) {
+        tripId = "sample"
+        session = nil
+        sampleError = message
     }
 
     /// KL to Ipoh with four cars, Hafiz's still waiting for a tracker; `started` puts it on the road.

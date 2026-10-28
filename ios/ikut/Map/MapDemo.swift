@@ -201,6 +201,20 @@ enum MapDemo {
         }
     }
 
+    /// `alert-banner`: the in-app banner for a hazard, on the driving map from the first moment.
+    static func alertBanner() -> some View {
+        Backend.configure()
+        let alerts = AlertCenter(bannerDuration: .seconds(3_600))
+        alerts.showForDemo(TripAlert(
+            id: "demo-banner", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
+            severity: .high, distance: nil, title: "Debris ahead", body: "Reported by Wyna’s car", spoken: ""))
+        return NavigationStack {
+            TripScreenHost(mode: .driving) { TripMapView(
+                session: TripSession(tripId: "demo", userId: "u-c1"), model: model(), alerts: alerts,
+                stopService: DemoStopService()) }
+        }
+    }
+
     /// The debris 3 km ahead as an approach alert.
     static let debrisAlert = TripAlert(
         id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,

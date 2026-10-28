@@ -435,6 +435,8 @@ struct LobbyView: View {
                     case "end": confirmEnd = true
                     case "rename": renameText = "Balik kampung raya"; renaming = true
                     case "qr": showQR = true
+                    case "action-error": actionError = "Can’t reach the server. Check your signal and try again."
+                    case "change-destination": showChangeDestination = true
                     default: break
                     }
                 }

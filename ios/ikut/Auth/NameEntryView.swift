@@ -15,6 +15,16 @@ struct NameEntryView: View {
         self.onDone = onDone
     }
 
+    #if DEBUG
+    /// Launch states `name-entry-error` (the sign-in problem line) and `name-entry-signing-in` (the spinner on Continue).
+    init(demo: String) {
+        onDone = {}
+        _name = State(initialValue: "Nurul")
+        _isWorking = State(initialValue: demo == "signing-in")
+        _errorMessage = State(initialValue: demo == "error" ? "Couldn’t sign you in. Check your signal and try again." : nil)
+    }
+    #endif
+
     private var isValid: Bool {
         if case .success = DisplayName.validate(name) { true } else { false }
     }

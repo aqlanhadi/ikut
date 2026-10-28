@@ -39,6 +39,8 @@ enum LobbyStopsDemo {
         case pulledUp
         /// Driving, a participant no longer in the trip: the banner with Back to trips on the folded sheet (#403).
         case drivingLost
+        /// A trip nobody has joined, one whose route is being rebuilt, and one that couldn't be read.
+        case noCars, routeUpdating, unreadable
     }
 
     /// KL to Ipoh, about 190 km.
@@ -110,6 +112,15 @@ enum LobbyStopsDemo {
             return LobbyView(sample: model(tapah), planner: planner, organizer: true)
         case .member:
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false)
+        case .noCars:
+            let base = model(stopsOnRoute)
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            return LobbyView(sample: LobbyModel(sampleTrip: base.trip!, cars: [], members: [], stops: base.stops), planner: planner, organizer: true)
+        case .routeUpdating:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init), status: .building)
+            return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true, tall: true)
+        case .unreadable:
+            return LobbyView(sample: LobbyModel(sampleError: "Can’t reach the server. Check your signal and try again."), planner: planner, organizer: true)
         case .sharing:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(
@@ -354,6 +365,23 @@ enum DemoScreens {
         case "lobby-confirm-end": return trip(lobbyAsking(.organizer, "end"))
         case "lobby-rename": return trip(lobbyAsking(.organizer, "rename"))
         case "lobby-qr": return trip(lobbyAsking(.organizer, "qr"))
+        case "lobby-action-error": return trip(lobbyAsking(.organizer, "action-error"))
+        case "lobby-change-destination": return trip(lobbyAsking(.organizer, "change-destination"))
+        case "lobby-no-cars": return trip(LobbyStopsDemo.lobby(.noCars))
+        case "lobby-route-updating": return trip(LobbyStopsDemo.lobby(.routeUpdating))
+        case "lobby-error": return trip(LobbyStopsDemo.lobby(.unreadable))
+        // Before Home: the name step with its sign-in problem line and its spinner; the first screen with no trips.
+        case "name-entry-error", "name-entry-signing-in":
+            return AnyView(NameEntryView(demo: name == "name-entry-error" ? "error" : "signing-in").environment(AuthModel()))
+        case "join-location-off":
+            return AnyView(TripScreenHost(mode: .home) { HomePickedDemo.view(name) }
+                .environment(AuthModel()).environment(LocationPermission(demo: .denied)))
+        case "home-empty": return home("empty")
+        case "home-new-trip-error": return home("new-trip-error")
+        case "home-new-trip-creating": return home("new-trip-creating")
+        case "root-loading": return AnyView(ProgressView())
+        case "alert-banner": return AnyView(MapDemo.alertBanner())
+        case "road-offline": return AnyView(MapDemo.view(online: false))
         // Driving, the two notification asks the map makes at trip start.
         case "road-ask-alerts": return AnyView(MapDemo.view(ask: .roadAlerts))
         case "road-ask-alerts-off": return AnyView(MapDemo.view(ask: .roadAlertsOff))
@@ -420,7 +448,7 @@ enum DemoScreens {
         // Joining in Home's sheet (D58): the name and the location ask first for someone new (H1, H2), the code (empty, found, found with the drive from here, not found), then which
         // car (nothing picked, someone else's car, my own car). The sheet is the same height on all of them.
         case "join-h1-name", "join-h2-location", "join-h3-empty", "join-h3-found", "join-h3-found-drive", "join-h3-not-found",
-             "join-h4-car", "join-h4-copilot", "join-h4-own":
+             "join-h3-looking", "join-h3-no-signal", "join-h4-joining", "join-h4-car", "join-h4-copilot", "join-h4-own":
             return home(name)
         case "lobby-own-merges": return trip(OwnWayDemo.lobby(.merges))
         case "lobby-own-main": return trip(OwnWayDemo.lobby(.onMain))

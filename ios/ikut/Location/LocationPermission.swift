@@ -77,7 +77,20 @@ final class LocationPermission {
         UIApplication.shared.open(url)
     }
 
+    #if DEBUG
+    /// A permission fixed at `status`, for launch states: the system's answer never replaces it.
+    init(demo status: Status) {
+        self.status = status
+        accuracy = .full
+        demoFixed = true
+    }
+    @ObservationIgnored private var demoFixed = false
+    #endif
+
     private func refresh() {
+        #if DEBUG
+        if demoFixed { return }
+        #endif
         status = LocationAccess.status(from: manager.authorizationStatus)
         accuracy = LocationAccess.accuracy(from: manager.accuracyAuthorization)
         if let waiter, waiter.until(status) { finishWait() }

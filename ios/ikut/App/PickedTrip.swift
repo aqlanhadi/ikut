@@ -210,6 +210,14 @@ enum HomePickedDemo {
             default: "Gathering · 4 of 5 cars ready · meet 12:00"
             }
             return TripsHomeView(demo: [running] + past, routes: [thin], nowStatus: ["sample-now": line])
+        case "empty": return TripsHomeView(demo: [], routes: [])
+        case "new-trip-error", "new-trip-creating":
+            let ipoh = DestinationResult(name: "Ipoh", subtitle: "City in Perak", coordinate: .init(latitude: 4.5975, longitude: 101.0901), category: nil)
+            let flow = NewTripFlow(search: CreateTripModel())
+            flow.showReadyForDemo(
+                place: ipoh, route: BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Polyline.encode(LobbyStopsDemo.route)))
+            flow.showCreateStateForDemo(creating: name == "new-trip-creating")
+            return TripsHomeView(demo: past, routes: [thin], creating: flow)
         case "list-tall": return TripsHomeView(demo: past, routes: [thin], expanded: true)
         default: return TripsHomeView(demo: past, routes: [thin])
         }
