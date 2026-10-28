@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 
 extension StopCardModel {
-    /// The demo can open the card on a later screen (`IKUT_MAP_DEMO_CARD`): `reason` (Fuel chosen),
+    /// The demo can open the card on a later screen (`road-card-pit-stop-*` launch states): `reason` (Fuel chosen),
     /// `typed` (Fuel chosen, with a message), `passenger` (Are you a passenger?), `message` (the message
     /// field) and `sent` (Sent to the convoy). Anything else is the home screen.
     func applyDemo(_ name: String?) {

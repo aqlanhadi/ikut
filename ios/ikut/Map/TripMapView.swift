@@ -30,7 +30,7 @@ struct TripMapView: View {
     /// Alerts, the notification pre-prompt and the cars listener. Off in the demo.
     private let liveServices: Bool
     private var stopService: any StopServing = StopService()
-    /// The demo can open the card on one of its screens (`IKUT_MAP_DEMO_CARD`); nil in the app.
+    /// The demo can open the card on one of its screens (`road-card-*` launch states); nil in the app.
     private var demoScreen: String?
     /// `camera-sheet-tour` (Debug launch state): the sheet and the banners come and go by themselves.
     private var demoTour = false

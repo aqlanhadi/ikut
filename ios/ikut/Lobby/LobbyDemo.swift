@@ -359,7 +359,6 @@ enum DemoScreens {
         case "road-header-never": return AnyView(PanelHeaderDemo(.never))
         case "road-header-convoy": return AnyView(PanelHeaderDemo(nil))
         case "road-panel-short": return AnyView(MapDemo.view())
-        case "road-panel-you-online": return AnyView(MapDemo.view(expanded: true))
         case "road-panel-you-offline": return AnyView(MapDemo.view(expanded: true, online: false))
         case "road-panel-tall": return AnyView(MapDemo.view(expanded: true))
         // Five cars: the list is longer than the sheet's room, so the whole panel scrolls as one (D34 7a).
