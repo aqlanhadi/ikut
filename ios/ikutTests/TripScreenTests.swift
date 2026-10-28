@@ -171,10 +171,12 @@ struct TripScreenTests {
         }
     }
 
-    @Test func drivingIsNotAPushSoItNoLongerCoversTheLobbysSheet() {
-        // The cover rule has nothing for the map any more: the sheet stays up and changes its content.
-        #expect(!LobbySheet.isCovered(.init(), lobbyOnScreen: true))
-        #expect(!PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: false))
+    @MainActor @Test func drivingIsNotAPushSoItNoLongerCoversTheLobbysSheet() {
+        // The cover rule has nothing for the map: the sheet stays up and changes its content.
+        let stage = TripScreenModel(mode: .lobby)
+        #expect(stage.sheet.presented)
+        stage.go(to: .driving)
+        #expect(stage.sheet.presented)
     }
 
     // MARK: Camera reading (D57)
@@ -205,7 +207,7 @@ struct TripScreenTests {
 @MainActor
 struct TripScreenModelTests {
     /// A model whose trips use a fake tracker and car-route service, and save nothing.
-    @MainActor private final class Rig {
+    @MainActor fileprivate final class Rig {
         let tracker = FakeTrackingController()
         let carRoute = FakeCarRoute()
         private(set) var made: [String] = []
@@ -370,5 +372,151 @@ struct TripScreenModelTests {
         #expect(!rig.model().keepScreenOn)
         screen.keepScreenOn = true
         #expect(rig.model().keepScreenOn)
+    }
+}
+
+/// The one sheet (D63 C3): every hand-over between Home, the lobby and driving lands on its mode's size in one change,
+/// with the camera's target changed by the same call, and a layer on its way out cannot resize it.
+@MainActor
+struct TripSheetTests {
+    private typealias Rig = TripScreenModelTests.Rig
+
+    /// The mode, the sheet's size and the camera's target, as one call leaves them.
+    private struct Landing: Equatable {
+        var mode: TripScreenMode
+        var size: TripSheetSize
+        var camera: TripScreenLogic.EntryCamera
+    }
+
+    private func landing(_ screen: TripScreenModel) -> Landing {
+        Landing(mode: screen.mode, size: screen.sheet.size, camera: screen.entryCamera)
+    }
+
+    /// Runs `handOver` and returns how many times the sheet's size changed in it.
+    private func changes(_ screen: TripScreenModel, _ handOver: () -> Void) -> Int {
+        let before = screen.sheet.changes
+        handOver()
+        return screen.sheet.changes - before
+    }
+
+    @Test func createTripOpensTheLobbyAtMediumInOneChange() {
+        let screen = Rig().model(mode: .home)
+        let home = HomeModel(sheet: screen.sheet)
+        home.expanded = true
+        #expect(screen.sheet.size == .home(tall: true))
+        #expect(changes(screen) { screen.open(tripId: "t1", started: false) } == 1)
+        #expect(landing(screen) == Landing(mode: .lobby, size: .lobby(tall: false), camera: .wholeTrip))
+        // Home's model, still held while its view goes, cannot pull the lobby's sheet to Home's size.
+        home.expanded = false
+        #expect(screen.sheet.size == .lobby(tall: false))
+    }
+
+    @Test func joinThenItsLobbyIsOneChangeEach() {
+        let screen = Rig().model(mode: .home)
+        let home = HomeModel(sheet: screen.sheet)
+        home.expanded = true
+        // Join's steps open short over Home: one change, within Home.
+        #expect(changes(screen) {
+            home.beginJoin(JoinStart(code: "K7M2QX"), camera: .automatic, displayName: "Sam", signedIn: true,
+                           location: .whenInUse, api: FakeJoinAPI(preview: TripPreview(tripId: "t1", name: "T", destinationName: "Ipoh", cars: [])))
+        } == 1)
+        #expect(screen.sheet.size == .home(tall: false) && home.mode == .join)
+        #expect(changes(screen) { screen.open(tripId: "t1", started: false) } == 1)
+        #expect(landing(screen) == Landing(mode: .lobby, size: .lobby(tall: false), camera: .wholeTrip))
+    }
+
+    @Test(arguments: [true, false])
+    func startTripFoldsTheConvoyInOneChangeFromEitherLobbySize(tall: Bool) {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        screen.sheet.resize(to: .lobby(tall: tall))
+        #expect(changes(screen) { screen.go(to: .driving) } == 1)
+        #expect(landing(screen) == Landing(mode: .driving, size: .driving(.folded), camera: .follow))
+    }
+
+    @Test(arguments: [PanelSheet.Shown.folded, .unfolded, .pulledUp])
+    func backToTripsAndLeaveReturnToHomesShortListInOneChange(from shown: PanelSheet.Shown) {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: true)
+        screen.sheet.resize(to: .driving(shown))
+        #expect(changes(screen) { screen.exit() } == 1)
+        #expect(landing(screen) == Landing(mode: .home, size: .home(tall: false), camera: .homeList))
+    }
+
+    @Test func aPulledUpLobbyWhileDrivingIsOneChangeAndItsAsksKeepTheSheetUp() {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: true)
+        #expect(changes(screen) { screen.sheet.resize(to: .driving(.pulledUp)) } == 1)
+        // Rename, Leave and End present from inside the pulled-up sheet: it stays up, at its size.
+        screen.sheet.cover([.confirmLeave, .renaming], among: TripSheetCover.trip)
+        #expect(screen.sheet.presented && screen.sheet.size == .driving(.pulledUp))
+        // Change destination takes the screen: the sheet steps aside, and comes back at the size it had.
+        screen.sheet.cover([.changeDestination], among: TripSheetCover.trip)
+        #expect(!screen.sheet.presented)
+        screen.sheet.cover([], among: TripSheetCover.trip)
+        #expect(screen.sheet.presented && screen.sheet.size == .driving(.pulledUp))
+    }
+
+    @Test func endThenTheRecapThenDoneStepsAsideWithoutAResizeThenHomeInOneChange() {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: true)
+        screen.sheet.resize(to: .driving(.unfolded))
+        // The trip ends: the convoy sheet steps aside for the recap, at the size it had.
+        #expect(changes(screen) { screen.sheet.cover([.tripEnded], among: TripSheetCover.trip) } == 0)
+        #expect(!screen.sheet.presented)
+        // The recap is pushed over the map, and the trip's layer goes off screen.
+        screen.sheet.cover([.pushed], among: TripSheetCover.home)
+        screen.sheet.cover([.tripEnded, .tripOffScreen], among: TripSheetCover.trip)
+        // Done: Home's list, short, in one change; nothing of the ended trip still holds the sheet back.
+        #expect(changes(screen) { screen.exit() } == 1)
+        screen.sheet.cover([], among: TripSheetCover.home)
+        #expect(landing(screen) == Landing(mode: .home, size: .home(tall: false), camera: .homeList))
+        #expect(screen.sheet.presented)
+    }
+
+    @Test func aNewTripsLobbyIsNotHeldBackByTheLastTripsReasons() {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        // The lobby going off screen as its trip closes writes after the exit.
+        screen.exit()
+        screen.sheet.cover([.tripOffScreen, .suggestStops], among: TripSheetCover.trip)
+        screen.open(tripId: "t2", started: false)
+        #expect(screen.sheet.presented)
+    }
+
+    @Test func theModeAlreadyOnScreenIsNoChangeAndKeepsItsSize() {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        screen.sheet.resize(to: .lobby(tall: true))
+        #expect(changes(screen) { screen.open(tripId: "t1", started: false) } == 0)
+        #expect(screen.sheet.size == .lobby(tall: true))
+        #expect(changes(screen) { screen.go(to: .lobby) } == 0)
+    }
+
+    @Test func aLayerOnItsWayOutCannotResizeTheSheet() {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        // The lobby's detent reported while its content goes, after Start.
+        screen.go(to: .driving)
+        #expect(!screen.sheet.resize(to: .lobby(tall: true)))
+        #expect(changes(screen) { screen.exit() } == 1)
+        // The convoy's, after Back to trips.
+        #expect(!screen.sheet.resize(to: .driving(.unfolded)))
+        #expect(screen.sheet.size == .home(tall: false))
+    }
+
+    /// The mode, the size and the camera's target are written by the one call, synchronously, so the caller's one
+    /// `withAnimation` carries all three: none is left for a later update to change.
+    @Test(arguments: [TripScreenMode.lobby, .driving])
+    func theCameraTargetChangesInTheSameTransactionAsTheSize(to mode: TripScreenMode) {
+        let screen = Rig().model(mode: .home)
+        final class Seen: @unchecked Sendable { var mode = false, size = false, camera = false }
+        let seen = Seen()
+        withObservationTracking { _ = screen.mode } onChange: { seen.mode = true }
+        withObservationTracking { _ = screen.sheet.size } onChange: { seen.size = true }
+        withObservationTracking { _ = screen.entryCamera } onChange: { seen.camera = true }
+        withAnimation(Motion.sheet(reduceMotion: false)) { screen.open(tripId: "t1", started: mode == .driving) }
+        #expect(seen.mode && seen.size && seen.camera)
+        #expect(landing(screen) == Landing(mode: mode, size: .entry(mode), camera: TripScreenLogic.entryCamera(mode)))
     }
 }

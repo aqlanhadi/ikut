@@ -34,20 +34,22 @@ struct LobbyMapTests {
 
     // MARK: Cover rule
 
-    @Test func theSheetStaysForNothingPushedOrPresented() {
-        #expect(!LobbySheet.isCovered(.init(), lobbyOnScreen: true))
+    @MainActor @Test func theSheetStaysForNothingPushedOrPresented() {
+        #expect(TripSheet(size: .lobby(tall: false)).presented)
     }
 
-    @Test(arguments: [
-        LobbySheet.Cover(changeDestination: true), .init(suggestStops: true),
-        .init(renaming: true), .init(alwaysExplainer: true), .init(confirmLeave: true), .init(confirmEnd: true),
-    ])
-    func eachPushedOrPresentedThingCoversTheSheet(cover: LobbySheet.Cover) {
-        #expect(LobbySheet.isCovered(cover, lobbyOnScreen: true))
+    @MainActor @Test(arguments: [TripSheetCover.changeDestination, .suggestStops, .renaming, .alwaysExplainer,
+                                 .confirmLeave, .confirmEnd])
+    func eachPushedOrPresentedThingCoversTheSheet(cover: TripSheetCover) {
+        let sheet = TripSheet(size: .lobby(tall: false))
+        sheet.cover([cover], among: TripSheetCover.trip)
+        #expect(!sheet.presented)
     }
 
-    @Test func aPoppedLobbyTakesItsSheetWithIt() {
-        #expect(LobbySheet.isCovered(.init(), lobbyOnScreen: false))
+    @MainActor @Test func aPoppedLobbyTakesItsSheetWithIt() {
+        let sheet = TripSheet(size: .lobby(tall: false))
+        sheet.cover([.tripOffScreen], among: [.tripOffScreen])
+        #expect(!sheet.presented)
     }
 
     // MARK: Pins

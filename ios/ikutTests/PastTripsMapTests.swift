@@ -126,17 +126,16 @@ struct HomeSheetTests {
         #expect(HomeSheet.compactHeight <= HomeSheet.defaultReach)
     }
 
-    @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {
-        func covered(path: Int = 0, name: Bool = false, denied: Bool = false, after: Bool = false, opening: Bool = false) -> Bool {
-            HomeSheet.isCovered(pathCount: path, showName: name, showDenied: denied, afterName: after, opening: opening)
+    @MainActor @Test func homeSheetIsCoveredByEachThingThatTakesTheScreen() {
+        // The one list (`TripSheetCover`): Home's root writes its own reasons, and each steps the sheet aside.
+        let sheet = TripSheet()
+        #expect(sheet.presented)
+        for reason in TripSheetCover.home {
+            sheet.cover([reason], among: TripSheetCover.home)
+            #expect(!sheet.presented, "\(reason)")
         }
-        #expect(!covered())
-        #expect(covered(path: 1))
-        #expect(covered(path: 2))
-        #expect(covered(name: true))
-        #expect(covered(denied: true))
-        #expect(covered(after: true))
-        #expect(covered(opening: true))
+        sheet.cover([], among: TripSheetCover.home)
+        #expect(sheet.presented)
     }
 
     @Test func aRootSheetWaitsForHomeSheetToGo() {

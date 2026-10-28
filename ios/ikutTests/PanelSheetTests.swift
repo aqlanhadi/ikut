@@ -231,12 +231,18 @@ struct PanelSheetTests {
         #expect(PanelSheet.height(.unfolded, in: h) == 480)
     }
 
-    @Test func theSheetStepsAsideForEachThingThatTakesTheScreen() {
-        #expect(!PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: false))
-        #expect(PanelSheet.isCovered(ended: true, explainerWants: false, lobbyWants: false))
-        #expect(PanelSheet.isCovered(ended: false, explainerWants: true, lobbyWants: false))
-        // What the pulled-up lobby asks for (Leave, End, rename, Change destination) takes the screen too.
-        #expect(PanelSheet.isCovered(ended: false, explainerWants: false, lobbyWants: true))
+    @MainActor @Test func theSheetStepsAsideForEachThingThatTakesTheScreen() {
+        func presented(_ covers: Set<TripSheetCover>) -> Bool {
+            let sheet = TripSheet(size: .driving(.folded))
+            sheet.cover(covers, among: TripSheetCover.trip)
+            return sheet.presented
+        }
+        #expect(presented([]))
+        #expect(!presented([.tripEnded]))
+        #expect(!presented([.alwaysExplainer]))
+        // What the pulled-up lobby puts over the whole screen (Change destination, Suggest stops) takes it too.
+        #expect(!presented([.changeDestination]))
+        #expect(!presented([.suggestStops]))
     }
 
     @Test func theLobbysAlwaysSheetWaitsForTheConvoySheetToGo() {

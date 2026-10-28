@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The sizes, detents and cover rule of the driving screen's convoy sheet, pure so they can be tested.
+/// The sizes and detents of the driving screen's convoy sheet, pure so they can be tested; what it steps aside for is
+/// the one list (`TripSheetCover`).
 /// The sheet is Apple's own (`.sheet`, always up, the map above it stays touchable): short shows today's
 /// folded panel, tall the unfolded one. A card (Report, Pit stop, who is here) is a sheet of its own over it, as
 /// tall as its content (`cardHeight`). Heights are the panel's own measured height, so the text size is followed; until a layout has been
@@ -14,6 +15,12 @@ enum PanelSheet {
 
         /// The convoy list is unfolded at tall and pulled up alike, so pulling up never moves what was being read.
         var listUnfolded: Bool { self != .folded }
+
+        /// The header's fold and unfold: unfolding a pulled-up sheet leaves it pulled up. The size to move to, nil
+        /// when the list is in that state already.
+        func expanding(_ value: Bool) -> Shown? {
+            value == listUnfolded ? nil : (value ? .unfolded : .folded)
+        }
     }
 
     /// The panel's content heights before they are measured (folded, then unfolded), without the bar.
@@ -201,13 +208,6 @@ enum PanelSheet {
         case .passed, .gaveUp: shown
         case .stopAsks: shown == .pulledUp ? .unfolded : shown
         }
-    }
-
-    /// The sheet steps aside for everything that is pushed or presented from under it: the trip ending (the
-    /// recap), the Always location sheet that the lobby presents, and what the lobby puts over the whole screen
-    /// (`lobbyWants`: Change destination, or another screen pushed over the trip).
-    static func isCovered(ended: Bool, explainerWants: Bool, lobbyWants: Bool) -> Bool {
-        ended || explainerWants || lobbyWants
     }
 
     /// The room for the sheet: the map's full height less what the pills and banners need above it.

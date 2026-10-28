@@ -83,8 +83,6 @@ final class TripSession {
     var alwaysExplainerShowing = false
     /// True while a map ask is on screen; the lobby holds the sheet until it's answered.
     var askShowing = false
-    /// True while the driving screen's convoy sheet is up; the lobby's Always sheet waits for it to go (one sheet at a time).
-    var mapSheetUp = false
     /// Set the instant this user pauses, before the write lands; cleared on resume or losing tracker duty.
     private var localPausedAt: Date?
     @ObservationIgnored private let clock: () -> Date

@@ -240,7 +240,7 @@ struct TripStartSwapDemo: View {
         lobby.task {
             try? await Task.sleep(for: .seconds(2))
             let next = TripScreenLogic.mode(after: .start, from: stage.mode)
-            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.mode = next }
+            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.go(to: next) }
         }
     }
 }

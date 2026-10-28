@@ -11,7 +11,6 @@ struct ConvoySheetStateTests {
         s.foldedContent = 200
         s.unfoldedContent = 400
         s.barContent = 60
-        s.panelUp = true
         return s
     }
 
@@ -24,55 +23,49 @@ struct ConvoySheetStateTests {
 
     @Test func startsFoldedWithNoCard() {
         let s = ConvoySheetState()
-        #expect(s.shown == .folded)
-        #expect(!s.listUnfolded)
+        #expect(TripSheetSize.entry(.driving) == .driving(.folded))
+        #expect(!TripSheetSize.entry(.driving).shown.listUnfolded)
         #expect(s.presentedCard == nil)
         #expect(!s.cardDismissing)
     }
 
     @Test func foldAndUnfoldFollowTheHeader() {
-        var s = ConvoySheetState()
-        #expect(s.shown(expanding: false) == nil)
-        #expect(s.shown(expanding: true) == .unfolded)
-        s.shown = .unfolded
-        #expect(s.listUnfolded)
-        #expect(s.shown(expanding: true) == nil)
-        #expect(s.shown(expanding: false) == .folded)
+        let folded = PanelSheet.Shown.folded
+        #expect(folded.expanding(false) == nil)
+        #expect(folded.expanding(true) == .unfolded)
+        let unfolded = PanelSheet.Shown.unfolded
+        #expect(unfolded.listUnfolded)
+        #expect(unfolded.expanding(true) == nil)
+        #expect(unfolded.expanding(false) == .folded)
     }
 
     @Test func unfoldingAPulledUpSheetLeavesItPulledUp() {
-        var s = ConvoySheetState()
-        s.shown = .pulledUp
-        #expect(s.listUnfolded)
-        #expect(s.shown(expanding: true) == nil)
+        let pulledUp = PanelSheet.Shown.pulledUp
+        #expect(pulledUp.listUnfolded)
+        #expect(pulledUp.expanding(true) == nil)
         // Folding it from there goes all the way down.
-        #expect(s.shown(expanding: false) == .folded)
+        #expect(pulledUp.expanding(false) == .folded)
     }
 
-    @Test func pullUpAndBackAreOnlyAMotionWhenTheSizeChanges() {
-        var s = ConvoySheetState()
-        s.shown = .unfolded
-        #expect(s.needsMotion(to: .pulledUp))
-        s.shown = .pulledUp
-        #expect(!s.needsMotion(to: .pulledUp))
-        #expect(s.needsMotion(to: .unfolded))
+    @MainActor @Test func pullUpAndBackAreOnlyAChangeWhenTheSizeChanges() {
+        let sheet = TripSheet(size: .driving(.unfolded))
+        sheet.resize(to: .driving(.pulledUp))
+        #expect(sheet.changes == 1)
+        sheet.resize(to: .driving(.pulledUp))
+        #expect(sheet.changes == 1)
+        sheet.resize(to: .driving(.unfolded))
+        #expect(sheet.changes == 2)
     }
 
     @Test func theHazardApproachFoldsAndPassingLeavesTheSizeAlone() {
-        var s = ConvoySheetState()
-        s.shown = .pulledUp
-        #expect(s.shown(after: .approaching) == .folded)
-        #expect(s.shown(after: .passed) == .pulledUp)
-        s.shown = .unfolded
-        #expect(s.shown(after: .gaveUp) == .unfolded)
+        #expect(PanelSheet.shown(after: .approaching, from: .pulledUp) == .folded)
+        #expect(PanelSheet.shown(after: .passed, from: .pulledUp) == .pulledUp)
+        #expect(PanelSheet.shown(after: .gaveUp, from: .unfolded) == .unfolded)
     }
 
     @Test func aStopAskingBringsAPulledUpSheetBackToTall() {
-        var s = ConvoySheetState()
-        s.shown = .pulledUp
-        #expect(s.shown(after: .stopAsks) == .unfolded)
-        s.shown = .folded
-        #expect(s.shown(after: .stopAsks) == .folded)
+        #expect(PanelSheet.shown(after: .stopAsks, from: .pulledUp) == .unfolded)
+        #expect(PanelSheet.shown(after: .stopAsks, from: .folded) == .folded)
     }
 
     // MARK: Held heights
@@ -159,34 +152,31 @@ struct ConvoySheetStateTests {
     @Test func coversNothingWhileTheSheetIsNotUp() {
         var s = measured()
         settle(&s)
-        s.panelUp = false
-        #expect(s.covered(room: room, hasTopBanner: false) == 0)
+        #expect(s.covered(.unfolded, up: false, room: room, hasTopBanner: false) == 0)
     }
 
     @Test func coversTheSheetsHeightAndPulledUpCountsAsTall() {
         var s = measured()
         settle(&s)
         let h = s.appliedHeights!
-        #expect(s.covered(room: room, hasTopBanner: false) == h.short)
-        s.shown = .unfolded
-        #expect(s.covered(room: room, hasTopBanner: false) == h.tall)
-        s.shown = .pulledUp
-        #expect(s.covered(room: room, hasTopBanner: false) == h.tall)
+        #expect(s.covered(.folded, up: true, room: room, hasTopBanner: false) == h.short)
+        #expect(s.covered(.unfolded, up: true, room: room, hasTopBanner: false) == h.tall)
+        #expect(s.covered(.pulledUp, up: true, room: room, hasTopBanner: false) == h.tall)
     }
 
     // MARK: A card opening and closing
 
     @Test(arguments: [PanelSheet.Shown.folded, .unfolded, .pulledUp])
-    func aCardOpensOverEachSizeAndTheSizeIsTheSameWhenItCloses(size: PanelSheet.Shown) {
+    @MainActor func aCardOpensOverEachSizeAndTheSizeIsTheSameWhenItCloses(size: PanelSheet.Shown) {
         var s = measured()
-        s.shown = size
+        let sheet = TripSheet(size: .driving(size))
         s.stopCardOpen = true
         let want = s.wantedCard(reportReady: false, stopReady: true, arrivalLive: false)
         #expect(want == .stopRequest)
         let r7 = s.syncCard(wanted: want)
         #expect(!r7)
         #expect(s.presentedCard == .stopRequest)
-        #expect(s.shown == size)
+        #expect(sheet.size == .driving(size))
         s.stopCardOpen = false
         // Wanting none starts its dismissal, and the sheet reports it gone.
         let r8 = s.syncCard(wanted: nil)
@@ -196,7 +186,7 @@ struct ConvoySheetStateTests {
         let r9 = s.cardDismissed(wanted: nil)
         #expect(!r9)
         #expect(!s.cardDismissing)
-        #expect(s.shown == size)
+        #expect(sheet.size == .driving(size) && sheet.changes == 0)
     }
 
     @Test func theCardKeepsShowingWhatItLastShowedWhileItSlidesDown() {
@@ -264,11 +254,9 @@ struct ConvoySheetStateTests {
         s.stopCardOpen = true
         s.syncCard(wanted: .stopRequest)
         s.convoySheetWent()
-        #expect(!s.panelUp)
         #expect(s.presentedCard == nil)
         #expect(!s.cardDismissing)
         // Still wanted when the sheet is back up: it opens again.
-        s.panelUp = true
         let r13 = s.syncCard(wanted: s.wantedCard(reportReady: false, stopReady: true, arrivalLive: false))
         #expect(!r13)
         #expect(s.presentedCard == .stopRequest)

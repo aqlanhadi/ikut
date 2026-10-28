@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The sizes and detents of Home's sheet, pure so they can be tested. The sheet is Apple's own
 /// (`.sheet` with two detents, always up, the map behind it stays touchable at the short one); the
-/// map's `expanded` state is what the detent selection reads and writes.
+/// one sheet's size (`TripSheet`, through `HomeModel.expanded`) is what the detent selection reads and writes.
 enum HomeSheet {
     /// Height of the sheet when short (at the default text size): the list shows its title row, the two pills and the first
     /// past trips; a picked trip its header (back, name, date, Share, stats line) and the top of its recap card.
@@ -109,10 +109,4 @@ enum HomeSheet {
 
     /// Whatever detent the sheet settles on, tall or not (a dragged sheet reports only its detent).
     static func isExpanded(_ detent: PresentationDetent) -> Bool { BottomSheet.isTall(detent, tall: tall) }
-
-    /// Home's sheet steps aside while anything else is pushed or presented from the root: a pushed screen,
-    /// the name or location-denied sheet (wanted, or waiting for the name), or a route being opened.
-    static func isCovered(pathCount: Int, showName: Bool, showDenied: Bool, afterName: Bool, opening: Bool) -> Bool {
-        pathCount > 0 || showName || showDenied || afterName || opening
-    }
 }
