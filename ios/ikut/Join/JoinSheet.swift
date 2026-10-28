@@ -139,7 +139,7 @@ struct JoinSheet: View {
             }
         case .car:
             if let taken = model.trackerTakenResult {
-                Button { onJoined(taken.tripId, false) } label: { Text("Continue").barActionLabel() }
+                Button { onJoined(taken.tripId, model.tracks) } label: { Text("Continue").barActionLabel() }
                     .actionBarStyle(prominent: true)
                     .accessibilityIdentifier("joinContinue")
                     .sheetActionBar(sides: false)
@@ -246,7 +246,7 @@ struct JoinSheet: View {
                 return
             }
             refusedOnTap = false
-            if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId, decision.tracker && model.tracker) }
+            if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId, model.tracks) }
         }
     }
 

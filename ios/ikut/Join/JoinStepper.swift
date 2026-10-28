@@ -171,6 +171,13 @@ enum JoinSteps {
         }
     }
 
+    /// Whether this phone tracks the car it joined: it asked to (My own car, or the share switch on: `asked`), it may
+    /// share (`sharing`, from `tracker(wantsToShare:authorization:)`: refused, it joins as the co-pilot), and nobody
+    /// else had the car already (`trackerTaken`).
+    static func tracks(asked: Bool, sharing: Bool, trackerTaken: Bool) -> Bool {
+        asked && sharing && !trackerTaken
+    }
+
     static let locationOffNote = "Location is off, so you’re joining as the co-pilot. Turn it on in Settings to share this car."
 
     /// The main button of the car step: "Join Aqlan’s Myvi as Nurul", "Join in my own car as Nurul", or plain
