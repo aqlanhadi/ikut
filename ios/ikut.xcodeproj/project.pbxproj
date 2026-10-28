@@ -97,6 +97,7 @@
 		519A8EFE7DB25FA48F9DD13D /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */; };
 		51CFCAB78FFA18C207850A59 /* StopDriving.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30373103D4B59BAB60C163E5 /* StopDriving.swift */; };
 		528F9D6547A8B3D1A1A13FC1 /* PickedTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220B4DCEF3B189952DC1F1B9 /* PickedTripTests.swift */; };
+		52C738B9BE5559515F99B87D /* ConvoySheetStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A631D9F08E4EC1DEDCEA38 /* ConvoySheetStateTests.swift */; };
 		53EF6DDB8C3D86482D63952C /* TripRouteInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC7EB105E449EB09482E179 /* TripRouteInfo.swift */; };
 		53F5268421FC5C6A355F7902 /* TripExitMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456F6193440599A0317F386C /* TripExitMenu.swift */; };
 		543F159C6474EEE812A787EF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAD86226D34FC774F9DB35D /* ContentView.swift */; };
@@ -151,6 +152,7 @@
 		7CB4DED2FB0CD3F34170BACE /* StopAnswerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */; };
 		7CDF94F9A09AC073A5663F5C /* PlacePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1025A993964C9BD7063EFC61 /* PlacePin.swift */; };
 		7D38CD66489208EA7A56D806 /* RecapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00D2E21B9C9E2428BB8B757 /* RecapContent.swift */; };
+		7E468C2DFE8FEF4989DF4049 /* ConvoySheetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A009554BF15571D35F2DD64E /* ConvoySheetState.swift */; };
 		7E6E1801B96D4FC4E6A46128 /* LobbyMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D682C5C9F984EC55FF14A11 /* LobbyMap.swift */; };
 		7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C963869E69413A0E655BFED4 /* SpeechQueue.swift */; };
 		7F0F1E9387E6DF47B36D0E2D /* NextStop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B30BE299BB81EFCED8F1A8 /* NextStop.swift */; };
@@ -398,6 +400,7 @@
 		4310BE369727B65548BADA52 /* ConvoyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyPanel.swift; sourceTree = "<group>"; };
 		4365C32AF91E6D4FEA8C34F4 /* CarRouteLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarRouteLogic.swift; sourceTree = "<group>"; };
 		4374E90353623C476DD233DD /* EventService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventService.swift; sourceTree = "<group>"; };
+		43A631D9F08E4EC1DEDCEA38 /* ConvoySheetStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoySheetStateTests.swift; sourceTree = "<group>"; };
 		43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeNowEmulatorTests.swift; sourceTree = "<group>"; };
 		4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		456F6193440599A0317F386C /* TripExitMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripExitMenu.swift; sourceTree = "<group>"; };
@@ -497,6 +500,7 @@
 		9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestPlacesTests.swift; sourceTree = "<group>"; };
 		9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelHeaderDemo.swift; sourceTree = "<group>"; };
 		9F6A312F64D63E711A33AAFF /* PlaceSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearchTests.swift; sourceTree = "<group>"; };
+		A009554BF15571D35F2DD64E /* ConvoySheetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoySheetState.swift; sourceTree = "<group>"; };
 		A05DA41ACB55C3124C7D91A2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A11DE0CC85044E36B54C8C0F /* ReportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportSheet.swift; sourceTree = "<group>"; };
 		A2029D17F25EE0C51578850D /* LobbyStopsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyStopsUITests.swift; sourceTree = "<group>"; };
@@ -757,6 +761,7 @@
 				AAF84B4D76AF2635109EAD53 /* CameraTourDemo.swift */,
 				4310BE369727B65548BADA52 /* ConvoyPanel.swift */,
 				E715F12926E78F920D452DEC /* ConvoyRows.swift */,
+				A009554BF15571D35F2DD64E /* ConvoySheetState.swift */,
 				1361DC3293C4BFA1B3D9DA1B /* DrivingGlance.swift */,
 				4A620E8A51928B21C76E9227 /* FollowGlide.swift */,
 				7965946011270463EE3762F1 /* MapColors.swift */,
@@ -978,6 +983,7 @@
 				EBD1DFEF46958D1710EC5B2F /* CameraPaceTests.swift */,
 				1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */,
 				6E4D3D4F86031C4EEBEE0B86 /* ConvoyHeaderTests.swift */,
+				43A631D9F08E4EC1DEDCEA38 /* ConvoySheetStateTests.swift */,
 				E0D7B5FA67D691851818F691 /* ConvoyTests.swift */,
 				FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */,
 				F96D7D95AD4B85B47A729BFE /* DrivingGlanceTests.swift */,
@@ -1327,6 +1333,7 @@
 				35F976285A6C1473665E4CE0 /* ConvoyOrdering.swift in Sources */,
 				9689C8A9A022A712C8B9C13E /* ConvoyPanel.swift in Sources */,
 				2904C5ADC6004EBD4FF990DA /* ConvoyRows.swift in Sources */,
+				7E468C2DFE8FEF4989DF4049 /* ConvoySheetState.swift in Sources */,
 				D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */,
 				E033FC8BB50C1A84A455E66D /* CreateTripModel.swift in Sources */,
 				A73AAE0FC74B7C166FC40A05 /* CreateTripView.swift in Sources */,
@@ -1513,6 +1520,7 @@
 				38F4EE5C5C007473A9B3EE20 /* CameraPaceTests.swift in Sources */,
 				6B6E898BB79ED1F3A1C67B5B /* CarRouteTests.swift in Sources */,
 				060EB7C0E06EE4CDFBEFFD24 /* ConvoyHeaderTests.swift in Sources */,
+				52C738B9BE5559515F99B87D /* ConvoySheetStateTests.swift in Sources */,
 				D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */,
 				7B2B2622524DCA230BA33FC3 /* DeepLinkTests.swift in Sources */,
 				2850B1E1AF850FA86A54164D /* DrivingGlanceTests.swift in Sources */,
