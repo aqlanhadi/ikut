@@ -165,9 +165,9 @@ extension Color {
     /// goes faint over the map; the usual accent in light and off glass.
     static var surfaceAccent: Color {
         guard GlassSurface.active else { return MapPalette.accent }
+        let lifted = UIColor(MapColors.glassAccentDark.color)
         return Color(UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.42, green: 0.70, blue: 1.0, alpha: 1) : UIColor(MapPalette.accent)
+            traits.userInterfaceStyle == .dark ? lifted : UIColor(MapPalette.accent)
         })
     }
 }

@@ -31,7 +31,7 @@ struct StatCaption: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.caption2.weight(.semibold))
+            .font(.caption.weight(.semibold))
             .kerning(0.6)
             .foregroundStyle(.secondary)
     }
