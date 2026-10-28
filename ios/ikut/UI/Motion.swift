@@ -21,10 +21,10 @@ enum Motion {
     /// Reduce Motion.
     static func camera(reduceMotion: Bool) -> Animation? { reduceMotion ? nil : .smooth(duration: 0.6) }
 
-    /// Tracking my car and moving other cars between location fixes: linear over `interval` seconds, so the glide
-    /// ends as the next fix arrives. With Reduce Motion the fade.
+    /// Following my car and moving the cars between their fixes (D70): linear over `interval` seconds
+    /// (`FollowGlide`), so the map moves on steadily. `nil` (a step on each fix) with Reduce Motion, or for no time.
     static func follow(interval: TimeInterval, reduceMotion: Bool) -> Animation? {
-        reduceMotion ? reduced : .linear(duration: max(interval, 0.05))
+        reduceMotion || interval <= 0 ? nil : .linear(duration: interval)
     }
 }
 

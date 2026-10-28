@@ -83,11 +83,23 @@ enum CameraInsetMove {
         return flying ? .retarget : .nudge(plan.cause)
     }
 
+    /// Whether a change of aim is a step of the same view (following my car on, the convoy's frame moving with its
+    /// cars), which glides linearly over the time between fixes (D70), rather than a change of mode.
+    static func isStep(from old: CameraTarget?, to new: CameraTarget?) -> Bool {
+        switch (old, new) {
+        case (.follow?, .follow?), (.fit?, .fit?): true
+        default: false
+        }
+    }
+
     /// The camera's motion for a nudge: the sheet's or the banner's own (`Motion`), so the camera and what moved it
-    /// end together; the follow glide for the aim itself moving; a jump with Reduce Motion, as every camera move.
-    static func animation(_ cause: Cause, reduceMotion: Bool) -> Animation? {
+    /// end together; for the aim itself moving, the linear follow glide over `step` seconds when it is a step
+    /// (`FollowGlide`), else the short camera glide; a jump with Reduce Motion, as every camera move.
+    static func animation(_ cause: Cause, reduceMotion: Bool, step: TimeInterval? = nil) -> Animation? {
         switch cause {
-        case .none: return DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)
+        case .none:
+            if let step { return Motion.follow(interval: step, reduceMotion: reduceMotion) }
+            return DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)
         case .sheet: return reduceMotion ? nil : Motion.sheet(reduceMotion: false)
         case .banner: return reduceMotion ? nil : Motion.banner(reduceMotion: false)
         }
@@ -102,6 +114,11 @@ import os
 enum CameraMoveLog {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ikut", category: "camera")
     private static let on = ProcessInfo.processInfo.environment["IKUT_CAMERA_LOG"] != nil
+
+    static func note(_ text: String) {
+        guard on else { return }
+        log.notice("camera note: \(text)")
+    }
 
     static func record(inputs: CameraInsetMove.Inputs, plan: CameraInsetMove.Plan?) {
         guard on else { return }

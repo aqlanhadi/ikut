@@ -402,6 +402,10 @@ enum DemoScreens {
         case "road-skip-all-meet": return AnyView(StopArrivalDemo(.skipAllMeeting))
         // D57: the camera's long and short hops on the driving map, then the recap map's steps, looping.
         case "camera-tour": return AnyView(CameraTourDemo().environment(LocationPermission()).environment(AuthModel()))
+        // D70: following my car on its own fixes every second, the other cars written every 5 s, gliding.
+        case "follow-drive": return AnyView(FollowDriveDemo().environment(LocationPermission()).environment(AuthModel()))
+        case "follow-drive-interrupts": return AnyView(FollowDriveDemo(interrupts: true).environment(LocationPermission()).environment(AuthModel()))
+        case "follow-drive-still": return AnyView(FollowDriveDemo(still: true).environment(LocationPermission()).environment(AuthModel()))
         // The recap as the pushed page: system Back, the trip name as the large title, Share in the bar (D34).
         case "recap":
             return AnyView(NavigationStack {

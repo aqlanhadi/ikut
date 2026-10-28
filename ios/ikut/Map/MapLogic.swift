@@ -49,6 +49,8 @@ struct MapMarker: Identifiable, Equatable, Sendable {
     var isPaused = false
     /// Reached the destination: the badge shows a small check.
     var hasArrived = false
+    /// Seconds the marker glides to `coordinate` from where it was drawn (D70, `MarkerGlide`); 0 places it.
+    var glide: TimeInterval = 0
 
     /// "Aqlan", "Hafiz · joining", "Daniel · 2 min ago", "Wyna · Paused".
     var label: String {
@@ -217,11 +219,10 @@ enum MapCameraLogic {
     /// Any drag, pinch or rotate by the user hands the camera back to them.
     static func mode(afterUserGestureFrom mode: MapMode) -> MapMode { .free }
 
-    /// Follow my car when I am the tracker, my phone otherwise; each falls back to the other.
-    static func myCoordinate(
-        isTracker: Bool, carPosition: MapCoordinate?, device: MapCoordinate?
-    ) -> MapCoordinate? {
-        isTracker ? (carPosition ?? device) : (device ?? carPosition)
+    /// Follow my phone's own fixes (about one a second; the tracker's phone is its car), else my car's position,
+    /// written every 5 s (D70).
+    static func myCoordinate(carPosition: MapCoordinate?, device: MapCoordinate?) -> MapCoordinate? {
+        device ?? carPosition
     }
 }
 

@@ -35,8 +35,15 @@ final class TripMapModel {
     private(set) var myCar: Car?
     /// I am the tracker of my car, so my phone is what reports its position.
     private(set) var isTracker = false
-    /// The phone's own fix, while it is being streamed (not the tracker).
-    var device: DeviceFix?  // set by the location stream; tests set it directly
+    /// The phone's own fix, while it is being streamed (the tracker's too: its map follows it, D70). Set by
+    /// `receive`; tests set it directly, which drops the glide aim.
+    var device: DeviceFix? { didSet { myAim = nil } }
+    /// Where my phone's latest fix puts me and how long the glide there takes (`FollowGlide`).
+    private(set) var myAim: FollowGlide.Aim?
+    /// The glide time of each car's last move (`FollowGlide`), and of the last move of any (the follow camera's or
+    /// the convoy frame's step).
+    @ObservationIgnored private var glideTimes: [String: TimeInterval] = [:]
+    @ObservationIgnored private(set) var lastGlide: TimeInterval?
     private(set) var isEnded = false
     /// This phone has a network path (`NetworkStatus`, after its hold); with my car's freshness it makes the "You" tag.
     var networkUp = true
@@ -152,6 +159,7 @@ final class TripMapModel {
         convoy.myCarId = myCarId
         self.isTracker = isTracker
         self.isEnded = isEnded
+        noteGlides(from: self.positions, to: positions)
         self.positions = positions
         var routeChanged = false
         if let trip {
@@ -320,7 +328,15 @@ final class TripMapModel {
         let online = youOnline
         return MapMarkerBuilder.markers(from: convoy.snapshot, myCarId: myCarId).map {
             var marker = $0
-            if marker.isMine { marker.youOnline = online }
+            marker.glide = glideTime(for: marker.id)
+            if marker.isMine {
+                marker.youOnline = online
+                // The tracker's phone is the car: its marker moves on the phone's own fixes, where the camera aims.
+                if isTracker, let myAim {
+                    marker.coordinate = myAim.coordinate
+                    marker.heading = myAim.heading ?? marker.heading
+                }
+            }
             return marker
         }
     }
@@ -342,7 +358,50 @@ final class TripMapModel {
         let carPosition = myCarId.flatMap { positions[$0] }.map {
             MapCoordinate(latitude: $0.location.latitude, longitude: $0.location.longitude)
         }
-        return MapCameraLogic.myCoordinate(isTracker: isTracker, carPosition: carPosition, device: device?.coordinate)
+        return MapCameraLogic.myCoordinate(carPosition: carPosition, device: myAim?.coordinate ?? device?.coordinate)
+    }
+
+    // MARK: Glides (D70)
+
+    /// A new fix from this phone: where it puts me, and the glide there from the last one.
+    func receive(_ fix: DeviceFix, now: Date = Date()) {
+        // A fix taken before the one already drawn would glide the car backwards: dropped.
+        if let device, let before = device.at, let at = fix.at, at < before { return }
+        let aim = FollowGlide.aim(previous: device.map { Self.glideFix($0, now: now) },
+                                  latest: Self.glideFix(fix, now: now), now: now)
+        device = fix
+        myAim = aim
+        lastGlide = aim.duration
+    }
+
+    /// How long the marker of `carId` glides to where it is now drawn: my car (as its tracker) on my fixes, any other
+    /// over the time between its last two written positions.
+    func glideTime(for carId: String) -> TimeInterval {
+        if carId == myCarId, isTracker, let myAim { return myAim.duration }
+        return glideTimes[carId] ?? 0
+    }
+
+    private func noteGlides(from old: [String: Position], to new: [String: Position], now: Date = Date()) {
+        for (id, position) in new {
+            guard let before = old[id] else { glideTimes[id] = 0; continue }
+            guard before.location != position.location else { continue }
+            // Older than the position before it (out of order): drawn where it says at once, never glided backwards.
+            if let was = before.updatedAt, let at = position.updatedAt, at < was { glideTimes[id] = 0; continue }
+            // Another car's time is the server's: nothing carried on (`maxLead` 0).
+            let aim = FollowGlide.aim(previous: Self.glideFix(before, now: now), latest: Self.glideFix(position, now: now),
+                                      now: now, maxLead: 0)
+            glideTimes[id] = aim.duration
+            lastGlide = aim.duration
+        }
+    }
+
+    private static func glideFix(_ fix: DeviceFix, now: Date) -> FollowGlide.Fix {
+        FollowGlide.Fix(coordinate: fix.coordinate, course: fix.course, speed: fix.speed, at: fix.at ?? now)
+    }
+
+    private static func glideFix(_ position: Position, now: Date) -> FollowGlide.Fix {
+        FollowGlide.Fix(coordinate: MapCoordinate(latitude: position.location.latitude, longitude: position.location.longitude),
+                        course: position.heading, speed: position.speed, at: position.updatedAt ?? now)
     }
 
     /// What the camera should show right now; nil in free mode.
@@ -482,12 +541,11 @@ final class TripMapModel {
 
     // MARK: Device location
 
-    /// Streams the phone's location while the map is visible and I am not the tracker (the tracker
-    /// already knows where it is). Does nothing without When In Use or Always permission; the
-    /// permission flow elsewhere asks for it. Ends when its task is cancelled.
+    /// Streams the phone's location while the map is on screen and the app in front, for the tracker too: the map
+    /// follows these fixes (about one a second) rather than the car's five-second writes (D70); what the tracker
+    /// writes is unchanged. Does nothing without When In Use or Always permission; the permission flow elsewhere
+    /// asks for it. Ends when its task is cancelled.
     func runDeviceLocation() async {
-        device = nil
-        guard !isTracker else { return }
         switch CLLocationManager().authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways: break
         default: return
@@ -496,9 +554,9 @@ final class TripMapModel {
             for try await update in CLLocationUpdate.liveUpdates() {
                 if Task.isCancelled { break }
                 guard let location = update.location, location.horizontalAccuracy >= 0 else { continue }
-                device = DeviceFix(
+                receive(DeviceFix(
                     coordinate: MapCoordinate(location.coordinate), course: location.course, speed: location.speed,
-                    at: location.timestamp)
+                    at: location.timestamp))
             }
         } catch {
             // The stream ended; the map keeps the last fix.

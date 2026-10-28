@@ -697,3 +697,22 @@ struct HazardEmulatorTests {
         { var p = $0; p.updatedAt = now; return p }
     }
 }
+
+/// D70: the hazard's ping (`HazardPingTiming`) stops by itself instead of pulsing until the hazard is passed.
+struct HazardPingTests {
+    @Test func threePingsOfTwoRingsThenNothing() {
+        // A ring every 0.8 s, each spreading for 1.6 s: six rings, the last gone at 5.6 s.
+        #expect(HazardPingTiming.rings(elapsed: 0) == [0])
+        #expect(HazardPingTiming.rings(elapsed: 0.8).count == 2)
+        #expect(HazardPingTiming.rings(elapsed: 4.1).count == 2)
+        let last = HazardPingTiming.rings(elapsed: 5.0)
+        #expect(last.count == 1 && abs(last[0] - 0.625) < 1e-9)
+        #expect(HazardPingTiming.rings(elapsed: 5.61).isEmpty)
+        #expect(HazardPingTiming.rings(elapsed: 60).isEmpty)
+        #expect(abs(HazardPingTiming.duration - 5.6) < 1e-9)
+        // Every ring that shows is part way out, never past its end.
+        for t in stride(from: 0.0, to: 6, by: 0.05) {
+            #expect(HazardPingTiming.rings(elapsed: t).allSatisfy { $0 >= 0 && $0 < 1 })
+        }
+    }
+}
