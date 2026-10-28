@@ -122,6 +122,12 @@ final class NewTripFlow {
     }
 
     #if DEBUG
+    /// Create trip while the trip is being written (the spinner), or after it couldn't be (the red line).
+    func showCreateStateForDemo(creating: Bool) {
+        isCreating = creating
+        createError = creating ? nil : "Couldn’t create the trip. Check your signal and try again."
+    }
+
     /// New trip for `place`, as after a pick, without building a route.
     func showReadyForDemo(place: DestinationResult, route: BuiltRoute) {
         phase = .ready(Ready(place: place, route: route))

@@ -11,8 +11,12 @@ enum JoinDemo {
         var withRoute = false
         /// When set, the ticket can't be read and says this.
         var failure: String?
+        /// The lookup, or the join, never answers: the spinner stays.
+        var lookupHangs = false
+        var joinHangs = false
 
         func preview(code: String) async throws -> TripPreview {
+            if lookupHangs { try await Task.sleep(for: .seconds(86_400)) }
             if let failure { throw JoinError(message: failure) }
             return TripPreview(
                 tripId: "demo", name: "Balik kampung raya", destinationName: "Ipoh",
@@ -37,7 +41,8 @@ enum JoinDemo {
         }
 
         func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
-            JoinResult(tripId: "demo", carId: "c2", trackerTaken: false)
+            if joinHangs { try await Task.sleep(for: .seconds(86_400)) }
+            return JoinResult(tripId: "demo", carId: "c2", trackerTaken: false)
         }
     }
 
@@ -55,26 +60,32 @@ enum JoinDemo {
     /// `join-h3-not-found`, `join-h4-car`, `join-h4-copilot` and `join-h4-own` (D58). The found states look the trip up
     /// from the fixed-data API a moment after they open, as the real one does.
     static func home(_ state: String) -> TripsHomeView? {
-        guard state.hasPrefix("join-h") else { return nil }
+        guard state.hasPrefix("join-h") || state == "join-location-off" else { return nil }
         let drive = state == "join-h3-found-drive"
             ? TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60) : nil
         let code: String? = state == "join-h3-empty" ? nil : "K7M2QX"
-        let failure = state == "join-h3-not-found" ? JoinService.message(code: .notFound, serverMessage: "") : nil
+        let failure = state == "join-h3-not-found" ? JoinService.message(code: .notFound, serverMessage: "")
+            : state == "join-h3-no-signal" ? JoinService.message(code: .unavailable, serverMessage: "") : nil
         let model = JoinModel(
             displayName: "Nurul", initialCode: code,
-            api: API(withStops: true, withCoordinate: true, withRoute: true, failure: failure), driveFromHere: { _ in drive })
+            api: API(withStops: true, withCoordinate: true, withRoute: true, failure: failure,
+                     lookupHangs: state == "join-h3-looking", joinHangs: state == "join-h4-joining"),
+            driveFromHere: { _ in drive })
         if state == "join-h1-name" { model.displayName = "" }
         // H1 and H2 come first for a person with no name and no answer to iOS yet; the other states are for someone with both.
         let plan = state == "join-h1-name" ? JoinPlan(needsName: true, needsLocation: true)
             : state == "join-h2-location" ? JoinPlan(needsName: false, needsLocation: true) : JoinPlan()
         let stepper = JoinStepper(model: model, plan: plan)
-        if state.hasPrefix("join-h4") {
+        if state.hasPrefix("join-h4") || state == "join-location-off" {
             stepper.show(.car)
             Task { @MainActor in
                 for _ in 0..<100 where model.preview == nil { try? await Task.sleep(for: .milliseconds(50)) }
                 switch state {
                 case "join-h4-copilot": if let car = model.cars.first { model.select(car) }
-                case "join-h4-own": model.selectNewCar()
+                case "join-h4-own", "join-location-off": model.selectNewCar()
+                case "join-h4-joining":
+                    if let car = model.cars.first { model.select(car) }
+                    _ = await model.join(sharing: false)
                 default: break
                 }
             }
