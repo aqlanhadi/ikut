@@ -48,24 +48,28 @@ struct HazardMapContent: View {
     }
 }
 
-/// Two rings spreading out from the marker and fading, one after the other. With Reduce Motion,
-/// one ring that stays put.
+/// Rings spreading out from the marker and fading, one after the other, for a few seconds after the approach pill
+/// comes up (`HazardPingTiming`); then the marker stands still. With Reduce Motion, one ring that stays put.
 private struct HazardPing: View {
     let color: Color
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private static let period = 1.6
+    @State private var start = Date()
+    @State private var done = false
 
     var body: some View {
         if reduceMotion {
             ring(phase: 0.3)
-        } else {
+        } else if !done {
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                let phase = context.date.timeIntervalSinceReferenceDate / Self.period
                 ZStack {
-                    ring(phase: phase.truncatingRemainder(dividingBy: 1))
-                    ring(phase: (phase + 0.5).truncatingRemainder(dividingBy: 1))
+                    ForEach(Array(HazardPingTiming.rings(elapsed: context.date.timeIntervalSince(start)).enumerated()),
+                            id: \.offset) { _, phase in ring(phase: phase) }
                 }
+            }
+            // The timeline goes once the last ring has faded, so nothing keeps drawing (or keeps the app busy).
+            .task {
+                try? await Task.sleep(for: .seconds(HazardPingTiming.duration))
+                done = true
             }
         }
     }
@@ -78,6 +82,28 @@ private struct HazardPing: View {
             .scaleEffect(1 + 2 * phase)
             .opacity(1 - phase)
             .accessibilityHidden(true)
+    }
+}
+
+/// When the hazard ping's rings show (D70): three pings of two rings, a ring every 0.8 s, each spreading for 1.6 s,
+/// so the ping is over 5.6 s after the pill came up. Three pings draw the eye to the hazard as the pill arrives;
+/// after that the pill and the marker say where it is, and a ring pulsing until the hazard is passed (up to a
+/// minute or more) only pulls the eye back to the screen while driving.
+enum HazardPingTiming {
+    static let period: TimeInterval = 1.6
+    static let ringsPerPeriod = 2
+    static let pings = 3
+    private static var ringCount: Int { pings * ringsPerPeriod }
+    private static var gap: TimeInterval { period / Double(ringsPerPeriod) }
+    /// From the first ring to the last one gone.
+    static var duration: TimeInterval { Double(ringCount - 1) * gap + period }
+
+    /// How far out each ring that shows is, 0 (at the marker) to under 1 (gone), `elapsed` seconds in.
+    static func rings(elapsed: TimeInterval) -> [Double] {
+        (0..<ringCount).compactMap { index in
+            let phase = (elapsed - Double(index) * gap) / period
+            return phase >= 0 && phase < 1 ? phase : nil
+        }
     }
 }
 
