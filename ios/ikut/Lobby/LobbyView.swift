@@ -639,7 +639,7 @@ struct LobbyView: View {
 
     /// Works out how each car meets the route (decoding routes and finding the merge: not for every redraw), then asks
     /// for the towns of the cars that join along the way.
-    /// Nothing while driving folded: the convoy's cars listener keeps changing the cars, but no row shows them.
+    /// Nothing while driving folded: the session's cars listener keeps changing the cars, but no row shows them.
     func askJoinTowns() {
         let work = joinWork
         guard work != .none, let mainLine else { return }

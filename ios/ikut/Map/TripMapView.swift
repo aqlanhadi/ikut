@@ -10,8 +10,8 @@ let cardSheetLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ikut", cat
 /// mode controls on the right and the convoy panel (list, Joining, Report, Stop) at the bottom.
 ///
 /// The trip screen's driving layer (D53): it draws its chrome over the host's one map (`TripScreenHost`), tells the map
-/// what to draw (`TripMapSpec`) and moves its camera, and fills the one sheet with the convoy panel. The lobby puts it
-/// on screen with its own session (never a second one). The Stop button opens the request sheet, and an open stop
+/// what to draw (`TripMapSpec`) and moves its camera, and fills the one sheet with the convoy panel. The trip screen's
+/// model puts it on screen with the open trip's one session (never a second one). The Stop button opens the request sheet, and an open stop
 /// request shows as a card above the panel. Pulled up to its tallest, the convoy sheet continues with the lobby's
 /// journey, code, trip, options and Leave or End (`continuation`, canvas row L): there is no Back.
 struct TripMapView: View {

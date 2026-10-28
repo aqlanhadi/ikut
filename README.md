@@ -31,6 +31,17 @@ cd ios && xcodegen
 open ikut.xcodeproj
 ```
 
+### Code layout (`ios/ikut/`)
+
+One map, one sheet, one reader of the trip's data. Where the pieces live:
+
+- **The trip screen** (`Map/TripScreen.swift`, `Map/MapSpace.swift`): `TripScreenModel` decides the mode (Home, lobby, driving) and holds the open trip's objects as one `OpenTrip` (session, lobby model, planner), made once when the trip opens. `TripSheet` is the one sheet for every mode. `MapSpace` is the one map frame and the one cover (what the top layers and the sheet hide), which Home, the lobby and driving all read for their camera. `TripScreenHost` draws the map and the layers over it.
+- **Home** (`App/`): `HomeModel` holds its flows and what the camera did before each. `TripsHomeView` is the sheet; its rows, header, rename alerts and Debug demo states are `HomeTripRows`, `HomeHeader`, `HomeRenameAlerts` and `TripsHomeView+Demo`.
+- **The trip's data** (`Session/`): `TripSession` is the one reader of the trip, cars, stops and members; the lobby and the convoy both read from it. `TrackingDuty` runs the car's tracker for it.
+- **Lobby** (`Lobby/`): `LobbyView` and `LobbyModel`, with the tall-sheet sections in `LobbySheetSections` (they also continue below the convoy while driving).
+- **Driving** (`Map/`): `TripMapView` is the driving layer over the host's map. `ConvoySheetState` holds the convoy sheet's motion and card hand-over; `CameraInputsWatch` (`CameraInsetMove.swift`) turns everything that changes what the camera can see into one move.
+- **Debug launch states** (`IKUT_SCREEN`): `Lobby/LobbyDemo.swift`.
+
 Debug builds talk to the local emulators (start them first). Set `IKUT_USE_PRODUCTION=1` in the scheme to hit the real project, or `IKUT_EMULATOR_HOST=<Mac's LAN IP>` when running on a real iPhone.
 
 For field tests and battery runs, install with the `ikut-release` scheme. It builds Release, which always uses production, so the app works when opened from the home screen. Free-provisioning installs expire after 7 days.
