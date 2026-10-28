@@ -80,8 +80,7 @@ class DemoBase: TwoPhoneConvoyBase {
         // A passenger waits for the organizer to start the trip: the button is Show map once it has; tap until the map shows.
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline, !app.buttons["Report"].exists {
-            if app.buttons["Not now"].exists { app.buttons["Not now"].tap() }
-            else if start.exists, start.isHittable { start.tap() }
+            if !dismissNotNow(), start.exists, start.isHittable { start.tap() }
             Thread.sleep(forTimeInterval: 3)
         }
         // The map's asks (road alerts, keep the screen on) come one after another once it shows.
@@ -91,11 +90,10 @@ class DemoBase: TwoPhoneConvoyBase {
 
     /// Joins `code` from Home. `ridingIn`: the car tile to pick as a passenger; otherwise a new car named `carName`.
     func joinDemo(code: String, name: String, ridingIn tile: String? = nil, carName: String? = nil) throws {
-        openJoinForm(code: code, name: name)
-        shot(tile == nil ? "join-as-own-car" : "join-as-passenger")
         // Passenger either way when riding in a car: the car's own state sets the share switch, so say off.
-        chooseCarAndJoin(ridingIn: tile, carName: carName ?? "\(name)'s car", sharing: tile == nil ? nil : false, timeout: 30)
-        XCTAssertTrue(waitForLobby(timeout: 60), "Didn't reach the lobby")
+        try join(code: code, name: name, ridingIn: tile, carName: carName, sharing: tile == nil ? nil : false, lobbyTimeout: 60) {
+            shot(tile == nil ? "join-as-own-car" : "join-as-passenger")
+        }
     }
 
     func reportDebris() {
@@ -116,7 +114,7 @@ class DemoBase: TwoPhoneConvoyBase {
         let pitStop = stopButton
         guard soft("Pit stop button", timeout: 20, core: true, {
             // The "Get road alerts?" question can still be up over the map.
-            if app.buttons["Not now"].exists { app.buttons["Not now"].tap(); Thread.sleep(forTimeInterval: 1) }
+            if dismissNotNow() { Thread.sleep(forTimeInterval: 1) }
             return pitStop.exists && pitStop.isHittable
         }) else { return }
         pitStop.tap()
@@ -164,26 +162,14 @@ final class DemoOrganizerUITests: DemoBase {
 
         try step("1. creates the trip (name, New trip, Where to? Ipoh, lobby)") {
             startNewTrip(as: demoName)
-            let search = app.textFields["Destination"]
             // A first-run sign-in can fail once ("Network error ..." under the name field); Continue tries again.
+            let search = app.textFields["Destination"]
             for _ in 0..<12 where !search.exists {
                 if search.waitForExistence(timeout: 4) { break }
                 if app.buttons["Continue"].exists { app.buttons["Continue"].tap() }
             }
             if !search.exists { shot("FAILED-no-destination-field") }
-            XCTAssertTrue(search.exists, "Didn't reach Where to?")
-            search.tap()
-            search.typeText("Ipoh")
-            let result = button(beginningWith: "Ipoh")
-            XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
-            result.tap()
-            tapCreateTrip()
-            if !waitForLobby(timeout: 120) {
-                shot("FAILED-no-lobby")
-                let error = labelled("identifier == %@", "createTripError")
-                XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
-                throw WaitFailure()
-            }
+            try createTrip(to: "Ipoh", lobbyTimeout: 120, searchTimeout: 1, resultTimeout: 30)
             let code = readJoinCode()
             shot("lobby-created")
             mark("a.code", code)
