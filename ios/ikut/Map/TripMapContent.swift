@@ -98,7 +98,7 @@ struct TripMapStyle {
     var containerWidth: CGFloat = 0
     /// Where a coordinate is drawn on screen now, for the cars' glide (`MarkerGlide`); nil off the driving host.
     var point: ((MapCoordinate) -> CGPoint?)?
-    /// Changes when running slides must be placed (`TripMapStage.placeSlides`).
+    /// Changes when running slides must be placed (`TripScreenModel.placeSlides`).
     var placeSlides = 0
 
     func converting(_ point: @escaping (MapCoordinate) -> CGPoint?) -> TripMapStyle {

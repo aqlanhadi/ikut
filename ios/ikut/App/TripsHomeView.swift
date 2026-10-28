@@ -9,7 +9,7 @@ import SwiftUI
 /// a sheet change on the same map.
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
-    @Environment(TripMapStage.self) private var stage
+    @Environment(TripScreenModel.self) private var stage
     @Environment(LocationPermission.self) private var location
     /// Home's flows and what they remember (`HomeModel`); HomeView makes it and hands it in.
     let given: HomeModel

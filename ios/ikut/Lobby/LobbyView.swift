@@ -16,17 +16,16 @@ struct LobbyView: View {
     /// The trip ended (by the organizer or the server): show the recap.
     var onEnded: (String) -> Void = { _ in }
     @Environment(LocationPermission.self) var location
-    @Environment(TripMapStage.self) var stage
+    @Environment(TripScreenModel.self) var stage
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @ScaledMetric(relativeTo: .title) var codeSize: CGFloat = 30
+    /// The trip's lobby model and session, made by the screen's model (`TripScreenModel.open`); a sample lobby makes
+    /// its own.
     @State var model: LobbyModel
     @State var session: TripSession
     @State var routeInfo = TripRouteInfo()
     /// The main route's length in meters, for how far along a stop is in time.
     @State var routeLength: Double?
-    // The same switch the map applies (TripMapView): the lobby is where it moved to.
-    @AppStorage("ikut.map.keepAwake") var keepAwake = false
-    @AppStorage("ikut.map.keepAwakeAnswered") var keepAwakeAnswered = false
     /// A participant's own trip: their start, where they join, their distance and drive time (D26).
     @State var ownWay = OwnWayInfo()
     /// The main route as a line (for each car's join), and the towns the other cars join near.
@@ -79,17 +78,15 @@ struct LobbyView: View {
     /// In a sample lobby: this person is no longer in the trip.
     var sampleLost = false
 
-    /// `session`: the trip's session, made once by the caller (`HomeView`), so redrawing the caller doesn't make (and
-    /// drop) a session with its own location manager each time; nil makes one here.
-    init(tripId: String, session: TripSession? = nil, onExit: @escaping () -> Void,
-         onEnded: @escaping (String) -> Void = { _ in }) {
+    /// `trip`: the open trip's session, lobby model and planner, made once by the screen's model when the trip opened
+    /// (`TripScreenModel.open`), so no redraw makes (and drops) a session with its own location manager.
+    init(trip: OpenTrip, onExit: @escaping () -> Void, onEnded: @escaping (String) -> Void = { _ in }) {
         self.onExit = onExit
         self.onEnded = onEnded
-        let session = session ?? TripSession(tripId: tripId, userId: Auth.auth().currentUser?.uid ?? "")
-        _model = State(initialValue: LobbyModel(session: session))
-        _joinTowns = State(initialValue: JoinTowns.shared(for: tripId))
-        _session = State(initialValue: session)
-        _planner = State(initialValue: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
+        _model = State(initialValue: trip.lobby)
+        _joinTowns = State(initialValue: JoinTowns.shared(for: trip.id))
+        _session = State(initialValue: trip.session)
+        _planner = State(initialValue: trip.planner)
     }
 
     #if DEBUG
@@ -323,9 +320,9 @@ struct LobbyView: View {
             case .driving:
                 if let sampleDriving {
                     sampleDriving({ AnyView(pulledUpContent(here: $0)) }, drivingBanner)
-                } else {
+                } else if let map = stage.trip?.map {
                     TripMapView(
-                        session: session, continuation: { AnyView(pulledUpContent(here: $0)) },
+                        session: session, map: map, continuation: { AnyView(pulledUpContent(here: $0)) },
                         topBanner: drivingBanner, lobbyWants: LobbySheet.drivingCovered(cover, lobbyOnScreen: onScreen),
                         onEnded: { onEnded(model.tripId) })
                 }
@@ -450,10 +447,9 @@ struct LobbyView: View {
         }
     }
 
-    /// Back to trips: the trip keeps going without this screen. Its session stops here, before Home takes the map,
-    /// rather than whenever the view is released.
+    /// Back to trips: the trip keeps going without this screen. Its session stops as the screen's model closes the
+    /// trip (`TripScreenModel.exit`), before Home takes the map, rather than whenever the view is released.
     func backToTrips() {
-        if !isSample { session.stop() }
         onExit()
     }
     func endTrip() { run { try await session.endTrip() } }

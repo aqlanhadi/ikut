@@ -1,3 +1,4 @@
+import FirebaseFirestore
 import MapKit
 import SwiftUI
 import Testing
@@ -56,13 +57,13 @@ struct TripScreenTests {
     }
 
     @MainActor @Test func theStageHasACameraOnceALayerPlacedOne() {
-        let stage = TripMapStage()
+        let stage = TripScreenModel()
         #expect(stage.mode == .lobby)
         #expect(!stage.hasCamera)
         stage.camera = .region(MKCoordinateRegion(
             center: .init(latitude: 3.9, longitude: 101.3), span: .init(latitudeDelta: 1.5, longitudeDelta: 1)))
         #expect(stage.hasCamera)
-        #expect(TripMapStage(mode: .driving).mode == .driving)
+        #expect(TripScreenModel(mode: .driving).mode == .driving)
     }
 
     // MARK: The one sheet
@@ -112,7 +113,7 @@ struct TripScreenTests {
     }
 
     @MainActor @Test func theStageOpensATripAndExitsToHomeKeepingTheOneCamera() {
-        let stage = TripMapStage(mode: .home)
+        let stage = TripScreenModel(mode: .home)
         #expect(stage.mode == .home)
         #expect(stage.tripId == nil)
         stage.camera = .region(MKCoordinateRegion(
@@ -180,7 +181,7 @@ struct TripScreenTests {
 
     /// A move that ends where it began writes nothing, so nothing that reads the heading or the scale redraws.
     @MainActor @Test func theMapsReadingIsWrittenOnlyWhenItChanges() {
-        let stage = TripMapStage(mode: .home)
+        let stage = TripScreenModel(mode: .home)
         let reading = TripCameraReading(distance: 2_500, pitch: 0, latitudeDelta: 0.02)
         stage.read(heading: 10, reading: reading)
         final class Flag: @unchecked Sendable { var on = false }
@@ -196,5 +197,145 @@ struct TripScreenTests {
         stage.read(heading: 12, reading: TripCameraReading(distance: 3_000, pitch: 0, latitudeDelta: 0.025))
         #expect(again.on)
         #expect(stage.reading?.distance == 3_000)
+    }
+}
+
+/// The trip screen's one model owns the open trip's objects (D63 C2): made once in `open`, dropped in `exit`, and the
+/// session (with the tracker) stopped there, so nothing keeps tracking after Back to trips, Leave or End.
+@MainActor
+struct TripScreenModelTests {
+    /// A model whose trips use a fake tracker and car-route service, and save nothing.
+    @MainActor private final class Rig {
+        let tracker = FakeTrackingController()
+        let carRoute = FakeCarRoute()
+        private(set) var made: [String] = []
+        let defaults = UserDefaults(suiteName: "TripScreenModelTests.\(UUID().uuidString)")!
+
+        func model(mode: TripScreenMode = .home) -> TripScreenModel {
+            TripScreenModel(mode: mode, defaults: defaults) { [self] tripId in
+                made.append(tripId)
+                let carRoute = carRoute
+                let session = TripSession(tripId: tripId, userId: "u1", tracker: tracker,
+                                          carRouteFactory: { _, _, _, _, _ in carRoute })
+                return OpenTrip(id: tripId, session: session,
+                                planner: StopPlanner(router: StraightRoads(), delay: .zero, origin: { nil }, save: { _ in }))
+            }
+        }
+    }
+
+    private static let trip = Trip(
+        id: "t1", name: "T", code: "ABC123", organizerId: "u1", route: Fixtures.longRoute.polyline,
+        destination: Destination(name: "KB", coordinate: GeoPoint(latitude: 6.1, longitude: 102.2)), status: .active)
+    private static let member = Member(id: "u1", displayName: "A", carId: "c1", role: .organizer)
+    private static let car = Car.fixture("c1", name: "Car", number: 1, lead: true, state: .joining, color: "#000000",
+                                         tracker: "u1")
+
+    @Test func openMakesTheTripsObjectsOnceAndOpeningItAgainKeepsThem() throws {
+        let rig = Rig()
+        let screen = rig.model()
+        #expect(screen.trip == nil)
+
+        screen.open(tripId: "t1", started: false)
+        let first = try #require(screen.trip)
+        #expect(first.id == "t1")
+        #expect(first.lobby.tripId == "t1")
+        #expect(first.map.mode == TripScreenLogic.drivingEntryMode)
+
+        // The app opening into the trip it already has (a relaunch route, a Now row): the same objects.
+        screen.open(tripId: "t1", started: true)
+        let again = try #require(screen.trip)
+        #expect(again.session === first.session)
+        #expect(again.lobby === first.lobby)
+        #expect(again.planner === first.planner)
+        #expect(again.map === first.map)
+        #expect(rig.made == ["t1"])
+        #expect(screen.mode == .driving)
+    }
+
+    @Test func exitDropsEveryObjectSoNoSessionIsLeft() {
+        let rig = Rig()
+        let screen = rig.model()
+        weak var session: TripSession?
+        weak var lobby: LobbyModel?
+        weak var planner: StopPlanner?
+        weak var map: TripMapModel?
+        screen.open(tripId: "t1", started: false)
+        session = screen.trip?.session
+        lobby = screen.trip?.lobby
+        planner = screen.trip?.planner
+        map = screen.trip?.map
+        #expect(session != nil && lobby != nil && planner != nil && map != nil)
+
+        screen.exit()
+        #expect(screen.trip == nil)
+        #expect(screen.tripId == nil)
+        #expect(screen.mode == .home)
+        #expect(session == nil)
+        #expect(lobby == nil)
+        #expect(planner == nil)
+        #expect(map == nil)
+    }
+
+    @Test func backToTripsStopsTrackingThatWasRunning() async {
+        let rig = Rig()
+        let screen = rig.model()
+        screen.open(tripId: "t1", started: true)
+        screen.trip?.session.applyForTesting(trip: Self.trip, member: Self.member, car: Self.car)
+        await waitUntil(.seconds(2)) { rig.tracker.isTracking }
+        #expect(rig.tracker.isTracking)
+
+        screen.exit()
+        #expect(!rig.tracker.isTracking)
+        #expect(rig.tracker.stopCount >= 1)
+        // A fix after the exit reaches nobody: the session is gone.
+        #expect(rig.tracker.onFix == nil)
+    }
+
+    @Test func reopeningAnotherTripGivesFreshObjects() throws {
+        let rig = Rig()
+        let screen = rig.model()
+        screen.open(tripId: "t1", started: false)
+        weak let oldSession = screen.trip?.session
+        let oldPlanner = try #require(screen.trip?.planner)
+        screen.exit()
+
+        screen.open(tripId: "t2", started: false)
+        let next = try #require(screen.trip)
+        #expect(next.id == "t2")
+        #expect(next.planner !== oldPlanner)
+        #expect(oldSession == nil)
+        #expect(rig.made == ["t1", "t2"])
+
+        // And the same trip again after an exit: fresh too (its old objects went with the exit).
+        screen.exit()
+        screen.open(tripId: "t2", started: false)
+        #expect(screen.trip?.session !== next.session)
+        #expect(rig.made == ["t1", "t2", "t2"])
+    }
+
+    @Test func aRelaunchOpensDrivingForAStartedTripAndTheLobbyOtherwise() {
+        let entry = PastTrips.Entry(id: "a", name: "Trip a", destination: "Ipoh", endedAt: nil,
+                                    seenAt: Date(timeIntervalSince1970: 0))
+        for (read, mode) in [(HomeNow.Read(line: "On the move", started: true), TripScreenMode.driving),
+                             (HomeNow.Read(line: "Gathering"), .lobby)] {
+            let rig = Rig()
+            let screen = rig.model()
+            let route = LaunchRoute.decide(signedIn: true, entries: [entry], read: ["a": read], pendingJoin: nil)
+            guard case .trip(let id, let started) = route else { Issue.record("expected a trip, got \(route)"); continue }
+            screen.open(tripId: id, started: started)
+            #expect(screen.mode == mode)
+            #expect(screen.trip?.id == "a")
+        }
+    }
+
+    @Test func keepScreenOnIsOnUntilChosenAndRemembersTheChoice() {
+        let rig = Rig()
+        #expect(rig.model().keepScreenOn)
+        let screen = rig.model()
+        screen.keepScreenOn = false
+        #expect(rig.defaults.bool(forKey: TripScreenModel.keepAwakeAnsweredKey))
+        #expect(!rig.model().keepScreenOn)
+        screen.keepScreenOn = true
+        #expect(rig.model().keepScreenOn)
     }
 }
