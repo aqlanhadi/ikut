@@ -65,9 +65,10 @@ struct HomeModelTests {
     }
 
     @Test func tappingARunningTripOpensItAndAnEndedOneIsPicked() {
-        let model = HomeModel(past: [entry("now", ended: false), entry("old")])
-        #expect(model.opening(entry("old")) == .pick(entry("old")))
         let running = entry("now", ended: false)
+        let old = entry("old")
+        let model = HomeModel(past: [running, old])
+        #expect(model.opening(old) == .pick(old))
         #expect(model.opening(running) == .trip(running, started: false))
         model.nowStarted = ["now"]
         #expect(model.opening(running) == .trip(running, started: true))
