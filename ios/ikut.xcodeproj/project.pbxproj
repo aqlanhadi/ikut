@@ -182,6 +182,7 @@
 		9B4CB838014CB0BD376988F7 /* Position.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE6A468C2B522F5226FFC78 /* Position.swift */; };
 		9BB6E062ECEC7EDADF1CA6D7 /* StopLeaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3077A797F64E10D19A3B4D36 /* StopLeaveTests.swift */; };
 		9C88E9F61DEC32F38B28C02F /* NextStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 423FF6822F3DBBDDFF5571D9 /* NextStopTests.swift */; };
+		9D11F64FD74369DACE4704CA /* AnimationDump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FF20374AEDB6D0AE7E9F65 /* AnimationDump.swift */; };
 		9EDC48B733121D1A6E0056D6 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0803549353B1CD91367C85 /* LobbyView.swift */; };
 		A068D03A44E44AD4E4982A1B /* RequestPlacesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */; };
 		A0DA932F784B100BA0FDFCD8 /* PlacesRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */; };
@@ -302,6 +303,7 @@
 		01E0F9C4A3658B6AB1A4B07F /* StopDelayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopDelayTests.swift; sourceTree = "<group>"; };
 		01EE01CC4EDE188E0718E364 /* StopLeave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLeave.swift; sourceTree = "<group>"; };
 		02B0DDAF1194DD5CA4B0A112 /* PositionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionBuilder.swift; sourceTree = "<group>"; };
+		02FF20374AEDB6D0AE7E9F65 /* AnimationDump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDump.swift; sourceTree = "<group>"; };
 		031322A39B18B3872843D671 /* AddStopSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopSheet.swift; sourceTree = "<group>"; };
 		06B07E299123E0601E23DBDD /* YouTagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTagTests.swift; sourceTree = "<group>"; };
 		076A4E68B7B0C8291C62A7BB /* NextStopDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextStopDemo.swift; sourceTree = "<group>"; };
@@ -587,6 +589,7 @@
 		0C3C6779B68FE359CFD8B4DB /* App */ = {
 			isa = PBXGroup;
 			children = (
+				02FF20374AEDB6D0AE7E9F65 /* AnimationDump.swift */,
 				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
 				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
 				CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */,
@@ -1274,6 +1277,7 @@
 				DDFB1D5C15A1D5FEC996A11C /* AlertSettings.swift in Sources */,
 				B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */,
 				EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */,
+				9D11F64FD74369DACE4704CA /* AnimationDump.swift in Sources */,
 				B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */,
 				591D0BEAD1974F23903F13DC /* ApproachPill.swift in Sources */,
 				0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */,

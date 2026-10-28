@@ -24,6 +24,7 @@ class ConvoyUITestCase: XCTestCase {
 
     /// Taps Allow on a system permission prompt (the test has to tap the app once for the monitor to run).
     func allowPermissionPrompts(_ labels: [String] = ["Allow While Using App", "Allow Once", "Allow"]) {
+        forwardAnimationDump()
         addUIInterruptionMonitor(withDescription: "Permissions") { alert in
             for label in labels where alert.buttons[label].exists {
                 alert.buttons[label].tap()
@@ -31,6 +32,14 @@ class ConvoyUITestCase: XCTestCase {
             }
             return false
         }
+    }
+
+    /// Q21 diagnostic: `TEST_RUNNER_IKUT_ANIM_DUMP=<file>` makes the app (Debug) log every running Core Animation
+    /// animation every 2 s to that file (`AnimationDump`), to see what keeps XCTest from calling the app idle.
+    /// Every test calls `allowPermissionPrompts` before launching, so it is forwarded from there.
+    private func forwardAnimationDump() {
+        guard let app, let file = ProcessInfo.processInfo.environment["IKUT_ANIM_DUMP"], !file.isEmpty else { return }
+        app.launchEnvironment["IKUT_ANIM_DUMP"] = file
     }
 
     // MARK: Steps, waits, screenshots
