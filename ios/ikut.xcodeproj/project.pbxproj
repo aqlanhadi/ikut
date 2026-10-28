@@ -268,6 +268,7 @@
 		EDBF46FA09C4587FEFC09278 /* SessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD72135383C0C50AA7ECE9D /* SessionTests.swift */; };
 		EE9B601663917D691533A6BA /* AlertTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301CCB7DC568D10AFB1C2B1B /* AlertTests.swift */; };
 		EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F2A2E1542D39038AFC98D /* AlwaysLocationExplainerView.swift */; };
+		EFC537C667F53676F2919BEF /* LobbySheetSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969AB41D53300836956F03B0 /* LobbySheetSections.swift */; };
 		F07B4F17815DB1F4736E7F78 /* TripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2769228FEE1D9534950492 /* TripService.swift */; };
 		F2C6459F43100013C9AEBA20 /* MapPickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C9353808E19095E6015DC1 /* MapPickView.swift */; };
 		F6B53E2E7B17959EE85F9245 /* PanelHeaderDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */; };
@@ -471,6 +472,7 @@
 		92C73E6E157AAC5F01E45FF7 /* GeoPoint+Coordinate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeoPoint+Coordinate.swift"; sourceTree = "<group>"; };
 		94110B44C36ABA8B33885499 /* TripMapContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapContentTests.swift; sourceTree = "<group>"; };
 		951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefreshTests.swift; sourceTree = "<group>"; };
+		969AB41D53300836956F03B0 /* LobbySheetSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbySheetSections.swift; sourceTree = "<group>"; };
 		9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAll.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
 		991414E381145C07351D7F20 /* LocationDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationDeniedView.swift; sourceTree = "<group>"; };
@@ -630,6 +632,7 @@
 				FF81D5CB8E128614D8DEC83F /* LobbyLogic.swift */,
 				5D682C5C9F984EC55FF14A11 /* LobbyMap.swift */,
 				1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */,
+				969AB41D53300836956F03B0 /* LobbySheetSections.swift */,
 				D219AF64C8F12910D7096FED /* LobbyStopsViews.swift */,
 				EF0803549353B1CD91367C85 /* LobbyView.swift */,
 				CF4929E443213AF6C3151555 /* OwnWay.swift */,
@@ -1341,6 +1344,7 @@
 				E5CB8CC79FCB879F13930FEB /* LobbyLogic.swift in Sources */,
 				7E6E1801B96D4FC4E6A46128 /* LobbyMap.swift in Sources */,
 				8AD641712731A68B8D09EEF5 /* LobbyModel.swift in Sources */,
+				EFC537C667F53676F2919BEF /* LobbySheetSections.swift in Sources */,
 				48A0796725D089ABD3E90FD1 /* LobbyStopsViews.swift in Sources */,
 				9EDC48B733121D1A6E0056D6 /* LobbyView.swift in Sources */,
 				4A62431BEA2E9F01E17A2CE2 /* LocationAccess.swift in Sources */,
