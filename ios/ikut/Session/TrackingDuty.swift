@@ -59,11 +59,12 @@ final class TrackingDuty {
         self.tracker.onFix = { [weak self] fix in self?.handle(fix: fix) }
     }
 
-    /// The session's deinit: no later fix, no startup, tracking stopped. (`PlacesRefresher` is the session's to reset.)
+    /// The session's deinit: no later fix, tracking stopped, and the tracking session ended (the generation goes up), so a
+    /// startup still waiting for the first fix or `ensureRoute` can't start tracking once the session is gone.
+    /// (`PlacesRefresher` is the session's to reset.)
     func shutDown() {
-        startupTask?.cancel()
         tracker.onFix = nil
-        tracker.stop()
+        stopNow()
     }
 
     /// Stops tracking synchronously and ends the session: no later fix reaches the car-route service.
