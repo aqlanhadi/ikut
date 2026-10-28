@@ -283,6 +283,9 @@ final class CameraFlight {
         guard isFlying, let set, let legs else { return false }
         finalPosition = position
         flyingTo = view
+        // The new aim comes from the latest target, so it replaces a follow step held under the old cover: running
+        // that at the landing would glide back to a stale aim.
+        held = nil
         guard legIndex == legs.count - 1 else { return true }
         let remaining = max(legEnd.timeIntervalSinceNow / timeScale, Self.shortestRetarget)
         let leg = CameraPace.Leg(to: view, duration: remaining, curve: legs[legIndex].curve)
