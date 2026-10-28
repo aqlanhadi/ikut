@@ -31,6 +31,16 @@ struct TripReadsTests {
         #expect(TripScreenLogic.lobbyReads(onScreen: false, mode: .driving, pulledUp: true) == [])
     }
 
+    @Test func joinTownsAreLookedUpOnlyInTheLobbysMode() {
+        #expect(TripScreenLogic.joinWork(onScreen: true, mode: .lobby, pulledUp: false) == .joinsAndTowns)
+        // Below the pulled-up convoy: the rows show how each car joins, but no town is looked up.
+        #expect(TripScreenLogic.joinWork(onScreen: true, mode: .driving, pulledUp: true) == .joins)
+        // Driving folded: the convoy's cars listener keeps changing the cars, and the lobby works nothing out.
+        #expect(TripScreenLogic.joinWork(onScreen: true, mode: .driving, pulledUp: false) == .none)
+        #expect(TripScreenLogic.joinWork(onScreen: true, mode: .home, pulledUp: false) == .none)
+        #expect(TripScreenLogic.joinWork(onScreen: false, mode: .lobby, pulledUp: false) == .none)
+    }
+
     @Test func twoReadersShareOneListener() {
         #expect(TripSessionLogic.reads([:]) == [])
         #expect(TripSessionLogic.reads([.map: [.cars]]) == [.cars])
@@ -165,5 +175,38 @@ struct TripListenerCountEmulatorTests {
         #expect(session.runningListeners == sessionOwn)
         session.stop()
         #expect(count(session, map) == 0)
+    }
+
+    /// The rest itself, as the views drive it (no `restUnread()` by hand): Start hands the cars from the lobby to the
+    /// map in one update, and the members listener rests after the delay instead of running for the rest of the drive.
+    @Test func aHandOverKeepsTheCarsListenerAndTheMembersListenerRests() async throws {
+        let s = try await EmulatorTrip.make(name: "Rest", route: Fixtures.longRoute)
+        let session = TripSession(
+            tripId: s.tripId, userId: s.uid, tracker: FakeTrackingController(), restDelay: .milliseconds(300))
+        defer { session.stop() }
+        session.start()
+        session.read([.cars, .members], by: .lobby)
+        await waitUntil(.seconds(10)) { !session.cars.isEmpty && !session.members.isEmpty }
+        #expect(session.attachCount == [.cars: 1, .members: 1])
+
+        // Start: the lobby rests, the map reads the cars.
+        session.read([], by: .lobby)
+        session.read([.cars], by: .map)
+        #expect(session.runningListeners.contains("members"))
+        #expect(session.runningListeners.contains("cars"))
+
+        await waitUntil(.seconds(3)) { !session.runningListeners.contains("members") }
+        #expect(!session.runningListeners.contains("members"))
+        #expect(session.runningListeners.contains("cars"))
+        // The one cars listener ran throughout: never removed and attached again.
+        #expect(session.attachCount == [.cars: 1, .members: 1])
+
+        // Pulled up and folded again: members comes back, then rests again.
+        session.read([.cars, .members], by: .lobby)
+        #expect(session.attachCount == [.cars: 1, .members: 2])
+        session.read([], by: .lobby)
+        await waitUntil(.seconds(3)) { !session.runningListeners.contains("members") }
+        #expect(!session.runningListeners.contains("members"))
+        #expect(session.attachCount[.cars] == 1)
     }
 }

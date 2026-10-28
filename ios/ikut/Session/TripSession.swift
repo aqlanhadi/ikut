@@ -64,6 +64,10 @@ final class TripSession {
     /// What each screen reads from the session beyond the trip; the cars and members listeners run for their union.
     @ObservationIgnored private var readers: [TripReader: Set<TripRead>] = [:]
     @ObservationIgnored private var restTask: Task<Void, Never>?
+    /// How long a listener nobody reads waits before it rests (a test makes it short).
+    @ObservationIgnored private let restDelay: Duration
+    /// How many times each shared listener was attached (the hand-over test: one cars listener throughout).
+    @ObservationIgnored private(set) var attachCount: [TripRead: Int] = [:]
     /// The stop and car `answerListener` is on, so it moves only when either does.
     @ObservationIgnored private var listeningAnswer: [String]?
     /// The stop and car whose answer has had its first snapshot (or failed), so a session may be keyed on it.
@@ -102,8 +106,10 @@ final class TripSession {
         ensureTimeout: Duration = .seconds(8),
         clock: @escaping () -> Date = { Date() },
         pauseWriter: PauseWriter? = nil,
-        leaveWriter: LeaveWriter? = nil
+        leaveWriter: LeaveWriter? = nil,
+        restDelay: Duration = .seconds(1)
     ) {
+        self.restDelay = restDelay
         self.leaveWriter = leaveWriter
         self.clock = clock
         self.pauseWriter = pauseWriter
@@ -146,7 +152,7 @@ final class TripSession {
                 if let trip { self.trip = trip }
                 if let message { self.errorMessage = message }
                 self.reevaluate()
-                if self.isOrganizer, trip?.startedAt != nil { self.rebuilder.resumeIfPending() }
+                if self.isOrganizer, TripSessionLogic.isStarted(trip) { self.rebuilder.resumeIfPending() }
             }
         }
 
@@ -201,7 +207,8 @@ final class TripSession {
         attachReads()
         restTask?.cancel()
         restTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1))
+            guard let delay = self?.restDelay else { return }
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             self?.restUnread()
         }
@@ -234,6 +241,7 @@ final class TripSession {
         guard tripListener != nil else { return }
         let wanted = TripSessionLogic.reads(readers)
         if wanted.contains(.cars), carsListener == nil {
+            attachCount[.cars, default: 0] += 1
             carsListener = db.collection(FirestorePaths.cars(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
                 let cars = snapshot?.decoded(Car.self)
                 let message = error?.localizedDescription
@@ -245,6 +253,7 @@ final class TripSession {
             }
         }
         if wanted.contains(.members), membersListener == nil {
+            attachCount[.members, default: 0] += 1
             membersListener = db.collection(FirestorePaths.members(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
                 let members = snapshot?.decoded(Member.self)
                 let message = error?.localizedDescription
@@ -468,7 +477,7 @@ final class TripSession {
         }
         let waits = tripListener != nil
             && TripSessionLogic.waitsForAnswer(
-                stops: stops, carState: car.state, tripStarted: trip.startedAt != nil,
+                stops: stops, carState: car.state, tripStarted: TripSessionLogic.isStarted(trip),
                 answerRead: answerReadFor == listeningAnswer && listeningAnswer != nil)
         self.duty.reevaluate(
             TrackingDuty.Wanted(
@@ -479,7 +488,7 @@ final class TripSession {
     /// What the organizer's phone rebuilds the route from (D25 4d). Nil once there is nothing to rebuild here (not
     /// the organizer, not started, ended); throws while there is no location yet, so the rebuilder tries again.
     private func rebuildInput() async throws -> RouteRebuild.Input? {
-        guard isOrganizer, isLiveMember, let trip, trip.startedAt != nil else { return nil }
+        guard isOrganizer, isLiveMember, isStarted, let trip else { return nil }
         let own = member.flatMap { positions[$0.carId] }
         let organizer: CLLocationCoordinate2D
         if let here = try? await RouteBuilder.currentLocation() {

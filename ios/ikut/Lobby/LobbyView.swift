@@ -475,10 +475,20 @@ struct LobbyView: View {
     func updateListening() {
         guard !isSample else { return }
         session.read(TripScreenLogic.lobbyReads(onScreen: onScreen, mode: stage.mode, pulledUp: stage.pulledUp), by: .lobby)
-        let towns = onScreen && stage.mode == .lobby
-        guard towns != townsOpen else { return }
-        townsOpen = towns
-        if towns { joinTowns.open() } else { joinTowns.cancel() }
+        let work = joinWork
+        let towns = work == .joinsAndTowns
+        if towns != townsOpen {
+            townsOpen = towns
+            if towns { joinTowns.open() } else { joinTowns.cancel() }
+        }
+        // Back in the lobby (or pulled up): catch up on the cars that changed while it wasn't asking.
+        if work != .none { askJoinTowns() }
+    }
+
+    /// How much join-town work the lobby does now (`TripScreenLogic.joinWork`); a sample lobby does all of it.
+    var joinWork: TripScreenLogic.JoinWork {
+        isSample ? .joinsAndTowns
+            : TripScreenLogic.joinWork(onScreen: onScreen, mode: stage.mode, pulledUp: stage.pulledUp)
     }
 
     /// The lobby's map (route, pins, the whole-trip button) and its sheet, handed to the host's one map and one sheet.
@@ -624,8 +634,10 @@ struct LobbyView: View {
 
     /// Works out how each car meets the route (decoding routes and finding the merge: not for every redraw), then asks
     /// for the towns of the cars that join along the way.
+    /// Nothing while driving folded: the convoy's cars listener keeps changing the cars, but no row shows them.
     func askJoinTowns() {
-        guard let mainLine else { return }
+        let work = joinWork
+        guard work != .none, let mainLine else { return }
         let meeting = TripSessionLogic.meetingPoint(in: model.stops) != nil
         var found: [String: LobbyContent.CarJoin] = [:]
         for item in model.groupedCars {
@@ -633,6 +645,7 @@ struct LobbyView: View {
             found[id] = LobbyContent.carJoin(of: item.car, main: mainLine, hasMeetingPoint: meeting)
         }
         joins = found
+        guard work == .joinsAndTowns else { return }
         joinTowns.request(cars: model.groupedCars.filter { !isMine($0) }, joins: found, main: mainLine)
     }
 
