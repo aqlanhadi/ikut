@@ -8,6 +8,8 @@ import OSLog
 ///
 /// Every member listens to the trip, their own member doc and `positions`. Only the car's tracker
 /// (while the trip is active) runs the `TrackingService`; it stops the moment that stops being true.
+/// The session decides whether this phone has the duty (listeners, pause, leave, end, the meeting-point answer);
+/// `TrackingDuty` does the tracking itself (session key, startup, the car's route, the fixes).
 @Observable @MainActor
 final class TripSession {
     let tripId: String
@@ -27,9 +29,7 @@ final class TripSession {
     private(set) var membershipLost = false
     /// True while leaving or ending; tracking is not restarted meanwhile.
     private(set) var isClosing = false
-    private(set) var isTracking = false {
-        didSet { PlacesRefresher.tripRunning = isTracking }
-    }
+    var isTracking: Bool { duty.isTracking }
     /// Organizer only: rebuilds the main route mid-trip (a new destination, a stop skipped for everyone).
     let rebuilder: RouteRebuilder
 
@@ -41,11 +41,9 @@ final class TripSession {
     /// The trip is still running and this user is still in it: leaving, pausing and editing make sense (Lobby's canLeave, canEdit and canPause build on it).
     var isLiveMember: Bool { !isEnded && !membershipLost }
 
-    @ObservationIgnored private let tracker: TrackingControlling
+    @ObservationIgnored private let duty: TrackingDuty
     @ObservationIgnored private let injectedDB: Firestore?
     @ObservationIgnored private lazy var db: Firestore = injectedDB ?? Firestore.firestore()
-    @ObservationIgnored private let carRouteFactory: CarRouteFactory
-    @ObservationIgnored private let ensureTimeout: Duration
     @ObservationIgnored private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ikut", category: "TripSession")
     @ObservationIgnored private var tripListener: ListenerRegistration?
     @ObservationIgnored private var memberListener: ListenerRegistration?
@@ -60,14 +58,6 @@ final class TripSession {
     /// The last error on the answer listener; the same listener waits `answerRetryDelay` before attaching again.
     @ObservationIgnored private var answerFailure: TripSessionLogic.AnswerFailure?
     @ObservationIgnored private var listeningCarId: String?
-    /// The tracking session in progress (same car and main route); nil when not the tracker.
-    @ObservationIgnored private var sessionKey: SessionKey?
-    /// Bumped whenever a session ends or begins; stale startup and fix tasks compare against it.
-    @ObservationIgnored private var sessionGeneration = 0
-    @ObservationIgnored private var startupTask: Task<Void, Never>?
-    @ObservationIgnored private var carRoute: CarRouteControlling?
-    /// Signature of the own route `TrackingService` was last started with.
-    @ObservationIgnored private var trackedCarRoute: [Double]?
     @ObservationIgnored private var explainerShown = false
     /// True from the moment the Always-location sheet is wanted until it's dismissed; the map holds its asks
     /// for as long as it is.
@@ -91,13 +81,6 @@ final class TripSession {
     func pauseForDemo() { localPausedAt = clock() }
     #endif
 
-    private struct SessionKey: Equatable {
-        var carId: String
-        var tripRoute: String
-        /// Latitude and longitude of the meeting point; nil without one.
-        var meetingPoint: [Double]?
-    }
-
     init(
         tripId: String, userId: String, tracker: TrackingControlling? = nil, db: Firestore? = nil,
         carRouteFactory: @escaping CarRouteFactory = {
@@ -113,23 +96,21 @@ final class TripSession {
         self.pauseWriter = pauseWriter
         self.tripId = tripId
         self.userId = userId
-        self.tracker = tracker ?? TrackingService()
+        self.duty = TrackingDuty(
+            tripId: tripId, tracker: tracker ?? TrackingService(), carRouteFactory: carRouteFactory,
+            ensureTimeout: ensureTimeout)
         self.injectedDB = db
-        self.carRouteFactory = carRouteFactory
-        self.ensureTimeout = ensureTimeout
         self.rebuilder = RouteRebuilder(tripId: tripId) { result, destination in
             try await TripService.rebuildRoute(tripId: tripId, result: result, destination: destination)
         }
-        self.tracker.onFix = { [weak self] fix in self?.handle(fix: fix) }
+        self.duty.mainRoute = { [weak self] in self?.trip?.route }
         self.rebuilder.input = { [weak self] in try await self?.rebuildInput() }
     }
 
     isolated deinit {
-        startupTask?.cancel()
         expiryTask?.cancel()
         rebuilder.cancel()
-        tracker.onFix = nil
-        tracker.stop()
+        duty.shutDown()
         removeListeners()
         PlacesRefresher.tripRunning = false
     }
@@ -346,16 +327,7 @@ final class TripSession {
     // MARK: - Private
 
     /// Stops tracking synchronously and ends the session: no later fix reaches the car-route service.
-    private func stopTrackingNow() {
-        tracker.stop()
-        sessionGeneration += 1
-        startupTask?.cancel()
-        startupTask = nil
-        carRoute = nil
-        sessionKey = nil
-        trackedCarRoute = nil
-        isTracking = false
-    }
+    private func stopTrackingNow() { duty.stopNow() }
 
     private func applyMember(_ member: Member?) {
         self.member = member
@@ -398,130 +370,26 @@ final class TripSession {
     /// tracking runs with. A reroute by the car-route service lands here through the snapshot of its own write.
     private func reevaluate() {
         guard !isClosing else { return }
-        let duty = TripSessionLogic.shouldTrack(
+        let hasDuty = TripSessionLogic.shouldTrack(
             userId: userId, tripStatus: trip?.status, isMember: member != nil,
             trackerUserId: car?.trackerUserId)
         // Losing tracker duty while paused drops the local pause; the doc's pause is the next tracker's to resume.
-        if !duty { localPausedAt = nil }
+        if !hasDuty { localPausedAt = nil }
         syncExpiryTimer()
         listenToOwnAnswer()
-        let wants = duty && !isPaused
+        let wants = hasDuty && !isPaused
         guard wants, let trip, let car, let carId = car.id else {
-            if tracker.isTracking || sessionKey != nil { stopTrackingNow() }
-            isTracking = tracker.isTracking
+            self.duty.reevaluate(nil)
             return
         }
-        let started = trip.startedAt != nil
-        if tripListener != nil,
-           TripSessionLogic.waitsForAnswer(
-               stops: stops, carState: car.state, tripStarted: started, answerRead: answerReadFor == listeningAnswer
-                   && listeningAnswer != nil) {
-            isTracking = tracker.isTracking
-            return
-        }
-        let running = sessionKey.flatMap { key -> TripSessionLogic.RunningSession? in
-            guard key.carId == carId, key.tripRoute == trip.route else { return nil }
-            return TripSessionLogic.RunningSession(
-                meetingPoint: key.meetingPoint.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) })
-        }
-        let meetingPoint = TripSessionLogic.sessionMeetingPoint(
-            in: stops, skippingAlong: skipsMeetingPoint, carState: car.state, tripStarted: started, running: running)
-        let key = SessionKey(
-            carId: carId, tripRoute: trip.route, meetingPoint: meetingPoint.map { [$0.latitude, $0.longitude] })
-        if key != sessionKey {
-            stopTrackingNow()
-            beginSession(
-                key, trip: trip,
-                car: TripSessionLogic.carForNewSession(car, hasMeetingPoint: meetingPoint != nil, tripStarted: trip.startedAt != nil),
-                meetingPoint: meetingPoint)
-        } else if tracker.isTracking {
-            let docRoute = TripSessionLogic.routeLine(from: car.route)
-            if TripSessionLogic.signature(of: docRoute) != trackedCarRoute {
-                startTracking(carId: carId, carRoute: docRoute)
-            }
-        }
-        isTracking = tracker.isTracking
-    }
-
-    private func startTracking(carId: String, carRoute: RouteLine?) {
-        trackedCarRoute = TripSessionLogic.signature(of: carRoute)
-        tracker.start(
-            tripId: tripId, carId: carId,
-            mainRoute: TripSessionLogic.routeLine(from: trip?.route) ?? RouteLine([]),
-            carRoute: carRoute)
-    }
-
-    /// Becoming the tracker: one fix, then `ensureRoute`, then tracking with the own route.
-    /// Tracking never waits on the network for long: `ensureRoute` is abandoned after `ensureTimeout`.
-    private func beginSession(_ key: SessionKey, trip: Trip, car: Car, meetingPoint: CLLocationCoordinate2D?) {
-        sessionKey = key
-        sessionGeneration += 1
-        let generation = sessionGeneration
-        let service: CarRouteControlling?
-        do {
-            service = try carRouteFactory(tripId, key.carId, trip, car, meetingPoint)
-        } catch {
-            log.error("car route service unavailable: \(error.localizedDescription, privacy: .public)")
-            service = nil
-        }
-        carRoute = service
-        let docRoute = TripSessionLogic.routeLine(from: car.route)
-        startupTask = Task { [weak self] in
-            await self?.runStartup(generation: generation, carId: key.carId, service: service, docRoute: docRoute)
-        }
-    }
-
-    private func runStartup(generation: Int, carId: String, service: CarRouteControlling?, docRoute: RouteLine?) async {
-        if let service, let fix = await tracker.firstFix() {
-            guard generation == sessionGeneration else { return }
-            _ = await ensureRoute(service, at: fix.coordinate)
-        }
-        guard generation == sessionGeneration else { return }
-        // On failure the service still holds the route it resumed with (nil: main route only).
-        startTracking(carId: carId, carRoute: service.map(\.routeLine) ?? docRoute)
-        isTracking = tracker.isTracking
-        // No reconcile with the car doc here: it may not yet show the route `ensureRoute` just wrote,
-        // and the snapshot of that write restarts tracking if it differs.
-    }
-
-    /// True if `ensureRoute` succeeded in time. A late success still reaches us as a car snapshot.
-    private func ensureRoute(_ service: CarRouteControlling, at location: CLLocationCoordinate2D) async -> Bool {
-        let race = EnsureRace()
-        let timeout = ensureTimeout
-        return await withCheckedContinuation { continuation in
-            race.continuation = continuation
-            let work = Task { @MainActor [log] in
-                do {
-                    _ = try await service.ensureRoute(at: location)
-                    race.finish(true)
-                } catch {
-                    log.error("ensureRoute failed, tracking the main route: \(error.localizedDescription, privacy: .public)")
-                    race.finish(false)
-                }
-            }
-            let timer = Task { @MainActor [log] in
-                try? await Task.sleep(for: timeout)
-                if race.finish(false) { log.error("ensureRoute timed out, tracking the main route") }
-            }
-            race.cancelTimer = { timer.cancel() }
-            _ = work
-        }
-    }
-
-    /// Once-only result for `ensureRoute` versus its timeout.
-    @MainActor
-    private final class EnsureRace {
-        var continuation: CheckedContinuation<Bool, Never>?
-        var cancelTimer: (() -> Void)?
-
-        @discardableResult
-        func finish(_ success: Bool) -> Bool {
-            guard let continuation else { return false }
-            self.continuation = nil
-            cancelTimer?()
-            continuation.resume(returning: success)
-            return true
-        }
+        let waits = tripListener != nil
+            && TripSessionLogic.waitsForAnswer(
+                stops: stops, carState: car.state, tripStarted: trip.startedAt != nil,
+                answerRead: answerReadFor == listeningAnswer && listeningAnswer != nil)
+        self.duty.reevaluate(
+            TrackingDuty.Wanted(
+                trip: trip, car: car, carId: carId, stops: stops, skipsMeetingPoint: skipsMeetingPoint,
+                waitsForAnswer: waits))
     }
 
     /// What the organizer's phone rebuilds the route from (D25 4d). Nil once there is nothing to rebuild here (not
@@ -542,18 +410,6 @@ final class TripSession {
             destination: CLLocationCoordinate2D(
                 latitude: trip.destination.coordinate.latitude, longitude: trip.destination.coordinate.longitude),
             destinationName: trip.destination.name, organizer: organizer, organizerOffset: own?.convoyOffset)
-    }
-
-    /// Every published fix goes to the car-route service without blocking tracking. A reroute needs no
-    /// action here: the write it made comes back as a car snapshot, which restarts tracking.
-    private func handle(fix: LocationFix) {
-        guard let service = carRoute, tracker.isTracking else { return }
-        let generation = sessionGeneration
-        Task { [weak self] in
-            let event = await service.handle(fix: fix)
-            guard let self, generation == self.sessionGeneration else { return }
-            if case .failed(let message) = event { self.log.error("car route update failed: \(message, privacy: .public)") }
-        }
     }
 
     /// Listens to this car's answer on the meeting point (the first stop, when it is a meeting point), so a
