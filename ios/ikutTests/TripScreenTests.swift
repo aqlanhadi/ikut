@@ -714,7 +714,7 @@ struct OneMapTests {
         var aims = 0
         let before = screen.sheet.changes
         let moved = cameraWrites(screen) {
-            withAnimation(Motion.sheet(reduceMotion: false)) {
+            _ = withAnimation(Motion.sheet(reduceMotion: false)) {
                 screen.sheetChange(in: .home, { screen.sheet.resize(to: .home(tall: tall)) }, cover: { cover }) { _ in aims += 1 }
             }
         }
@@ -769,7 +769,7 @@ struct OneMapTests {
             if let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: 812, aimedTop: 68) { moves.append(plan) }
         }
         let before = screen.sheet.changes
-        withAnimation(Motion.sheet(reduceMotion: false)) {
+        _ = withAnimation(Motion.sheet(reduceMotion: false)) {
             screen.sheetChange(in: .driving, { screen.sheet.resize(to: .driving(to)) },
                                cover: { MapCover(top: 6, bottom: bottom) }) { _ in take(inputs()) }
         }
