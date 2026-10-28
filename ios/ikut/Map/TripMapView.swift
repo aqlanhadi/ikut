@@ -342,7 +342,11 @@ struct TripMapView: View {
         guard let plan else { return }
         // My car on to its next fix (or the convoy's frame moving with its cars): a linear glide over the time
         // between fixes, which also takes in a recentre a banner left for it (D70).
-        let step = CameraInsetMove.isStep(from: old.target, to: new.target) ? model.lastGlide : nil
+        var step: TimeInterval?
+        if CameraInsetMove.isStep(from: old.target, to: new.target) {
+            // Following: my fix's glide, even when a car's write came in the same update.
+            if case .follow? = new.target, let aim = model.myAim { step = aim.duration } else { step = model.lastGlide }
+        }
         move(to: model.cameraTarget, animated: true, plan: plan, step: step)
     }
 
