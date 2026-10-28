@@ -233,6 +233,23 @@ struct SessionCarRouteTests {
         #expect(!tracker.isTracking)
         #expect(tracker.onFix == nil)
     }
+
+    /// A snapshot queued just before Back to trips lands after `stop()`: the stopped session takes it in without
+    /// starting tracking again.
+    @Test func aSnapshotAfterStopNeverStartsTracking() async throws {
+        let rig = Rig()
+        rig.becomeTracker()
+        await waitUntil(.seconds(2)) { rig.tracker.isTracking }
+        #expect(rig.tracker.startCount == 1)
+        rig.session.stop()
+        #expect(!rig.tracker.isTracking)
+
+        rig.becomeTracker()
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(rig.tracker.startCount == 1)
+        #expect(!rig.tracker.isTracking)
+        #expect(!rig.session.isTracking)
+    }
 }
 
 private func meetStop(order: Int = 0, skipped: Bool? = nil, left: Bool = false) -> PlannedStop {

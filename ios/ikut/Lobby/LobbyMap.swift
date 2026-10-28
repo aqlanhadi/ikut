@@ -197,7 +197,7 @@ struct LobbyMapLayer: View {
     var onCandidateTap: (String) -> Void = { _ in }
     @Binding var command: LobbyMapCommand
 
-    @Environment(TripMapStage.self) private var stage
+    @Environment(TripScreenModel.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var roundSide = SheetButtonSize.round
     @State private var mapHeight: CGFloat = 0

@@ -37,7 +37,7 @@ struct TripMapView: View {
     /// `follow-drive-interrupts` (D70): the sheet, a banner, Fit, Follow and a hazard in the middle of follow glides.
     private var demoInterrupts = false
 
-    @Environment(TripMapStage.self) private var stage
+    @Environment(TripScreenModel.self) private var stage
     @State private var model: TripMapModel
     @State private var alerts = AlertCenter()
     @State private var toast = ReportToastModel()
@@ -85,19 +85,17 @@ struct TripMapView: View {
     @State private var bannerArrivals = BannerSlot.Arrivals()
     /// What the slot has already said, so a message coming back from waiting is not said again.
     @State private var spokenBanners = SpokenBanners()
-    /// Kept screen on while the map is up. Until `keepAwakeAnswered` (the person chose, by the menu or the old ask)
-    /// the screen stays on (`ScreenAwake.preference`).
-    @AppStorage("ikut.map.keepAwake") private var keepAwake = false
-    @AppStorage("ikut.map.keepAwakeAnswered") private var keepAwakeAnswered = false
     @AppStorage(AlertSettings.readAloudKey) private var readAloud = AlertSettings.readAloudDefault
 
-    private var keepAwakeOn: Bool { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) }
+    /// Kept screen on while the map is up: the screen's one setting (`TripScreenModel.keepScreenOn`).
+    private var keepAwakeOn: Bool { stage.keepScreenOn }
     /// What was asked on the last trip (`TripAskMemory`), so leaving the map and coming back doesn't nag.
     @AppStorage("ikut.map.askedTrip") private var askedTrip = ""
 
+    /// The app's: `model` is the open trip's, made with it by the screen's model (`OpenTrip.map`).
     init(
-        session: TripSession, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil,
-        lobbyWants: Bool = false, onEnded: @escaping () -> Void = {}
+        session: TripSession, map model: TripMapModel, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil,
+        topBanner: AnyView? = nil, lobbyWants: Bool = false, onEnded: @escaping () -> Void = {}
     ) {
         self.session = session
         self.continuation = continuation
@@ -105,8 +103,6 @@ struct TripMapView: View {
         self.lobbyWants = lobbyWants
         self.onEnded = onEnded
         liveServices = true
-        let model = TripMapModel(session: session)
-        model.mode = TripScreenLogic.drivingEntryMode
         _model = State(initialValue: model)
     }
 

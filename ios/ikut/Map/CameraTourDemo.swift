@@ -10,7 +10,7 @@ struct CameraTourDemo: View {
 
     @State private var phase = Phase.driving
     @State private var caption = "Watch the camera"
-    @State private var stage = TripMapStage(mode: .driving, tripId: "demo")
+    @State private var stage = TripScreenModel(mode: .driving)
     @State private var model = MapDemo.model()
     @State private var recapStep = 0
 

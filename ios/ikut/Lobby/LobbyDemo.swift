@@ -226,7 +226,7 @@ struct DemoGeocoder: ReverseGeocoding {
 /// `trip-start-swap`: the organiser's lobby, and 2 s later Start trip, so the switch to driving can be watched: the same
 /// map, the camera from the whole route to my car, the lobby's sheet becoming the convoy's (D53).
 struct TripStartSwapDemo: View {
-    @Environment(TripMapStage.self) private var stage
+    @Environment(TripScreenModel.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let lobby = LobbyStopsDemo.lobby(.organizer, driving: { continuation, banner in
         let model = MapDemo.model()
@@ -249,7 +249,7 @@ struct TripStartSwapDemo: View {
 /// watched: the same map, the camera from New trip's route to the whole trip above the lobby's sheet, New trip's sheet
 /// becoming the lobby's (D54). Nothing is written.
 struct HomeCreateSwapDemo: View {
-    @Environment(TripMapStage.self) private var stage
+    @Environment(TripScreenModel.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -442,7 +442,9 @@ enum DemoScreens {
         case "home-where-to": return home("where-to")
         case "home-new-trip": return home("new-trip")
         // New trip, then Create trip 2 s later: the switch to the lobby on the same map (D54).
-        case "home-create-swap": return nav(TripScreenHost(mode: .home) { HomeCreateSwapDemo() })
+        case "home-create-swap":
+            // Its Create trip opens a sample trip: nothing is read, tracked or saved.
+            return nav(TripScreenHost(mode: .home, makeTrip: { OpenTrip.sample(tripId: $0) }) { HomeCreateSwapDemo() })
         case "home-picked-failed": return home("failed")
         // A trip left early, picked: its route, and no recap (D54, #421).
         case "home-picked-left": return home("left")

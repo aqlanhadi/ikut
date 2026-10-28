@@ -222,8 +222,7 @@ extension LobbyView {
             VStack(spacing: 0) {
                 if !isSample || sampleSharing {
                     Toggle("Keep screen on", isOn: Binding(
-                        get: { ScreenAwake.preference(answered: keepAwakeAnswered, stored: keepAwake) },
-                        set: { keepAwake = $0; keepAwakeAnswered = true }))
+                        get: { stage.keepScreenOn }, set: { stage.keepScreenOn = $0 }))
                         .padding(.horizontal, Spacing.l)
                         .frame(minHeight: 48)
                         .accessibilityIdentifier("lobby.keepAwake")

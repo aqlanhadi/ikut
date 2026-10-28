@@ -1,3 +1,4 @@
+import FirebaseAuth
 import MapKit
 import SwiftUI
 
@@ -168,11 +169,48 @@ struct TripCameraReading: Equatable {
     var latitudeDelta: Double
 }
 
-/// The trip screen's shared state: the mode, the one camera, and what the map reports about itself. The host owns it;
-/// the layers read it from the environment and move the camera with their own logic (`LobbyMapLogic`,
-/// `MapCameraRoom`).
+/// The open trip's objects, made together when a trip opens on the screen and dropped together when it closes
+/// (`TripScreenModel.open`, `exit`): nothing else makes them for a live trip.
+@MainActor
+struct OpenTrip {
+    let id: String
+    /// The one reader of the trip, and the tracker's owner (`TrackingDuty`): it goes with the trip.
+    let session: TripSession
+    let lobby: LobbyModel
+    let planner: StopPlanner
+    /// The driving layer's model: made with the trip, put on screen when driving starts.
+    let map: TripMapModel
+
+    /// The app's: a session for the signed-in person, and stop edits saved to the trip.
+    static func live(tripId: String) -> OpenTrip {
+        let session = TripSession(tripId: tripId, userId: Auth.auth().currentUser?.uid ?? "")
+        return OpenTrip(id: tripId, session: session,
+                        planner: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
+    }
+
+    #if DEBUG
+    /// The demos': a session that is never started (no reads, no tracking) and a planner that saves nothing.
+    static func sample(tripId: String) -> OpenTrip {
+        OpenTrip(id: tripId, session: TripSession(tripId: tripId, userId: "u-c1"),
+                 planner: StopPlanner(router: DemoRoads(), delay: .milliseconds(150), origin: { nil }, save: { _ in }))
+    }
+    #endif
+
+    init(id: String, session: TripSession, planner: StopPlanner) {
+        self.id = id
+        self.session = session
+        lobby = LobbyModel(session: session)
+        self.planner = planner
+        map = TripMapModel(session: session)
+        map.mode = TripScreenLogic.drivingEntryMode
+    }
+}
+
+/// The trip screen's one model: the mode, the open trip's objects (`OpenTrip`), the one camera, what the map reports
+/// about itself, and Keep screen on. HomeView owns it; the layers read it from the environment and move the camera
+/// with their own logic (`LobbyMapLogic`, `MapCameraRoom`).
 @Observable @MainActor
-final class TripMapStage {
+final class TripScreenModel {
     var mode: TripScreenMode
     var camera: MapCameraPosition = .automatic
     var heading = 0.0
@@ -181,8 +219,21 @@ final class TripMapStage {
     var mapFrame: CGRect = .zero
     /// Driving: the convoy sheet is pulled up and the lobby continues below the convoy (`PanelSheet.showsContinuation`).
     var pulledUp = false
-    /// The trip on screen in the lobby's and driving modes; nil on Home.
-    private(set) var tripId: String?
+    /// The trip on screen in the lobby's and driving modes, with its objects; nil on Home.
+    private(set) var trip: OpenTrip?
+    var tripId: String? { trip?.id }
+    @ObservationIgnored private let makeTrip: @MainActor (String) -> OpenTrip
+    @ObservationIgnored private let defaults: UserDefaults
+    /// Keep screen on: the lobby's switch, and what the driving map holds the screen by (`ScreenAwake`). Read from
+    /// the phone's settings here only; on until the person chooses (`ScreenAwake.preference`).
+    var keepScreenOn: Bool {
+        didSet {
+            defaults.set(keepScreenOn, forKey: Self.keepAwakeKey)
+            defaults.set(true, forKey: Self.keepAwakeAnsweredKey)
+        }
+    }
+    static let keepAwakeKey = "ikut.map.keepAwake"
+    static let keepAwakeAnsweredKey = "ikut.map.keepAwakeAnswered"
     /// The camera as it moves, frame by frame, outside observation so a glide redraws nothing (Home's settle check).
     let cameraBox = CameraBox()
     /// The camera move in flight, paced by `CameraPace` (D57).
@@ -224,22 +275,32 @@ final class TripMapStage {
         }
     }
 
-    init(mode: TripScreenMode = .lobby, tripId: String? = nil) {
+    init(mode: TripScreenMode = .lobby, defaults: UserDefaults = .standard,
+         makeTrip: @escaping @MainActor (String) -> OpenTrip = { OpenTrip.live(tripId: $0) }) {
         self.mode = mode
-        self.tripId = tripId
+        self.defaults = defaults
+        self.makeTrip = makeTrip
+        keepScreenOn = ScreenAwake.preference(
+            answered: defaults.bool(forKey: Self.keepAwakeAnsweredKey), stored: defaults.bool(forKey: Self.keepAwakeKey))
     }
 
-    /// Home hands the map to a trip: its lobby, or driving when it has started (`TripScreenLogic.Event.open`).
+    /// Home hands the map to a trip: its lobby, or driving when it has started (`TripScreenLogic.Event.open`). The
+    /// trip's objects are made here, once: opening the trip already open keeps them.
     func open(tripId: String, started: Bool) {
-        self.tripId = tripId
+        if trip?.id != tripId {
+            trip?.session.stop()
+            trip = makeTrip(tripId)
+        }
         pulledUp = false
         flight.cancel()
         mode = TripScreenLogic.mode(after: .open(started: started), from: mode)
     }
 
-    /// Leave, End or Back to trips: Home's list on the same map.
+    /// Leave, End or Back to trips: Home's list on the same map. The trip's session stops here (tracking and its
+    /// listeners), before Home takes the map, and its objects go.
     func exit() {
-        tripId = nil
+        trip?.session.stop()
+        trip = nil
         pulledUp = false
         flight.cancel()
         mode = TripScreenLogic.mode(after: .exit, from: mode)
@@ -284,16 +345,17 @@ final class TripMapStage {
 /// The trip screen: one full-screen map with one camera, the layer for the mode over it, and one sheet whose content
 /// and detents change with the mode (never dismissed and presented again for a switch).
 struct TripScreenHost<Content: View>: View {
-    @State private var stage: TripMapStage
+    @State private var stage: TripScreenModel
     private let content: Content
 
-    init(mode: TripScreenMode = .lobby, @ViewBuilder content: () -> Content) {
-        _stage = State(initialValue: TripMapStage(mode: mode))
+    init(mode: TripScreenMode = .lobby, makeTrip: (@MainActor (String) -> OpenTrip)? = nil,
+         @ViewBuilder content: () -> Content) {
+        _stage = State(initialValue: makeTrip.map { TripScreenModel(mode: mode, makeTrip: $0) } ?? TripScreenModel(mode: mode))
         self.content = content()
     }
 
     /// The app's one host (`HomeView`), whose stage it keeps to open and close trips on it.
-    init(stage: TripMapStage, @ViewBuilder content: () -> Content) {
+    init(stage: TripScreenModel, @ViewBuilder content: () -> Content) {
         _stage = State(initialValue: stage)
         self.content = content()
     }
@@ -330,7 +392,7 @@ struct TripScreenHost<Content: View>: View {
 /// The host map's camera, readings and gestures.
 private struct TripMapBehaviour: ViewModifier {
     let spec: TripMapSpec
-    @Bindable var stage: TripMapStage
+    @Bindable var stage: TripScreenModel
 
     func body(content: Content) -> some View {
         content

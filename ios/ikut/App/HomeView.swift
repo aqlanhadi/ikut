@@ -1,4 +1,3 @@
-import FirebaseAuth
 import SwiftUI
 
 /// Root navigation: the welcome screen until "Get Started", then the app's one map (`TripScreenHost`, D54) with Home
@@ -23,13 +22,12 @@ struct HomeView: View {
     @Binding var pendingJoinCode: String?
 
     @State private var path: [Route] = []
-    /// The one map's mode, camera and open trip, shared by Home and the trip (D54).
-    @State private var stage = TripMapStage(mode: .home)
+    /// The one map's mode, camera and open trip with its session and models, shared by Home and the trip (D54). The
+    /// trip's objects are made and dropped by it (`open`, `exit`), not here.
+    @State private var stage = TripScreenModel(mode: .home)
     /// Where the app opens has been decided (`LaunchRoute`): until then nothing is drawn, so Home never flashes before
     /// the trip this phone is in.
     @State private var launched = false
-    /// The open trip's session, made once when the trip opens (not on every redraw of this view).
-    @State private var tripSession: TripSession?
     /// Home's flows (`HomeModel`): once New trip's or Join's gates are through, `home.creating` / `home.joining` turn
     /// Home's sheet into Where to? or the join steps over its own map, with the code from a link or QR filled in (D58;
     /// no pushed screen). Made afresh each time Home comes back from a trip.
@@ -181,7 +179,6 @@ struct HomeView: View {
         switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
         case .ready, .showAlwaysExplainer:
             // The map's first frame is the trip's: no flight, no Home before it.
-            prepareSession(tripId)
             stage.open(tripId: tripId, started: started)
             launched = true
         default:
@@ -194,16 +191,15 @@ struct HomeView: View {
     /// Home, or the trip open on the map: one layer at a time over the one map, each publishing what the map draws and
     /// the sheet's content (`TripMapSpec`, `TripSheetSpec`).
     @ViewBuilder private var layer: some View {
-        if let tripId = stage.tripId {
-            LobbyView(tripId: tripId, session: tripSession?.tripId == tripId ? tripSession : nil,
-                      onExit: exitTrip, onEnded: { ended in
+        if let trip = stage.trip {
+            LobbyView(trip: trip, onExit: exitTrip, onEnded: { ended in
                 // The recap is its own screen, pushed over the trip; its Done returns to Home's list (`closeRecap`).
                 // The lobby and the driving map both report the end, and may again when the recap is closed: once.
                 guard ended == stage.tripId, !path.contains(.recap(tripId: ended)) else { return }
                 path = [.recap(tripId: ended)]
             })
             // A different trip is a new session, model and planner.
-            .id(tripId)
+            .id(trip.id)
         } else {
             TripsHomeView(
                 model: home,
@@ -223,7 +219,6 @@ struct HomeView: View {
     private func openTrip(_ tripId: String, started: Bool) {
         home.creating = false
         home.joining = nil
-        prepareSession(tripId)
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
     }
 
@@ -232,16 +227,9 @@ struct HomeView: View {
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { closeTrip() }
     }
 
-    private func prepareSession(_ tripId: String) {
-        if tripSession?.tripId != tripId {
-            tripSession = TripSession(tripId: tripId, userId: Auth.auth().currentUser?.uid ?? "")
-        }
-    }
-
-    /// The map back to Home; the trip's session goes with its screen.
+    /// The map back to Home; the trip's session stops and goes with its objects (`TripScreenModel.exit`).
     private func closeTrip() {
         stage.exit()
-        tripSession = nil
         home = HomeModel.launching()
     }
 
