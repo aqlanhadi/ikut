@@ -30,11 +30,10 @@ struct HomeView: View {
     @State private var launched = false
     /// The open trip's session, made once when the trip opens (not on every redraw of this view).
     @State private var tripSession: TripSession?
-    /// New trip's gates are through: Home's sheet becomes Where to? over its own map (no pushed screen).
-    @State private var creating = false
-    /// Join's gates are through: Home's sheet becomes the join steps over its own map, with the code from a link or QR
-    /// filled in (D58; no pushed screen).
-    @State private var joining: JoinStart?
+    /// Home's flows (`HomeModel`): once New trip's or Join's gates are through, `home.creating` / `home.joining` turn
+    /// Home's sheet into Where to? or the join steps over its own map, with the code from a link or QR filled in (D58;
+    /// no pushed screen). Made afresh each time Home comes back from a trip.
+    @State private var home = HomeModel.launching()
     @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
     @State private var showDenied = false
     @State private var showName = false
@@ -207,15 +206,14 @@ struct HomeView: View {
             .id(tripId)
         } else {
             TripsHomeView(
+                model: home,
                 onNewTrip: { begin(.create) },
                 onJoin: { begin(.join(code: nil)) },
                 // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
                 onOpenTrip: { entry, started in begin(.trip(tripId: entry.id, started: started)) },
                 covered: homeSheetCovered,
                 sheetUp: $homeSheetUp,
-                creating: $creating,
                 onCreated: { tripId in openTrip(tripId, started: false) },
-                joining: $joining,
                 onJoined: { tripId in openTrip(tripId, started: false) }
             )
         }
@@ -223,8 +221,8 @@ struct HomeView: View {
 
     /// The trip takes over the one map: Home's sheet becomes the lobby's (or the convoy's) and the camera flies to it.
     private func openTrip(_ tripId: String, started: Bool) {
-        creating = false
-        joining = nil
+        home.creating = false
+        home.joining = nil
         prepareSession(tripId)
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
     }
@@ -244,6 +242,7 @@ struct HomeView: View {
     private func closeTrip() {
         stage.exit()
         tripSession = nil
+        home = HomeModel.launching()
     }
 
     /// Done on the recap: back to the one map, which is Home's list again (the ended trip's lobby or map closes in the
@@ -259,8 +258,8 @@ struct HomeView: View {
         // approximate location still goes through the settings prompt first.
         if case .join(let code) = route, JoinSteps.sheetHostsLocation(status: location.status, accuracy: location.accuracy) {
             hasSeenWelcome = true
-            creating = false
-            joining = JoinStart(code: code)
+            home.creating = false
+            home.joining = JoinStart(code: code)
             return
         }
         if auth.state == .signedIn {
@@ -273,7 +272,7 @@ struct HomeView: View {
 
     private func open(_ route: Route, replacing: Bool = false) async {
         // A join link (or code) opened during Where to? or New trip leaves that flow: Home is not left on it afterwards.
-        if case .join = route { creating = false }
+        if case .join = route { home.creating = false }
         opening = true
         defer { opening = false }
         while true {
@@ -289,11 +288,11 @@ struct HomeView: View {
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:
-                if case .create = route { creating = true; return }
+                if case .create = route { home.creating = true; return }
                 if case .join(let code) = route {
                     // A link on a fresh install opens Home first: there is no Welcome to push Join over any more.
                     hasSeenWelcome = true
-                    joining = JoinStart(code: code)
+                    home.joining = JoinStart(code: code)
                     return
                 }
                 if case .trip(let tripId, let started) = route { openTrip(tripId, started: started); return }

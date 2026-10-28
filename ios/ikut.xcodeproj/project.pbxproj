@@ -135,6 +135,7 @@
 		6DF4DBBFC2479CD85E53631F /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CAC79F1BB254D2FFA7FF24B /* QRScannerView.swift */; };
 		6E9EB28B2723AACAD74CD9FC /* TripMapModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AD7663BE4B472EA27B284CC /* TripMapModel.swift */; };
 		7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A17502ECF89C7385935BA5 /* StopRouteTests.swift */; };
+		7198C46FB019CDC9AE5ABEF5 /* HomeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B53A5B7C8FCD9F45B61013 /* HomeModel.swift */; };
 		72445B83188E679CC45FEFED /* BottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259104081FD2BD54F7BCE87D /* BottomSheet.swift */; };
 		72913577CD65DD10CE46D83D /* EventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F201EC357C45D84BC4395C /* EventTests.swift */; };
 		7296DE8EDE46EEF454129D03 /* TripSessionLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8ECEB1452E465155C7324B /* TripSessionLogic.swift */; };
@@ -215,6 +216,7 @@
 		B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */; };
 		B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */; };
 		B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A209AB9671B47B22C20E451 /* ikut.icon */; };
+		B653006A61ACC89FFD7094C8 /* HomeModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91D939C4B6B3F841C81E964 /* HomeModelTests.swift */; };
 		B7DDF8AAF5AC85A86C6F39D6 /* StopPillLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */; };
 		B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */; };
 		B80DAA47953098D10019E756 /* DeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69797704602A7657261A60C /* DeepLink.swift */; };
@@ -525,10 +527,12 @@
 		C04CCEA528ABC4C37CC45074 /* StopLeaveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLeaveService.swift; sourceTree = "<group>"; };
 		C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreLocationSource.swift; sourceTree = "<group>"; };
 		C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCameraTests.swift; sourceTree = "<group>"; };
+		C2B53A5B7C8FCD9F45B61013 /* HomeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeModel.swift; sourceTree = "<group>"; };
 		C3E80CE011C8490310C42F29 /* StopLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLogic.swift; sourceTree = "<group>"; };
 		C456C99B4E7723AFF06FB58C /* StopCardParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCardParts.swift; sourceTree = "<group>"; };
 		C46CA4198406B579655640C1 /* FirestoreDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDecoding.swift; sourceTree = "<group>"; };
 		C46D1C04BC5842435C33213A /* TripSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSession.swift; sourceTree = "<group>"; };
+		C91D939C4B6B3F841C81E964 /* HomeModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeModelTests.swift; sourceTree = "<group>"; };
 		C963869E69413A0E655BFED4 /* SpeechQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueue.swift; sourceTree = "<group>"; };
 		CA192F79FB2F9166FBD454E4 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCamera.swift; sourceTree = "<group>"; };
@@ -609,6 +613,7 @@
 				CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */,
 				2E5BF62FE297FAF566E38721 /* HomeHeader.swift */,
 				2B2B86DD84637F94BD8CD6C9 /* HomeMapContent.swift */,
+				C2B53A5B7C8FCD9F45B61013 /* HomeModel.swift */,
 				84D5E973FCE988F061DA7D83 /* HomeNow.swift */,
 				733A27B1422ACC870244D3E8 /* HomeRenameAlerts.swift */,
 				F56D59AA9467F430D986EC9F /* HomeSheet.swift */,
@@ -981,6 +986,7 @@
 				ED21589D476E823056C68F4D /* FollowGlideTests.swift */,
 				3444E323182FDDB4B67D7428 /* HazardTests.swift */,
 				C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */,
+				C91D939C4B6B3F841C81E964 /* HomeModelTests.swift */,
 				43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */,
 				9A4E6220545874C63A72429B /* HomeNowTests.swift */,
 				4B89CD36B48802E9292F07AF /* JoinStepperTests.swift */,
@@ -1343,6 +1349,7 @@
 				D2524C7FCC6D0876AC013798 /* HomeCamera.swift in Sources */,
 				F6017A198D489282BE790269 /* HomeHeader.swift in Sources */,
 				76C148E268AE2ACA0726EA9B /* HomeMapContent.swift in Sources */,
+				7198C46FB019CDC9AE5ABEF5 /* HomeModel.swift in Sources */,
 				ECFB40507E2C0ED0F4BEDE8E /* HomeNow.swift in Sources */,
 				8699DA76482D1A79209C0CA7 /* HomeRenameAlerts.swift in Sources */,
 				BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */,
@@ -1517,6 +1524,7 @@
 				92645091B22B66E6182B8677 /* Geometry.swift in Sources */,
 				079075CB6B156BCB6CBF0CEA /* HazardTests.swift in Sources */,
 				D4001445E5CE74D71F3D5092 /* HomeCameraTests.swift in Sources */,
+				B653006A61ACC89FFD7094C8 /* HomeModelTests.swift in Sources */,
 				A773017CB9C9B79C20C393FC /* HomeNowEmulatorTests.swift in Sources */,
 				3E3947EE2E72D11FC40409C1 /* HomeNowTests.swift in Sources */,
 				FDFF2E6CAE8C2F8A39EF06AE /* JoinStepperTests.swift in Sources */,

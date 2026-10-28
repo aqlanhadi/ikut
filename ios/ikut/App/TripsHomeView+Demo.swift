@@ -37,16 +37,16 @@ extension TripsHomeView {
 
     /// `tour`: picks the first trip and closes it again by itself, the second time pulling it up and down first.
     func playTour() async {
-        guard tour, let first = past.first else { return }
+        guard tour, let first = model.past.first else { return }
         for cycle in 0..<2 {
             try? await Task.sleep(for: .seconds(2.5))
             open(first)
             try? await Task.sleep(for: .seconds(3.5))
             if cycle == 1 {
                 // Pulled up and back down, to see that the map and Legal stay put under the tall sheet.
-                expanded = true
+                model.expanded = true
                 try? await Task.sleep(for: .seconds(3))
-                expanded = false
+                model.expanded = false
                 try? await Task.sleep(for: .seconds(2.5))
             }
             closePicked()
@@ -71,11 +71,11 @@ extension TripsHomeView {
             tourCaption = "Your street to every trip"
             fit(animated: true)
             await pause(3)
-            guard let first = past.first else { return }
+            guard let first = model.past.first else { return }
             tourCaption = "Pick a trip"
             open(first)
             await pause(3)
-            if let stop = picked?.model.recap?.timeline.first(where: { $0.kind == .stop && $0.coordinate != nil }) {
+            if let stop = model.picked?.model.recap?.timeline.first(where: { $0.kind == .stop && $0.coordinate != nil }) {
                 tourCaption = "A stop on its route"
                 selectItem(stop)
                 await pause(3)
