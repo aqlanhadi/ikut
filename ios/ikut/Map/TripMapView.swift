@@ -762,7 +762,7 @@ struct TripMapView: View {
         if sheet.appliedHeights == nil {
             sheet.take(next)
         } else {
-            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { sheet.take(next) }
+            withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { _ = sheet.take(next) }
         }
     }
 
