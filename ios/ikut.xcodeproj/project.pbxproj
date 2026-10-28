@@ -182,6 +182,7 @@
 		9B4CB838014CB0BD376988F7 /* Position.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE6A468C2B522F5226FFC78 /* Position.swift */; };
 		9BB6E062ECEC7EDADF1CA6D7 /* StopLeaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3077A797F64E10D19A3B4D36 /* StopLeaveTests.swift */; };
 		9C88E9F61DEC32F38B28C02F /* NextStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 423FF6822F3DBBDDFF5571D9 /* NextStopTests.swift */; };
+		9D11F64FD74369DACE4704CA /* AnimationDump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FF20374AEDB6D0AE7E9F65 /* AnimationDump.swift */; };
 		9EDC48B733121D1A6E0056D6 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0803549353B1CD91367C85 /* LobbyView.swift */; };
 		A068D03A44E44AD4E4982A1B /* RequestPlacesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */; };
 		A0DA932F784B100BA0FDFCD8 /* PlacesRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */; };
@@ -196,6 +197,7 @@
 		A832D47DD7426CC3658296CC /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = CA192F79FB2F9166FBD454E4 /* README.md */; };
 		A889D2AE7ED65EDEDDACD020 /* OwnWayDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD4FAF0956DC812EFB12371 /* OwnWayDemo.swift */; };
 		A8EA53549F4BF60CC688242A /* CarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1252A60E6727550F035DB2EA /* CarRow.swift */; };
+		A948EF8F075A80A7961562DB /* IdleGuardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86383C6DC7F6FA548E34D39A /* IdleGuardUITests.swift */; };
 		AB001DF51B13F800F9ECF236 /* TripPullUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */; };
 		AB256D3E1F0754FA098EBBDD /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4B40FAD764F7CB2F3E7EA17C /* FirebaseFunctions */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
@@ -302,6 +304,7 @@
 		01E0F9C4A3658B6AB1A4B07F /* StopDelayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopDelayTests.swift; sourceTree = "<group>"; };
 		01EE01CC4EDE188E0718E364 /* StopLeave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopLeave.swift; sourceTree = "<group>"; };
 		02B0DDAF1194DD5CA4B0A112 /* PositionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionBuilder.swift; sourceTree = "<group>"; };
+		02FF20374AEDB6D0AE7E9F65 /* AnimationDump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDump.swift; sourceTree = "<group>"; };
 		031322A39B18B3872843D671 /* AddStopSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopSheet.swift; sourceTree = "<group>"; };
 		06B07E299123E0601E23DBDD /* YouTagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTagTests.swift; sourceTree = "<group>"; };
 		076A4E68B7B0C8291C62A7BB /* NextStopDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextStopDemo.swift; sourceTree = "<group>"; };
@@ -453,6 +456,7 @@
 		84D5E973FCE988F061DA7D83 /* HomeNow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeNow.swift; sourceTree = "<group>"; };
 		85031A857FFEE9A7F7CEE986 /* StopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopService.swift; sourceTree = "<group>"; };
 		85C199021086844F76B783FE /* StopOurSideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopOurSideTests.swift; sourceTree = "<group>"; };
+		86383C6DC7F6FA548E34D39A /* IdleGuardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdleGuardUITests.swift; sourceTree = "<group>"; };
 		881F14A69E038A11FD750DD0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8910BC2D6402772067EC5AE7 /* SuggestStops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestStops.swift; sourceTree = "<group>"; };
 		89911FBE6E40CB98D46C337F /* Polyline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polyline.swift; sourceTree = "<group>"; };
@@ -587,6 +591,7 @@
 		0C3C6779B68FE359CFD8B4DB /* App */ = {
 			isa = PBXGroup;
 			children = (
+				02FF20374AEDB6D0AE7E9F65 /* AnimationDump.swift */,
 				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
 				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
 				CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */,
@@ -766,6 +771,7 @@
 				6E3E1590F043F72EDA19EF6F /* ConvoyScenarioUITests.swift */,
 				E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */,
 				99320F601C724896FA7271D4 /* DemoUITests.swift */,
+				86383C6DC7F6FA548E34D39A /* IdleGuardUITests.swift */,
 				A2029D17F25EE0C51578850D /* LobbyStopsUITests.swift */,
 				12E15667CB100441C37373C1 /* MapAsks.swift */,
 				56D56ABF41D0A65788959592 /* TwoPhoneConvoyUITests.swift */,
@@ -1274,6 +1280,7 @@
 				DDFB1D5C15A1D5FEC996A11C /* AlertSettings.swift in Sources */,
 				B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */,
 				EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */,
+				9D11F64FD74369DACE4704CA /* AnimationDump.swift in Sources */,
 				B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */,
 				591D0BEAD1974F23903F13DC /* ApproachPill.swift in Sources */,
 				0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */,
@@ -1454,6 +1461,7 @@
 				61D02EBF0CDB17DDAFA6BC46 /* ConvoyUITestCase.swift in Sources */,
 				11CA80C194C3B109415910D3 /* CreateTripUITests.swift in Sources */,
 				26AF3954E35DCE138E2814DA /* DemoUITests.swift in Sources */,
+				A948EF8F075A80A7961562DB /* IdleGuardUITests.swift in Sources */,
 				39BF6A05E0C57D1E0848CAEB /* LobbyStopsUITests.swift in Sources */,
 				22384C41D587D1B83AB40B9D /* MapAsks.swift in Sources */,
 				2CEB063315CCBBD0FC44B088 /* TwoPhoneConvoyUITests.swift in Sources */,

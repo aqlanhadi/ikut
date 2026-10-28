@@ -24,12 +24,26 @@ class ConvoyUITestCase: XCTestCase {
 
     /// Taps Allow on a system permission prompt (the test has to tap the app once for the monitor to run).
     func allowPermissionPrompts(_ labels: [String] = ["Allow While Using App", "Allow Once", "Allow"]) {
+        forwardAnimationDump()
         addUIInterruptionMonitor(withDescription: "Permissions") { alert in
             for label in labels where alert.buttons[label].exists {
                 alert.buttons[label].tap()
                 return true
             }
             return false
+        }
+    }
+
+    /// Q21: XCTest's "wait for idle" can get stuck for the rest of a launch after a UIKit sheet transition is cut short
+    /// (one animation start without its stop; the app itself is idle), and then every tap waits 60 s. The Debug app's
+    /// `AnimationDump` gives the leaked count back when `IKUT_IDLE_GUARD=1`, so every UI test turns it on. With
+    /// `TEST_RUNNER_IKUT_ANIM_DUMP=<file>` the app also logs XCTest's busy flag and its running animations every 2 s.
+    /// Every test calls `allowPermissionPrompts` before launching, so both are set from there.
+    private func forwardAnimationDump() {
+        guard let app else { return }
+        app.launchEnvironment["IKUT_IDLE_GUARD"] = "1"
+        if let file = ProcessInfo.processInfo.environment["IKUT_ANIM_DUMP"], !file.isEmpty {
+            app.launchEnvironment["IKUT_ANIM_DUMP"] = file
         }
     }
 

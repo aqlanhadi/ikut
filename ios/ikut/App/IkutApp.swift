@@ -8,6 +8,9 @@ struct IkutApp: App {
 
     init() {
         Backend.configure()
+        #if DEBUG
+        AnimationDump.startIfAsked()
+        #endif
         _auth = State(initialValue: AuthModel())
     }
 
