@@ -55,10 +55,8 @@ struct LobbyView: View {
     @State var onScreen = false
     /// The join towns are being looked up (the lobby's mode, on screen).
     @State var townsOpen = false
-    /// The lobby's sheet is up (it reports its own appear and dismiss); what else is presented waits for it to go.
-    @State var sheetUp = false
-    /// The sheet is at its tall detent.
-    @State var expanded = false
+    /// A sample lobby opens with its sheet tall.
+    var sampleTall = false
     @State var mapCommand = LobbyMapCommand()
     @ScaledMetric(relativeTo: .body) var mediumHeight: CGFloat = LobbySheet.compactHeight
     @State var sheetSafeBottom: CGFloat = 0
@@ -113,7 +111,7 @@ struct LobbyView: View {
         sampleLost = lost
         // A sample lobby never looks a town up unless the demo gives it a geocoder.
         if let joinTowns { _joinTowns = State(initialValue: joinTowns) }
-        _expanded = State(initialValue: tall)
+        sampleTall = tall
         _planner = State(initialValue: planner)
         sampleOrganizer = organizer
         _adding = State(initialValue: adding)
@@ -207,7 +205,7 @@ struct LobbyView: View {
     func switchMode(_ event: TripScreenLogic.Event) {
         let next = TripScreenLogic.mode(after: event, from: stage.mode)
         guard next != stage.mode else { return }
-        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.mode = next }
+        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.go(to: next) }
     }
 
     /// Stop edits run in the banner motion, so the List slides the rows around an inserted, removed or moved one.
@@ -267,20 +265,30 @@ struct LobbyView: View {
     /// Pause and resume are for the phone that is broadcasting (or paused while it was).
     var canPause: Bool { rows.canPause }
 
-    var cover: LobbySheet.Cover {
-        LobbySheet.Cover(
-            changeDestination: showChangeDestination,
-            suggestStops: showSuggestStops, renaming: renaming, alwaysExplainer: session.alwaysExplainerShowing,
-            confirmLeave: confirmLeave, confirmEnd: confirmEnd)
+    /// What the trip's layers push or present now, which the one sheet steps aside for in each mode (`TripSheetCover`).
+    var covers: Set<TripSheetCover> {
+        var covers = Set<TripSheetCover>()
+        if showChangeDestination { covers.insert(.changeDestination) }
+        if showSuggestStops { covers.insert(.suggestStops) }
+        if renaming { covers.insert(.renaming) }
+        if session.alwaysExplainerShowing { covers.insert(.alwaysExplainer) }
+        if confirmLeave { covers.insert(.confirmLeave) }
+        if confirmEnd { covers.insert(.confirmEnd) }
+        if isEnded { covers.insert(.tripEnded) }
+        return covers
     }
-    var sheetCovered: Bool { LobbySheet.isCovered(cover, lobbyOnScreen: onScreen) }
+    /// The trip's reasons this view writes; the screen's own (`tripOffScreen`) it writes as it appears and goes.
+    static let asks = TripSheetCover.trip.subtracting([.tripOffScreen])
+    /// The one sheet is at its tall detent (the lobby's).
+    var expanded: Bool { stage.sheet.size == .lobby(tall: true) }
+    func setExpanded(_ tall: Bool) { stage.sheet.resize(to: .lobby(tall: tall)) }
     var compact: CGFloat { LobbySheet.compact(scaled: mediumHeight) }
 
     /// What the sheet's content change runs on, and what a stop tap's camera flight uses.
     func flyTo(_ stopId: String) {
         mapCommand = mapCommand.asking(.stop(stopId))
         // The map is behind the sheet when it is tall: bring it down to the medium detent to show the stop.
-        if expanded { withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { expanded = false } }
+        if expanded { withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { setExpanded(false) } }
     }
 
     var mapPins: [LobbyPin] {
@@ -308,7 +316,7 @@ struct LobbyView: View {
     }
 
     var body: some View {
-        let sheetsUp = sheetUp
+        let sheetsUp = stage.sheet.up
         let inLobby = stage.mode == .lobby
         return ZStack {
             switch TripScreenLogic.layer(in: stage.mode) {
@@ -323,7 +331,7 @@ struct LobbyView: View {
                 } else if let map = stage.trip?.map {
                     TripMapView(
                         session: session, map: map, continuation: { AnyView(pulledUpContent(here: $0)) },
-                        topBanner: drivingBanner, lobbyWants: LobbySheet.drivingCovered(cover, lobbyOnScreen: onScreen),
+                        topBanner: drivingBanner,
                         onEnded: { onEnded(model.tripId) })
                 }
             }
@@ -333,6 +341,7 @@ struct LobbyView: View {
         // Rule #396 (`TripScreenLogic.lobbyReads`): driving, the lobby reads the session's cars and members only while
         // the convoy sheet is pulled up and shows the lobby below the convoy.
         .onChange(of: stage.mode) { _, _ in updateListening() }
+        .onChange(of: covers, initial: true) { _, covers in stage.sheet.cover(covers, among: Self.asks) }
         .onChange(of: stage.pulledUp) { _, pulledUp in
             updateListening()
             // The asks inside the pulled-up sheet went with it (a fold, a stop request, a hazard): none comes back by
@@ -363,7 +372,7 @@ struct LobbyView: View {
         }
         .onChange(of: model.stops) { _, _ in syncPlanner() }
         .sheet(isPresented: Binding(
-            get: { BottomSheet.presents(wanted: showSuggestStops, sheetUp: sheetUp) }, set: { showSuggestStops = $0 })) {
+            get: { BottomSheet.presents(wanted: showSuggestStops, sheetUp: sheetsUp) }, set: { showSuggestStops = $0 })) {
             SuggestStopsSheet(
                 model: SuggestStopsModel(
                     line: routeInfo.coordinates.count > 1 ? RouteLine(routeInfo.coordinates) : nil,
@@ -403,6 +412,8 @@ struct LobbyView: View {
         }
         .onAppear {
             onScreen = true
+            stage.tripLayer(of: session, onScreen: true)
+            if sampleTall { setExpanded(true) }
             if !isSample { session.start() }
             updateListening()
         }
@@ -410,16 +421,15 @@ struct LobbyView: View {
         // screen's model closes the trip (`TripScreenModel.exit`).
         .onDisappear {
             onScreen = false
+            stage.tripLayer(of: session, onScreen: false)
             updateListening()
         }
         .onChange(of: session.isTracking) { _, tracking in
             guard tracking else { return }
-            let action = LocationAccess.nextAction(
-                status: location.status, accuracy: location.accuracy, context: .goingToBackground)
-            if session.consumeAlwaysExplainer(action: action) { session.alwaysExplainerShowing = true }
+            if session.consumeAlwaysExplainer(action: location.backgroundAction) { session.alwaysExplainerShowing = true }
         }
         .sheet(isPresented: Binding(
-            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing, mapSheetUp: session.mapSheetUp || sheetUp) },
+            get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing, mapSheetUp: sheetsUp) },
             set: { if !$0 { session.alwaysExplainerShowing = false } }
         )) {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.
@@ -494,12 +504,7 @@ struct LobbyView: View {
             ownColorHex: ownCarColor, sheetCompact: compact,
             onCandidateTap: { adding?.select($0) }, command: $mapCommand)
             .onChange(of: adding?.selectedId, initial: true) { _, id in if let id { flyTo(id) } }
-            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(
-                presented: !sheetCovered, onDismiss: { sheetUp = false },
-                content: AnyView(sheetContent
-                    .onAppear { sheetUp = true }
-                    // The content changing to the convoy's (driving) is not a dismissal: the lobby's sheet is gone all the same.
-                    .onDisappear { sheetUp = false })))
+            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(content: AnyView(sheetContent)))
     }
 
     /// The lobby's content in Apple's own sheet over the map (canvas B4 medium, B5 tall): the same glass surface as the
@@ -512,7 +517,7 @@ struct LobbyView: View {
             if let adding {
                 AddStopContent(
                     model: adding, barLift: barLift, onSelect: { adding.select($0) },
-                    onExpand: { withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { expanded = true } },
+                    onExpand: { withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { setExpanded(true) } },
                     onBack: closeAddStop,
                     onAdd: { draft in
                         addStop(draft)
@@ -531,7 +536,7 @@ struct LobbyView: View {
         }
         .presentationDetents(TripScreenLogic.Sheet.lobby(compact: compact).detents, selection: Binding(
             get: { LobbySheet.detent(expanded: expanded, compact: compact) },
-            set: { expanded = LobbySheet.isExpanded($0) }))
+            set: { setExpanded(LobbySheet.isExpanded($0)) }))
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: TripScreenLogic.Sheet.lobby(compact: compact).touchableUpThrough))
         .interactiveDismissDisabled()

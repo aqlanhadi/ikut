@@ -10,7 +10,8 @@ struct JoinSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var stepper: JoinStepper
     var onClose: () -> Void
-    var onJoined: (_ tripId: String) -> Void
+    /// Joined: the trip, and whether this phone tracks its car (it shares, and nobody else had the car).
+    var onJoined: (_ tripId: String, _ tracks: Bool) -> Void
 
     @State private var codeText: String
     @State private var showScanner = false
@@ -23,7 +24,7 @@ struct JoinSheet: View {
     /// iOS was asked on the Join tap and refused: the line shows and the next tap joins as the co-pilot.
     @State private var refusedOnTap = false
 
-    init(stepper: JoinStepper, onClose: @escaping () -> Void, onJoined: @escaping (_ tripId: String) -> Void) {
+    init(stepper: JoinStepper, onClose: @escaping () -> Void, onJoined: @escaping (_ tripId: String, _ tracks: Bool) -> Void) {
         self.stepper = stepper
         self.onClose = onClose
         self.onJoined = onJoined
@@ -138,7 +139,7 @@ struct JoinSheet: View {
             }
         case .car:
             if let taken = model.trackerTakenResult {
-                Button { onJoined(taken.tripId) } label: { Text("Continue").barActionLabel() }
+                Button { onJoined(taken.tripId, model.tracks) } label: { Text("Continue").barActionLabel() }
                     .actionBarStyle(prominent: true)
                     .accessibilityIdentifier("joinContinue")
                     .sheetActionBar(sides: false)
@@ -245,7 +246,7 @@ struct JoinSheet: View {
                 return
             }
             refusedOnTap = false
-            if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId) }
+            if let result = await model.join(sharing: decision.tracker) { onJoined(result.tripId, model.tracks) }
         }
     }
 

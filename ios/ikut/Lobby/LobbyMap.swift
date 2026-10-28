@@ -2,9 +2,9 @@ import CoreLocation
 import MapKit
 import SwiftUI
 
-/// The sizes, detents and cover rule of the lobby's sheet, pure so they can be tested. Like Home's (`HomeSheet`),
-/// the sheet is Apple's own, always up, with the map behind it touchable at the medium height: medium shows the top
-/// of the content and the cars (canvas B4), tall the rest (B5).
+/// The sizes and detents of the lobby's sheet, pure so they can be tested; what it steps aside for is the one list
+/// (`TripSheetCover`). Like Home's (`HomeSheet`), the sheet is Apple's own, always up, with the map behind it touchable
+/// at the medium height: medium shows the top of the content and the cars (canvas B4), tall the rest (B5).
 enum LobbySheet {
     /// The medium detent's height at the default text size (B4's 470 pt).
     static let compactHeight: CGFloat = 470
@@ -26,22 +26,6 @@ enum LobbySheet {
     static func detent(expanded: Bool, compact: CGFloat) -> PresentationDetent { expanded ? tall : medium(compact) }
     static func isExpanded(_ detent: PresentationDetent) -> Bool { BottomSheet.isTall(detent, tall: tall) }
 
-    /// What is pushed or presented from the lobby (the driving mode is not: it changes the sheet's content): the sheet steps aside for each and comes back when they are gone.
-    struct Cover: Equatable {
-        var changeDestination = false
-        var suggestStops = false
-        var renaming = false
-        var alwaysExplainer = false
-        var confirmLeave = false
-        var confirmEnd = false
-    }
-
-    /// Driving, the convoy sheet steps aside only for what is pushed or presented over the screen: Change destination,
-    /// the Always sheet, or the lobby not on screen. Leave, End and rename present from inside the pulled-up sheet.
-    static func drivingCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
-        !lobbyOnScreen || cover.changeDestination || cover.suggestStops || cover.alwaysExplainer
-    }
-
     /// The asks presented from inside the pulled-up driving sheet.
     struct PulledUpAsks: Equatable {
         var confirmLeave = false
@@ -54,12 +38,6 @@ enum LobbySheet {
     /// hazard approach): torn down with it, so cleared, never shown untapped at the next pull-up; kept while it shows.
     static func pulledUpAsks(_ asks: PulledUpAsks, continuationShown: Bool) -> PulledUpAsks {
         continuationShown ? asks : PulledUpAsks()
-    }
-
-    /// Whether the sheet is away: anything above is up, or the lobby itself is not on screen (popped).
-    static func isCovered(_ cover: Cover, lobbyOnScreen: Bool) -> Bool {
-        !lobbyOnScreen || cover.changeDestination || cover.suggestStops
-            || cover.renaming || cover.alwaysExplainer || cover.confirmLeave || cover.confirmEnd
     }
 }
 
@@ -220,7 +198,7 @@ struct LobbyMapLayer: View {
             .onChange(of: command) { _, new in go(new.target, animated: true) }
             // Coming back from driving: the camera flies from your car back to the whole trip, wherever it was left.
             .onAppear {
-                if TripScreenLogic.entryCamera(.lobby) == .wholeTrip {
+                if stage.entryCamera == .wholeTrip {
                     go(.wholeTrip, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
                 }
             }

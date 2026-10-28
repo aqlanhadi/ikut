@@ -186,6 +186,48 @@ struct JoinModelTests {
         #expect(none.code.isEmpty && !none.isLoadingPreview)
     }
 
+    // MARK: Whether this phone tracks the car it joined (asks for Always before the lobby, #497)
+
+    private let x70 = PreviewCar(id: "c2", name: "X70", color: TripService.palette[1], hasTracker: false)
+
+    /// Joins as the sheet does: `sharing` is `JoinSteps.tracker` for what iOS said on the tap.
+    private func joined(_ pick: (JoinModel) -> Void, authorization: LocationAccess.Status = .whenInUse,
+                        trackerTaken: Bool = false) async -> JoinModel {
+        let preview = TripPreview(tripId: "t1", name: "Raya", destinationName: "Ipoh", cars: trip.cars + [x70])
+        let model = JoinModel(displayName: "Sam", api: FakeJoinAPI(
+            preview: preview, joinResult: JoinResult(tripId: "t1", carId: "c9", trackerTaken: trackerTaken)))
+        model.codeChanged("ABC234")
+        await waitUntil(.milliseconds(500)) { model.preview != nil }
+        pick(model)
+        let wantsToShare = model.selection == .newCar || model.tracker
+        let sharing = JoinSteps.tracker(wantsToShare: wantsToShare, authorization: authorization).tracker
+        _ = await model.join(sharing: sharing)
+        return model
+    }
+
+    @Test func aNewCarWhileSharingTracks() async {
+        #expect(await joined { $0.selectNewCar() }.tracks)
+    }
+
+    @Test func anExistingCarWithNoTrackerTracks() async {
+        #expect(await joined { $0.select(self.x70) }.tracks)
+    }
+
+    @Test func ridingInACarThatHasATrackerDoesNotTrack() async {
+        #expect(await !joined { $0.select(self.trip.cars[0]) }.tracks)
+    }
+
+    @Test func aTrackerTakenJoinThenContinueDoesNotTrack() async {
+        let model = await joined({ $0.select(self.x70) }, trackerTaken: true)
+        #expect(model.trackerTakenResult != nil)
+        #expect(!model.tracks)
+    }
+
+    @Test func locationRefusedOnTheTapJoinsAsCoPilotAndDoesNotTrack() async {
+        #expect(await !joined({ $0.selectNewCar() }, authorization: .denied).tracks)
+        #expect(!JoinSteps.tracks(asked: true, sharing: false, trackerTaken: false))
+    }
+
     @Test func newCarDefaultsAndTrackerFollowsSelection() async {
         let model = JoinModel(displayName: "Sam", api: FakeJoinAPI(preview: trip))
         model.codeChanged("ABC234")

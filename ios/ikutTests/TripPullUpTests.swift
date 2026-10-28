@@ -140,17 +140,21 @@ struct TripPullUpTests {
 
     // MARK: What the convoy sheet steps aside for
 
-    @Test func drivingTheSheetStaysUpForLeaveEndAndRenameAndStepsAsideForWhatTakesTheScreen() {
-        func cover(_ change: (inout LobbySheet.Cover) -> Void) -> LobbySheet.Cover { var c = LobbySheet.Cover(); change(&c); return c }
+    @MainActor @Test func drivingTheSheetStaysUpForLeaveEndAndRenameAndStepsAsideForWhatTakesTheScreen() {
+        func presented(_ covers: Set<TripSheetCover>) -> Bool {
+            let sheet = TripSheet(size: .driving(.pulledUp))
+            sheet.cover(covers, among: TripSheetCover.trip)
+            return sheet.presented
+        }
         // Presented from inside the pulled-up sheet: it stays up, so Cancel leaves it pulled up.
-        #expect(!LobbySheet.drivingCovered(cover { $0.confirmEnd = true }, lobbyOnScreen: true))
-        #expect(!LobbySheet.drivingCovered(cover { $0.confirmLeave = true }, lobbyOnScreen: true))
-        #expect(!LobbySheet.drivingCovered(cover { $0.renaming = true }, lobbyOnScreen: true))
+        #expect(presented([.confirmEnd]))
+        #expect(presented([.confirmLeave]))
+        #expect(presented([.renaming]))
         // Pushed or presented over the whole screen: it steps aside.
-        #expect(LobbySheet.drivingCovered(cover { $0.changeDestination = true }, lobbyOnScreen: true))
-        #expect(LobbySheet.drivingCovered(cover { $0.alwaysExplainer = true }, lobbyOnScreen: true))
-        #expect(LobbySheet.drivingCovered(LobbySheet.Cover(), lobbyOnScreen: false))
-        #expect(!LobbySheet.drivingCovered(LobbySheet.Cover(), lobbyOnScreen: true))
+        #expect(!presented([.changeDestination]))
+        #expect(!presented([.alwaysExplainer]))
+        #expect(!presented([.tripOffScreen]))
+        #expect(presented([]))
     }
 
     @Test func theAsksInsideThePulledUpSheetGoWithItAndNeverComeBackUntapped() {

@@ -21,15 +21,13 @@ struct TripsHomeView: View {
     /// A trip that hasn't ended opens on the same map: its lobby, or driving when Home has read that it started. An
     /// ended one is picked on this map instead.
     var onOpenTrip: (PastTrips.Entry, _ started: Bool) -> Void = { _, _ in }
-    /// A pushed screen or a sheet of the parent is up: Home's sheet steps aside (a sheet is presented
-    /// over Home, so it would sit over them) and comes back when this is false again.
-    var covered = false
-    /// Follows whether the sheet is on screen (set when it appears, cleared once it has gone), for the parent.
-    var sheetUp: Binding<Bool> = .constant(false)
+    /// A pushed screen or a sheet of the parent is up: Home's sheet steps aside (a sheet is presented over Home, so it
+    /// would sit over them) and comes back when this is false again (`TripSheetCover.home`, set by the parent).
+    var covered: Bool { stage.sheet.covered(by: TripSheetCover.home) }
     /// The trip was made: its id, to open its lobby.
     var onCreated: (String) -> Void = { _ in }
-    /// The trip was joined: its id, to open its lobby.
-    var onJoined: (String) -> Void = { _ in }
+    /// The trip was joined: its id, to open its lobby, and whether this phone tracks its car.
+    var onJoined: (String, Bool) -> Void = { _, _ in }
 
     @State private var renaming = false
     @State private var newName = ""
@@ -49,13 +47,10 @@ struct TripsHomeView: View {
     #endif
 
     init(model: HomeModel = HomeModel.launching(), onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
-         onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, covered: Bool = false,
-         sheetUp: Binding<Bool> = .constant(false), onCreated: @escaping (String) -> Void = { _ in },
-         onJoined: @escaping (String) -> Void = { _ in }) {
+         onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, onCreated: @escaping (String) -> Void = { _ in },
+         onJoined: @escaping (String, Bool) -> Void = { _, _ in }) {
         given = model
         self.onJoined = onJoined
-        self.covered = covered
-        self.sheetUp = sheetUp
         self.onCreated = onCreated
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
@@ -108,15 +103,16 @@ struct TripsHomeView: View {
             .allowsHitTesting(false)
             .ignoresSafeArea()
             .preference(key: TripMapSpecKey.self, value: mapSpec)
-            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(
-                presented: !covered, onDismiss: { sheetUp.wrappedValue = false },
-                content: AnyView(sheetContent
-                    .onAppear { sheetUp.wrappedValue = true }
-                    // The content changing to a trip's is not a dismissal: Home's sheet is gone all the same.
-                    .onDisappear { sheetUp.wrappedValue = false })))
+            .preference(key: TripSheetSpecKey.self, value: TripSheetSpec(content: AnyView(sheetContent)))
             // Coming back from a trip the camera flies from it to the list; the app's first frame just places it.
             .onAppear {
-                guard TripScreenLogic.entryCamera(.home) == .homeList else { return }
+                // A demo's own model takes the screen's one sheet, at the size it was seeded with.
+                if model.sheet !== stage.sheet {
+                    let tall = model.expanded
+                    model.sheet = stage.sheet
+                    model.expanded = tall
+                }
+                guard stage.entryCamera == .homeList else { return }
                 // Once per appearance (Home is new after a trip): where the phone last knew you were.
                 if model.here == nil, !model.isDemo, model.routes.isEmpty { model.here = Self.lastKnownLocation() }
                 let animated = TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera)
@@ -447,9 +443,9 @@ struct TripsHomeView: View {
         goBack(model.closeJoin(camera: stage.camera))
     }
 
-    private func joined(_ tripId: String) {
+    private func joined(_ tripId: String, tracks: Bool) {
         model.joined(covered: covered)
-        onJoined(tripId)
+        onJoined(tripId, tracks)
     }
 
     /// The camera for a found code: the trip's end above the sheet; nothing before that.
@@ -483,7 +479,7 @@ struct TripsHomeView: View {
         // same short height) keeps its size and only its contents change.
         return ZStack(alignment: .top) {
             if let joinFlow = model.joinFlow {
-                JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: joined)
+                JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: { joined($0, tracks: $1) })
                     .transition(.opacity)
             } else if let flow = model.flow {
                 Group {

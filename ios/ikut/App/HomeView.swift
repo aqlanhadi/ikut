@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Root navigation: the welcome screen until "Get Started", then the app's one map (`TripScreenHost`, D54) with Home
+/// Root navigation: the welcome screen until "Get started", then the app's one map (`TripScreenHost`, D54) with Home
 /// (`TripsHomeView`) or a trip (`LobbyView`: its lobby or the driving map) over it. Opening a trip and leaving it are a
 /// camera move and a sheet change on that map; Join is Home's sheet too (its steps, D58), and the recap is pushed over it.
 /// Signed-out visitors give a name (sheet) before Create or Join.
@@ -24,14 +24,14 @@ struct HomeView: View {
     @State private var path: [Route] = []
     /// The one map's mode, camera and open trip with its session and models, shared by Home and the trip (D54). The
     /// trip's objects are made and dropped by it (`open`, `exit`), not here.
-    @State private var stage = TripScreenModel(mode: .home)
+    @State private var stage: TripScreenModel
     /// Where the app opens has been decided (`LaunchRoute`): until then nothing is drawn, so Home never flashes before
     /// the trip this phone is in.
     @State private var launched = false
     /// Home's flows (`HomeModel`): once New trip's or Join's gates are through, `home.creating` / `home.joining` turn
     /// Home's sheet into Where to? or the join steps over its own map, with the code from a link or QR filled in (D58;
     /// no pushed screen). Made afresh each time Home comes back from a trip.
-    @State private var home = HomeModel.launching()
+    @State private var home: HomeModel
     @AppStorage("ikut.hasSeenWelcome") private var hasSeenWelcome = false
     @State private var showDenied = false
     @State private var showName = false
@@ -39,20 +39,25 @@ struct HomeView: View {
     @State private var afterName: Route?
     /// A route is being opened (a permission prompt may be up), so Home's sheet stays away.
     @State private var opening = false
-    /// Home's sheet is on screen (it reports its own appear and dismiss). The name and denied sheets wait for it to go.
-    @State private var homeSheetUp = false
     /// The route to open once the name sheet has gone (its dismissal is the signal, so a permission prompt can't collide).
     @State private var routeAfterName: Route?
 
-    /// Home's sheet is presented over Home, so it steps aside for everything that is pushed or presented
-    /// from here, and comes back when they are gone.
-    private var homeSheetCovered: Bool {
-        HomeSheet.isCovered(pathCount: path.count, showName: showName, showDenied: showDenied,
-                            afterName: afterName != nil, opening: opening)
+    /// The one sheet is presented over Home, so it steps aside for everything that is pushed or presented from here,
+    /// and comes back when they are gone (`TripSheetCover.home`).
+    private var homeCovers: Set<TripSheetCover> {
+        var covers = Set<TripSheetCover>()
+        if !path.isEmpty { covers.insert(.pushed) }
+        if showName || afterName != nil { covers.insert(.nameSheet) }
+        if showDenied { covers.insert(.locationSheet) }
+        if opening { covers.insert(.opening) }
+        return covers
     }
 
     init(pendingJoinCode: Binding<String?> = .constant(nil)) {
         _pendingJoinCode = pendingJoinCode
+        let stage = TripScreenModel(mode: .home)
+        _stage = State(initialValue: stage)
+        _home = State(initialValue: HomeModel.launching(sheet: stage.sheet))
     }
 
     var body: some View {
@@ -103,7 +108,7 @@ struct HomeView: View {
                     RecapView(tripId: tripId, onDone: closeRecap)
                 }
             }
-            .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showName, sheetUp: homeSheetUp) },
+            .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showName, sheetUp: stage.sheet.up) },
                                         set: { showName = $0 }),
                    onDismiss: {
                 // Home's sheet is held back until the route is open; a swipe-down instead of Continue drops the trip.
@@ -123,7 +128,7 @@ struct HomeView: View {
                 }
                 .presentationDetents([.medium, .large])
             }
-            .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showDenied, sheetUp: homeSheetUp) },
+            .sheet(isPresented: Binding(get: { BottomSheet.presents(wanted: showDenied, sheetUp: stage.sheet.up) },
                                         set: { showDenied = $0 })) {
                 LocationDeniedView { location.openSettings() }
             }
@@ -136,6 +141,7 @@ struct HomeView: View {
                 }
             }
             .onChange(of: pendingJoinCode, initial: true) { handlePendingJoin() }
+            .onChange(of: homeCovers, initial: true) { _, covers in stage.sheet.cover(covers, among: TripSheetCover.home) }
         }
     }
 
@@ -207,19 +213,25 @@ struct HomeView: View {
                 onJoin: { begin(.join(code: nil)) },
                 // Only a trip that hasn't ended reaches here: an ended one is picked on Home's map.
                 onOpenTrip: { entry, started in begin(.trip(tripId: entry.id, started: started)) },
-                covered: homeSheetCovered,
-                sheetUp: $homeSheetUp,
-                onCreated: { tripId in openTrip(tripId, started: false) },
-                onJoined: { tripId in openTrip(tripId, started: false) }
+                // The organiser tracks their own car; a joiner when they share theirs.
+                onCreated: { tripId in openTrip(tripId, started: false, tracks: true) },
+                onJoined: { tripId, tracks in openTrip(tripId, started: false, tracks: tracks) }
             )
         }
     }
 
-    /// The trip takes over the one map: Home's sheet becomes the lobby's (or the convoy's) and the camera flies to it.
-    private func openTrip(_ tripId: String, started: Bool) {
+    /// The trip takes over the one map: Home's sheet becomes the lobby's (or the convoy's) at its entry size, and the
+    /// camera's target changes, in one transaction (`TripScreenModel.go`).
+    /// `tracks`: this phone will track the trip (made or joined sharing), so Always is asked before the lobby comes up
+    /// when it has only When In Use. A trip reopened from Home or at launch is not known to track yet: it asks once
+    /// tracking starts, over the lobby.
+    private func openTrip(_ tripId: String, started: Bool, tracks: Bool = false) {
         home.creating = false
         home.joining = nil
-        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
+        let asks = TripSessionLogic.asksAlwaysOnOpen(willTrack: tracks, action: location.backgroundAction)
+        withAnimation(Motion.sheet(reduceMotion: reduceMotion)) {
+            stage.open(tripId: tripId, started: started, asksAlways: asks)
+        }
     }
 
     /// Leave, End or Back to trips: the trip's sheet becomes Home's list and the camera flies back to it.
@@ -230,7 +242,7 @@ struct HomeView: View {
     /// The map back to Home; the trip's session stops and goes with its objects (`TripScreenModel.exit`).
     private func closeTrip() {
         stage.exit()
-        home = HomeModel.launching()
+        home = HomeModel.launching(sheet: stage.sheet)
     }
 
     /// Done on the recap: back to the one map, which is Home's list again (the ended trip's lobby or map closes in the

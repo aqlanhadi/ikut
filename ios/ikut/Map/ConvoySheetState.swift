@@ -7,18 +7,14 @@ enum MapCard: Equatable, Identifiable {
     var id: String { "card" }
 }
 
-/// The motion and hand-over state of the driving screen's convoy sheet (D63 B3): which size it shows, the panel's
-/// measured heights and the ones it holds while it moves, and the card sheet over it (which card is wanted, which is
-/// up, which is on its way out, what the keyboard covers). A value type with no view in it, so every transition is a
-/// plain mutation that a test can run; `TripMapView` keeps it in one `@State`, wraps a change in `withAnimation`
+/// The motion and hand-over state of the driving screen's convoy sheet (D63 B3): the panel's measured heights and the
+/// ones it holds while it moves, and the card sheet over it (which card is wanted, which is up, which is on its way
+/// out, what the keyboard covers). A value type with no view in it, so every transition is a plain mutation that a
+/// test can run; `TripMapView` keeps it in one `@State`, wraps a change in `withAnimation`
 /// (`Motion.sheet`) and runs the timers (the held heights' release, the dismissal fallback), which are the only parts
-/// that need a clock. The sizes and rules themselves stay in `PanelSheet`.
+/// that need a clock. The sizes and rules themselves stay in `PanelSheet`; which size the sheet shows, and whether it is
+/// up, are the one sheet's (`TripSheet`, D63 C3).
 struct ConvoySheetState: Equatable {
-    /// The convoy list starts folded on every arrival at the map; the driver opens it, or pulls the sheet up for the
-    /// lobby below it, when they want it.
-    var shown = PanelSheet.Shown.folded
-    /// Apple's convoy sheet is on screen (it reports its own appear and dismiss).
-    var panelUp = false
     /// The panel's measured heights (nil until each layout is seen): folded list, unfolded list, the card, the
     /// pinned bar, and the banner on top of the panel (0 without one).
     var foldedContent: CGFloat?
@@ -46,9 +42,6 @@ struct ConvoySheetState: Equatable {
     var sheetSafeBottom: CGFloat = 34
     private(set) var cardSafeBottom: CGFloat = 34
     private(set) var cardKeyboard: CGFloat = 0
-
-    /// The convoy list is unfolded (tall or pulled up).
-    var listUnfolded: Bool { shown.listUnfolded }
 
     // MARK: Heights
 
@@ -86,9 +79,9 @@ struct ConvoySheetState: Equatable {
         return first
     }
 
-    /// The height of the map the sheets cover, for the camera; 0 while the sheet is not up.
-    func covered(room: CGFloat?, hasTopBanner: Bool) -> CGFloat {
-        guard panelUp else { return 0 }
+    /// The height of the map the sheets cover at `shown`, for the camera; 0 while the sheet is not `up`.
+    func covered(_ shown: PanelSheet.Shown, up: Bool, room: CGFloat?, hasTopBanner: Bool) -> CGFloat {
+        guard up else { return 0 }
         return PanelSheet.covered(
             shown: shown, in: heights(room: room, hasTopBanner: hasTopBanner),
             card: presentedCard == nil ? nil : cardHeight(room: room))
@@ -110,20 +103,6 @@ struct ConvoySheetState: Equatable {
         guard number == motion, moving else { return false }
         moving = false
         return true
-    }
-
-    /// Sets what the sheet shows; false when it shows it already (no motion then).
-    func needsMotion(to value: PanelSheet.Shown) -> Bool { value != shown }
-
-    /// The header's fold and unfold: unfolding a pulled-up sheet leaves it pulled up. The size to move to, nil when
-    /// the list is in that state already.
-    func shown(expanding value: Bool) -> PanelSheet.Shown? {
-        value == listUnfolded ? nil : (value ? .unfolded : .folded)
-    }
-
-    /// The size after a moment that touches the sheet by itself (a hazard approach, a stop asking).
-    func shown(after moment: PanelSheet.Moment) -> PanelSheet.Shown {
-        PanelSheet.shown(after: moment, from: shown)
     }
 
     // MARK: The card
@@ -174,7 +153,6 @@ struct ConvoySheetState: Equatable {
     /// The convoy sheet went (the trip ended, the Always explainer): the card went with it, and nothing is on its
     /// way out. It comes back with the convoy sheet if it is still wanted.
     mutating func convoySheetWent() {
-        panelUp = false
         presentedCard = nil
         cardDismissing = PanelSheet.cardsGone.dismissing
     }

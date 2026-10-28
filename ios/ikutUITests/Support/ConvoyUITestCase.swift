@@ -129,16 +129,48 @@ class ConvoyUITestCase: XCTestCase {
     }
 
     /// Waits for the lobby's bottom bar (Start trip, Show map or the waiting line), answering "Not now" to the Always
-    /// explainer if it comes up meanwhile: the lobby's sheet, and its bar, step aside while the explainer is up.
-    func waitForLobby(timeout: TimeInterval) -> Bool {
+    /// explainer if it comes up meanwhile: the lobby's sheet, and its bar, step aside while the explainer is up. Returns
+    /// once the bar has stayed on screen and hittable for `steady` seconds with no "Not now" up, so a sheet that comes
+    /// up and then slides away for the explainer is not taken for the lobby (#496).
+    func waitForLobby(timeout: TimeInterval, steady: TimeInterval = 1) -> Bool {
         let bar = lobbyPresence
+        let notNow = app.buttons["Not now"]
         let deadline = Date().addingTimeInterval(timeout)
+        var since: Date?
         while Date() < deadline {
-            dismissNotNow()
-            if bar.exists, bar.isHittable { return true }
-            Thread.sleep(forTimeInterval: 0.5)
+            if dismissNotNow() { since = nil }
+            if !notNow.exists, hittableOnScreen(bar) {
+                let start = since ?? Date()
+                since = start
+                if Date().timeIntervalSince(start) >= steady { return true }
+            } else {
+                since = nil
+            }
+            Thread.sleep(forTimeInterval: 0.25)
         }
         return false
+    }
+
+    /// Hittable, asked only once its frame is inside the app's window: XCTest records a failure, instead of answering
+    /// false, for an element whose frame is off screen (a sheet sliding away), or that went between two queries. One
+    /// snapshot gives its frame; a snapshot that finds nothing throws, and is false.
+    func hittableOnScreen(_ element: XCUIElement) -> Bool {
+        guard let frame = try? element.snapshot().frame,
+              let window = try? app.windows.firstMatch.snapshot().frame else { return false }
+        guard !frame.isEmpty, window.contains(CGPoint(x: frame.midX, y: frame.midY)) else { return false }
+        return element.isHittable
+    }
+
+    /// Start trip (or Show map) from the lobby: waits for its bar to be steady, taps it, answers the map's asks, and
+    /// tries again if the driving map doesn't come (the tap landed while the sheet was stepping aside).
+    func startFromLobby(lobbyTimeout: TimeInterval = 30, mapTimeout: TimeInterval = 15, attempts: Int = 3) {
+        for _ in 0..<attempts {
+            guard waitForLobby(timeout: lobbyTimeout) else { break }
+            lobbyActionButton.tap()
+            app.dismissMapAsks(first: 3)
+            if app.drivingReport.waitForExistence(timeout: mapTimeout) { return }
+        }
+        XCTFail("Start trip didn't switch to the driving map")
     }
 
     /// Answers "Not now" to whatever question is up (the Always-location explainer comes up once tracking starts, and
@@ -147,8 +179,13 @@ class ConvoyUITestCase: XCTestCase {
     @discardableResult
     func dismissNotNow(timeout: TimeInterval = 0) -> Bool {
         let notNow = app.buttons["Not now"]
-        guard timeout > 0 ? notNow.waitForExistence(timeout: timeout) : notNow.exists else { return false }
-        notNow.tap()
+        if timeout > 0, !notNow.waitForExistence(timeout: timeout) { return false }
+        // Tapped where one snapshot saw it: a "Not now" already tapped can still exist while it slides away and be
+        // gone by the time an element tap looks for it again, which XCTest records as a failure.
+        guard let frame = try? notNow.snapshot().frame, !frame.isEmpty,
+              let window = try? app.windows.firstMatch.snapshot().frame,
+              window.contains(CGPoint(x: frame.midX, y: frame.midY)) else { return false }
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
         return true
     }
 
@@ -262,6 +299,9 @@ class ConvoyUITestCase: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if home.exists || welcome.exists { return }
+            // A trip reopened at launch asks for Always over its sheet once tracking starts: the sheet (and Report or
+            // Back in it) comes back after Not now.
+            if dismissNotNow() { continue }
             if app.drivingReport.exists || back.exists { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
@@ -340,7 +380,13 @@ class ConvoyUITestCase: XCTestCase {
     /// The organizer's lobby: the six-letter join code from the header's "To Ipoh · code K7M 2QX" line.
     func readJoinCode() -> String {
         let line = labelled("label CONTAINS %@", " · code ")
-        XCTAssertTrue(line.waitForExistence(timeout: 15), "Lobby shows no join code")
+        // The lobby's sheet steps aside for the Always explainer: answer it while waiting for the code.
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline, !line.exists {
+            dismissNotNow()
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        XCTAssertTrue(line.exists, "Lobby shows no join code")
         let code = (line.label.components(separatedBy: "code ").last ?? "").replacingOccurrences(of: " ", with: "")
         XCTAssertEqual(code.count, 6, "code: \(code)")
         return code

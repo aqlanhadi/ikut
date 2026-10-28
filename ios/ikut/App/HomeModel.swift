@@ -27,8 +27,13 @@ final class HomeModel {
     var listCamera: MapCameraPosition
     /// Where the camera last went to show you (`HomeCamera`); nil before the first fix.
     var here: CLLocationCoordinate2D?
+    /// The one sheet (`TripSheet`), the screen's: Home sizes it only while Home is on screen.
+    var sheet: TripSheet
     /// The sheet is at its tall detent (the detent selection reads and writes it). Every flow starts and ends short.
-    var expanded = false
+    var expanded: Bool {
+        get { sheet.size == .home(tall: true) }
+        set { sheet.resize(to: .home(tall: newValue)) }
+    }
     /// Screenshot demo: shows what it was given and reads nothing from the phone or the server.
     var isDemo = false
     /// Reduce Motion is on (set by the view): the sheet's changes crossfade instead of moving.
@@ -64,7 +69,8 @@ final class HomeModel {
     private(set) var cameraBeforeJoin: MapCameraPosition?
 
     init(past: [PastTrips.Entry] = [], routes: [PastTripRoute] = [],
-         listCamera: MapCameraPosition = .region(HomeCamera.fallback)) {
+         listCamera: MapCameraPosition = .region(HomeCamera.fallback), sheet: TripSheet = TripSheet()) {
+        self.sheet = sheet
         self.past = past
         self.routes = routes
         self.listCamera = listCamera
@@ -72,12 +78,12 @@ final class HomeModel {
 
     /// Home as it opens: on the cached past routes when there are any, else a fixed region, never MapKit's
     /// follow-the-user (`HomeCamera`). The phone's last known spot is read once the view is on screen.
-    static func launching() -> HomeModel {
+    static func launching(sheet: TripSheet = TripSheet()) -> HomeModel {
         let cache = PastTripsMapService.cachedRoutes()
         let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
         let insets = TripsHomeView.obscured(mapHeight: 0)
         let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top)
-        return HomeModel(routes: region != nil ? cached : [], listCamera: HomeCamera.launch(cachedRoutes: region))
+        return HomeModel(routes: region != nil ? cached : [], listCamera: HomeCamera.launch(cachedRoutes: region), sheet: sheet)
     }
 
     /// What the sheet's content changing runs on: the camera's motion, or a short crossfade with Reduce Motion.

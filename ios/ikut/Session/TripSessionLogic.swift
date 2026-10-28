@@ -110,6 +110,12 @@ enum TripSessionLogic {
         action == .showAlwaysExplainer && !alreadyShown
     }
 
+    /// Whether a trip opening asks for Always before its lobby comes up: this phone will track it (it made the trip, or
+    /// joined sharing its car) and Always would be asked once tracking starts (`action` for going to the background).
+    static func asksAlwaysOnOpen(willTrack: Bool, action: LocationAction) -> Bool {
+        willTrack && action == .showAlwaysExplainer
+    }
+
     /// The Always sheet wants the screen while wanted and no map ask is up, so the two never stack.
     static func explainerWants(wanted: Bool, askShowing: Bool) -> Bool { wanted && !askShowing }
 

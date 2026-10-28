@@ -134,6 +134,119 @@ enum TripScreenLogic {
     }
 }
 
+/// The one sheet's size (D63 C3): Home's short or tall, the lobby's medium or tall, or the convoy's folded, unfolded or
+/// pulled up. The heights behind each stay with their mode (`HomeSheet`, `LobbySheet`, `PanelSheet`).
+enum TripSheetSize: Equatable {
+    case home(tall: Bool)
+    case lobby(tall: Bool)
+    case driving(PanelSheet.Shown)
+
+    var mode: TripScreenMode {
+        switch self {
+        case .home: .home
+        case .lobby: .lobby
+        case .driving: .driving
+        }
+    }
+
+    /// Where each mode's sheet starts: short, medium, folded (every arrival at the map starts with the list folded).
+    static func entry(_ mode: TripScreenMode) -> TripSheetSize {
+        switch mode {
+        case .home: .home(tall: false)
+        case .lobby: .lobby(tall: false)
+        case .driving: .driving(.folded)
+        }
+    }
+
+    /// Home's or the lobby's tall detent; the convoy's is `shown`.
+    var isTall: Bool {
+        switch self {
+        case .home(let tall), .lobby(let tall): tall
+        case .driving: false
+        }
+    }
+
+    /// The convoy sheet's size; folded outside driving.
+    var shown: PanelSheet.Shown {
+        if case .driving(let shown) = self { return shown }
+        return .folded
+    }
+}
+
+/// Why the one sheet steps aside (D63 C3): one list for every mode, each mode heeding its own (`heeded(in:)`).
+enum TripSheetCover: Hashable, CaseIterable {
+    /// Home's: a screen pushed over the map (the recap), the name sheet (wanted, or waiting for the name), the location
+    /// sheet, or a trip being opened while a permission prompt may be up.
+    case pushed, nameSheet, locationSheet, opening
+    /// The trip's layer is not on screen (another screen pushed over the trip, or the trip closing).
+    case tripOffScreen
+    /// What the lobby pushes or presents over the whole screen.
+    case changeDestination, suggestStops, alwaysExplainer
+    /// The lobby's asks: presented over its sheet in the lobby, from inside the pulled-up convoy sheet while driving.
+    case renaming, confirmLeave, confirmEnd
+    /// The trip ended: the recap is pushed.
+    case tripEnded
+
+    /// Home's reasons, written by its root (`HomeView`).
+    static let home: Set<Self> = [.pushed, .nameSheet, .locationSheet, .opening]
+    /// The open trip's, written by its layers (`LobbyView`); cleared when a trip opens or closes.
+    static let trip: Set<Self> = Set(allCases).subtracting(home)
+
+    /// What the sheet steps aside for in `mode`. Driving keeps it up for rename, Leave and End (they present from inside
+    /// the pulled-up sheet); the lobby keeps it up when the trip ends (the lobby going off screen takes it).
+    static func heeded(in mode: TripScreenMode) -> Set<Self> {
+        switch mode {
+        case .home: home
+        case .lobby: trip.subtracting([.tripEnded])
+        case .driving: trip.subtracting([.renaming, .confirmLeave, .confirmEnd])
+        }
+    }
+}
+
+/// The one sheet (D63 C3): its size, whether it is on screen, and why it steps aside, in one place for Home, the lobby
+/// and driving. The mode's switch (`TripScreenModel.go`) sets the size; within a mode its layer resizes it, and a
+/// layer on its way out (a detent reported while its content leaves) cannot.
+@Observable @MainActor
+final class TripSheet {
+    private(set) var size: TripSheetSize {
+        didSet { if size != oldValue { changes &+= 1 } }
+    }
+    /// The sheet is on screen (the host's sheet reports its appear and dismiss); what else is presented waits for it to go.
+    var up = false
+    private(set) var covers: Set<TripSheetCover> = []
+    /// How many times the size changed, so a test can tell a hand-over resized the sheet once.
+    @ObservationIgnored private(set) var changes = 0
+
+    init(size: TripSheetSize = .home(tall: false)) {
+        self.size = size
+    }
+
+    /// The sheet is wanted on screen in its mode.
+    var presented: Bool { covers.isDisjoint(with: TripSheetCover.heeded(in: size.mode)) }
+
+    /// Any of `kinds` holds the sheet back now, in any mode.
+    func covered(by kinds: Set<TripSheetCover>) -> Bool { !covers.isDisjoint(with: kinds) }
+
+    /// Sets which of `kinds` hold the sheet back now; the other reasons stay as they are.
+    func cover(_ reasons: Set<TripSheetCover>, among kinds: Set<TripSheetCover>) {
+        let next = covers.subtracting(kinds).union(reasons.intersection(kinds))
+        if next != covers { covers = next }
+    }
+
+    /// A resize within the mode on screen. One for another mode is ignored and returns false.
+    @discardableResult
+    func resize(to next: TripSheetSize) -> Bool {
+        guard next.mode == size.mode else { return false }
+        size = next
+        return true
+    }
+
+    /// The mode's switch: its entry size. Only `TripScreenModel.go` switches.
+    fileprivate func enter(_ mode: TripScreenMode) {
+        size = .entry(mode)
+    }
+}
+
 /// What a layer asks the one map to draw: the content, and the bottom safe area the logo and Legal ride above.
 struct TripMapSpec {
     var input = TripMapInput()
@@ -145,10 +258,9 @@ struct TripMapSpec {
     var onTap: (() -> Void)?
 }
 
-/// The one sheet's content and whether it is up now (the cover rules: `LobbySheet`, `PanelSheet`).
+/// The one sheet's content; whether it is up is the screen's (`TripSheet.presented`).
 struct TripSheetSpec {
-    var presented: Bool
-    var onDismiss: () -> Void
+    var onDismiss: () -> Void = {}
     var content: AnyView
 }
 
@@ -211,7 +323,13 @@ struct OpenTrip {
 /// with their own logic (`LobbyMapLogic`, `MapCameraRoom`).
 @Observable @MainActor
 final class TripScreenModel {
-    var mode: TripScreenMode
+    /// Home, the lobby or driving; switched only by `go(to:)`, with the sheet's size and the camera's target.
+    private(set) var mode: TripScreenMode
+    /// The one sheet: its size, whether it is up, and why it steps aside (D63 C3).
+    let sheet: TripSheet
+    /// Where the camera goes as the mode comes on screen: the layer coming on screen flies it there
+    /// (`TripScreenLogic.entryCamera`).
+    private(set) var entryCamera: TripScreenLogic.EntryCamera
     var camera: MapCameraPosition = .automatic
     var heading = 0.0
     var reading: TripCameraReading?
@@ -278,6 +396,8 @@ final class TripScreenModel {
     init(mode: TripScreenMode = .lobby, defaults: UserDefaults = .standard,
          makeTrip: @escaping @MainActor (String) -> OpenTrip = { OpenTrip.live(tripId: $0) }) {
         self.mode = mode
+        sheet = TripSheet(size: .entry(mode))
+        entryCamera = TripScreenLogic.entryCamera(mode)
         self.defaults = defaults
         self.makeTrip = makeTrip
         keepScreenOn = ScreenAwake.preference(
@@ -285,15 +405,34 @@ final class TripScreenModel {
     }
 
     /// Home hands the map to a trip: its lobby, or driving when it has started (`TripScreenLogic.Event.open`). The
-    /// trip's objects are made here, once: opening the trip already open keeps them.
-    func open(tripId: String, started: Bool) {
-        if trip?.id != tripId {
+    /// trip's objects are made here, once: opening the trip already open keeps them. `asksAlways`: this phone will
+    /// track the trip and still has only When In Use (`TripSessionLogic.asksAlwaysOnOpen`), so the Always explainer
+    /// comes now, before the lobby: Home's sheet steps aside in this same transaction, and the lobby's comes up once,
+    /// after the answer, instead of coming up and stepping aside for the ask when tracking starts.
+    func open(tripId: String, started: Bool, asksAlways: Bool = false) {
+        let fresh = trip?.id != tripId
+        if fresh {
             trip?.session.stop()
             trip = makeTrip(tripId)
+            sheet.cover([], among: TripSheetCover.trip)
+        }
+        if asksAlways, let session = trip?.session, session.consumeAlwaysExplainer(action: .showAlwaysExplainer) {
+            session.alwaysExplainerShowing = true
+            sheet.cover([.alwaysExplainer], among: [.alwaysExplainer])
         }
         pulledUp = false
         flight.cancel()
-        mode = TripScreenLogic.mode(after: .open(started: started), from: mode)
+        go(to: TripScreenLogic.mode(after: .open(started: started), from: mode), fresh: fresh)
+    }
+
+    /// The one switch between Home, the lobby and driving (D63 C3): the mode, the sheet's size and the camera's target
+    /// change together, so a caller's one `withAnimation` resizes the sheet once and aims the camera in that same
+    /// transaction. The mode already on screen changes nothing, unless a different trip comes (`fresh`).
+    func go(to next: TripScreenMode, fresh: Bool = false) {
+        guard next != mode || fresh else { return }
+        mode = next
+        sheet.enter(next)
+        entryCamera = TripScreenLogic.entryCamera(next)
     }
 
     /// Leave, End or Back to trips: Home's list on the same map. The trip's session stops here (tracking and its
@@ -301,9 +440,17 @@ final class TripScreenModel {
     func exit() {
         trip?.session.stop()
         trip = nil
+        sheet.cover([], among: TripSheetCover.trip)
         pulledUp = false
         flight.cancel()
-        mode = TripScreenLogic.mode(after: .exit, from: mode)
+        go(to: TripScreenLogic.mode(after: .exit, from: mode))
+    }
+
+    /// The open trip's layer went off screen (a screen pushed over it, or the trip closing): the sheet steps aside. A
+    /// layer of a trip no longer open (its write landing after a newer `open`) changes nothing.
+    func tripLayer(of session: TripSession, onScreen: Bool) {
+        guard trip == nil || trip?.session === session else { return }
+        sheet.cover(onScreen ? [] : [.tripOffScreen], among: [.tripOffScreen])
     }
 
     /// Something has placed the camera, so the next entry move is a flight from it.
@@ -366,9 +513,16 @@ struct TripScreenHost<Content: View>: View {
             .overlayPreferenceValue(TripSheetSpecKey.self) { spec in
                 Color.clear
                     .allowsHitTesting(false)
-                    .sheet(isPresented: Binding(get: { spec?.presented ?? false }, set: { _ in }),
-                           onDismiss: { spec?.onDismiss() }) {
-                        spec?.content
+                    .sheet(isPresented: Binding(get: { spec != nil && stage.sheet.presented }, set: { _ in }),
+                           onDismiss: {
+                        stage.sheet.up = false
+                        spec?.onDismiss()
+                    }) {
+                        // One container for every layer's content, so a hand-over swaps what is inside without the
+                        // sheet's one "up" going down and up again.
+                        ZStack { spec?.content }
+                            .onAppear { stage.sheet.up = true }
+                            .onDisappear { stage.sheet.up = false }
                     }
             }
             .environment(stage)

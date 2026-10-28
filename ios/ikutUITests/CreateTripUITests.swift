@@ -18,14 +18,10 @@ final class CreateTripUITests: ConvoyUITestCase {
         startNewTrip(as: "Organizer", homeTimeout: 15)
 
         try createTrip(to: destination)
-        let startTrip = app.buttons["Start trip"]
         add(XCTAttachment(screenshot: app.screenshot()))
 
-        // Tracking starts in the lobby; the "Not now" sheet (screen off) may cover Start trip, and the map asks its own.
-        dismissNotNow(timeout: 6)
-        startTrip.tap()
-        app.dismissMapAsks(first: 3)
-        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 20), "Didn't reach the map")
+        // The Always explainer ("Not now") may come before the lobby or over it, and the map asks its own.
+        startFromLobby()
         add(XCTAttachment(screenshot: app.screenshot()))
 
         // TEST_RUNNER_IKUT_HOLD_SECONDS keeps the map open, e.g. to watch `qa/drive-trip.mjs` play the route.
@@ -60,9 +56,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         XCTAssertTrue(waitForLobby(timeout: 30), "Home row to the lobby: no lobby sheet")
 
         // Start trip: the same screen in driving mode, the lobby's sheet now the convoy's.
-        lobbyActionButton.tap()
-        app.dismissMapAsks(first: 3)
-        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Didn't reach the map")
+        startFromLobby()
 
         // Pit stop's card over the convoy sheet, closed, then the sheet pulled up: one sheet, no card left behind.
         let pitStop = app.buttons["stop.button"]
@@ -135,9 +129,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         app.launch()
         startNewTrip(as: "Organizer", homeTimeout: 15)
         try createTrip(to: "Ipoh")
-        lobbyActionButton.tap()
-        app.dismissMapAsks(first: 3)
-        XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Start trip didn't switch to the driving map")
+        startFromLobby()
 
         app.terminate()
         app.launch()

@@ -16,6 +16,8 @@ final class JoinModel {
     private(set) var isJoining = false
     /// Set after a join where someone else already tracks the chosen car.
     private(set) var trackerTakenResult: JoinResult?
+    /// The last join made this phone its car's tracker (`JoinSteps.tracks`); false after a tracker-taken join.
+    private(set) var tracks = false
     var displayName: String
     var newCarName = ""
     private(set) var selection: CarSelection?
@@ -119,6 +121,7 @@ final class JoinModel {
         selection = nil
         errorMessage = nil
         trackerTakenResult = nil
+        tracks = false
         ticketDrive = nil
         driveTask?.cancel()
     }
@@ -173,6 +176,7 @@ final class JoinModel {
         do {
             let result = try await api.join(
                 code: code, displayName: firstName, car: car, tracker: tracker && sharing)
+            tracks = JoinSteps.tracks(asked: tracker, sharing: sharing, trackerTaken: result.trackerTaken)
             if result.trackerTaken {
                 trackerTakenResult = result
                 return nil
