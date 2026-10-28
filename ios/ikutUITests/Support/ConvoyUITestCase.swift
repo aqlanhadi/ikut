@@ -152,11 +152,11 @@ class ConvoyUITestCase: XCTestCase {
     }
 
     /// Hittable, asked only once its frame is inside the app's window: XCTest records a failure, instead of answering
-    /// false, for an element whose frame is off screen (a sheet sliding away).
+    /// false, for an element whose frame is off screen (a sheet sliding away), or that went between two queries. One
+    /// snapshot gives its frame; a snapshot that finds nothing throws, and is false.
     func hittableOnScreen(_ element: XCUIElement) -> Bool {
-        guard element.exists else { return false }
-        let frame = element.frame
-        let window = app.windows.firstMatch.frame
+        guard let frame = try? element.snapshot().frame,
+              let window = try? app.windows.firstMatch.snapshot().frame else { return false }
         guard !frame.isEmpty, window.contains(CGPoint(x: frame.midX, y: frame.midY)) else { return false }
         return element.isHittable
     }
@@ -179,8 +179,13 @@ class ConvoyUITestCase: XCTestCase {
     @discardableResult
     func dismissNotNow(timeout: TimeInterval = 0) -> Bool {
         let notNow = app.buttons["Not now"]
-        guard timeout > 0 ? notNow.waitForExistence(timeout: timeout) : notNow.exists else { return false }
-        notNow.tap()
+        if timeout > 0, !notNow.waitForExistence(timeout: timeout) { return false }
+        // Tapped where one snapshot saw it: a "Not now" already tapped can still exist while it slides away and be
+        // gone by the time an element tap looks for it again, which XCTest records as a failure.
+        guard let frame = try? notNow.snapshot().frame, !frame.isEmpty,
+              let window = try? app.windows.firstMatch.snapshot().frame,
+              window.contains(CGPoint(x: frame.midX, y: frame.midY)) else { return false }
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
         return true
     }
 
