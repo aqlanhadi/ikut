@@ -7,7 +7,7 @@ import SwiftUI
 /// three cars in the convoy near Tapah and Bidor (the last one stale), and Hafiz from Teluk Intan
 /// joining at Bidor on his own route.
 ///
-/// To see it in the simulator, launch a debug build with `IKUT_SCREEN=road-panel-short` (or another `road-panel-*`
+/// To see it in the simulator, launch a debug build with `IKUT_SCREEN=slot-stop-request` (or another `road-panel-*`
 /// state, see `DemoScreens`); `MapDemo.view()` hosts it. Nothing else in the app launches it.
 @MainActor
 enum MapDemo {
