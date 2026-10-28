@@ -318,12 +318,14 @@ private struct BannerGallery: View {
 /// `IKUT_SCREEN=slot-*`: one state of the banner slot each (MapBannerSlot.dc.html), on the demo map. Nothing speaks.
 /// `slot-hazard-stop-waiting` (frame a: the hazard shows, the stop approach waits), `slot-stop-approach` (b),
 /// `slot-stop-request` (b2), `slot-paused` (c), `slot-catchup` (d), `slot-route-notice` (d2), `slot-passed` (e),
-/// `slot-undo-toast` (f), `slot-toast-over-pill` (D60), `slot-error` (g), `slot-error-held` (i: the hazard shows, a red dot on the trip pill).
+/// `slot-undo-toast` (f), `slot-toast-over-pill` (D60), `slot-error` (g), `slot-error-held` (i: the hazard shows, a red dot on the trip pill),
+/// `camera-sheet-tour` (D67: following my car, then the whole convoy: the sheet unfolds and folds, a banner and an error come and go, looping).
 @MainActor
 enum BannerSlotDemo {
     static let names = [
         "slot-hazard-stop-waiting", "slot-stop-approach", "slot-stop-request", "slot-paused", "slot-catchup",
         "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-toast-over-pill", "slot-error", "slot-error-held",
+        "camera-sheet-tour",
     ]
 
     private static let errorLine = "Couldn’t reach the convoy. Try again in a moment."
@@ -347,6 +349,7 @@ enum BannerSlotDemo {
             return AnyView(map(plannedStop: true, toast: toast))
         case "slot-error": return AnyView(map(error: errorLine))
         case "slot-error-held": return AnyView(map(approach: true, error: errorLine))
+        case "camera-sheet-tour": return AnyView(map(tour: true))  // D67: sheet fold and banners coming, camera in step
         default: return nil
         }
     }
@@ -359,7 +362,8 @@ enum BannerSlotDemo {
 
     private static func map(
         approach: Bool = false, plannedStop: Bool = false, board: StopBoard = .empty, paused: Bool = false,
-        parked: String? = nil, passed: String? = nil, toast: ReportToastModel? = nil, error: String? = nil
+        parked: String? = nil, passed: String? = nil, toast: ReportToastModel? = nil, error: String? = nil,
+        tour: Bool = false
     ) -> some View {
         Backend.configure()
         let model = MapDemo.model(parked: parked)
@@ -381,7 +385,7 @@ enum BannerSlotDemo {
         return NavigationStack {
             TripScreenHost(mode: .driving) { TripMapView(
                 session: session, model: model, stopBoard: board, demoError: error,
-                demoApproach: approach ? MapDemo.debrisAlert : nil, demoPassed: passed, demoToast: toast,
+                demoApproach: approach ? MapDemo.debrisAlert : nil, demoPassed: passed, demoToast: toast, demoTour: tour,
                 stopService: DemoStopService()) }
         }
     }

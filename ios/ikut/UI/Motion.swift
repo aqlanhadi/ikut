@@ -225,7 +225,14 @@ final class CameraFlight {
     private var continues: @MainActor () -> Bool = { true }
     private var task: Task<Void, Never>?
     private var held: (() -> Void)?
+    private var set: (@MainActor (MapCameraPosition) -> Void)?
+    private var legs: [CameraPace.Leg]?
+    private var finalPosition: MapCameraPosition?
+    private var legIndex = 0
+    private var legEnd = Date()
     private let timeScale: Double
+    /// The least time a re-aimed last leg is given.
+    private static let shortestRetarget: TimeInterval = 0.1
 
     /// `timeScale` shortens every leg (tests).
     init(timeScale: Double = 1) { self.timeScale = timeScale }
@@ -240,24 +247,47 @@ final class CameraFlight {
              set: @escaping @MainActor (MapCameraPosition) -> Void) {
         cancel()
         let legs = CameraPace.legs(from: from, to: view, reduceMotion: reduceMotion)
+        finalPosition = position
         func target(of index: Int) -> MapCameraPosition {
-            index == legs.count - 1 ? position : .region(legs[index].to.region)
+            index == legs.count - 1 ? (finalPosition ?? position) : .region(legs[index].to.region)
         }
         flyingTo = view
         self.continues = continues
-        withAnimation(CameraPace.animation(legs[0])) { set(target(of: 0)) }
+        self.set = set
+        self.legs = legs
         let scale = timeScale
+        legIndex = 0
+        legEnd = Date().addingTimeInterval(legs[0].duration * scale)
+        withAnimation(CameraPace.animation(legs[0])) { set(target(of: 0)) }
         task = Task { [weak self] in
             for index in legs.indices {
                 try? await Task.sleep(for: .seconds(legs[index].duration * scale))
                 guard !Task.isCancelled else { return }
                 guard continues() else { self?.cancel(); return }
                 if index + 1 < legs.count {
+                    self?.legIndex = index + 1
+                    self?.legEnd = Date().addingTimeInterval(legs[index + 1].duration * scale)
                     withAnimation(CameraPace.animation(legs[index + 1])) { set(target(of: index + 1)) }
                 }
             }
             self?.land()
         }
+    }
+
+    /// A small change of where the flight lands (the banner or sheet that arrived while it flies moved what the
+    /// camera aims at): the flight lands there instead, in the time it had left, so there is no second move after the
+    /// landing. A later leg is simply aimed at `position`; the last leg in the air is set again with its remaining
+    /// time. False when nothing is flying (or the person has taken the map): the caller moves the camera itself.
+    @discardableResult
+    func retarget(to position: MapCameraPosition, view: CameraView) -> Bool {
+        guard isFlying, let set, let legs else { return false }
+        finalPosition = position
+        flyingTo = view
+        guard legIndex == legs.count - 1 else { return true }
+        let remaining = max(legEnd.timeIntervalSinceNow / timeScale, Self.shortestRetarget)
+        let leg = CameraPace.Leg(to: view, duration: remaining, curve: legs[legIndex].curve)
+        withAnimation(CameraPace.animation(leg)) { set(position) }
+        return true
     }
 
     /// Runs `apply` once the flight lands (the latest one only), or now when nothing is flying (or the person has
@@ -273,6 +303,8 @@ final class CameraFlight {
         flyingTo = nil
         continues = { true }
         held = nil
+        set = nil
+        legs = nil
     }
 
     private func land() {
@@ -281,6 +313,8 @@ final class CameraFlight {
         flyingTo = nil
         continues = { true }
         held = nil
+        set = nil
+        legs = nil
         apply?()
     }
 }

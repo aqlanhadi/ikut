@@ -123,6 +123,7 @@
 		6664FBFA3EF09F710D984DEE /* ConvoyHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56593AF71DE13AE887A4A0E /* ConvoyHeader.swift */; };
 		66B1B1B98B60E2439AD59234 /* ConvoyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB0A694CC1459C9224678CC /* ConvoyModel.swift */; };
 		66E1D3BEB35CA17544C67084 /* JoinService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBDD23345E4B5753BEC3866D /* JoinService.swift */; };
+		66FF3933C67886B391992ACB /* CameraInsetMove.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3460F253525E62DCFA34217E /* CameraInsetMove.swift */; };
 		684CB36C69FD2DA907C54EC7 /* PanelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12ADDCF865D1A7029BE6E299 /* PanelSheet.swift */; };
 		6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7D0C5E3A5A1C53E790120033 /* GoogleService-Info.plist */; };
 		6B6E898BB79ED1F3A1C67B5B /* CarRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */; };
@@ -245,6 +246,7 @@
 		E0C7E86BEDED57BD1C4A1256 /* PlannedStop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9BE33E452EA67593E95E26 /* PlannedStop.swift */; };
 		E0DA5017D0F92CF49077EA02 /* AlertBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9750682AB19CEB7CFF2B6B /* AlertBannerView.swift */; };
 		E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */; };
+		E2D3E899D1D27546D9CB2795 /* CameraInsetMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EDC4EED1F9D343E5BE454B /* CameraInsetMoveTests.swift */; };
 		E4ADF72C82298F5582A60C2B /* StopFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65A002CD84457A0B4A1CF7DC /* StopFormat.swift */; };
 		E4DC35787F05705E2D68F628 /* PlacePinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159E03084DFC4F56C746756E /* PlacePinTests.swift */; };
 		E4EF98D0A5B5842B9FC8EA69 /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A479378058FCF0288AE028C1 /* Fakes.swift */; };
@@ -345,6 +347,7 @@
 		259104081FD2BD54F7BCE87D /* BottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheet.swift; sourceTree = "<group>"; };
 		265DA41B16D79FE07ABF962B /* TripMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapView.swift; sourceTree = "<group>"; };
 		276A665B881911A49A9C38D7 /* PastTripsMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastTripsMap.swift; sourceTree = "<group>"; };
+		27EDC4EED1F9D343E5BE454B /* CameraInsetMoveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraInsetMoveTests.swift; sourceTree = "<group>"; };
 		28BB58A9FD28B315E822A8F2 /* PositionPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionPublisher.swift; sourceTree = "<group>"; };
 		28F201EC357C45D84BC4395C /* EventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTests.swift; sourceTree = "<group>"; };
 		29D417D8CDD8A80CCF181936 /* TrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTests.swift; sourceTree = "<group>"; };
@@ -365,6 +368,7 @@
 		322ED2F251FFDF594FC7D83E /* PickedTrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedTrip.swift; sourceTree = "<group>"; };
 		3375CFBCC39B1C2F76B90699 /* MapDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDemo.swift; sourceTree = "<group>"; };
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
+		3460F253525E62DCFA34217E /* CameraInsetMove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraInsetMove.swift; sourceTree = "<group>"; };
 		385EEAB04673E246156A8065 /* BannerSlotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerSlotTests.swift; sourceTree = "<group>"; };
 		39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeSizeTests.swift; sourceTree = "<group>"; };
 		3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalTests.swift; sourceTree = "<group>"; };
@@ -718,6 +722,7 @@
 			isa = PBXGroup;
 			children = (
 				9A59B3CC045531B01304008A /* BannerSlot.swift */,
+				3460F253525E62DCFA34217E /* CameraInsetMove.swift */,
 				AAF84B4D76AF2635109EAD53 /* CameraTourDemo.swift */,
 				4310BE369727B65548BADA52 /* ConvoyPanel.swift */,
 				E715F12926E78F920D452DEC /* ConvoyRows.swift */,
@@ -936,6 +941,7 @@
 				D34759F3D28A64C5908B2C7D /* AuthTests.swift */,
 				1AB0B6EE647875B8999B3F6F /* BackendTests.swift */,
 				385EEAB04673E246156A8065 /* BannerSlotTests.swift */,
+				27EDC4EED1F9D343E5BE454B /* CameraInsetMoveTests.swift */,
 				EBD1DFEF46958D1710EC5B2F /* CameraPaceTests.swift */,
 				1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */,
 				6E4D3D4F86031C4EEBEE0B86 /* ConvoyHeaderTests.swift */,
@@ -1268,6 +1274,7 @@
 				B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */,
 				D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */,
 				72445B83188E679CC45FEFED /* BottomSheet.swift in Sources */,
+				66FF3933C67886B391992ACB /* CameraInsetMove.swift in Sources */,
 				43C7A32C2A143215D37D1AF2 /* CameraTourDemo.swift in Sources */,
 				C70FB1E27983828B0CCE5EF8 /* Car.swift in Sources */,
 				D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */,
@@ -1456,6 +1463,7 @@
 				BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */,
 				17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */,
 				8736207F4C70DFC6ED87A072 /* BannerSlotTests.swift in Sources */,
+				E2D3E899D1D27546D9CB2795 /* CameraInsetMoveTests.swift in Sources */,
 				38F4EE5C5C007473A9B3EE20 /* CameraPaceTests.swift in Sources */,
 				6B6E898BB79ED1F3A1C67B5B /* CarRouteTests.swift in Sources */,
 				060EB7C0E06EE4CDFBEFFD24 /* ConvoyHeaderTests.swift in Sources */,
