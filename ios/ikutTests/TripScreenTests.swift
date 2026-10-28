@@ -832,10 +832,12 @@ struct OneMapTests {
         var plans: [CameraInsetMove.Plan] = []
         var sizeSeen: [TripSheetSize] = []
         let before = screen.sheet.changes
-        _ = withAnimation(Motion.sheet(reduceMotion: false)) {
-            watch.resize(screen, to: to, cover: { MapCover(top: 6, bottom: bottom) }, inputs: inputs) { old, new in
+        withAnimation(Motion.sheet(reduceMotion: false)) {
+            if let change = watch.resize(screen, to: to, cover: { MapCover(top: 6, bottom: bottom) }, inputs: inputs) {
                 sizeSeen.append(screen.sheet.size)
-                if let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: 812, aimedTop: 68) { plans.append(plan) }
+                if let plan = CameraInsetMove.plan(old: change.old, new: change.new, frameHeight: 812, aimedTop: 68) {
+                    plans.append(plan)
+                }
             }
         }
         #expect(screen.sheet.changes - before == 1)
@@ -855,10 +857,9 @@ struct OneMapTests {
     @Test func aConvoyResizeWhileDrivingIsNotOnScreenIsNoDecision() {
         let screen = Rig().model(mode: .lobby)
         var watch = CameraInputsWatch()
-        var acted = 0
-        let did = watch.resize(screen, to: .unfolded, cover: { MapCover(top: 6, bottom: 500) },
-                               inputs: { CameraInsetMove.Inputs(target: nil, top: 0, bottom: 0) }) { _, _ in acted += 1 }
-        #expect(!did && acted == 0 && screen.sheet.size == .lobby(tall: false) && watch.handled == nil)
+        let change = watch.resize(screen, to: .unfolded, cover: { MapCover(top: 6, bottom: 500) },
+                                  inputs: { CameraInsetMove.Inputs(target: nil, top: 0, bottom: 0) })
+        #expect(change == nil && screen.sheet.size == .lobby(tall: false) && watch.handled == nil)
     }
 
     @Test func aSheetChangeFromAModeNotOnScreenChangesNothing() {

@@ -884,9 +884,11 @@ struct TripMapView: View {
         guard value != shown else { return }
         // The camera's move for the new cover in the same transaction as the resize (D63 C4), on the sheet's motion.
         moveSheet {
-            inputsWatch.resize(stage, to: value, cover: { drivingCover }, inputs: { cameraInputs }) {
-                cameraInputsChanged(from: $0, to: $1)
-            }
+            // The watch is stored before the camera acts, so the watcher's next look finds these inputs handled.
+            var watch = inputsWatch
+            let change = watch.resize(stage, to: value, cover: { drivingCover }, inputs: { cameraInputs })
+            inputsWatch = watch
+            if let change { cameraInputsChanged(from: change.old, to: change.new) }
         }
     }
 

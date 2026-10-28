@@ -136,19 +136,17 @@ struct CameraInputsWatch: Equatable {
         return change
     }
 
-    /// A fold, unfold or pull-up of the convoy sheet: the resize, the cover it leaves (`cover`) and, when that changed
-    /// what the camera keeps clear, the camera's decision for the new `inputs` (`act`), all in this one call on the
-    /// screen (`TripScreenModel.sheetChange`), so inside the caller's one sheet motion. True when it acted.
-    @MainActor @discardableResult
+    /// A fold, unfold or pull-up of the convoy sheet: the resize and the cover it leaves (`cover`), in one call on the
+    /// screen (`TripScreenModel.sheetChange`); when that changed what the camera keeps clear, the change of `inputs` the
+    /// camera must decide on now, marked handled. The caller keeps this watch, then acts on the change, still inside
+    /// its one sheet motion. Nil: nothing for the camera (or driving is not on screen).
+    @MainActor
     mutating func resize(_ screen: TripScreenModel, to shown: PanelSheet.Shown, cover: () -> MapCover,
-                         inputs: () -> CameraInsetMove.Inputs,
-                         act: (CameraInsetMove.Inputs, CameraInsetMove.Inputs) -> Void) -> Bool {
+                         inputs: () -> CameraInsetMove.Inputs) -> (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)? {
         var change: (old: CameraInsetMove.Inputs, new: CameraInsetMove.Inputs)?
         screen.sheetChange(in: .driving, { screen.sheet.resize(to: .driving(shown)) }, cover: cover,
                            aim: { _ in change = take(inputs()) })
-        guard let change else { return false }
-        act(change.old, change.new)
-        return true
+        return change
     }
 }
 
