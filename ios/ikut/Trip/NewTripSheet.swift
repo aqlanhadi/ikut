@@ -46,6 +46,7 @@ struct WhereToSheet: View {
                         .focused($searchFocused)
                         .disabled(model.isWorking)
                         .accessibilityLabel("Destination")
+                        .accessibilityIdentifier("destinationField")
                         .onChange(of: model.query) { model.queryChanged() }
                         .onSubmit { model.submit() }
                 }
@@ -102,6 +103,7 @@ struct NewTripSheet: View {
                     .submitLabel(.done)
                     .disabled(flow.isCreating)
                     .accessibilityLabel("Trip name")
+                    .accessibilityIdentifier("newTripNameField")
             }
             .padding(.horizontal, Spacing.l)
             .frame(minHeight: 46)

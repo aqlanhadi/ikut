@@ -108,6 +108,7 @@ struct CreateTripView: View {
                         .focused($searchFocused)
                         .disabled(model.isWorking)
                         .accessibilityLabel("Destination")
+                        .accessibilityIdentifier("destinationField")
                         .onChange(of: model.query) { model.queryChanged() }
                         .onSubmit { model.submit() }
                 }

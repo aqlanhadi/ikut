@@ -350,6 +350,7 @@ struct JoinSheet: View {
             .focused($codeFocused)
             .disabled(model.isJoining)
             .accessibilityLabel("Trip code")
+            .accessibilityIdentifier("joinCodeField")
             .accessibilityValue(codeText)
             .onChange(of: codeText) {
                 model.codeChanged(codeText)
@@ -424,6 +425,7 @@ struct JoinSheet: View {
                     .frame(minHeight: 46)
                     .surfaceTile(radius: Radius.control)
                     .accessibilityLabel("Car name")
+                    .accessibilityIdentifier("joinCarNameField")
                     .onChange(of: model.newCarName) { model.newCarNameDidEdit() }
             }
 

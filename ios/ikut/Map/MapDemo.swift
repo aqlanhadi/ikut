@@ -155,7 +155,7 @@ enum MapDemo {
         return model
     }
 
-    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, card: String? = nil, report: Bool = false) -> some View {
+    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, card: String? = nil, report: Bool = false, ask: TripAsk? = nil) -> some View {
         Backend.configure()
         let model = model(fiveCars: fiveCars)
         model.networkUp = online
@@ -164,7 +164,7 @@ enum MapDemo {
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: stopBoard("lead", fiveCars: fiveCars),
                 demoCard: card, demoReport: report, demoExpanded: expanded,
-                stopService: DemoStopService())
+                stopService: DemoStopService(), demoAsk: ask)
             }
         }
     }
@@ -271,7 +271,7 @@ enum MapDemo {
 enum BannerSlotDemo {
     static let names = [
         "slot-hazard-stop-waiting", "slot-stop-approach", "slot-stop-request", "slot-paused", "slot-catchup",
-        "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-toast-over-pill", "slot-error", "slot-error-held",
+        "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-toast-failed", "slot-toast-sending", "slot-toast-over-pill", "slot-error", "slot-error-held",
         "camera-sheet-tour",
     ]
 
@@ -289,6 +289,11 @@ enum BannerSlotDemo {
         case "slot-undo-toast":
             let toast = ReportToastModel()
             toast.showForDemo(.reported(label: "debris", eventId: "demo-debris"))
+            return AnyView(map(toast: toast))
+        case "slot-toast-failed", "slot-toast-sending":
+            let toast = ReportToastModel()
+            toast.showForDemo(name == "slot-toast-failed"
+                ? .failed(message: "Couldn’t report debris. Check your signal.") : .sending(label: "debris"))
             return AnyView(map(toast: toast))
         case "slot-toast-over-pill":  // D60: the report toast over the planned-stop approach pill
             let toast = ReportToastModel()

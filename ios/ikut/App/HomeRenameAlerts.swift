@@ -13,6 +13,7 @@ struct HomeRenameAlerts: ViewModifier {
             .alert("Your name", isPresented: $renaming) {
                 TextField("Your name", text: $newName)
                     .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("renameNameField")
                 Button("Cancel", role: .cancel) {}
                 Button("Save") { saveName() }
             } message: {

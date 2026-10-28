@@ -32,6 +32,10 @@ struct TripsHomeView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var renameError: String?
+    #if DEBUG
+    /// A launch state opens with a name alert up: `rename` (the field) or `rename-error` (it couldn't be saved).
+    var demoAlert: String?
+    #endif
     /// The short sheet's height, the same for the list and a picked trip so a pick never resizes it. Follows the
     /// text size and nothing else.
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
@@ -525,6 +529,15 @@ struct TripsHomeView: View {
         .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(model.mode, compact: compact))))
         .interactiveDismissDisabled()
         .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
+        #if DEBUG
+        .onAppear {
+            switch demoAlert {
+            case "rename": newName = "Nurul"; renaming = true
+            case "rename-error": renameError = "Use 1 to \(DisplayName.maxLength) characters."
+            default: break
+            }
+        }
+        #endif
     }
 
     /// The search bar's height, which the name button is made to match (it grows with the text size).

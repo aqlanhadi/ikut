@@ -153,7 +153,7 @@ enum LobbyStopsDemo {
 
 /// Add a stop on KL to Ipoh (AddStop.dc.html): four R&Rs along the route, in the lobby's own sheet.
 extension LobbyStopsDemo {
-    enum AddScene { case list, picked, results, searchedPlace, meetingPoint }
+    enum AddScene { case list, picked, results, searchedPlace, meetingPoint, searchError }
 
     private static func rnr(_ id: String, _ name: String, _ lat: Double, _ lng: Double) -> PlaceAlong {
         let at = CLLocationCoordinate2D(latitude: lat, longitude: lng)
@@ -180,6 +180,9 @@ extension LobbyStopsDemo {
         switch scene {
         case .list: break
         case .picked: model.select("demo/tapah")
+        case .searchError:
+            model.search.query = "petrol station"
+            model.search.errorMessage = CreateTripModel.searchMessage
         case .results:
             model.search.showForDemo(query: "petrol station", results: [
                 place,
@@ -201,7 +204,7 @@ extension LobbyStopsDemo {
 /// The Suggest stops sheet on KL to Ipoh (SuggestStops.dc.html): one R&R on our side of the route.
 @MainActor
 enum SuggestStopsDemo {
-    static func sheet(seconds: Double = 2 * 3600 + 25 * 60, moved: Int = 0) -> some View {
+    static func sheet(seconds: Double = 2 * 3600 + 25 * 60, moved: Int = 0, nothing: Bool = false, noRoute: Bool = false) -> some View {
         let line = RouteLine(LobbyStopsDemo.route)
         let at = CLLocationCoordinate2D(latitude: 4.2, longitude: 101.25)
         let offset = line.project(at)?.offset ?? 0
@@ -209,7 +212,7 @@ enum SuggestStopsDemo {
             id: "demo/tapah", kind: .services, name: "R&R Tapah (northbound)", coordinate: at, ring: nil,
             facilities: [.fuel, .food, .toilets], brands: [], offset: offset, distance: 40, side: .left,
             carriageway: .ours, ours: true, entrance: at, slipEntrance: false, routeOffset: offset)
-        let model = SuggestStopsModel(line: line, routeSeconds: seconds, existing: [], sites: [], fuel: [], candidates: [tapah])
+        let model = SuggestStopsModel(line: noRoute ? nil : line, routeSeconds: seconds, existing: [], sites: [], fuel: [], candidates: nothing ? [] : [tapah])
         for _ in 0..<abs(moved) { model.step(moved > 0 ? 1 : -1) }
         let summary = "KL to Ipoh · \(RouteFormat.distance(line.length)) · \(ConvoyFormat.duration(seconds))"
         return SuggestStopsSheet(model: model, summary: summary, canAdd: { true }, onAdd: { _ in })
@@ -280,6 +283,11 @@ enum DemoScreens {
             // Home is the Home mode of the app's one map (D54).
             AnyView(TripScreenHost(mode: .home) { HomePickedDemo.view(state) }.environment(AuthModel()).environment(LocationPermission()))
         }
+        func lobbyAsking(_ scene: LobbyStopsDemo.Scene, _ ask: String) -> LobbyView {
+            var lobby = LobbyStopsDemo.lobby(scene)
+            lobby.demoAsk = ask
+            return lobby
+        }
         let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
         func search(_ model: CreateTripModel) -> AnyView { nav(CreateTripView(model: model) { _ in }) }
         func petrol(_ name: String, _ area: String, _ lat: Double, _ lon: Double) -> DestinationResult {
@@ -326,6 +334,44 @@ enum DemoScreens {
             let model = CreateTripModel()
             model.showForDemo(query: "zxqv", results: [], origin: kl, originName: "Kuala Lumpur")
             return search(model)
+        case "search-error":
+            let model = CreateTripModel()
+            model.query = "petrol station"
+            model.errorMessage = CreateTripModel.searchMessage
+            return search(model)
+        // Q23: screens that had no launch state. First, the ones before Home: welcome, the name step, the location
+        // denied page and the Always explainer, each on its own.
+        case "welcome": return AnyView(WelcomeView(onGetStarted: {}, onJoin: {}))
+        case "name-entry": return AnyView(NameEntryView().environment(AuthModel()))
+        case "location-denied": return AnyView(LocationDeniedView(onOpenSettings: {}))
+        case "always-explainer": return AnyView(AlwaysLocationExplainerView(permission: LocationPermission(), onFinish: { _ in }))
+        // Home's name alert (with its field) and the one saying it couldn't be saved.
+        case "home-rename": return home("rename")
+        case "home-rename-error": return home("rename-error")
+        // The lobby with an ask already up: Start with a car not sharing, Leave, End, Trip name, the QR code.
+        case "lobby-confirm-start": return trip(lobbyAsking(.notReady, "start"))
+        case "lobby-confirm-leave": return trip(lobbyAsking(.member, "leave"))
+        case "lobby-confirm-end": return trip(lobbyAsking(.organizer, "end"))
+        case "lobby-rename": return trip(lobbyAsking(.organizer, "rename"))
+        case "lobby-qr": return trip(lobbyAsking(.organizer, "qr"))
+        // Driving, the two notification asks the map makes at trip start.
+        case "road-ask-alerts": return AnyView(MapDemo.view(ask: .roadAlerts))
+        case "road-ask-alerts-off": return AnyView(MapDemo.view(ask: .roadAlertsOff))
+        // The stop card's other screens: the message typed, "Are you a passenger?", and "Sent to the convoy".
+        case "road-card-pit-stop-typed": return AnyView(MapDemo.view(card: "typed"))
+        case "road-card-pit-stop-passenger": return AnyView(MapDemo.view(card: "passenger"))
+        case "road-card-pit-stop-sent": return AnyView(MapDemo.view(card: "sent"))
+        // Suggest stops with nothing near that time, and with no route to look along.
+        case "suggest-stops-nothing": return AnyView(SuggestStopsDemo.sheet(nothing: true))
+        case "suggest-stops-cant": return AnyView(SuggestStopsDemo.sheet(noRoute: true))
+        case "add-search-error": return trip(LobbyStopsDemo.addStop(.searchError))
+        // The recap page while it loads, and when it couldn't load.
+        case "recap-loading", "recap-failed":
+            let model = name == "recap-failed" ? RecapModel(failedTripId: "demo") : RecapModel(tripId: "demo-never-loaded")
+            return AnyView(NavigationStack {
+                Color.clear.navigationTitle("Trips").navigationBarTitleDisplayMode(.inline)
+                    .navigationDestination(isPresented: .constant(true)) { RecapView(model: model) }
+            })
         case "lobby-organizer": return trip(LobbyStopsDemo.lobby(.organizer))
         case "lobby-tall": return trip(LobbyStopsDemo.lobby(.tall))
         case "lobby-not-ready": return trip(LobbyStopsDemo.lobby(.notReady))
