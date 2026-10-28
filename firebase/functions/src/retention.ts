@@ -26,12 +26,6 @@ export function shouldPurgeTripData(
   return now.getTime() - trip.endedAt.toMillis() > POSITION_RETENTION_MS;
 }
 
-/** True when an event's expiresAt is more than EVENT_GRACE_MS in the past. Events without expiresAt never expire. */
-export function isEventPastGrace(event: { expiresAt?: TimestampLike | null }, now: Date): boolean {
-  if (!event.expiresAt) return false;
-  return event.expiresAt.toMillis() < now.getTime() - EVENT_GRACE_MS;
-}
-
 /** Events with expiresAt before this instant are past the grace period. */
 export function eventExpiryCutoff(now: Date): Timestamp {
   return Timestamp.fromMillis(now.getTime() - EVENT_GRACE_MS);
