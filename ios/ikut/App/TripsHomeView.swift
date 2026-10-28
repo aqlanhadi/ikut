@@ -10,6 +10,12 @@ import SwiftUI
 struct TripsHomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(TripMapStage.self) private var stage
+    @Environment(LocationPermission.self) private var location
+    /// Home's flows and what they remember (`HomeModel`); HomeView makes it and hands it in.
+    let given: HomeModel
+    /// A demo's own model, kept across redraws of its parent (which makes a new view, and so a new seeded model, each time).
+    @State private var seeded: HomeModel?
+    var model: HomeModel { seeded ?? given }
     var onNewTrip: () -> Void
     var onJoin: () -> Void
     /// A trip that hasn't ended opens on the same map: its lobby, or driving when Home has read that it started. An
@@ -20,60 +26,18 @@ struct TripsHomeView: View {
     var covered = false
     /// Follows whether the sheet is on screen (set when it appears, cleared once it has gone), for the parent.
     var sheetUp: Binding<Bool> = .constant(false)
-    /// New trip was tapped and its gates (name, location) are through: the sheet becomes Where to? over this map.
-    /// Cleared again when the flow closes or the trip is made.
-    var creating: Binding<Bool> = .constant(false)
     /// The trip was made: its id, to open its lobby.
     var onCreated: (String) -> Void = { _ in }
-    /// Join was opened and its gates (name, location) are through: the sheet becomes the join steps over this map (D58).
-    /// Cleared again when the sheet closes or the trip is joined.
-    var joining: Binding<JoinStart?> = .constant(nil)
     /// The trip was joined: its id, to open its lobby.
     var onJoined: (String) -> Void = { _ in }
-
-    /// The join steps over this map; nil while the sheet shows its list.
-    @State private var joinFlow: JoinStepper?
-    @Environment(LocationPermission.self) private var location
-    /// Where the camera was before joining, for Close.
-    @State private var cameraBeforeJoin: MapCameraPosition?
-    /// The trip was joined and its lobby is opening: the steps stay until the lobby replaces this view, so the list never flashes.
-    @State private var finishingJoin = false
-
-    /// The create flow (Where to?, then New trip) over this map; nil while the sheet shows its list.
-    @State private var flow: NewTripFlow?
-    /// Where the camera was before the flow, for Close.
-    @State private var cameraBeforeCreate: MapCameraPosition?
-    /// The trip was made and its lobby is being pushed: the flow stays until Home's sheet is covered, so the list never flashes.
-    @State private var finishingCreate = false
 
     @State private var renaming = false
     @State private var newName = ""
     @State private var renameError: String?
-    /// The sheet is at its tall detent (the detent selection reads and writes it).
-    @State var expanded = false
-    @State var past: [PastTrips.Entry] = []
-    /// The status line of each trip in Now (one read when the list appears), by trip id.
-    @State private var nowStatus: [String: String] = [:]
-    /// Routes of the newest ended trips, drawn on the map (newest first).
-    @State private var routes: [PastTripRoute] = []
-    /// Where the list puts the camera when Home comes on screen: the cached past routes, or where you are.
-    @State private var listCamera: MapCameraPosition
-    /// The trips in Now that Home read as started: a tap opens them on the driving map.
-    @State private var nowStarted: Set<String> = []
-    /// The past trip picked on the map, whose recap fills the sheet.
-    @State var picked: PickedTrip?
-    /// Its route when it is older than the 12 drawn and the recap hasn't loaded yet.
-    @State private var fetchedRoute: PastTripRoute?
-    /// Where the camera was before picking, for Back.
-    @State private var cameraBeforePick: MapCameraPosition?
     /// The short sheet's height, the same for the list and a picked trip so a pick never resizes it. Follows the
     /// text size and nothing else.
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Where the camera last went to show you (`HomeCamera`); nil before the first fix.
-    @State private var here: CLLocationCoordinate2D?
-    /// Screenshot demo (`init(demo:)`): shows what it was given, and reads nothing from the phone or the server.
-    @State private var isDemo = false
     #if DEBUG
     /// Demo that can be tapped through: picking a trip gives it this recap (no server). `tour` also picks the
     /// first trip and closes it again by itself (the second time pulling it up and down first), so a recording needs no taps.
@@ -84,28 +48,18 @@ struct TripsHomeView: View {
     @State var tourCaption = ""
     #endif
 
-    init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
+    init(model: HomeModel = HomeModel.launching(), onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, covered: Bool = false,
-         sheetUp: Binding<Bool> = .constant(false), creating: Binding<Bool> = .constant(false),
-         onCreated: @escaping (String) -> Void = { _ in },
-         joining: Binding<JoinStart?> = .constant(nil), onJoined: @escaping (String) -> Void = { _ in }) {
-        self.joining = joining
+         sheetUp: Binding<Bool> = .constant(false), onCreated: @escaping (String) -> Void = { _ in },
+         onJoined: @escaping (String) -> Void = { _ in }) {
+        given = model
         self.onJoined = onJoined
         self.covered = covered
         self.sheetUp = sheetUp
-        self.creating = creating
         self.onCreated = onCreated
         self.onNewTrip = onNewTrip
         self.onJoin = onJoin
         self.onOpenTrip = onOpenTrip
-        // Open on the cached past routes when there are any, else a fixed region: never MapKit's follow-the-user
-        // (`HomeCamera`). The phone's last known spot is read once the view is on screen (`onAppear`).
-        let cache = PastTripsMapService.cachedRoutes()
-        let cached = PastTripsMapLogic.tripsToDraw(PastTrips.all()).compactMap { cache[$0.id] }
-        let insets = Self.obscured(mapHeight: 0)
-        let region = PastTripsMapLogic.region(fitting: cached, bottomObscured: insets.bottom, topObscured: insets.top)
-        _listCamera = State(initialValue: HomeCamera.launch(cachedRoutes: region))
-        if region != nil { _routes = State(initialValue: cached) }
     }
 
     #if DEBUG
@@ -115,32 +69,34 @@ struct TripsHomeView: View {
          selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false,
          cameraTour: Bool = false,
          creating createFlow: NewTripFlow? = nil, joining joinStepper: JoinStepper? = nil, nowStatus: [String: String] = [:]) {
-        self.init(onNewTrip: {}, onJoin: {})
+        let seeded = HomeModel.launching()
         if let joinStepper {
-            _joinFlow = State(initialValue: joinStepper)
-            if let camera = Self.demoJoinCamera(joinStepper) { _listCamera = State(initialValue: camera) }
+            seeded.joinFlow = joinStepper
+            if let camera = Self.demoJoinCamera(joinStepper) { seeded.listCamera = camera }
         }
         if let createFlow {
-            _flow = State(initialValue: createFlow)
-            if let camera = Self.demoCreateCamera(createFlow) { _listCamera = State(initialValue: camera) }
+            seeded.flow = createFlow
+            if let camera = Self.demoCreateCamera(createFlow) { seeded.listCamera = camera }
         }
-        _isDemo = State(initialValue: true)
-        _nowStatus = State(initialValue: nowStatus)
+        seeded.isDemo = true
+        seeded.nowStatus = nowStatus
+        seeded.past = past
+        seeded.routes = routes
+        seeded.expanded = expanded
+        seeded.picked = picked
+        if let picked {
+            let (route, camera) = Self.demoPickedCamera(picked, selecting: itemId, routes: routes)
+            seeded.fetchedRoute = route
+            if let camera { seeded.listCamera = camera }
+        } else if let r = PastTripsMapLogic.region(fitting: routes, bottomObscured: Self.obscured(mapHeight: 0).bottom,
+                                                   topObscured: Self.obscured(mapHeight: 0).top) {
+            seeded.listCamera = .region(r)
+        }
+        self.init(model: seeded, onNewTrip: {}, onJoin: {})
+        _seeded = State(initialValue: seeded)
         _demoModel = State(initialValue: tappable)
         _tour = State(initialValue: tour)
         _cameraTour = State(initialValue: cameraTour)
-        _past = State(initialValue: past)
-        _routes = State(initialValue: routes)
-        _expanded = State(initialValue: expanded)
-        _picked = State(initialValue: picked)
-        if let picked {
-            let (route, camera) = Self.demoPickedCamera(picked, selecting: itemId, routes: routes)
-            _fetchedRoute = State(initialValue: route)
-            if let camera { _listCamera = State(initialValue: camera) }
-        } else if let r = PastTripsMapLogic.region(fitting: routes, bottomObscured: Self.obscured(mapHeight: 0).bottom,
-                                                   topObscured: Self.obscured(mapHeight: 0).top) {
-            _listCamera = State(initialValue: .region(r))
-        }
     }
     #endif
 
@@ -162,20 +118,20 @@ struct TripsHomeView: View {
             .onAppear {
                 guard TripScreenLogic.entryCamera(.home) == .homeList else { return }
                 // Once per appearance (Home is new after a trip): where the phone last knew you were.
-                if here == nil, !isDemo, routes.isEmpty { here = Self.lastKnownLocation() }
+                if model.here == nil, !model.isDemo, model.routes.isEmpty { model.here = Self.lastKnownLocation() }
                 let animated = TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera)
                 // Back from a trip the map already has its height: fit the routes to it (the list camera was worked
                 // out before, for a typical phone).
-                if mapHeight > 0, !routes.isEmpty { fit(animated: animated) } else if routes.isEmpty, here != nil { showHere(animated: animated) } else { move(to: listCamera, animated: animated) }
+                if mapHeight > 0, !model.routes.isEmpty { fit(animated: animated) } else if model.routes.isEmpty, model.here != nil { showHere(animated: animated) } else { move(to: model.listCamera, animated: animated) }
             }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
-                if flow != nil { refocusCreate(animated: false) } else if joinFlow != nil { refocusJoin(animated: false) } else if picked != nil { refocus(animated: false) } else if !routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
+                if model.flow != nil { refocusCreate(animated: false) } else if model.joinFlow != nil { refocusJoin(animated: false) } else if model.picked != nil { refocus(animated: false) } else if !model.routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if model.here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
             }
             // Your location, once it may be read: the first fix (and a real move after it) moves Home's view of you.
-            .task(id: locationGranted) { if !isDemo, locationGranted { await watchLocation() } }
-        .task(id: PastTripsMapLogic.tripsToDraw(past).map(\.id)) { if !isDemo { await loadRoutes() } }
-        .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
+            .task(id: locationGranted) { if !model.isDemo, locationGranted { await watchLocation() } }
+        .task(id: PastTripsMapLogic.tripsToDraw(model.past).map(\.id)) { if !model.isDemo { await loadRoutes() } }
+        .task(id: model.picked?.entry.id) { if !model.isDemo { await loadPicked() } }
         #if DEBUG
         .task(id: tour) {
             await playTour()
@@ -193,21 +149,23 @@ struct TripsHomeView: View {
             }
         }
         #endif
-        .onChange(of: creating.wrappedValue) { _, now in
-            if now { beginCreate() } else if flow != nil, !finishingCreate { closeCreate() }
+        .onChange(of: model.creating) { _, now in
+            if now { beginCreate() } else if model.flow != nil, !model.finishingCreate { closeCreate() }
         }
-        .onChange(of: joining.wrappedValue, initial: true) { _, now in
-            if let now { beginJoin(now) } else if joinFlow != nil, !finishingJoin, !isDemo { closeJoin() }
+        // Before the join request below: a link at launch begins joining with the right motion.
+        .onChange(of: reduceMotion, initial: true) { _, now in model.reduceMotion = now }
+        .onChange(of: model.joining, initial: true) { _, now in
+            if let now { beginJoin(now) } else if model.joinFlow != nil, !model.finishingJoin, !model.isDemo { closeJoin() }
         }
-        .onChange(of: joinFlow?.model.preview) { _, _ in refocusJoin(animated: true) }
-        .onChange(of: mode) { old, new in
-            let keep = HomeSheet.expanded(expanded, from: old, to: new)
-            if keep != expanded { withAnimation(sheetMotion) { expanded = keep } }
+        .onChange(of: model.joinFlow?.model.preview) { _, _ in refocusJoin(animated: true) }
+        .onChange(of: model.mode) { old, new in
+            let keep = HomeSheet.expanded(model.expanded, from: old, to: new)
+            if keep != model.expanded { withAnimation(sheetMotion) { model.expanded = keep } }
         }
-        .onChange(of: flow?.cameraKey) { _, _ in refocusCreate(animated: true) }
-        .onChange(of: picked?.model.snapshot != nil) { was, has in
+        .onChange(of: model.flow?.cameraKey) { _, _ in refocusCreate(animated: true) }
+        .onChange(of: model.picked?.model.snapshot != nil) { was, has in
             // The recap arrived, perhaps from Try again: its route is the full one and the dots come with it.
-            guard let picked, !isDemo,
+            guard let picked = model.picked, !model.isDemo,
                   PickedTripLogic.shouldRefit(hadSnapshot: was, hasSnapshot: has, itemSelected: picked.selectedItem != nil,
                                               cameraMovedByUser: stage.camera.positionedByUser) else { return }
             refocus(animated: true, settling: true)
@@ -217,16 +175,7 @@ struct TripsHomeView: View {
             if now {
                 renaming = false
                 renameError = nil
-                if finishingCreate {
-                    finishingCreate = false
-                    flow = nil
-                    cameraBeforeCreate = nil
-                }
-                if finishingJoin {
-                    finishingJoin = false
-                    joinFlow = nil
-                    cameraBeforeJoin = nil
-                }
+                model.coverSheet()
             }
         }
     }
@@ -238,85 +187,68 @@ struct TripsHomeView: View {
     /// picks that trip). A tap on the map away from a picked trip's route goes back to the list.
     private var mapSpec: TripMapSpec {
         let input: TripMapInput
-        if let joinFlow {
+        if let joinFlow = model.joinFlow {
             input = joinFlow.mapInput
-        } else if let flow {
+        } else if let flow = model.flow {
             input = .newTrip(places: flow.pins, focusedId: flow.focusTarget?.id,
                              route: flow.ready.map { Polyline.decode($0.route.polyline) } ?? [])
-        } else if let picked {
-            input = .picked(route: pickedRoute(picked), dots: PickedTripLogic.markers(picked.model.recap),
+        } else if let picked = model.picked {
+            input = .picked(route: model.pickedRoute, dots: PickedTripLogic.markers(picked.model.recap),
                             selectedId: picked.selectedItemId)
         } else {
-            input = .home(routes: routes, names: Dictionary(past.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a }))
+            input = .home(routes: model.routes, names: Dictionary(model.past.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a }))
         }
         return TripMapSpec(
             input: input,
             style: TripMapStyle(
-                onPastTripTap: { id in if let entry = past.first(where: { $0.id == id }) { open(entry) } },
+                onPastTripTap: { id in if let entry = model.past.first(where: { $0.id == id }) { open(entry) } },
                 onRecapDotTap: { id in
-                    if let item = picked?.model.recap?.timeline.first(where: { $0.id == id }) { selectItem(item) }
+                    if let item = model.picked?.model.recap?.timeline.first(where: { $0.id == id }) { selectItem(item) }
                 }),
             // The logo and Legal ride 10 pt above the short sheet instead of under it, from the first frame, and stay
             // there when the sheet is pulled up (it covers them, as in Apple Maps; owner 2026-10-25, #343).
             // A left trip's short sheet takes them down with it (#437).
-            bottomPadding: HomeSheet.legalInset(mode, compact: compact),
+            bottomPadding: HomeSheet.legalInset(model.mode, compact: compact),
             hidesControls: true,
-            onTap: picked != nil ? { closePicked() } : nil)
+            onTap: model.picked != nil ? { closePicked() } : nil)
     }
 
     /// An ended trip is picked here, on the map; one still running opens on the same map.
     func open(_ entry: PastTrips.Entry) {
-        guard entry.endedAt != nil else { onOpenTrip(entry, nowStarted.contains(entry.id)); return }
-        pick(entry)
+        switch model.opening(entry) {
+        case .trip(let entry, let started): onOpenTrip(entry, started)
+        case .pick(let entry): pick(entry)
+        }
     }
 
     // MARK: Picked trip
 
-    private func pickedRoute(_ picked: PickedTrip) -> PastTripRoute? {
-        PickedTripLogic.route(for: picked.entry, snapshot: picked.model.snapshot, drawn: routes, fetched: fetchedRoute)
-    }
-
     private func pick(_ entry: PastTrips.Entry) {
-        cameraBeforePick = stage.camera
-        fetchedRoute = nil
-        withAnimation(sheetMotion) {
-            expanded = false
-            picked = pickedTrip(for: entry)
-        }
+        var recap: RecapModel?
+        #if DEBUG
+        recap = demoModel
+        #endif
+        model.pick(entry, camera: stage.camera, recap: recap)
         refocus(animated: true)
         AccessibilityNotification.Announcement("Showing \(entry.name) on the map. Back to trips is at the top of the sheet.").post()
     }
 
-    private func pickedTrip(for entry: PastTrips.Entry) -> PickedTrip {
-        #if DEBUG
-        if let demoModel { return PickedTrip(entry: entry, model: demoModel) }
-        #endif
-        return PickedTrip(entry: entry)
-    }
-
     /// Back to the list, with the camera where it was.
     func closePicked() {
-        guard picked != nil else { return }
-        withAnimation(sheetMotion) {
-            picked = nil
-            expanded = false
-        }
-        fetchedRoute = nil
-        goBack(to: cameraBeforePick)
-        cameraBeforePick = nil
+        if let back = model.closePicked(camera: stage.camera) { goBack(back) }
     }
 
     /// A timeline item: the map goes to it, and the sheet drops to short with the item in it.
     func selectItem(_ item: RecapTimelineItem) {
-        guard let picked else { return }
+        guard let picked = model.picked else { return }
         picked.select(item)
-        withAnimation(sheetMotion) { expanded = false }
+        withAnimation(sheetMotion) { model.expanded = false }
         refocus(animated: true)
     }
 
     /// The X on the item: back to the whole route.
     func showWholeTrip() {
-        picked?.clearSelection()
+        model.picked?.clearSelection()
         refocus(animated: true)
     }
 
@@ -343,14 +275,14 @@ struct TripsHomeView: View {
     /// `settling`: a refit after the first one (the recap or the full route arrived), skipped when it would only
     /// nudge a picture that is already there.
     private func refocus(animated: Bool, settling: Bool = false) {
-        guard let picked else { return }
+        guard let picked = model.picked else { return }
         // Above the short sheet, a left trip's included, whose padding follows it down.
-        let insets = Self.obscured(mapHeight: mapHeight, sheet: HomeSheet.height(mode, compact: compact),
-                                   padding: HomeSheet.legalInset(mode, compact: compact))
+        let insets = Self.obscured(mapHeight: mapHeight, sheet: HomeSheet.height(model.mode, compact: compact),
+                                   padding: HomeSheet.legalInset(model.mode, compact: compact))
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
             region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
-        } else if let route = pickedRoute(picked) {
+        } else if let route = model.pickedRoute {
             region = PickedTripLogic.fit(route, bottomObscured: insets.bottom, topObscured: insets.top)
         } else {
             region = nil
@@ -366,32 +298,32 @@ struct TripsHomeView: View {
     /// Loads the picked trip's recap, and its route alone when it is older than the 12 drawn.
     private func loadPicked() async {
         // A trip left early shows only its cached route: the trip and its recap are members-only.
-        guard let picked, PickedTripLogic.readsServer(picked.entry) else { return }
+        guard let picked = model.picked, PickedTripLogic.readsServer(picked.entry) else { return }
         let entry = picked.entry
         async let recapLoaded: Void = picked.model.load(myUserId: Auth.auth().currentUser?.uid)
-        if !routes.contains(where: { $0.id == entry.id }), picked.model.snapshot == nil {
+        if !model.routes.contains(where: { $0.id == entry.id }), picked.model.snapshot == nil {
             let one = await PastTripsMapService.load([entry], keeping: false).first
-            if !Task.isCancelled, self.picked?.entry.id == entry.id, let one {
-                fetchedRoute = one
+            if !Task.isCancelled, model.picked?.entry.id == entry.id, let one {
+                model.fetchedRoute = one
                 refocus(animated: true, settling: true)
             }
         }
         await recapLoaded
         // The recap's own route is the full one, and the dots arrive with it.
-        if !Task.isCancelled, self.picked?.entry.id == entry.id, picked.selectedItem == nil { refocus(animated: true, settling: true) }
+        if !Task.isCancelled, model.picked?.entry.id == entry.id, picked.selectedItem == nil { refocus(animated: true, settling: true) }
     }
 
     private func loadRoutes() async {
-        let drawn = PastTripsMapLogic.tripsToDraw(past)
-        guard !drawn.isEmpty else { routes = []; return }
+        let drawn = PastTripsMapLogic.tripsToDraw(model.past)
+        guard !drawn.isEmpty else { model.routes = []; return }
         let loaded = await PastTripsMapService.load(drawn)
-        guard !Task.isCancelled, loaded != routes else { return }
+        guard !Task.isCancelled, loaded != model.routes else { return }
         show(loaded, animated: true)
     }
 
     private func show(_ list: [PastTripRoute], animated: Bool) {
-        let first = routes.isEmpty
-        routes = list
+        let first = model.routes.isEmpty
+        model.routes = list
         // Fly only between two fits of routes; the first fit jumps, as a long fly from the
         // user's location is easily cut short by layout or a location fix.
         fit(animated: animated && !first)
@@ -399,9 +331,9 @@ struct TripsHomeView: View {
 
     /// Points the camera at every drawn route, above the compact sheet.
     func fit(animated: Bool) {
-        guard flow == nil, joinFlow == nil else { return }
+        guard model.flow == nil, model.joinFlow == nil else { return }
         let insets = Self.obscured(mapHeight: mapHeight)
-        guard let region = PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom,
+        guard let region = PastTripsMapLogic.region(fitting: model.routes, bottomObscured: insets.bottom,
                                                     topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
@@ -423,39 +355,24 @@ struct TripsHomeView: View {
 
     // MARK: Create flow
 
-    private var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow, leftTripPicked: picked?.isLeft == true, joining: joinFlow != nil) }
-
     /// New trip's gates are through: Where to? takes over the sheet and the map.
     private func beginCreate() {
-        guard flow == nil else { return }
-        cameraBeforeCreate = stage.camera
-        if picked != nil { closePicked() }
-        withAnimation(sheetMotion) {
-            expanded = false
-            flow = NewTripFlow()
-        }
+        model.beginCreate(camera: stage.camera, goBack: goBack)
     }
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeCreate() {
-        flow?.cancel()
-        withAnimation(sheetMotion) {
-            flow = nil
-            expanded = false
-        }
-        creating.wrappedValue = false
-        goBack(to: cameraBeforeCreate)
-        cameraBeforeCreate = nil
+        goBack(model.closeCreate(camera: stage.camera))
     }
 
     /// The camera for the step on screen: the pin at the top of the list, or the whole route above New trip's sheet.
     /// Before there is a place, the view around you when the camera shows you, else the fixed region it has.
     private func refocusCreate(animated: Bool) {
-        guard let flow else { return }
-        let sheet = HomeSheet.height(mode, compact: compact)
+        guard let flow = model.flow else { return }
+        let sheet = HomeSheet.height(model.mode, compact: compact)
         let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheet, compact: compact)
         let place = flow.region(bottomObscured: insets.bottom, topObscured: insets.top)
-        guard let region = HomeCamera.create(place: place, here: here, follows: followsFixes(hasPlace: place != nil),
+        guard let region = HomeCamera.create(place: place, here: model.here, follows: followsFixes(hasPlace: place != nil),
                                              bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
@@ -476,7 +393,7 @@ struct TripsHomeView: View {
 
     /// Whether a fix may move the camera now (`HomeCamera.followsFixes`).
     private func followsFixes(hasPlace: Bool) -> Bool {
-        HomeCamera.followsFixes(mode: mode, hasRoutes: !routes.isEmpty, hasPlace: hasPlace,
+        HomeCamera.followsFixes(mode: model.mode, hasRoutes: !model.routes.isEmpty, hasPlace: hasPlace,
                                 positionedByUser: stage.camera.positionedByUser)
     }
 
@@ -487,9 +404,9 @@ struct TripsHomeView: View {
             for try await update in CLLocationUpdate.liveUpdates() {
                 if Task.isCancelled { break }
                 guard let fix = update.location, fix.horizontalAccuracy >= 0,
-                      HomeCamera.isRealMove(from: here, to: fix.coordinate) else { continue }
-                here = fix.coordinate
-                if let flow {
+                      HomeCamera.isRealMove(from: model.here, to: fix.coordinate) else { continue }
+                model.here = fix.coordinate
+                if let flow = model.flow {
                     if followsFixes(hasPlace: flow.focusTarget != nil) { refocusCreate(animated: true) }
                 } else if followsFixes(hasPlace: false) {
                     showHere(animated: stage.hasCamera)
@@ -500,19 +417,18 @@ struct TripsHomeView: View {
         }
     }
 
-    /// Close or Back to trips: the view around you when the list has no routes and the camera showed you, else the
-    /// camera saved before (`HomeCamera.back`).
-    private func goBack(to saved: MapCameraPosition?) {
-        switch HomeCamera.back(hasRoutes: !routes.isEmpty, hereKnown: here != nil,
-                               positionedByUser: stage.camera.positionedByUser) {
+    /// Close or Back to trips: where the model says the camera goes (`HomeModel.CameraReturn`).
+    private func goBack(_ back: HomeModel.CameraReturn) {
+        switch back {
         case .here: showHere(animated: true)
-        case .saved: if let saved { move(to: saved, animated: true) }
+        case .saved(let saved): move(to: saved, animated: true)
+        case .stay: break
         }
     }
 
     /// The list's view of you above its short sheet, when it has no routes to show.
     private func showHere(animated: Bool) {
-        guard let here, flow == nil, joinFlow == nil, picked == nil, routes.isEmpty else { return }
+        guard let here = model.here, model.flow == nil, model.joinFlow == nil, model.picked == nil, model.routes.isEmpty else { return }
         let insets = Self.obscured(mapHeight: mapHeight)
         move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)), animated: animated)
     }
@@ -520,73 +436,36 @@ struct TripsHomeView: View {
     // MARK: Join flow
 
     /// Join's gates are through (or a link brought a code): the sheet becomes the join steps and the map shows the trip
-    /// once its code is found. A second start (another link) replaces the steps with the new code.
+    /// once its code is found. A link arriving mid-join must not swap the steps from under the person.
     private func beginJoin(_ start: JoinStart) {
-        // A link arriving mid-join must not swap the steps from under the person; they keep joining this trip.
-        guard JoinStepper.shouldReplace(joinFlow) else { return }
-        if joinFlow == nil {
-            cameraBeforeJoin = cameraBeforeCreate ?? cameraBeforePick ?? stage.camera
-        }
-        flow?.cancel()
-        if picked != nil { picked = nil }
-        creating.wrappedValue = false
-        let hasName = auth.state == .signedIn && !(auth.displayName ?? "").isEmpty
-        let stepper = JoinStepper.begin(start, displayName: auth.displayName ?? "",
-                                        plan: JoinSteps.plan(hasName: hasName, location: location.status))
-        withAnimation(sheetMotion) {
-            expanded = false
-            flow = nil
-            joinFlow = stepper
-        }
-        cameraBeforeCreate = nil
-        cameraBeforePick = nil
+        model.beginJoin(start, camera: stage.camera, displayName: auth.displayName, signedIn: auth.state == .signedIn,
+                        location: location.status)
     }
 
     /// Back to Home's list, the camera where it was. Nothing was written.
     private func closeJoin() {
-        withAnimation(sheetMotion) {
-            joinFlow = nil
-            expanded = false
-        }
-        joining.wrappedValue = nil
-        goBack(to: cameraBeforeJoin)
-        cameraBeforeJoin = nil
+        goBack(model.closeJoin(camera: stage.camera))
     }
 
     private func joined(_ tripId: String) {
-        finishingJoin = true
-        joining.wrappedValue = nil
+        model.joined(covered: covered)
         onJoined(tripId)
-        // Demo and tests have no parent to cover the sheet.
-        if !covered, isDemo { finishingJoin = false; joinFlow = nil }
     }
 
     /// The camera for a found code: the trip's end above the sheet; nothing before that.
     private func refocusJoin(animated: Bool) {
-        guard let joinFlow else { return }
+        guard let joinFlow = model.joinFlow else { return }
         let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: HomeSheet.joinHeight, compact: compact)
         guard let region = JoinSteps.region(for: joinFlow.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
 
     private func createTrip() {
-        guard let flow else { return }
-        guard let uid = auth.userID else {
-            flow.createError = "Couldn’t sign you in. Check your signal and try again."
-            return
-        }
-        let organizer = TripOrganizer(id: uid, displayName: auth.displayName ?? "Organizer")
         Task {
-            let id = await flow.create { name, place, route in
+            let id = await model.createTrip(userID: auth.userID, displayName: auth.displayName, covered: covered) { organizer, name, place, route in
                 try await TripService.createTrip(name: name, destination: place, route: route, organizer: organizer).tripId
             }
-            guard let id else { return }
-            flow.search.errorMessage = nil
-            finishingCreate = true
-            creating.wrappedValue = false
-            onCreated(id)
-            // Demo and tests have no parent to cover the sheet.
-            if !covered, isDemo { finishingCreate = false; self.flow = nil }
+            if let id { onCreated(id) }
         }
     }
 
@@ -603,10 +482,10 @@ struct TripsHomeView: View {
         // The header and the scrolling body are one page that crossfades in place, so the sheet (always at the
         // same short height) keeps its size and only its contents change.
         return ZStack(alignment: .top) {
-            if let joinFlow {
+            if let joinFlow = model.joinFlow {
                 JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: joined)
                     .transition(.opacity)
-            } else if let flow {
+            } else if let flow = model.flow {
                 Group {
                     if let ready = flow.ready {
                         NewTripSheet(flow: flow, ready: ready, onBack: { withAnimation(sheetMotion) { flow.back() } },
@@ -621,7 +500,7 @@ struct TripsHomeView: View {
             // The header stays put and the rows fade out under it (the system's soft top edge).
             Group {
                 ScrollView {
-                    if let picked {
+                    if let picked = model.picked {
                         PickedTripBody(picked: picked, onSelect: selectItem)
                             .padding(.bottom, Spacing.l)
                     } else {
@@ -632,7 +511,7 @@ struct TripsHomeView: View {
                 .scrollBounceBehavior(.basedOnSize)
             }
             .sheetTopBar {
-                if let picked {
+                if let picked = model.picked {
                     PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
                 } else {
                     HomeHeader(onNewTrip: onNewTrip, onJoin: onJoin, profileName: profileName, barHeight: $barHeight) { name in
@@ -641,19 +520,19 @@ struct TripsHomeView: View {
                     }
                 }
             }
-            .id(picked?.entry.id ?? "")
+            .id(model.picked?.entry.id ?? "")
             .transition(.opacity)
             }
         }
-        .animation(sheetMotion, value: mode)
+        .animation(sheetMotion, value: model.mode)
         .padding(.horizontal, Spacing.l)
         .padding(.top, HomeSheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .presentationDetents(HomeSheet.detents(mode, compact: compact), selection: Binding(
-            get: { HomeSheet.detent(expanded: expanded, mode: mode, compact: compact) },
-            set: { expanded = HomeSheet.isExpanded($0) }))
+        .presentationDetents(HomeSheet.detents(model.mode, compact: compact), selection: Binding(
+            get: { HomeSheet.detent(expanded: model.expanded, mode: model.mode, compact: compact) },
+            set: { model.expanded = HomeSheet.isExpanded($0) }))
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(mode, compact: compact))))
+        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(model.mode, compact: compact))))
         .interactiveDismissDisabled()
         .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
     }
@@ -663,11 +542,11 @@ struct TripsHomeView: View {
 
     /// "Now" (only when a trip hasn't ended) and "Past trips", each a group of rows on a tile.
     private var pastTrips: some View {
-        let parts = HomeNow.split(past)
+        let parts = HomeNow.split(model.past)
         return VStack(alignment: .leading, spacing: 0) {
             if !parts.now.isEmpty {
                 HomeSectionTitle(title: "Now")
-                HomeTripGroup(entries: parts.now, open: open) { HomeNowRow(entry: $0, status: nowStatus[$0.id]) }
+                HomeTripGroup(entries: parts.now, open: open) { HomeNowRow(entry: $0, status: model.nowStatus[$0.id]) }
             }
             HomeSectionTitle(title: "Past trips")
             if parts.past.isEmpty {
@@ -679,32 +558,18 @@ struct TripsHomeView: View {
                 HomeTripGroup(entries: parts.past, open: open) { HomePastRow(entry: $0) }
             }
         }
-        .onAppear { if !isDemo { past = PastTrips.all() } }
+        .onAppear { if !model.isDemo { model.reloadPast() } }
         // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
         .task(id: parts.now.map(\.id)) {
-            guard !isDemo else { return }
-            for entry in parts.now {
-                let read = await HomeNow.load(tripId: entry.id)
-                if Task.isCancelled { return }
-                if let moved = HomeNow.movesToPast(read, signedIn: auth.state == .signedIn) {
-                    // It ended while this phone wasn't in it, or this phone left or was removed: remember that, and it
-                    // moves to Past trips.
-                    PastTrips.record(tripId: entry.id, name: read.name ?? entry.name,
-                                     destination: read.destination ?? entry.destination, endedAt: moved,
-                                     left: HomeNow.wasLeft(read))
-                    past = PastTrips.all()
-                } else {
-                    nowStatus[entry.id] = read.line
-                    if read.started { nowStarted.insert(entry.id) } else { nowStarted.remove(entry.id) }
-                }
-            }
+            guard !model.isDemo else { return }
+            await model.readNow(signedIn: auth.state == .signedIn)
         }
     }
 
     /// Who the profile button shows: the signed-in name (a demo state shows a sample name).
     private var profileName: String? {
         #if DEBUG
-        if isDemo { return "Aqlan" }
+        if model.isDemo { return "Aqlan" }
         #endif
         return auth.state == .signedIn ? auth.displayName : nil
     }
