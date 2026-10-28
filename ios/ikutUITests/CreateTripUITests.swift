@@ -17,29 +17,12 @@ final class CreateTripUITests: ConvoyUITestCase {
         // Welcome on a first run, Home once a previous run got past it; the name sheet comes first when signed out.
         startNewTrip(as: "Organizer", homeTimeout: 15)
 
-        let search = app.textFields["Destination"]
-        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
-        search.tap()
-        search.typeText(destination)
-
-        let firstResult = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", destination)).firstMatch
-        XCTAssertTrue(firstResult.waitForExistence(timeout: 20), "No search result for \(destination)")
-        firstResult.tap()
-        tapCreateTrip()
-
+        try createTrip(to: destination)
         let startTrip = app.buttons["Start trip"]
-        if !waitForLobby(timeout: 30) {
-            let errors = app.staticTexts.matching(identifier: "createTripError")
-            let message = errors.firstMatch.exists ? errors.firstMatch.label : "no error shown"
-            add(XCTAttachment(screenshot: app.screenshot()))
-            XCTFail("Didn't reach the lobby (\(message))")
-            return
-        }
         add(XCTAttachment(screenshot: app.screenshot()))
 
         // Tracking starts in the lobby; the "Not now" sheet (screen off) may cover Start trip, and the map asks its own.
-        let notNow = app.buttons["Not now"]
-        if notNow.waitForExistence(timeout: 6) { notNow.tap() }
+        dismissNotNow(timeout: 6)
         startTrip.tap()
         app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 20), "Didn't reach the map")
@@ -62,15 +45,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         allowPermissionPrompts()
         app.launch()
         startNewTrip(as: "Organizer", homeTimeout: 15)
-        let search = app.textFields["Destination"]
-        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
-        search.tap()
-        search.typeText("Ipoh")
-        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
-        result.tap()
-        tapCreateTrip()
-        XCTAssertTrue(waitForLobby(timeout: 30), "New trip to the lobby: no lobby sheet")
+        try createTrip(to: "Ipoh")
 
         // Lobby, Back: Home's sheet comes back.
         app.buttons["Back to trips"].tap()
@@ -159,15 +134,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         allowPermissionPrompts()
         app.launch()
         startNewTrip(as: "Organizer", homeTimeout: 15)
-        let search = app.textFields["Destination"]
-        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
-        search.tap()
-        search.typeText("Ipoh")
-        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
-        result.tap()
-        tapCreateTrip()
-        XCTAssertTrue(waitForLobby(timeout: 30), "Create trip didn't open the lobby")
+        try createTrip(to: "Ipoh")
         lobbyActionButton.tap()
         app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 30), "Start trip didn't switch to the driving map")
@@ -200,15 +167,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         allowPermissionPrompts()
         app.launch()
         startNewTrip(as: "Organizer", homeTimeout: 15)
-        let search = app.textFields["Destination"]
-        XCTAssertTrue(search.waitForExistence(timeout: 15), "Didn't reach Where to?")
-        search.tap()
-        search.typeText("Ipoh")
-        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ipoh")).firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 20), "No search result for Ipoh")
-        result.tap()
-        tapCreateTrip()
-        XCTAssertTrue(waitForLobby(timeout: 30), "Create trip didn't open the lobby")
+        try createTrip(to: "Ipoh")
 
         app.terminate()
         app.launch()
@@ -220,7 +179,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         // hittable then fails the test.
         while Date() < deadline, !startTrip.exists {
             if home.exists { sawHome = true }
-            dismissAlwaysExplainerIfShown()
+            dismissNotNow()
             Thread.sleep(forTimeInterval: 0.2)
         }
         add(XCTAttachment(screenshot: app.screenshot()))
@@ -229,7 +188,7 @@ final class CreateTripUITests: ConvoyUITestCase {
         XCTAssertFalse(app.drivingReport.exists, "Relaunch before Start opened the driving map")
 
         // The Always sheet can come up over the lobby just now and take the tap.
-        dismissAlwaysExplainerIfShown()
+        dismissNotNow()
         app.buttons["lobby.back"].tap()
         XCTAssertTrue(home.waitForExistence(timeout: 15), "Back to trips didn't return to Home")
     }

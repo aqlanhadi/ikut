@@ -134,25 +134,29 @@ class ConvoyUITestCase: XCTestCase {
         let bar = lobbyPresence
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            dismissAlwaysExplainerIfShown()
+            dismissNotNow()
             if bar.exists, bar.isHittable { return true }
             Thread.sleep(forTimeInterval: 0.5)
         }
         return false
     }
 
-    /// The Always-location explainer comes up once tracking starts, and the lobby's sheet steps aside for it: answer it
-    /// "Not now" wherever the lobby is waited on, so a drag or a read never lands on the explainer.
-    func dismissAlwaysExplainerIfShown() {
+    /// Answers "Not now" to whatever question is up (the Always-location explainer comes up once tracking starts, and
+    /// the lobby's sheet steps aside for it; the map's asks too), so a drag or a read never lands on it. With a
+    /// `timeout` it waits that long for it to come up; without, only taps one already showing. True if it tapped.
+    @discardableResult
+    func dismissNotNow(timeout: TimeInterval = 0) -> Bool {
         let notNow = app.buttons["Not now"]
-        if notNow.exists { notNow.tap() }
+        guard timeout > 0 ? notNow.waitForExistence(timeout: timeout) : notNow.exists else { return false }
+        notNow.tap()
+        return true
     }
 
     /// The lobby's sheet is up at medium; the cars list starts below it. One drag brings the sheet to tall (never
     /// repeat it: another drag scrolls the list, and the cars header goes out of the tree). Does nothing the second time.
     func pullLobbySheetUp() {
         guard !lobbySheetPulled else { return }
-        dismissAlwaysExplainerIfShown()
+        dismissNotNow()
         lobbySheetPulled = true
         let grabber = app.otherElements["Sheet Grabber"]
         if grabber.exists {
@@ -283,8 +287,7 @@ class ConvoyUITestCase: XCTestCase {
         } else if back.exists {
             // Tracking starts as the lobby opens, and the Always explainer comes up once a moment later, with the
             // lobby's sheet stepping aside for it: wait for it and answer it first, then tap Back on the sheet.
-            let notNow = app.buttons["Not now"]
-            if notNow.waitForExistence(timeout: 5) { notNow.tap() }
+            dismissNotNow(timeout: 5)
             if back.waitForExistence(timeout: 10) { back.tap() }
         }
         if !home.waitForExistence(timeout: 15) {
@@ -380,10 +383,35 @@ class ConvoyUITestCase: XCTestCase {
         app.buttons["joinConfirm"].tap()
     }
 
-    /// Home (or Welcome) to the lobby of `code`, as my own car named "<name>'s car".
-    func join(code: String, name: String) throws {
-        openJoinForm(code: code, name: name)
-        chooseCarAndJoin(carName: "\(name)'s car")
-        XCTAssertTrue(waitForLobby(timeout: 30), "Didn't reach the lobby")
+    /// Where to? to the lobby: types `destination`, taps the first result, Create trip, and waits for the lobby. Call it
+    /// after `startNewTrip`. Fails the test (and throws) with the error the screen shows if the lobby doesn't come up.
+    func createTrip(to destination: String, lobbyTimeout: TimeInterval = 30,
+                    searchTimeout: TimeInterval = 15, resultTimeout: TimeInterval = 20) throws {
+        let search = app.textFields["Destination"]
+        XCTAssertTrue(search.waitForExistence(timeout: searchTimeout), "Didn't reach Where to?")
+        search.tap()
+        search.typeText(destination)
+        let result = button(beginningWith: destination)
+        XCTAssertTrue(result.waitForExistence(timeout: resultTimeout), "No search result for \(destination)")
+        result.tap()
+        tapCreateTrip()
+        if !waitForLobby(timeout: lobbyTimeout) {
+            shot("FAILED-no-lobby")
+            add(XCTAttachment(screenshot: app.screenshot()))
+            let error = labelled("identifier == %@", "createTripError")
+            XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
+            throw WaitFailure()
+        }
+    }
+
+    /// Home (or Welcome) to the lobby of `code`: as my own car named "<name>'s car", or riding in the car whose label
+    /// contains `tile`. `beforeCar` runs on the car step (the demo's screenshot). Each wait has its own timeout.
+    func join(code: String, name: String, ridingIn tile: String? = nil, carName: String? = nil, sharing: Bool? = nil,
+              homeTimeout: TimeInterval = 30, carTimeout: TimeInterval = 30, lobbyTimeout: TimeInterval = 30,
+              beforeCar: () -> Void = {}) throws {
+        openJoinForm(code: code, name: name, homeTimeout: homeTimeout)
+        beforeCar()
+        chooseCarAndJoin(ridingIn: tile, carName: carName ?? "\(name)'s car", sharing: sharing, timeout: carTimeout)
+        XCTAssertTrue(waitForLobby(timeout: lobbyTimeout), "Didn't reach the lobby")
     }
 }

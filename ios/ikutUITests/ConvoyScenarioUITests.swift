@@ -205,19 +205,16 @@ final class ConvoyScenarioUITests: ConvoyUITestCase {
     // MARK: Joining
 
     private func joinAndOpenMap(code: String, name: String) throws {
-        openJoinForm(code: code, name: name, homeTimeout: 20)
-        chooseCarAndJoin(carName: "\(name)'s car", timeout: 20)
-        XCTAssertTrue(waitForLobby(timeout: 20), "Didn't reach the lobby")
+        try join(code: code, name: name, homeTimeout: 20, carTimeout: 20, lobbyTimeout: 20)
 
         // Tracking starts in the lobby; the Always explainer may come up once it does.
-        let notNow = app.buttons["Not now"]
-        if notNow.waitForExistence(timeout: 6) { notNow.tap() }
+        dismissNotNow(timeout: 6)
         // The script is the organizer and starts the trip once this phone is tracking; the button is Show map then.
         XCTAssertTrue(lobbyActionButton.waitForExistence(timeout: 120), "The organizer didn't start the trip")
         lobbyActionButton.tap()
         app.dismissMapAsks(first: 3)
         XCTAssertTrue(app.drivingReport.waitForExistence(timeout: 20), "Didn't reach the map")
-        if notNow.waitForExistence(timeout: 2) { notNow.tap() }
+        dismissNotNow(timeout: 2)
         // The convoy sheet opens collapsed; open it to read the rows.
         let expand = app.buttons["Expand convoy list"]
         XCTAssertTrue(expand.waitForExistence(timeout: 5), "The convoy sheet should open collapsed")

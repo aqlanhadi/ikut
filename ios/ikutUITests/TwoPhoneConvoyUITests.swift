@@ -94,17 +94,12 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
 
     // MARK: Shared flows
 
-    func dismissNotNow() {
-        let notNow = app.buttons["Not now"]
-        if notNow.exists { notNow.tap() }
-    }
-
     /// Lobby: 4 cars, all tracking, with the expected names.
     func checkLobbyHasFourCars() throws {
         // The cars sit below the fold of the sheet at medium.
         pullLobbySheetUp()
         try waitFor("lobby shows 4 of 4 ready", timeout: 90) {
-            dismissAlwaysExplainerIfShown()
+            dismissNotNow()
             return labelled("label CONTAINS %@", "4 of 4 ready").exists
         }
         // ("Wyna" only: typing an apostrophe may come out curly with smart punctuation.)
@@ -167,21 +162,8 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
 
         try step("1. creates the trip (name, New trip, Where to?, lobby)") {
             startNewTrip(as: "Aisha")
-            let search = app.textFields["Destination"]
-            XCTAssertTrue(search.waitForExistence(timeout: 20), "Didn't reach Where to?")
-            search.tap()
-            search.typeText("Ipoh")
-            let result = button(beginningWith: "Ipoh")
-            XCTAssertTrue(result.waitForExistence(timeout: 30), "No search result for Ipoh")
-            result.tap()
-            tapCreateTrip()
-            if !waitForLobby(timeout: 45) {
-                let error = labelled("identifier == %@", "createTripError")
-                XCTFail("Didn't reach the lobby (\(error.exists ? error.label : "no error shown"))")
-                throw WaitFailure()
-            }
-            let notNow = app.buttons["Not now"]
-            if notNow.waitForExistence(timeout: 4) { notNow.tap() }
+            try createTrip(to: "Ipoh", lobbyTimeout: 45, searchTimeout: 20, resultTimeout: 30)
+            dismissNotNow(timeout: 4)
             let code = readJoinCode()
             shot("01-lobby-created")
             mark("a.code", code)
