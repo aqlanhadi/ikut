@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Root navigation: the welcome screen until "Get Started", then the app's one map (`TripScreenHost`, D54) with Home
+/// Root navigation: the welcome screen until "Get started", then the app's one map (`TripScreenHost`, D54) with Home
 /// (`TripsHomeView`) or a trip (`LobbyView`: its lobby or the driving map) over it. Opening a trip and leaving it are a
 /// camera move and a sheet change on that map; Join is Home's sheet too (its steps, D58), and the recap is pushed over it.
 /// Signed-out visitors give a name (sheet) before Create or Join.

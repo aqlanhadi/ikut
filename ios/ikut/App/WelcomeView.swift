@@ -79,7 +79,7 @@ struct WelcomeView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, Spacing.cozy)
-                Button(action: onGetStarted) { Text("Get Started").frame(maxWidth: .infinity) }
+                Button(action: onGetStarted) { Text("Get started").frame(maxWidth: .infinity) }
                     .actionButton(.primary)
                 Button(action: onJoin) {
                     Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity)
