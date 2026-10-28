@@ -16,6 +16,11 @@ final class LocationPermission {
 
     private(set) var status: Status
     private(set) var accuracy: Accuracy
+    /// What the app should do before tracking runs in the background (`LocationContext.goingToBackground`): the Always
+    /// explainer while only When In Use is given.
+    var backgroundAction: LocationAction {
+        LocationAccess.nextAction(status: status, accuracy: accuracy, context: .goingToBackground)
+    }
 
     @ObservationIgnored private let manager = CLLocationManager()
     @ObservationIgnored private let delegate = Delegate()

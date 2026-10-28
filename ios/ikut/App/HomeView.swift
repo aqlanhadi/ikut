@@ -228,8 +228,7 @@ struct HomeView: View {
     private func openTrip(_ tripId: String, started: Bool, tracks: Bool = false) {
         home.creating = false
         home.joining = nil
-        let asks = TripSessionLogic.asksAlwaysOnOpen(willTrack: tracks, action: LocationAccess.nextAction(
-            status: location.status, accuracy: location.accuracy, context: .goingToBackground))
+        let asks = TripSessionLogic.asksAlwaysOnOpen(willTrack: tracks, action: location.backgroundAction)
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) {
             stage.open(tripId: tripId, started: started, asksAlways: asks)
         }

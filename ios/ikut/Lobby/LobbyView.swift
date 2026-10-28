@@ -426,9 +426,7 @@ struct LobbyView: View {
         }
         .onChange(of: session.isTracking) { _, tracking in
             guard tracking else { return }
-            let action = LocationAccess.nextAction(
-                status: location.status, accuracy: location.accuracy, context: .goingToBackground)
-            if session.consumeAlwaysExplainer(action: action) { session.alwaysExplainerShowing = true }
+            if session.consumeAlwaysExplainer(action: location.backgroundAction) { session.alwaysExplainerShowing = true }
         }
         .sheet(isPresented: Binding(
             get: { TripSessionLogic.explainerVisible(wanted: session.alwaysExplainerShowing, askShowing: session.askShowing, mapSheetUp: sheetsUp) },
