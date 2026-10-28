@@ -1,4 +1,5 @@
 #if DEBUG
+import FirebaseFirestore
 import MapKit
 import SwiftUI
 
@@ -94,6 +95,67 @@ struct CameraTourDemo: View {
                 recapStep = step
                 await pause(2.5)
             }
+        }
+    }
+}
+
+/// `IKUT_SCREEN=follow-drive` (D70): my car (the lead, this phone its tracker) drives north on the E1 at 100 km/h
+/// with a fix every second, the camera following; Wyna and Daniel write their positions every 5 s, as the tracker
+/// does. The map should glide on steadily, with no step every 5 s, and the other cars move smoothly between their
+/// writes. Tap Fit to watch the cars move within the frame; a pan stops the camera and leaves the cars moving.
+struct FollowDriveDemo: View {
+    @State private var model: TripMapModel = {
+        let model = MapDemo.model()
+        model.mode = .follow
+        return model
+    }()
+
+    var body: some View {
+        NavigationStack {
+            TripScreenHost(mode: .driving) {
+                TripMapView(session: TripSession(tripId: "demo", userId: "u-c1"), model: model, stopBoard: .empty,
+                            alerts: AlertCenter(bannerDuration: .seconds(3_600)), stopService: DemoStopService())
+            }
+        }
+        .task { await drive() }
+    }
+
+    private func drive() async {
+        let main = RouteLine(MapDemo.densify(MapDemo.mainWaypoints))
+        let tapah = main.project(.init(latitude: 4.2000, longitude: 101.2600))?.offset ?? 0
+        /// Where each car starts on the route and how fast it goes, m/s.
+        let cars: [String: (start: Double, speed: Double)] = [
+            "c1": (tapah, 100 / 3.6), "c2": (tapah - 1_800, 92 / 3.6), "c4": (tapah - 6_400, 96 / 3.6),
+        ]
+        func spot(_ id: String, _ seconds: Double) -> (MapCoordinate, Double, Double)? {
+            guard let car = cars[id] else { return nil }
+            let offset = car.start + car.speed * seconds
+            guard let here = main.coordinate(atOffset: offset), let ahead = main.coordinate(atOffset: offset + 50) else { return nil }
+            return (MapCoordinate(here), PlaceSide.bearing(here, ahead), offset)
+        }
+        let begin = Date()
+        var second = 0.0
+        while !Task.isCancelled {
+            let now = Date()
+            if let (here, course, _) = spot("c1", second) {
+                model.receive(DeviceFix(coordinate: here, course: course, speed: cars["c1"]!.speed, at: now), now: now)
+            }
+            // Every 5 s, the cars' written positions, as their trackers write them.
+            if Int(second) % 5 == 0 {
+                var positions: [String: Position] = [:]
+                for id in ["c1", "c2", "c3", "c4"] {
+                    if let (here, course, offset) = spot(id, second), let speed = cars[id]?.speed {
+                        positions[id] = Position(
+                            id: nil, location: GeoPoint(latitude: here.latitude, longitude: here.longitude), speed: speed,
+                            heading: course, routeOffset: offset, convoyOffset: offset, battery: 0.8, updatedAt: now)
+                    } else if let kept = model.carPosition(id) {
+                        positions[id] = kept
+                    }
+                }
+                model.apply(trip: nil, myCar: model.myCar, myCarId: "c1", positions: positions, isTracker: true)
+            }
+            second += 1
+            try? await Task.sleep(for: .seconds(max(begin.addingTimeInterval(second).timeIntervalSinceNow, 0)))
         }
     }
 }

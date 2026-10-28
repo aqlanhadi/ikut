@@ -279,12 +279,12 @@ struct MapCameraTests {
         #expect(target == .follow(center: tapah, distance: MapCameraLogic.followDistance))
     }
 
-    @Test func trackerFollowsItsCarOthersFollowTheirPhone() {
-        #expect(MapCameraLogic.myCoordinate(isTracker: true, carPosition: tapah, device: bidor) == tapah)
-        #expect(MapCameraLogic.myCoordinate(isTracker: false, carPosition: tapah, device: bidor) == bidor)
-        #expect(MapCameraLogic.myCoordinate(isTracker: false, carPosition: tapah, device: nil) == tapah)
-        #expect(MapCameraLogic.myCoordinate(isTracker: true, carPosition: nil, device: bidor) == bidor)
-        #expect(MapCameraLogic.myCoordinate(isTracker: false, carPosition: nil, device: nil) == nil)
+    /// D70: the tracker follows its phone's own fixes too (about one a second), not the five-second write.
+    @Test func everyPhoneFollowsItsOwnFixesThenItsCar() {
+        #expect(MapCameraLogic.myCoordinate(carPosition: tapah, device: bidor) == bidor)
+        #expect(MapCameraLogic.myCoordinate(carPosition: tapah, device: nil) == tapah)
+        #expect(MapCameraLogic.myCoordinate(carPosition: nil, device: bidor) == bidor)
+        #expect(MapCameraLogic.myCoordinate(carPosition: nil, device: nil) == nil)
     }
 }
 

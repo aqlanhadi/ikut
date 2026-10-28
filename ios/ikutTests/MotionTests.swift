@@ -15,12 +15,13 @@ struct MotionTests {
         #expect(Motion.sheet(reduceMotion: true) == Motion.reduced)
         #expect(Motion.banner(reduceMotion: true) == Motion.reduced)
         #expect(Motion.quick(reduceMotion: true) == Motion.reduced)
-        #expect(Motion.follow(interval: 2, reduceMotion: true) == Motion.reduced)
+        // The follow glide steps with Reduce Motion, as the camera does (D70).
+        #expect(Motion.follow(interval: 2, reduceMotion: true) == nil)
         #expect(Motion.camera(reduceMotion: true) == nil)
         #expect(Motion.reduced == .easeInOut(duration: 0.2))
     }
 
-    @Test func followNeverGetsAZeroInterval() {
-        #expect(Motion.follow(interval: 0, reduceMotion: false) == .linear(duration: 0.05))
+    @Test func aFollowGlideOfNoTimeIsAStep() {
+        #expect(Motion.follow(interval: 0, reduceMotion: false) == nil)
     }
 }

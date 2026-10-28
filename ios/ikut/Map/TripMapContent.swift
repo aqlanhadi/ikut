@@ -88,6 +88,18 @@ struct TripMapInput {
         TripMapInput(showsUser: true, home: HomeMapInput(places: places, focusedPlaceId: focusedId, newTripRoute: route))
     }
 
+    /// The cars drawn at `drawn` (the driving layer's glide, D70) where it has them.
+    func drawing(cars drawn: [String: MapCoordinate]) -> TripMapInput {
+        guard !drawn.isEmpty else { return self }
+        var input = self
+        input.cars = cars.map { car in
+            var car = car
+            if let spot = drawn[car.id] { car.coordinate = spot }
+            return car
+        }
+        return input
+    }
+
     /// Pins in drawing order: the chosen R&R last, so it is on top.
     var orderedPins: [LobbyPin] { pins.sorted { !$0.isSelectedCandidate && $1.isSelectedCandidate } }
 }

@@ -173,6 +173,9 @@ final class TripMapStage {
     let cameraBox = CameraBox()
     /// The camera move in flight, paced by `CameraPace` (D57).
     let flight = CameraFlight()
+    /// Where the driving map draws each car (D70), set by the driving layer in a linear glide per fix, so the
+    /// markers move smoothly between fixes as the camera does; a car missing here is drawn where it is.
+    var drawnCars: [String: MapCoordinate] = [:]
 
     init(mode: TripScreenMode = .lobby, tripId: String? = nil) {
         self.mode = mode
@@ -266,7 +269,7 @@ struct TripScreenHost<Content: View>: View {
         style.cameraHeading = stage.heading
         style.containerWidth = stage.mapFrame.maxX
         return Map(position: $stage.camera) {
-            TripMapContent(input: spec.input, style: style)
+            TripMapContent(input: spec.input.drawing(cars: stage.drawnCars), style: style)
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
         .mapControlVisibility(spec.hidesControls ? .hidden : .automatic)

@@ -250,7 +250,13 @@ struct TripMapView: View {
             }
             .task(id: pillTimerKey) { await tickPill() }
             .task { await watchDriving() }
-            .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
+            // The phone's own fixes for the map (D70): the tracker's only while the app is in front, since its map
+            // follows them only to draw.
+            .task(id: DeviceStreamKey(isTracker: model.isTracker, active: scenePhase == .active)) {
+                guard liveServices else { return }
+                if !model.isTracker || scenePhase == .active { await model.runDeviceLocation() } else { model.device = nil }
+            }
+            .onChange(of: markerSpots, initial: true) { old, new in glideMarkers(from: old, to: new) }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
             // One watcher for everything that moves the camera (D67): the aim itself, and the sheet, the stop card or a
             // banner changing what the map can see. Several changes in one update are one move, on the motion of the
@@ -334,7 +340,27 @@ struct TripMapView: View {
         CameraMoveLog.record(inputs: new, plan: plan)
         #endif
         guard let plan else { return }
-        move(to: model.cameraTarget, animated: true, plan: plan)
+        // My car on to its next fix (or the convoy's frame moving with its cars): a linear glide over the time
+        // between fixes, which also takes in a recentre a banner left for it (D70).
+        let step = CameraInsetMove.isStep(from: old.target, to: new.target) ? model.lastGlide : nil
+        move(to: model.cameraTarget, animated: true, plan: plan, step: step)
+    }
+
+    /// Where each car's marker is drawn, watched to glide them (D70).
+    private var markerSpots: [String: MapCoordinate] {
+        Dictionary(model.markers.map { ($0.id, $0.coordinate) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// Moves each car that moved in a linear glide over the time between its fixes (`TripMapModel.glideTime`), on
+    /// its own: my car on my phone's fixes (as the camera), the others on their writes. A step with Reduce Motion,
+    /// and in the background, where nothing is seen. One animation per fix, never a repeating one.
+    private func glideMarkers(from old: [String: MapCoordinate], to new: [String: MapCoordinate]) {
+        let still = reduceMotion || scenePhase != .active
+        for (id, spot) in new where stage.drawnCars[id] != spot {
+            let glide = old[id] == nil || still ? nil : Motion.follow(interval: model.glideTime(for: id), reduceMotion: false)
+            withAnimation(glide) { stage.drawnCars[id] = spot }
+        }
+        for id in stage.drawnCars.keys where new[id] == nil { stage.drawnCars[id] = nil }
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
@@ -382,13 +408,13 @@ struct TripMapView: View {
     /// landing (`retarget`) or waits for it; anything bigger (into follow from the lobby, Fit, a hazard, a car) is
     /// paced by `CameraPace` and takes over whatever is in flight (`CameraInsetMove.action`).
     private func move(to target: CameraTarget?, animated: Bool, reaim: Bool = false,
-                      plan: CameraInsetMove.Plan = .init(targetChanged: true, cause: .none)) {
+                      plan: CameraInsetMove.Plan = .init(targetChanged: true, cause: .none), step: TimeInterval? = nil) {
         guard let aimed = cameraRoom.target(target), let next = Self.position(for: aimed) else { return }
         aimedTop = mapInsets.top + mapAbove
         guard animated else { stage.place(next); return }
         let view = cameraView(for: aimed)
         let nudge = { [stage, reduceMotion] (cause: CameraInsetMove.Cause) in
-            withAnimation(CameraInsetMove.animation(cause, reduceMotion: reduceMotion)) { stage.camera = next }
+            withAnimation(CameraInsetMove.animation(cause, reduceMotion: reduceMotion, step: step)) { stage.camera = next }
         }
         let paced = CameraPace.decide(flyingTo: stage.flight.destination, seen: stage.seenView, to: view, reaim: reaim)
         let action = CameraInsetMove.action(plan, paced: paced, flying: stage.flight.isFlying)
@@ -1229,6 +1255,7 @@ struct TripMapView: View {
         // Popped, or another screen pushed over the trip: no convoy sheet any more.
         session.mapSheetUp = false
         stage.pulledUp = false
+        stage.drawnCars = [:]
         onScreen = false
         ask = nil
         session.askShowing = false
@@ -1237,4 +1264,10 @@ struct TripMapView: View {
         model.stop()
         alerts.stop()
     }
+}
+
+/// When the map's own location stream runs (`TripMapView`, D70).
+private struct DeviceStreamKey: Hashable {
+    var isTracker: Bool
+    var active: Bool
 }
