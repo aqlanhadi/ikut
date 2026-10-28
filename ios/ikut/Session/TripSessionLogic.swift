@@ -64,7 +64,24 @@ typealias CarRouteFactory = @MainActor (
     _ tripId: String, _ carId: String, _ trip: Trip, _ car: Car, _ meetingPoint: CLLocationCoordinate2D?
 ) throws -> CarRouteControlling
 
+/// What a screen reads from the session beyond the trip, its stops and this phone's own docs (`TripSession.read`).
+enum TripRead: Hashable, Sendable { case cars, members }
+
+/// The screens that read from the session: the lobby (its rows, also below the pulled-up convoy) and the convoy's map.
+enum TripReader: Hashable, Sendable { case lobby, map }
+
 enum TripSessionLogic {
+    /// The listeners the session runs for what its readers read: the union, so two readers share one listener.
+    static func reads(_ readers: [TripReader: Set<TripRead>]) -> Set<TripRead> {
+        readers.values.reduce(into: Set<TripRead>()) { $0.formUnion($1) }
+    }
+
+    /// The trip has started and is still running (`startedAt` set, not ended): the one rule the lobby and the map read.
+    static func isStarted(_ trip: Trip?) -> Bool {
+        guard let trip, trip.status == .active else { return false }
+        return trip.startedAt != nil
+    }
+
     /// Only the car's tracker, while the trip is active and they are still a member, broadcasts.
     static func shouldTrack(
         userId: String, tripStatus: TripStatus?, isMember: Bool, trackerUserId: String?

@@ -150,9 +150,11 @@ struct LobbyEmulatorTests {
         let ids = try await EmulatorTrip.make(
             name: "Lobby test", carName: "Aqlan's Myvi", carColor: TripService.palette[0])
 
-        let model = LobbyModel(tripId: ids.tripId)
-        model.start()
-        defer { model.stop() }
+        let session = TripSession(tripId: ids.tripId, userId: ids.uid, tracker: FakeTrackingController())
+        session.start()
+        session.read(TripScreenLogic.lobbyReads(onScreen: true, mode: .lobby, pulledUp: false), by: .lobby)
+        let model = LobbyModel(session: session)
+        defer { session.stop() }
 
         await waitUntil(.seconds(10)) { model.trip != nil && !model.cars.isEmpty && !model.members.isEmpty }
         #expect(model.trip?.name == "Lobby test")

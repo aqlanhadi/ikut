@@ -3,34 +3,41 @@ import FirebaseFirestore
 import Foundation
 import Observation
 
-/// Live trip, cars and members for the lobby, from Firestore snapshot listeners.
+/// The lobby's view of the trip: the trip, cars, members and stops, read from the trip's session (its one reader,
+/// so the lobby rows and the convoy can't disagree). A sample lobby holds its own data instead.
 @Observable @MainActor
 final class LobbyModel {
     let tripId: String
-    private(set) var trip: Trip?
-    private(set) var cars: [Car] = []
-    private(set) var members: [Member] = []
+    /// The trip's session; nil in a sample lobby.
+    @ObservationIgnored private let session: TripSession?
+    private var sampleTrip: Trip?
+    private var sampleCars: [Car] = []
+    private var sampleMembers: [Member] = []
+    private var sampleStops: [PlannedStop] = []
+
+    var trip: Trip? { session?.trip ?? sampleTrip }
+    var cars: [Car] { session?.cars ?? sampleCars }
+    var members: [Member] { session?.members ?? sampleMembers }
     /// The planned stops, in driving order.
-    private(set) var stops: [PlannedStop] = []
-    private(set) var errorMessage: String?
+    var stops: [PlannedStop] { session?.stops ?? sampleStops }
+    var errorMessage: String? { session?.errorMessage }
 
     var groupedCars: [LobbyCar] { LobbyLogic.group(cars: cars, members: members) }
 
-    // Handles aren't Sendable; they're written on the main actor and removed in stop() or deinit.
-    @ObservationIgnored nonisolated(unsafe) private var listeners: [ListenerRegistration] = []
-
-    init(tripId: String) {
-        self.tripId = tripId
+    init(session: TripSession) {
+        tripId = session.tripId
+        self.session = session
     }
 
     #if DEBUG
-    /// A lobby on sample data, for previews. Don't `start()` it: the listeners would replace the data.
+    /// A lobby on sample data, for previews: no session, nothing is read.
     init(sampleTrip trip: Trip, cars: [Car], members: [Member], stops: [PlannedStop] = []) {
         tripId = trip.id ?? "sample"
-        self.trip = trip
-        self.cars = cars
-        self.members = members
-        self.stops = stops
+        session = nil
+        sampleTrip = trip
+        sampleCars = cars
+        sampleMembers = members
+        sampleStops = stops
     }
 
     /// KL to Ipoh with four cars, Hafiz's still waiting for a tracker; `started` puts it on the road.
@@ -65,59 +72,4 @@ final class LobbyModel {
             stops: stops)
     }
     #endif
-
-    deinit {
-        for listener in listeners { listener.remove() }
-    }
-
-    /// Attaches the listeners; calling it again while running does nothing.
-    func start() {
-        guard listeners.isEmpty else { return }
-        let db = Firestore.firestore()
-
-        listeners.append(
-            db.document(FirestorePaths.trip(tripId)).addSnapshotListener { [weak self] snapshot, error in
-                let trip = try? snapshot?.data(as: Trip.self)
-                let message = error?.localizedDescription
-                Task { @MainActor in
-                    if let trip { self?.trip = trip }
-                    if let message { self?.errorMessage = message }
-                }
-            })
-
-        listeners.append(
-            db.collection(FirestorePaths.cars(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
-                let cars = snapshot?.decoded(Car.self)
-                let message = error?.localizedDescription
-                Task { @MainActor in
-                    if let cars { self?.cars = cars }
-                    if let message { self?.errorMessage = message }
-                }
-            })
-
-        listeners.append(
-            db.collection(FirestorePaths.stops(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
-                let stops = snapshot?.decoded(PlannedStop.self)
-                let message = error?.localizedDescription
-                Task { @MainActor in
-                    if let stops { self?.stops = stops.sorted { $0.order < $1.order } }
-                    if let message { self?.errorMessage = message }
-                }
-            })
-
-        listeners.append(
-            db.collection(FirestorePaths.members(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
-                let members = snapshot?.decoded(Member.self)
-                let message = error?.localizedDescription
-                Task { @MainActor in
-                    if let members { self?.members = members }
-                    if let message { self?.errorMessage = message }
-                }
-            })
-    }
-
-    func stop() {
-        for listener in listeners { listener.remove() }
-        listeners = []
-    }
 }

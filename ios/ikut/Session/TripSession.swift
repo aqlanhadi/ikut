@@ -6,7 +6,9 @@ import OSLog
 
 /// Live state of the trip this user is in, plus the tracker duty that follows from it.
 ///
-/// Every member listens to the trip, their own member doc and `positions`. Only the car's tracker
+/// The one reader of the trip's data: the lobby and the convoy both read the trip, stops, cars and members from here,
+/// so they can't disagree. Every member listens to the trip, their own member doc, the stops and `positions`; the
+/// cars and the members only while a screen reads them (`read(_:by:)`, rule #396). Only the car's tracker
 /// (while the trip is active) runs the `TrackingService`; it stops the moment that stops being true.
 /// The session decides whether this phone has the duty (listeners, pause, leave, end, the meeting-point answer);
 /// `TrackingDuty` does the tracking itself (session key, startup, the car's route, the fixes).
@@ -24,6 +26,10 @@ final class TripSession {
     private(set) var skipsMeetingPoint = false
     /// Latest position per car id.
     private(set) var positions: [String: Position] = [:]
+    /// Every car in the trip, while the lobby or the convoy reads them; the last read stays while nobody does.
+    private(set) var cars: [Car] = []
+    /// Everyone in the trip, while the lobby reads them (rule #396); the last read stays while it rests.
+    private(set) var members: [Member] = []
     private(set) var errorMessage: String?
     /// True once the member doc snapshot says this user is not in the trip (any more).
     private(set) var membershipLost = false
@@ -37,6 +43,8 @@ final class TripSession {
     /// (e.g. after a relaunch) and the pause has not expired.
     var isPaused: Bool { TripSessionLogic.isPaused(pausedAt: pauseStart, now: clock()) }
     var isEnded: Bool { trip?.status == .ended }
+    /// Started (`startedAt`) and not ended: the one answer the lobby and the convoy both read.
+    var isStarted: Bool { TripSessionLogic.isStarted(trip) }
     var isOrganizer: Bool { trip?.organizerId == userId && !userId.isEmpty }
     /// The trip is still running and this user is still in it: leaving, pausing and editing make sense (Lobby's canLeave, canEdit and canPause build on it).
     var isLiveMember: Bool { !isEnded && !membershipLost }
@@ -51,6 +59,11 @@ final class TripSession {
     @ObservationIgnored private var positionsListener: ListenerRegistration?
     @ObservationIgnored private var stopsListener: ListenerRegistration?
     @ObservationIgnored private var answerListener: ListenerRegistration?
+    @ObservationIgnored private var carsListener: ListenerRegistration?
+    @ObservationIgnored private var membersListener: ListenerRegistration?
+    /// What each screen reads from the session beyond the trip; the cars and members listeners run for their union.
+    @ObservationIgnored private var readers: [TripReader: Set<TripRead>] = [:]
+    @ObservationIgnored private var restTask: Task<Void, Never>?
     /// The stop and car `answerListener` is on, so it moves only when either does.
     @ObservationIgnored private var listeningAnswer: [String]?
     /// The stop and car whose answer has had its first snapshot (or failed), so a session may be keyed on it.
@@ -109,6 +122,7 @@ final class TripSession {
 
     isolated deinit {
         expiryTask?.cancel()
+        restTask?.cancel()
         rebuilder.cancel()
         duty.shutDown()
         removeListeners()
@@ -174,6 +188,73 @@ final class TripSession {
                     if let message { self.errorMessage = message }
                 }
             }
+        attachReads()
+    }
+
+    // MARK: - Who reads the cars and members
+
+    /// What `reader` reads now. A listener someone starts reading attaches at once; one nobody reads any more rests a
+    /// moment later (`restUnread()`), so a hand-over between the lobby and the convoy in one update keeps it running.
+    func read(_ wanted: Set<TripRead>, by reader: TripReader) {
+        guard readers[reader, default: []] != wanted else { return }
+        readers[reader] = wanted
+        attachReads()
+        restTask?.cancel()
+        restTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            self?.restUnread()
+        }
+    }
+
+    /// Removes the cars or members listener when no screen reads it; what it last read stays.
+    func restUnread() {
+        let wanted = TripSessionLogic.reads(readers)
+        if !wanted.contains(.cars) {
+            carsListener?.remove()
+            carsListener = nil
+        }
+        if !wanted.contains(.members) {
+            membersListener?.remove()
+            membersListener = nil
+        }
+    }
+
+    /// The listeners running now, by name (the listener-count test).
+    var runningListeners: [String] {
+        let all: [(String, ListenerRegistration?)] = [
+            ("trip", tripListener), ("member", memberListener), ("car", carListener), ("positions", positionsListener),
+            ("stops", stopsListener), ("answer", answerListener), ("cars", carsListener), ("members", membersListener),
+        ]
+        return all.compactMap { $0.1 == nil ? nil : $0.0 }
+    }
+
+    /// Attaches the cars and members listeners someone reads, once the session runs (`start()`).
+    private func attachReads() {
+        guard tripListener != nil else { return }
+        let wanted = TripSessionLogic.reads(readers)
+        if wanted.contains(.cars), carsListener == nil {
+            carsListener = db.collection(FirestorePaths.cars(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
+                let cars = snapshot?.decoded(Car.self)
+                let message = error?.localizedDescription
+                Task { @MainActor in
+                    guard let self, self.carsListener != nil else { return }
+                    if let cars { self.cars = cars }
+                    if let message { self.errorMessage = message }
+                }
+            }
+        }
+        if wanted.contains(.members), membersListener == nil {
+            membersListener = db.collection(FirestorePaths.members(tripId: tripId)).addSnapshotListener { [weak self] snapshot, error in
+                let members = snapshot?.decoded(Member.self)
+                let message = error?.localizedDescription
+                Task { @MainActor in
+                    guard let self, self.membersListener != nil else { return }
+                    if let members { self.members = members }
+                    if let message { self.errorMessage = message }
+                }
+            }
+        }
     }
 
     /// Stops tracking and detaches every listener.
@@ -313,8 +394,11 @@ final class TripSession {
 
     /// Test seam: feeds the state the listeners would, without Firestore.
     func applyForTesting(
-        trip: Trip?, member: Member?, car: Car?, stops: [PlannedStop] = [], skipsMeetingPoint: Bool = false
+        trip: Trip?, member: Member?, car: Car?, stops: [PlannedStop] = [], skipsMeetingPoint: Bool = false,
+        cars: [Car] = [], members: [Member] = []
     ) {
+        self.cars = cars
+        self.members = members
         self.trip = trip
         self.skipsMeetingPoint = skipsMeetingPoint
         self.stops = stops
@@ -465,6 +549,11 @@ final class TripSession {
     }
 
     private func removeListeners() {
+        restTask?.cancel()
+        carsListener?.remove()
+        membersListener?.remove()
+        carsListener = nil
+        membersListener = nil
         tripListener?.remove()
         memberListener?.remove()
         carListener?.remove()
