@@ -50,8 +50,8 @@ struct TripsHomeView: View {
     @State private var newName = ""
     @State private var renameError: String?
     /// The sheet is at its tall detent (the detent selection reads and writes it).
-    @State private var expanded = false
-    @State private var past: [PastTrips.Entry] = []
+    @State var expanded = false
+    @State var past: [PastTrips.Entry] = []
     /// The status line of each trip in Now (one read when the list appears), by trip id.
     @State private var nowStatus: [String: String] = [:]
     /// Routes of the newest ended trips, drawn on the map (newest first).
@@ -61,7 +61,7 @@ struct TripsHomeView: View {
     /// The trips in Now that Home read as started: a tap opens them on the driving map.
     @State private var nowStarted: Set<String> = []
     /// The past trip picked on the map, whose recap fills the sheet.
-    @State private var picked: PickedTrip?
+    @State var picked: PickedTrip?
     /// Its route when it is older than the 12 drawn and the recap hasn't loaded yet.
     @State private var fetchedRoute: PastTripRoute?
     /// Where the camera was before picking, for Back.
@@ -78,10 +78,10 @@ struct TripsHomeView: View {
     /// Demo that can be tapped through: picking a trip gives it this recap (no server). `tour` also picks the
     /// first trip and closes it again by itself (the second time pulling it up and down first), so a recording needs no taps.
     @State private var demoModel: RecapModel?
-    @State private var tour = false
+    @State var tour = false
     /// `home-camera-tour` (D57): plays Home's camera hops by itself, with a caption naming each.
     @State private var cameraTour = false
-    @State private var tourCaption = ""
+    @State var tourCaption = ""
     #endif
 
     init(onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
@@ -118,20 +118,11 @@ struct TripsHomeView: View {
         self.init(onNewTrip: {}, onJoin: {})
         if let joinStepper {
             _joinFlow = State(initialValue: joinStepper)
-            let insets = HomeSheet.createInsets(
-                mapHeight: 0, sheet: HomeSheet.joinHeight, compact: HomeSheet.compactHeight)
-            if let region = JoinSteps.region(for: joinStepper.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) {
-                _listCamera = State(initialValue: .region(region))
-            }
+            if let camera = Self.demoJoinCamera(joinStepper) { _listCamera = State(initialValue: camera) }
         }
         if let createFlow {
             _flow = State(initialValue: createFlow)
-            let insets = HomeSheet.createInsets(
-                mapHeight: 0, sheet: HomeSheet.height(HomeSheet.mode(flow: createFlow), compact: HomeSheet.compactHeight),
-                compact: HomeSheet.compactHeight)
-            if let region = createFlow.region(bottomObscured: insets.bottom, topObscured: insets.top) {
-                _listCamera = State(initialValue: .region(region))
-            }
+            if let camera = Self.demoCreateCamera(createFlow) { _listCamera = State(initialValue: camera) }
         }
         _isDemo = State(initialValue: true)
         _nowStatus = State(initialValue: nowStatus)
@@ -143,15 +134,9 @@ struct TripsHomeView: View {
         _expanded = State(initialValue: expanded)
         _picked = State(initialValue: picked)
         if let picked {
-            if let itemId, let item = picked.model.recap?.timeline.first(where: { $0.id == itemId }) { picked.select(item) }
-            let route = PickedTripLogic.route(for: picked.entry, snapshot: picked.model.snapshot, drawn: routes, fetched: nil)
+            let (route, camera) = Self.demoPickedCamera(picked, selecting: itemId, routes: routes)
             _fetchedRoute = State(initialValue: route)
-            let insets = Self.obscured(mapHeight: 0)
-            if let c = picked.selectedItem?.coordinate {
-                _listCamera = State(initialValue: .region(PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)))
-            } else if let route, let r = PickedTripLogic.fit(route, bottomObscured: insets.bottom, topObscured: insets.top) {
-                _listCamera = State(initialValue: .region(r))
-            }
+            if let camera { _listCamera = State(initialValue: camera) }
         } else if let r = PastTripsMapLogic.region(fitting: routes, bottomObscured: Self.obscured(mapHeight: 0).bottom,
                                                    topObscured: Self.obscured(mapHeight: 0).top) {
             _listCamera = State(initialValue: .region(r))
@@ -160,7 +145,7 @@ struct TripsHomeView: View {
     #endif
 
     /// The map's height on screen (it runs under the status bar and the home indicator).
-    private var mapHeight: CGFloat { stage.mapFrame.height }
+    var mapHeight: CGFloat { stage.mapFrame.height }
 
     var body: some View {
         Color.clear
@@ -193,20 +178,7 @@ struct TripsHomeView: View {
         .task(id: picked?.entry.id) { if !isDemo { await loadPicked() } }
         #if DEBUG
         .task(id: tour) {
-            guard tour, let first = past.first else { return }
-            for cycle in 0..<2 {
-                try? await Task.sleep(for: .seconds(2.5))
-                open(first)
-                try? await Task.sleep(for: .seconds(3.5))
-                if cycle == 1 {
-                    // Pulled up and back down, to see that the map and Legal stay put under the tall sheet.
-                    expanded = true
-                    try? await Task.sleep(for: .seconds(3))
-                    expanded = false
-                    try? await Task.sleep(for: .seconds(2.5))
-                }
-                closePicked()
-            }
+            await playTour()
         }
         .task(id: cameraTour) { if cameraTour { await playCameraTour() } }
         .overlay(alignment: .top) {
@@ -293,7 +265,7 @@ struct TripsHomeView: View {
     }
 
     /// An ended trip is picked here, on the map; one still running opens on the same map.
-    private func open(_ entry: PastTrips.Entry) {
+    func open(_ entry: PastTrips.Entry) {
         guard entry.endedAt != nil else { onOpenTrip(entry, nowStarted.contains(entry.id)); return }
         pick(entry)
     }
@@ -323,7 +295,7 @@ struct TripsHomeView: View {
     }
 
     /// Back to the list, with the camera where it was.
-    private func closePicked() {
+    func closePicked() {
         guard picked != nil else { return }
         withAnimation(sheetMotion) {
             picked = nil
@@ -335,7 +307,7 @@ struct TripsHomeView: View {
     }
 
     /// A timeline item: the map goes to it, and the sheet drops to short with the item in it.
-    private func selectItem(_ item: RecapTimelineItem) {
+    func selectItem(_ item: RecapTimelineItem) {
         guard let picked else { return }
         picked.select(item)
         withAnimation(sheetMotion) { expanded = false }
@@ -343,7 +315,7 @@ struct TripsHomeView: View {
     }
 
     /// The X on the item: back to the whole route.
-    private func showWholeTrip() {
+    func showWholeTrip() {
         picked?.clearSelection()
         refocus(animated: true)
     }
@@ -354,7 +326,7 @@ struct TripsHomeView: View {
     /// Every camera move on Home goes through here, paced by `CameraPace` (D57): a near move glides, a far one pulls
     /// out, travels and settles, and with Reduce Motion each is one short ease. A placed refit while a flight is in the
     /// air waits for it to land; a tiny change keeps the shortest glide.
-    private func move(to position: MapCameraPosition, animated: Bool) {
+    func move(to position: MapCameraPosition, animated: Bool) {
         let view = HomeCamera.view(of: position)
         let glide = { [stage, reduceMotion] in
             withAnimation(CameraPace.nudgeAnimation(reduceMotion: reduceMotion)) { stage.camera = position }
@@ -426,7 +398,7 @@ struct TripsHomeView: View {
     }
 
     /// Points the camera at every drawn route, above the compact sheet.
-    private func fit(animated: Bool) {
+    func fit(animated: Bool) {
         guard flow == nil, joinFlow == nil else { return }
         let insets = Self.obscured(mapHeight: mapHeight)
         guard let region = PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom,
@@ -487,50 +459,6 @@ struct TripsHomeView: View {
                                              bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
-
-    #if DEBUG
-    /// Home's hops for `home-camera-tour`, looping: the first fix (the country to your street), the street to every
-    /// trip, a pick, a stop on it, the whole trip, back to trips, and a far hop to Johor Bahru and back.
-    private func playCameraTour() async {
-        func pause(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
-        let insets = Self.obscured(mapHeight: mapHeight)
-        let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
-        let country = MKCoordinateRegion(center: .init(latitude: 4.2, longitude: 102.0), span: .init(latitudeDelta: 8, longitudeDelta: 6))
-        let johor = HomeCamera.around(.init(latitude: 1.4927, longitude: 103.7414), bottomObscured: insets.bottom, topObscured: insets.top)
-        while !Task.isCancelled {
-            tourCaption = "The country"
-            move(to: .region(country), animated: false)
-            await pause(2.5)
-            tourCaption = "First fix: the country to your street"
-            move(to: .region(HomeCamera.around(kl, bottomObscured: insets.bottom, topObscured: insets.top)), animated: true)
-            await pause(3.5)
-            tourCaption = "Your street to every trip"
-            fit(animated: true)
-            await pause(3)
-            guard let first = past.first else { return }
-            tourCaption = "Pick a trip"
-            open(first)
-            await pause(3)
-            if let stop = picked?.model.recap?.timeline.first(where: { $0.kind == .stop && $0.coordinate != nil }) {
-                tourCaption = "A stop on its route"
-                selectItem(stop)
-                await pause(3)
-                tourCaption = "The whole trip again"
-                showWholeTrip()
-                await pause(3)
-            }
-            tourCaption = "Back to trips"
-            closePicked()
-            await pause(3)
-            tourCaption = "To Johor Bahru: out, across and in"
-            move(to: .region(johor), animated: true)
-            await pause(4.5)
-            tourCaption = "Back to trips: out, across and in"
-            fit(animated: true)
-            await pause(4.5)
-        }
-    }
-    #endif
 
     // MARK: Your location
 
@@ -707,7 +635,10 @@ struct TripsHomeView: View {
                 if let picked {
                     PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
                 } else {
-                    header
+                    HomeHeader(onNewTrip: onNewTrip, onJoin: onJoin, profileName: profileName, barHeight: $barHeight) { name in
+                        newName = name
+                        renaming = true
+                    }
                 }
             }
             .id(picked?.entry.id ?? "")
@@ -724,74 +655,28 @@ struct TripsHomeView: View {
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(mode, compact: compact))))
         .interactiveDismissDisabled()
-        .alert("Your name", isPresented: $renaming) {
-            TextField("Your name", text: $newName)
-                .textInputAutocapitalization(.words)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") { saveName() }
-        } message: {
-            Text("What the convoy sees in new trips.")
-        }
-        .alert("Couldn’t change your name", isPresented: .constant(renameError != nil)) {
-            Button("OK") { renameError = nil }
-        } message: {
-            Text(renameError ?? "")
-        }
+        .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
     }
 
     /// The search bar's height, which the name button is made to match (it grows with the text size).
     @State private var barHeight = SheetSearch.height
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: Spacing.m) {
-            // Apple Maps' top row: the search bar and the name's avatar. Tapping the bar starts the same flow, in
-            // Where to?, where the bar becomes editable.
-            HStack(spacing: Spacing.gap) {
-                SheetSearchButton(placeholder: "Where to?", action: onNewTrip)
-                    .trackingHeight($barHeight)
-                    .accessibilityIdentifier("homeWhereTo")
-                profileButton
-            }
-            .padding(.top, Spacing.xs)
-
-            Button(action: onJoin) {
-                HStack(spacing: Spacing.m) {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
-                        .background(Color(.label).opacity(0.9), in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
-                        .accessibilityHidden(true)
-                    Text("Join with a code").font(.body.weight(.medium)).foregroundStyle(.primary)
-                    Spacer(minLength: Spacing.s)
-                    Text("or scan").font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-                }
-                .padding(.horizontal, Spacing.m)
-                .frame(minHeight: 50)
-                .contentShape(Rectangle())
-                .surfaceTile(radius: Radius.control)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("homeJoin")
-        }
-    }
 
     /// "Now" (only when a trip hasn't ended) and "Past trips", each a group of rows on a tile.
     private var pastTrips: some View {
         let parts = HomeNow.split(past)
         return VStack(alignment: .leading, spacing: 0) {
             if !parts.now.isEmpty {
-                sectionTitle("Now")
-                group(parts.now) { nowRow($0) }
+                HomeSectionTitle(title: "Now")
+                HomeTripGroup(entries: parts.now, open: open) { HomeNowRow(entry: $0, status: nowStatus[$0.id]) }
             }
-            sectionTitle("Past trips")
+            HomeSectionTitle(title: "Past trips")
             if parts.past.isEmpty {
                 // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
                 EmptyRow("Trips you start or join will show here.")
                     .foregroundStyle(Color.surfaceSecondary)
                     .surfaceTile(radius: Radius.control)
             } else {
-                group(parts.past) { pastRow($0) }
+                HomeTripGroup(entries: parts.past, open: open) { HomePastRow(entry: $0) }
             }
         }
         .onAppear { if !isDemo { past = PastTrips.all() } }
@@ -816,97 +701,12 @@ struct TripsHomeView: View {
         }
     }
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Color.surfaceSecondary)
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.m)
-            .padding(.bottom, Spacing.xs)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private func group(_ entries: [PastTrips.Entry], row: @escaping (PastTrips.Entry) -> some View) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                if index > 0 { RowDivider() }
-                Button { open(entry) } label: { row(entry) }
-                    .buttonStyle(.plain)
-            }
-        }
-        .surfaceTile(radius: Radius.control)
-    }
-
-    private func nowRow(_ entry: PastTrips.Entry) -> some View {
-        HStack(spacing: Spacing.m) {
-            Image(systemName: "flag.checkered")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                Text(nowStatus[entry.id] ?? HomeNow.fallbackStatus)
-                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
-            }
-            Spacer(minLength: Spacing.s)
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
-        }
-        .padding(.horizontal, Spacing.m)
-        .frame(minHeight: 56)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens the trip")
-    }
-
-    private func pastRow(_ entry: PastTrips.Entry) -> some View {
-        HStack(spacing: Spacing.m) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entry.name).font(.body.weight(.medium)).foregroundStyle(.primary)
-                Text(PastTrips.withPhrase(entry.others) ?? PickedTripLogic.subtitle(entry))
-                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(1)
-            }
-            Spacer(minLength: Spacing.s)
-            if let ended = entry.endedAt {
-                Text(ended.formatted(.dateTime.day().month(.abbreviated)))
-                    .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-            }
-        }
-        .padding(.horizontal, Spacing.m)
-        .frame(minHeight: 56)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Shows the trip on the map")
-    }
-
-    @ViewBuilder
-    private var profileButton: some View {
-        if let name = profileName {
-            RoundGlassIconButton(text: name.prefix(1).uppercased(), label: "Your name and settings", size: barHeight, exact: true) {
-                newName = name
-                renaming = true
-            }
-        }
-    }
-
     /// Who the profile button shows: the signed-in name (a demo state shows a sample name).
     private var profileName: String? {
         #if DEBUG
         if isDemo { return "Aqlan" }
         #endif
         return auth.state == .signedIn ? auth.displayName : nil
-    }
-
-    private func saveName() {
-        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard case .success = DisplayName.validate(trimmed) else {
-            renameError = "Use 1 to \(DisplayName.maxLength) characters."
-            return
-        }
-        Task {
-            do { try await auth.updateDisplayName(trimmed) } catch { renameError = error.localizedDescription }
-        }
     }
 }
 
