@@ -213,6 +213,26 @@ struct SessionCarRouteTests {
         #expect(rig.tracker.startCount == 0)
         #expect(!rig.session.isTracking)
     }
+
+    /// Back to trips while the first fix or `ensureRoute` is still pending: the session is released and tracking
+    /// must not start afterwards (an empty main route, a tracker nobody stops).
+    @Test func sessionReleasedDuringStartupNeverStartsTracking() async throws {
+        let tracker = FakeTrackingController()
+        let carRoute = FakeCarRoute()
+        carRoute.ensureHangs = true
+        var session: TripSession? = TripSession(
+            tripId: "t1", userId: "u1", tracker: tracker,
+            carRouteFactory: { _, _, _, _, _ in carRoute }, ensureTimeout: .milliseconds(100))
+        session?.applyForTesting(trip: testTrip(), member: testMember, car: testCar())
+        await waitUntil(.seconds(2)) { carRoute.ensureCalls == 1 }
+        #expect(carRoute.ensureCalls == 1)
+        session = nil
+        // Past `ensureTimeout`, when startup would go on to `startTracking`.
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(tracker.startCount == 0)
+        #expect(!tracker.isTracking)
+        #expect(tracker.onFix == nil)
+    }
 }
 
 private func meetStop(order: Int = 0, skipped: Bool? = nil, left: Bool = false) -> PlannedStop {

@@ -114,6 +114,7 @@
 		5C70256875A060BD3AED7F23 /* RequestPlaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22D878D22F72D9E78CD9DE62 /* RequestPlaces.swift */; };
 		5D18041BA2CDBB3808121983 /* PlaceRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FE148B8C110122AD858B9D2 /* PlaceRules.swift */; };
 		5E0572F32C4E89743D919B29 /* AuthEmulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */; };
+		5F78D28E96A03E0AABFC519B /* TrackingDuty.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B0FB0B0F03C1ECAE7C814D /* TrackingDuty.swift */; };
 		5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881F14A69E038A11FD750DD0 /* Theme.swift */; };
 		603229DBA878868CF3EDDB49 /* AddStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBAE5CE8B29F5659AA605AB /* AddStopTests.swift */; };
 		6062867CC5108F8969937695 /* AddStopModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0322844C0F9486635E0DB1C /* AddStopModel.swift */; };
@@ -431,6 +432,7 @@
 		66FF5396649ED8B58EC123A7 /* TripAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAskTests.swift; sourceTree = "<group>"; };
 		67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarAheadTests.swift; sourceTree = "<group>"; };
 		698FEDDD6491F2113B929776 /* RecapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapService.swift; sourceTree = "<group>"; };
+		69B0FB0B0F03C1ECAE7C814D /* TrackingDuty.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingDuty.swift; sourceTree = "<group>"; };
 		69F3CF9A6AAD541D8024D3F1 /* JoinTowns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinTowns.swift; sourceTree = "<group>"; };
 		6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteTimeoutTests.swift; sourceTree = "<group>"; };
 		6BBAE5CE8B29F5659AA605AB /* AddStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopTests.swift; sourceTree = "<group>"; };
@@ -1076,6 +1078,7 @@
 		E82D7AE7B5EB4B519789AD5C /* Session */ = {
 			isa = PBXGroup;
 			children = (
+				69B0FB0B0F03C1ECAE7C814D /* TrackingDuty.swift */,
 				C46D1C04BC5842435C33213A /* TripSession.swift */,
 				9B8ECEB1452E465155C7324B /* TripSessionLogic.swift */,
 			);
@@ -1451,6 +1454,7 @@
 				AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */,
 				5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */,
 				1D60D40F65E7155998DF0CAC /* TicketDrive.swift in Sources */,
+				5F78D28E96A03E0AABFC519B /* TrackingDuty.swift in Sources */,
 				3948F54C6AB6FC2E960961D3 /* TrackingService.swift in Sources */,
 				902FF2CE4308539543381C77 /* TrackingTypes.swift in Sources */,
 				AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */,
