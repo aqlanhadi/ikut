@@ -115,6 +115,11 @@ enum CameraMoveLog {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ikut", category: "camera")
     private static let on = ProcessInfo.processInfo.environment["IKUT_CAMERA_LOG"] != nil
 
+    static func note(_ text: String) {
+        guard on else { return }
+        log.notice("camera note: \(text)")
+    }
+
     static func record(inputs: CameraInsetMove.Inputs, plan: CameraInsetMove.Plan?) {
         guard on else { return }
         log.notice("camera inputs: top \(Int(inputs.top)) bottom \(Int(inputs.bottom)) -> \(plan == nil ? "no move" : "move")")

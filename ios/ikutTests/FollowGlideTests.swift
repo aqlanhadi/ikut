@@ -96,13 +96,22 @@ struct FollowGlideTests {
         #expect(stillStanding.heading == nil)
     }
 
-    @Test func aMarkerStartsBackWhereTheCarWasDrawnInPoints() {
-        // 1e-5 degrees a point: a car 28 m north (2.5e-4 degrees) starts 25 points below its new place.
-        let back = MarkerGlide.offset(from: start, to: next, degreesPerPoint: 1e-5, heading: 0)
-        #expect(abs(back.height - 25) < 0.1 && abs(back.width) < 1e-6)
-        // The map turned to face east: north is to the left, so the old place is to the right.
-        let turned = MarkerGlide.offset(from: start, to: next, degreesPerPoint: 1e-5, heading: 90)
-        #expect(abs(turned.width - 25) < 0.1 && abs(turned.height) < 1e-6)
+    @Test func aSlideThatIsCutShortStartsTheNextFromWhereTheMarkerIsDrawn() {
+        let slide = MarkerGlide.Slide(from: CGSize(width: 0, height: 40), start: t0, duration: 4)
+        #expect(slide.remaining(at: t0) == CGSize(width: 0, height: 40))
+        #expect(slide.remaining(at: t0 + 1) == CGSize(width: 0, height: 30))
+        #expect(slide.remaining(at: t0 + 9) == .zero)
+    }
+
+    @Test func aSlideIsPlacedWhenTheScaleMovesOrTheStepIsTooSmallToSee() {
+        // Fit to Follow, or a pinch: the start in points no longer matches the map.
+        #expect(MarkerGlide.scaleMoved(from: 0.01, to: 0.012))
+        #expect(MarkerGlide.scaleMoved(from: 0.01, to: 0.0085))
+        #expect(!MarkerGlide.scaleMoved(from: 0.01, to: 0.0105))
+        #expect(!MarkerGlide.scaleMoved(from: 0, to: 0.01))
+        // A standing car, or one moving under a point a second at Fit zoom: placed.
+        #expect(!MarkerGlide.worthGliding(CGSize(width: 1, height: 1)))
+        #expect(MarkerGlide.worthGliding(CGSize(width: 0, height: 28)))
     }
 
     @Test func theGlideIsLinearWithoutReduceMotionAndAStepWithIt() {

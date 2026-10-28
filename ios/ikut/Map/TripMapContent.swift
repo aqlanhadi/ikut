@@ -96,8 +96,16 @@ struct TripMapInput {
 struct TripMapStyle {
     var cameraHeading = 0.0
     var containerWidth: CGFloat = 0
-    /// Degrees of latitude per point of the map as last read (0 before), for the cars' glide (`MarkerGlide`).
-    var degreesPerPoint = 0.0
+    /// Where a coordinate is drawn on screen now, for the cars' glide (`MarkerGlide`); nil off the driving host.
+    var point: ((MapCoordinate) -> CGPoint?)?
+    /// Changes when running slides must be placed (`TripMapStage.placeSlides`).
+    var placeSlides = 0
+
+    func converting(_ point: @escaping (MapCoordinate) -> CGPoint?) -> TripMapStyle {
+        var style = self
+        style.point = point
+        return style
+    }
     /// The hazard that pings because an alert for it is up.
     var pingingEventId: String?
     var onCandidateTap: (String) -> Void = { _ in }
@@ -157,7 +165,7 @@ struct TripMapContent: MapContent {
             Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
                 MapMarkerView(marker: marker, cameraHeading: style.cameraHeading, containerWidth: style.containerWidth)
                     .modifier(MarkerGlide(coordinate: marker.coordinate, duration: marker.glide,
-                                          degreesPerPoint: style.degreesPerPoint, cameraHeading: style.cameraHeading))
+                                          place: style.placeSlides, point: style.point))
             }
             .annotationTitles(.hidden)
         }
@@ -165,40 +173,73 @@ struct TripMapContent: MapContent {
 }
 
 /// A car's marker gliding to its new place (D70). MapKit plays its own short ease for an annotation that moves, whatever
-/// animation it is given, so the annotation is moved at once and its view starts back where the car was drawn, offset
-/// by the step in points, and slides to it linearly over `duration`, a SwiftUI animation MapKit leaves alone. A step
-/// with Reduce Motion, before the map's scale is read, or for a car placed rather than glided (`duration` 0).
+/// animation it is given, so the annotation is moved at once and its view starts back where the car is drawn now
+/// (the step in points, from the map's own conversion, which knows its heading, pitch and padding, plus what is left
+/// of a slide still running) and slides to it linearly over `duration`, a SwiftUI animation MapKit leaves alone.
+/// Placed instead: with Reduce Motion, for a car placed rather than glided (`duration` 0), for a step too small to
+/// see (`placeUnder`), and whenever `place` changes (a flight, the scale moving), so a slide never runs on in
+/// points of a scale the map has left.
 struct MarkerGlide: ViewModifier {
     var coordinate: MapCoordinate
     var duration: TimeInterval
-    var degreesPerPoint: Double
-    var cameraHeading: Double
+    var place: Int
+    var point: ((MapCoordinate) -> CGPoint?)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var offset = CGSize.zero
+    @State private var slide: Slide?
+
+    /// A step shorter than this, in points, is placed: a standing car, or one far out at Fit zoom.
+    static let placeUnder: CGFloat = 1.5
+    /// A scale change bigger than this share places the slides.
+    static let scaleTolerance = 0.1
+
+    struct Slide: Equatable {
+        var from: CGSize
+        var start: Date
+        var duration: TimeInterval
+
+        /// The offset still to cover at `now` (the slide is linear).
+        func remaining(at now: Date) -> CGSize {
+            let left = max(0, 1 - now.timeIntervalSince(start) / max(duration, 0.001))
+            return CGSize(width: from.width * left, height: from.height * left)
+        }
+    }
+
+    static func scaleMoved(from: Double, to: Double) -> Bool {
+        guard from > 0, to > 0 else { return false }
+        return abs(to / from - 1) > scaleTolerance
+    }
+
+    static func worthGliding(_ from: CGSize) -> Bool {
+        (from.width * from.width + from.height * from.height).squareRoot() >= placeUnder
+    }
 
     func body(content: Content) -> some View {
         content
             .offset(offset)
-            .onChange(of: coordinate) { old, new in
-                var still = Transaction()
-                still.disablesAnimations = true
-                guard !reduceMotion, duration > 0, degreesPerPoint > 0 else {
-                    withTransaction(still) { offset = .zero }
-                    return
-                }
-                withTransaction(still) {
-                    offset = Self.offset(from: old, to: new, degreesPerPoint: degreesPerPoint, heading: cameraHeading)
-                }
-                withAnimation(.linear(duration: duration)) { offset = .zero }
-            }
+            .onChange(of: coordinate) { old, new in start(from: old, to: new) }
+            .onChange(of: place) { stop() }
     }
 
-    /// Where `from` is drawn relative to `to`, in points on a map turned `heading` degrees.
-    static func offset(from: MapCoordinate, to: MapCoordinate, degreesPerPoint: Double, heading: Double) -> CGSize {
-        let cosLat = cos(to.latitude * .pi / 180)
-        let north = (from.latitude - to.latitude) / degreesPerPoint
-        let east = (from.longitude - to.longitude) * cosLat / degreesPerPoint
-        let h = heading * .pi / 180
-        return CGSize(width: east * cos(h) - north * sin(h), height: -(east * sin(h) + north * cos(h)))
+    private func start(from old: MapCoordinate, to new: MapCoordinate) {
+        let now = Date()
+        let left = slide?.remaining(at: now) ?? .zero
+        guard !reduceMotion, duration > 0, let a = point?(old), let b = point?(new) else { stop(); return }
+        let from = CGSize(width: a.x - b.x + left.width, height: a.y - b.y + left.height)
+        guard Self.worthGliding(from) else { stop(); return }
+        jump(to: from)
+        withAnimation(.linear(duration: duration)) { offset = .zero }
+        slide = Slide(from: from, start: now, duration: duration)
+    }
+
+    private func stop() {
+        slide = nil
+        jump(to: .zero)
+    }
+
+    private func jump(to value: CGSize) {
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) { offset = value }
     }
 }

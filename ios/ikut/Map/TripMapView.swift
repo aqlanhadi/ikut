@@ -34,6 +34,8 @@ struct TripMapView: View {
     private var demoScreen: String?
     /// `camera-sheet-tour` (Debug launch state): the sheet and the banners come and go by themselves.
     private var demoTour = false
+    /// `follow-drive-interrupts` (D70): the sheet, a banner, Fit, Follow and a hazard in the middle of follow glides.
+    private var demoInterrupts = false
 
     @Environment(TripMapStage.self) private var stage
     @State private var model: TripMapModel
@@ -146,7 +148,7 @@ struct TripMapView: View {
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil, demoTour: Bool = false,
-        stopService: any StopServing = StopService(),
+        demoInterrupts: Bool = false, stopService: any StopServing = StopService(),
         demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil
     ) {
         _alerts = State(initialValue: alerts)
@@ -157,6 +159,7 @@ struct TripMapView: View {
         self.stopService = stopService
         demoScreen = demoCard
         self.demoTour = demoTour
+        self.demoInterrupts = demoInterrupts
         _glanceError = State(initialValue: demoError.map { var e = GlanceError(); e.show($0, cause: .send); return e } ?? GlanceError())
         _stopCardOpen = State(initialValue: demoCard != nil && !demoReport)
         if demoReport {
@@ -266,6 +269,7 @@ struct TripMapView: View {
             .task(id: approach?.id) { await watchApproach() }
             .task(id: passedText) { await expirePassed() }
             .task(id: demoTour) { if demoTour { await playSheetTour() } }
+            .task(id: demoInterrupts) { if demoInterrupts { await playInterrupts() } }
     }
 
     // MARK: Map
@@ -292,6 +296,29 @@ struct TripMapView: View {
             await pause(4)
             withAnimation(Motion.banner(reduceMotion: reduceMotion)) { glanceError.resolve(.pause) }
             await pause(2.5)
+        }
+    }
+
+    /// `follow-drive-interrupts`: each change lands 0.4 s into a follow glide (the fixes come on the whole second),
+    /// so the camera can be checked to end where the change says, with no snap back to the glide's aim.
+    private func playInterrupts() async {
+        func pause(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+        await pause(3.4)
+        for change in 0..<8 where !Task.isCancelled {
+            #if DEBUG
+            CameraMoveLog.note("interrupt \(change)")
+            #endif
+            switch change {
+            case 0: setShown(.unfolded)
+            case 1: setShown(.folded)
+            case 2: withAnimation(Motion.banner(reduceMotion: reduceMotion)) { passedText = "Passed the debris" }
+            case 3: withAnimation(Motion.banner(reduceMotion: reduceMotion)) { passedText = nil }
+            case 4: model.mode = .fit
+            case 5: model.mode = .follow
+            case 6: model.mode = .hazard(id: "demo-debris")
+            default: model.mode = .follow
+            }
+            await pause(3)
         }
     }
 
@@ -399,13 +426,22 @@ struct TripMapView: View {
         aimedTop = mapInsets.top + mapAbove
         guard animated else { stage.place(next); return }
         let view = cameraView(for: aimed)
-        let nudge = { [stage, reduceMotion] (cause: CameraInsetMove.Cause) in
+        let nudge = { [stage, reduceMotion, mapWidth] (cause: CameraInsetMove.Cause) in
             // A follow step: MapKit plays its own short ease for a small `withAnimation` move, whatever its length, so
-            // the step is a keyframe glide instead, which it plays as given (D70).
-            if cause == .none, !reduceMotion, let step, step > 0, let camera = next.camera {
-                stage.glide(to: camera, duration: step)
+            // the step is a keyframe glide instead, which it plays as given (D70); one too small to see is placed.
+            if cause == .none, !reduceMotion, let step, let camera = next.camera {
+                let points = (stage.seenView.map { CameraPace.travel(from: $0, to: view) } ?? 1) * Double(mapWidth)
+                stage.glide(to: camera, duration: step > 0 && points >= MarkerGlide.placeUnder ? step : 0.01)
                 return
             }
+            // A sheet or banner move while a follow glide runs: MapKit keeps playing the glide over a `withAnimation`
+            // move, so the move itself is a keyframe on the cover's time, which takes the glide's place.
+            if stage.isGliding, !reduceMotion, let camera = next.camera {
+                stage.glide(to: camera, duration: cause == .banner ? 0.3 : 0.4)
+                return
+            }
+            // Anything else ends a running glide first, so it isn't fought or swallowed.
+            stage.endGlide()
             withAnimation(CameraInsetMove.animation(cause, reduceMotion: reduceMotion, step: step)) { stage.camera = next }
         }
         let paced = CameraPace.decide(flyingTo: stage.flight.destination, seen: stage.seenView, to: view, reaim: reaim)
@@ -416,7 +452,9 @@ struct TripMapView: View {
         switch action {
         case .hold: stage.flight.hold { nudge(.none) }
         case .nudge(let cause): nudge(cause)
-        case .retarget: if !stage.flight.retarget(to: next, view: view) { nudge(plan.cause) }
+        case .retarget:
+            stage.endGlide()
+            if !stage.flight.retarget(to: next, view: view) { nudge(plan.cause) }
         case .fly: stage.fly(to: next, view: view, reduceMotion: reduceMotion)
         }
     }

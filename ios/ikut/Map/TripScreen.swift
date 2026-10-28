@@ -178,12 +178,36 @@ final class TripMapStage {
     private(set) var glides = 0
     @ObservationIgnored private(set) var glideTo: MapCamera?
     @ObservationIgnored private(set) var glideTime: TimeInterval = 0
+    @ObservationIgnored private var glideEnds = Date.distantPast
+    /// Bumped when the cars' running slides (`MarkerGlide`) must be placed at once: a flight starts, or the map's
+    /// scale moved by more than a tenth, so a slide's start in points would no longer be where the car was.
+    private(set) var placeSlides = 0
+    @ObservationIgnored private var slideScale: Double?
 
     /// Glides the camera to `camera` linearly over `duration` seconds, from wherever it is drawn now.
     func glide(to camera: MapCamera, duration: TimeInterval) {
         glideTo = camera
         glideTime = duration
+        glideEnds = Date().addingTimeInterval(duration)
         glides &+= 1
+    }
+
+    var isGliding: Bool { glideEnds > Date() }
+
+    /// Marks the glide ended for a move that isn't a follow step (Fit, a flight, the sheet or a banner): setting the
+    /// camera takes over a running keyframe glide by itself, while a second, ending keyframe started in the same
+    /// update was measured to swallow that move (D70 `follow-drive-interrupts`).
+    func endGlide() {
+        glideEnds = .distantPast
+    }
+
+    /// The map's scale as it moves (`onMapCameraChange` continuous): places the slides once it moved a tenth.
+    func noteScale(_ latitudeDelta: Double) {
+        guard let was = slideScale else { slideScale = latitudeDelta; return }
+        if MarkerGlide.scaleMoved(from: was, to: latitudeDelta) {
+            slideScale = latitudeDelta
+            placeSlides &+= 1
+        }
     }
 
     init(mode: TripScreenMode = .lobby, tripId: String? = nil) {
@@ -221,6 +245,8 @@ final class TripMapStage {
     /// A paced move to `position`, which shows `view` (`CameraPace`): from wherever the camera is now, taking over a
     /// move in flight, and stopping if the person takes the map.
     func fly(to position: MapCameraPosition, view: CameraView, reduceMotion: Bool) {
+        endGlide()
+        placeSlides &+= 1
         flight.fly(to: position, view: view, from: seenView, reduceMotion: reduceMotion,
                    continues: { [weak self] in self?.camera.positionedByUser == false }) { [weak self] in
             self?.camera = $0
@@ -277,34 +303,46 @@ struct TripScreenHost<Content: View>: View {
         var style = spec.style
         style.cameraHeading = stage.heading
         style.containerWidth = stage.mapFrame.maxX
-        if let reading = stage.reading, stage.mapFrame.height > 0 {
-            style.degreesPerPoint = reading.latitudeDelta / Double(stage.mapFrame.height)
+        style.placeSlides = stage.placeSlides
+        return MapReader { proxy in
+            Map(position: $stage.camera) {
+                TripMapContent(input: spec.input, style: style.converting { proxy.convert($0.clCoordinate, to: .global) })
+            }
+            .modifier(TripMapBehaviour(spec: spec, stage: stage))
         }
-        return Map(position: $stage.camera) {
-            TripMapContent(input: spec.input, style: style)
-        }
-        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-        .mapControlVisibility(spec.hidesControls ? .hidden : .automatic)
-        // The follow glide (D70): only the middle and the height move; the rest stays as the camera is.
-        .mapCameraKeyframeAnimator(trigger: stage.glides) { [stage] initial in
-            let to = stage.glideTo ?? initial
-            let time = max(stage.glideTime, 0.01)
-            KeyframeTrack(\MapCamera.centerCoordinate) { LinearKeyframe(to.centerCoordinate, duration: time) }
-            KeyframeTrack(\MapCamera.distance) { LinearKeyframe(to.distance, duration: time) }
-        }
-        // MapKit fits and centres inside the safe area: the logo and Legal ride above what the layer keeps clear.
-        .safeAreaPadding(.bottom, spec.bottomPadding)
-        .onMapCameraChange(frequency: .continuous) { context in
-            stage.cameraBox.record(context.camera, latitudeDelta: context.region.span.latitudeDelta)
-        }
-        .onMapCameraChange { context in
-            stage.read(heading: context.camera.heading, reading: TripCameraReading(
-                distance: context.camera.distance, pitch: context.camera.pitch,
-                latitudeDelta: context.region.span.latitudeDelta))
-        }
-        // Home: a tap away from the picked trip's route goes back to the list. Elsewhere the map keeps its taps.
-        .gesture(TapGesture().onEnded { spec.onTap?() }, including: spec.onTap == nil ? .subviews : .all)
-        .ignoresSafeArea()
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stage.mapFrame = $0 }
+    }
+}
+
+/// The host map's camera, readings and gestures.
+private struct TripMapBehaviour: ViewModifier {
+    let spec: TripMapSpec
+    @Bindable var stage: TripMapStage
+
+    func body(content: Content) -> some View {
+        content
+            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+            .mapControlVisibility(spec.hidesControls ? .hidden : .automatic)
+            // The follow glide (D70): only the middle and the height move; the rest stays as the camera is.
+            .mapCameraKeyframeAnimator(trigger: stage.glides) { [stage] initial in
+                let to = stage.glideTo ?? initial
+                let time = max(stage.glideTime, 0.01)
+                KeyframeTrack(\MapCamera.centerCoordinate) { LinearKeyframe(to.centerCoordinate, duration: time) }
+                KeyframeTrack(\MapCamera.distance) { LinearKeyframe(to.distance, duration: time) }
+            }
+            // MapKit fits and centres inside the safe area: the logo and Legal ride above what the layer keeps clear.
+            .safeAreaPadding(.bottom, spec.bottomPadding)
+            .onMapCameraChange(frequency: .continuous) { context in
+                stage.cameraBox.record(context.camera, latitudeDelta: context.region.span.latitudeDelta)
+                stage.noteScale(context.region.span.latitudeDelta)
+            }
+            .onMapCameraChange { context in
+                stage.read(heading: context.camera.heading, reading: TripCameraReading(
+                    distance: context.camera.distance, pitch: context.camera.pitch,
+                    latitudeDelta: context.region.span.latitudeDelta))
+            }
+            // Home: a tap away from the picked trip's route goes back to the list. Elsewhere the map keeps its taps.
+            .gesture(TapGesture().onEnded { spec.onTap?() }, including: spec.onTap == nil ? .subviews : .all)
+            .ignoresSafeArea()
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stage.mapFrame = $0 }
     }
 }

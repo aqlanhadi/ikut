@@ -104,8 +104,10 @@ struct CameraTourDemo: View {
 /// does. The map should glide on steadily, with no step every 5 s, and the other cars move smoothly between their
 /// writes. Tap Fit to watch the cars move within the frame; a pan stops the camera and leaves the cars moving.
 /// `follow-drive-still`: the same drive with the map held still on the convoy, to watch the cars alone.
+/// `follow-drive-interrupts`: the drive, with the sheet, a banner, Fit, Follow and a hazard landing mid-glide.
 struct FollowDriveDemo: View {
     var still = false
+    var interrupts = false
 
     @State private var model: TripMapModel = {
         let model = MapDemo.model()
@@ -117,7 +119,8 @@ struct FollowDriveDemo: View {
         NavigationStack {
             TripScreenHost(mode: .driving) {
                 TripMapView(session: TripSession(tripId: "demo", userId: "u-c1"), model: model, stopBoard: .empty,
-                            alerts: AlertCenter(bannerDuration: .seconds(3_600)), stopService: DemoStopService())
+                            alerts: AlertCenter(bannerDuration: .seconds(3_600)), demoInterrupts: interrupts,
+                            stopService: DemoStopService())
             }
         }
         .task {
