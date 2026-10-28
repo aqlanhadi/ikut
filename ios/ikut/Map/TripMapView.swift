@@ -110,8 +110,10 @@ struct TripMapView: View {
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil, demoTour: Bool = false,
         demoInterrupts: Bool = false, stopService: any StopServing = StopService(),
-        demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil
+        demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil,
+        demoAsk: TripAsk? = nil
     ) {
+        _ask = State(initialValue: demoAsk)
         _alerts = State(initialValue: alerts)
         self.session = session
         self.continuation = continuation

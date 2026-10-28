@@ -147,6 +147,11 @@ enum HomePickedDemo {
         let thin = PastTripsMapLogic.route(id: entry.id, name: entry.name, destinationName: snapshot.destinationName,
                                            destination: snapshot.destination, encodedRoute: snapshot.route)
         let past = [entry] + older
+        if name == "rename" || name == "rename-error" {
+            var home = TripsHomeView(demo: past, routes: [thin])
+            home.demoAlert = name
+            return home
+        }
         let model = RecapModel(snapshot: snapshot, originName: "Tanjung Malim")
         switch name {
         case "short": return TripsHomeView(demo: past, routes: [thin], picked: PickedTrip(entry: entry, model: model))

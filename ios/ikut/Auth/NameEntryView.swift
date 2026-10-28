@@ -100,6 +100,7 @@ struct NameFieldCard: View {
                 .frame(minHeight: 50)
                 .ikutCard()
                 .accessibilityLabel("Your name")
+                .accessibilityIdentifier("nameField")
                 .onSubmit(onSubmit)
         }
     }

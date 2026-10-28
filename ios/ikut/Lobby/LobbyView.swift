@@ -75,6 +75,10 @@ struct LobbyView: View {
     var sampleSharing = false
     /// In a sample lobby: this person is no longer in the trip.
     var sampleLost = false
+    #if DEBUG
+    /// A launch state opens with one of the lobby's asks already up: `start`, `leave`, `end`, `rename`, `qr`.
+    var demoAsk: String?
+    #endif
 
     /// `trip`: the open trip's session, lobby model and planner, made once by the screen's model when the trip opened
     /// (`TripScreenModel.open`), so no redraw makes (and drops) a session with its own location manager.
@@ -418,6 +422,16 @@ struct LobbyView: View {
             onScreen = true
             stage.tripLayer(of: session, onScreen: true)
             if sampleTall { setExpanded(true) }
+            #if DEBUG
+            switch demoAsk {
+            case "start": confirmStart = true
+            case "leave": confirmLeave = true
+            case "end": confirmEnd = true
+            case "rename": renameText = "Balik kampung raya"; renaming = true
+            case "qr": showQR = true
+            default: break
+            }
+            #endif
             if !isSample { session.start() }
             updateListening()
         }
@@ -472,6 +486,7 @@ struct LobbyView: View {
     @ViewBuilder var renameActions: some View {
         TextField("Trip name", text: $renameText)
             .textInputAutocapitalization(.words)
+            .accessibilityIdentifier("renameTripField")
         Button("Cancel", role: .cancel) {}
         Button("Save") {
             let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
