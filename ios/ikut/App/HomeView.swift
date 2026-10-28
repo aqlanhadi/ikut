@@ -223,8 +223,6 @@ struct HomeView: View {
     private func openTrip(_ tripId: String, started: Bool) {
         home.creating = false
         home.joining = nil
-        // The flow that made or joined this trip is let go with its steps, not kept until Home comes back.
-        home.coverSheet()
         prepareSession(tripId)
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
     }
