@@ -145,6 +145,23 @@ final class HomeModel {
         }
     }
 
+    /// Where the camera goes as Home's list comes on screen (D63 C4): every drawn route above the short sheet once the map
+    /// has a height, else the view around you when there are no routes, else the list's camera (worked out before, for a
+    /// typical phone). Nil, no move: a flow (Where to?, joining) or a picked trip keeps its own camera, or the routes make
+    /// no region.
+    func entryCamera(mapHeight: CGFloat) -> MapCameraPosition? {
+        let insets = TripsHomeView.obscured(mapHeight: mapHeight)
+        if mapHeight > 0, !routes.isEmpty {
+            guard flow == nil, joinFlow == nil else { return nil }
+            return PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) }
+        }
+        if routes.isEmpty, let here {
+            guard flow == nil, joinFlow == nil, picked == nil else { return nil }
+            return .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top))
+        }
+        return listCamera
+    }
+
     // MARK: Picked trip
 
     /// An ended trip is picked: the sheet shows its recap, short. `recap` is a demo's ready-made one.

@@ -20,6 +20,13 @@ enum LobbySheet {
     /// Legal ride above it and stay put when the sheet is pulled up.
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
+    /// What the lobby's sheet covers of the map for its camera (D63 C4): the medium sheet (the camera fits the trip above
+    /// it, inside the map's bottom safe area); the tall one covers the map on purpose and moves nothing, so it is not a
+    /// parameter. The round button under the status bar is at the top.
+    static func cover(compact: CGFloat) -> MapCover {
+        MapCover(top: LobbyMapLogic.buttonBand, bottom: legalInset(compact: compact))
+    }
+
     static func medium(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
     static let tall = PresentationDetent.large
     static func detents(compact: CGFloat) -> Set<PresentationDetent> { [medium(compact), tall] }
@@ -178,9 +185,6 @@ struct LobbyMapLayer: View {
     @Environment(TripScreenModel.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var roundSide = SheetButtonSize.round
-    @State private var mapHeight: CGFloat = 0
-    /// The map's top safe area: the status bar (the lobby has no navigation bar).
-    @State private var safeTop: CGFloat = 0
     @State private var onStop = false
     @State private var fitted = false
 
@@ -188,11 +192,11 @@ struct LobbyMapLayer: View {
         Color.clear
             .allowsHitTesting(false)
             .ignoresSafeArea()
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-                guard height != mapHeight else { return }
-                mapHeight = height
-                refitIfOurs(animated: false)
-            }
+            // The one map's height and status bar (D63 C4): known before the lobby comes on screen, so its first fit is
+            // already right; a later change (rotation, a call bar) refits as the layer's own measuring did.
+            .onChange(of: stage.space.frame.height) { _, _ in refitIfOurs(animated: false) }
+            .onChange(of: stage.space.safeTop) { _, _ in refitIfOurs(animated: false) }
+            .onChange(of: LobbySheet.cover(compact: sheetCompact), initial: true) { _, cover in stage.cover(cover, from: .lobby) }
             .onChange(of: route.count, initial: true) { _, _ in refitIfOurs(animated: fitted) }
             .onChange(of: pins) { _, _ in refitIfOurs(animated: fitted) }
             .onChange(of: command) { _, new in go(new.target, animated: true) }
@@ -213,16 +217,9 @@ struct LobbyMapLayer: View {
                 .buttonStyle(.plain)
                 .roundGlass()
                 .padding(.trailing, Spacing.m)
-                .padding(.top, safeTop + Spacing.xs)
+                .padding(.top, stage.space.safeTop + Spacing.xs)
                 .accessibilityLabel("Show the whole trip")
                 .accessibilityIdentifier("lobby.wholeTrip")
-            }
-            // Measured here, outside the layer's ignoresSafeArea (inside it the insets read zero): the top safe area is
-            // the status bar, as the layout has it.
-            .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.top }) { top in
-                guard top != safeTop else { return }
-                safeTop = top
-                refitIfOurs(animated: false)
             }
             .preference(key: TripMapSpecKey.self, value: TripMapSpec(
                 input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),
@@ -238,12 +235,18 @@ struct LobbyMapLayer: View {
     }
 
     private func go(_ target: LobbyMapTarget, animated: Bool) {
+        // The one cover, written first so a fit made in the sheet's transaction reads the lobby's own (D63 C4).
+        stage.cover(LobbySheet.cover(compact: sheetCompact), from: .lobby)
+        let cover = stage.space.cover(in: .lobby) ?? LobbySheet.cover(compact: sheetCompact)
         guard let region = LobbyMapLogic.region(for: target, route: route, pins: pins, bottomObscured: 0,
-                                                topObscured: LobbyMapLogic.topFraction(mapHeight: mapHeight, safeTop: safeTop,
-                                                                          bottomPadding: LobbySheet.legalInset(compact: sheetCompact))) else { return }
+                                                topObscured: LobbyMapLogic.topFraction(mapHeight: stage.space.frame.height,
+                                                                                       safeTop: stage.space.safeTop,
+                                                                                       bottomPadding: cover.bottom)) else { return }
         onStop = target != .wholeTrip
         fitted = true
         let position = MapCameraPosition.region(region)
+        // The view already aimed at (the entry's fit, then the route arriving the same): no second flight or placement.
+        if position == stage.aimed, !stage.camera.positionedByUser { return }
         if animated {
             stage.fly(to: position, view: CameraView(region: region), reduceMotion: reduceMotion)
         } else if CameraPace.decide(flyingTo: stage.flight.destination, seen: nil, to: CameraView(region: region)) == .hold {

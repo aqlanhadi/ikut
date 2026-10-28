@@ -58,6 +58,10 @@ enum HomeSheet {
         return flow.ready == nil ? .whereTo : .newTrip
     }
 
+    /// What Home's sheet covers of the map for its camera (D63 C4): the short sheet of `mode`. The tall one covers the
+    /// map on purpose and moves nothing (#343), so it is not a parameter.
+    static func cover(_ mode: Mode, compact: CGFloat) -> MapCover { MapCover(top: 0, bottom: height(mode, compact: compact)) }
+
     /// The short detent's height for `mode`.
     static func height(_ mode: Mode, compact: CGFloat) -> CGFloat {
         switch mode {

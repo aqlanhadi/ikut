@@ -39,6 +39,24 @@ enum CameraInsetMove {
     /// My car counts as comfortably in view while it is inside this middle share of the visible strip.
     static let comfort: CGFloat = 0.6
 
+    /// The inputs from the one map (D63 C4), as the driving layer measured them: what covers it (`cover`: the banner
+    /// stack from the layer's top, the sheet from the bottom) in a layer `layerHeight` tall starting `above` below the
+    /// map's top, shrunk together when they would leave less than `MapObscuredInsets.minimumVisible`, and the top
+    /// counted from the map's own top edge (`MapSpace.layerHeight`, `MapSpace.above`).
+    static func inputs(target: CameraTarget?, layerHeight: CGFloat, above: CGFloat, cover: MapCover) -> Inputs {
+        let insets = MapObscuredInsets.insets(mapHeight: layerHeight, top: cover.top, bottom: cover.bottom)
+        return Inputs(target: target, top: insets.top + above, bottom: insets.bottom)
+    }
+
+    /// The change to act on for `new`, from the last inputs acted on (`handled`): nil when those are `new` already (the
+    /// sheet's own change moved the camera in its transaction, and the watcher now sees the same inputs), the first
+    /// look (`new` twice) before any. Watching from the last handled rather than the last seen keeps D67's one
+    /// decision per update for whatever else changed meanwhile, such as a banner in the same update.
+    static func unhandled(_ handled: Inputs?, _ new: Inputs) -> (old: Inputs, new: Inputs)? {
+        guard let handled else { return (new, new) }
+        return handled == new ? nil : (handled, new)
+    }
+
     /// Whether `new` needs a camera move after `old`, and which. `frameHeight`: the map's height, which `top` and `bottom`
     /// are measured in. `aimedTop`: the top cover the camera was last aimed with; a banner that came
     /// without a move left the car where it was, so this is where the car is in the strip.

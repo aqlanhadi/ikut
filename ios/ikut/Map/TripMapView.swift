@@ -60,14 +60,13 @@ struct TripMapView: View {
     @State private var pillNow = Date()
     @State private var driving = DrivingDetector()
     @State private var glanceError = GlanceError()
-    @State private var mapHeight: CGFloat = 0
-    /// The banner stack's height, for `mapInsets`; the sheet's own height comes from `sheetHeights`.
+    /// The banner stack's height, for the one cover's top (`drivingCover`); the sheet's own height comes from `sheetHeights`.
     @State private var topHeight: CGFloat = 0
     /// The on-screen panel's header words, for the probes (`ConvoyPanel.headerWords`).
     @State private var panelHeader: ConvoyHeader.Text?
-    @State private var mapMaxY: CGFloat = 0
-    @State private var mapMinY: CGFloat = 0
-    @State private var mapWidth: CGFloat = 0
+    /// The camera inputs last acted on, by the sheet's own change (`setShown`) or by the watcher, so the watcher seeing
+    /// the same ones after a sheet change makes no second move (D63 C4).
+    @State private var handledInputs: CameraInsetMove.Inputs?
     /// The bottom inset the map keeps as safe area: the folded panel's, so the Legal label sits
     /// above it. The rest of what covers the map goes into the camera (`cameraRoom`).
     @State private var legalInset: CGFloat = 0
@@ -147,13 +146,9 @@ struct TripMapView: View {
             .overlay(alignment: .top) {
                 topStack.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapHeight = $0 }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { mapWidth = $0 }
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { mapMinY = $0 }
-            // The map runs on under the home indicator, past the frame seen here.
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY + $0.safeAreaInsets.bottom } action: {
-                mapMaxY = $0
-            }
+            // What covers the one map (D63 C4): a banner or a measured height written as it changes; a fold, unfold or
+            // pull-up writes it itself, in its own transaction (`setShown`).
+            .onChange(of: drivingCover, initial: true) { _, cover in stage.cover(cover, from: .driving) }
             .overlay(alignment: .topTrailing) {
                 // Below whatever is at the top (the trip pill, a banner, the stop pill), with the same gap
                 // the stack keeps between its own items. Before the stack is measured: its top
@@ -224,7 +219,7 @@ struct TripMapView: View {
             // One watcher for everything that moves the camera (D67): the aim itself, and the sheet, the stop card or a
             // banner changing what the map can see. Several changes in one update are one move, on the motion of the
             // change that caused it (`CameraInsetMove`).
-            .onChange(of: cameraInputs, initial: true) { old, new in cameraInputsChanged(from: old, to: new) }
+            .onChange(of: cameraInputs, initial: true) { _, new in takeCameraInputs(new) }
             .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
@@ -294,12 +289,13 @@ struct TripMapView: View {
             bottomPadding: legalInset)
     }
 
-    /// The map's height (it runs under the status bar, `mapAbove`), from the host's map.
-    private var mapFullHeight: CGFloat { mapMaxY - stage.mapFrame.minY }
+    /// The map's height down to the screen's bottom edge, from the one map (D63 C4).
+    private var mapFullHeight: CGFloat { stage.space.fullHeight }
+    private var mapWidth: CGFloat { stage.space.frame.width }
 
     /// How far above this layer's top the map starts: the one map runs under the status bar for the lobby and for
     /// driving alike, while this layer (and the banner stack it measures) starts under it.
-    private var mapAbove: CGFloat { max(mapMinY - stage.mapFrame.minY, 0) }
+    private var mapAbove: CGFloat { stage.space.above }
 
     /// Reads the map's scale off its own camera once a move has ended; the first reading aims the camera again.
     private func measureCamera(_ reading: TripCameraReading?) {
@@ -313,7 +309,22 @@ struct TripMapView: View {
 
     /// What the camera aims at and what covers the map, watched as one value.
     private var cameraInputs: CameraInsetMove.Inputs {
-        CameraInsetMove.Inputs(target: model.cameraTarget, top: mapInsets.top + mapAbove, bottom: mapInsets.bottom)
+        CameraInsetMove.inputs(target: model.cameraTarget, layerHeight: stage.space.layerHeight, above: mapAbove, cover: cover)
+    }
+
+    /// What this layer lays over the map: the banner stack at the top, the sheet and the stop card at the bottom.
+    private var drivingCover: MapCover {
+        MapCover(top: topHeight, bottom: sheet.covered(shown, up: stage.sheet.up, room: sheetRoom, hasTopBanner: topBanner != nil))
+    }
+
+    /// What covers the map, as the one cover holds it; this layer's own until its first write lands.
+    private var cover: MapCover { stage.space.cover(in: .driving) ?? drivingCover }
+
+    /// Hands the camera inputs it has not acted on yet (`CameraInsetMove.unhandled`).
+    private func takeCameraInputs(_ new: CameraInsetMove.Inputs) {
+        guard let (old, new) = CameraInsetMove.unhandled(handledInputs, new) else { return }
+        handledInputs = new
+        cameraInputsChanged(from: old, to: new)
     }
 
     /// The camera's move for a change of its inputs: none when my car stays comfortably in view under a new banner,
@@ -337,18 +348,12 @@ struct TripMapView: View {
         move(to: model.cameraTarget, animated: true, plan: plan, step: step)
     }
 
-    /// What the banner stack and the panel cover, as the map's extra safe area.
-    private var mapInsets: EdgeInsets {
-        let insets = MapObscuredInsets.insets(
-            mapHeight: mapHeight, top: topHeight, bottom: sheet.covered(shown, up: stage.sheet.up, room: sheetRoom, hasTopBanner: topBanner != nil))
-        return EdgeInsets(top: insets.top, leading: 0, bottom: insets.bottom, trailing: 0)
-    }
-
     /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`).
     private var cameraRoom: MapCameraRoom {
-        MapCameraRoom(
+        let inputs = cameraInputs
+        return MapCameraRoom(
             width: mapWidth, height: max(mapFullHeight - legalInset, 0),
-            top: mapInsets.top + mapAbove, bottom: max(mapInsets.bottom - legalInset, 0),
+            top: inputs.top, bottom: max(inputs.bottom - legalInset, 0),
             latitudePerPointPerMeter: latitudePerPointPerMeter)
     }
 
@@ -384,7 +389,7 @@ struct TripMapView: View {
     private func move(to target: CameraTarget?, animated: Bool, reaim: Bool = false,
                       plan: CameraInsetMove.Plan = .init(targetChanged: true, cause: .none), step: TimeInterval? = nil) {
         guard let aimed = cameraRoom.target(target), let next = Self.position(for: aimed) else { return }
-        aimedTop = mapInsets.top + mapAbove
+        aimedTop = cameraInputs.top
         guard animated else { stage.place(next); return }
         let view = cameraView(for: aimed)
         let nudge = { [stage, reduceMotion, mapWidth] (cause: CameraInsetMove.Cause) in
@@ -737,7 +742,7 @@ struct TripMapView: View {
     /// The map's height under the pills and banners, where the sheet may reach to at most (the stop pill, a
     /// banner and the trip pill always stay visible above it, at any text size).
     private var sheetRoom: CGFloat? {
-        PanelSheet.room(mapHeight: mapMaxY > 0 ? mapMaxY - mapMinY : 0,
+        PanelSheet.room(mapHeight: max(mapFullHeight - mapAbove, 0),
                         reserved: max(bannerShowing ? 158 : 74, topHeight + Spacing.m))
     }
 
@@ -878,7 +883,11 @@ struct TripMapView: View {
     /// as the sheet's own detent change, with the heights held until it is over.
     private func setShown(_ value: PanelSheet.Shown) {
         guard value != shown else { return }
-        moveSheet { stage.sheet.resize(to: .driving(value)) }
+        // The camera's move for the new cover in the same transaction as the resize (D63 C4), on the sheet's motion.
+        moveSheet {
+            stage.sheetChange(in: .driving, { stage.sheet.resize(to: .driving(value)) }, cover: { drivingCover },
+                              aim: { _ in takeCameraInputs(cameraInputs) })
+        }
     }
 
     /// The header's fold and unfold: unfolding a pulled-up sheet leaves it pulled up.

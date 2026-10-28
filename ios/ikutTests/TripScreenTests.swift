@@ -579,3 +579,239 @@ struct TripSheetTests {
         #expect(landing(screen) == Landing(mode: mode, size: .entry(mode), camera: TripScreenLogic.entryCamera(mode)))
     }
 }
+
+/// The one map's frame and cover (D63 C4): what Home's, the lobby's and driving's cameras read, and each camera move made
+/// in the same transaction as the sheet change that causes it.
+@MainActor
+struct OneMapTests {
+    private typealias Rig = TripScreenModelTests.Rig
+
+    /// Counts writes of the camera while `body` runs, synchronously (inside the caller's transaction).
+    private func cameraWrites(_ screen: TripScreenModel, _ body: () -> Void) -> Bool {
+        final class Seen: @unchecked Sendable { var camera = false }
+        let seen = Seen()
+        withObservationTracking { _ = screen.camera } onChange: { seen.camera = true }
+        body()
+        return seen.camera
+    }
+
+    // MARK: One frame, one cover
+
+    @Test func theSpaceIsWrittenOnlyWhenItChanges() {
+        let space = MapSpace()
+        final class Seen: @unchecked Sendable { var count = 0 }
+        let seen = Seen()
+        space.measure(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+        space.measure(safeTop: 62)
+        withObservationTracking { _ = space.frame; _ = space.safeTop } onChange: { seen.count += 1 }
+        space.measure(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+        space.measure(safeTop: 62)
+        #expect(seen.count == 0)
+        #expect(space.write(MapCover(top: 0, bottom: 300), mode: .home))
+        #expect(!space.write(MapCover(top: 0, bottom: 300), mode: .home))
+    }
+
+    @Test func aCoverFromAModeNotOnScreenIsIgnored() {
+        let screen = Rig().model(mode: .driving)
+        #expect(screen.cover(MapCover(top: 68, bottom: 255), from: .driving))
+        // The lobby still lives under the convoy; its writes must not move the follow camera.
+        #expect(!screen.cover(LobbySheet.cover(compact: 470), from: .lobby))
+        #expect(screen.space.cover(in: .driving) == MapCover(top: 68, bottom: 255))
+        #expect(screen.space.cover(in: .lobby) == nil)
+    }
+
+    // MARK: Each mode's camera reads it, with the same results as before
+
+    @Test(arguments: [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join])
+    func homesCameraReadsTheOneCoverWithTheSameInsets(mode: HomeSheet.Mode) {
+        let compact = HomeSheet.compactHeight
+        let cover = HomeSheet.cover(mode, compact: compact)
+        let padding = HomeSheet.legalInset(mode, compact: compact)
+        // What the picked trip and the create steps aimed with before: the mode's short sheet, measured by Home itself.
+        #expect(TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, padding: padding)
+            == TripsHomeView.obscured(mapHeight: 874, sheet: HomeSheet.height(mode, compact: compact), padding: padding))
+        #expect(HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact)
+            == HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.height(mode, compact: compact), compact: compact))
+        #expect(cover.top == 0)
+    }
+
+    @Test func joiningAimsAboveTheJoinSheetAsBefore() {
+        #expect(HomeSheet.cover(.join, compact: HomeSheet.compactHeight).bottom == HomeSheet.joinHeight)
+    }
+
+    @Test(arguments: [CGFloat(470), 560])
+    func theLobbysCameraReadsTheOneCoverWithTheSameFit(compact: CGFloat) {
+        let cover = LobbySheet.cover(compact: compact)
+        #expect(LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: cover.bottom)
+            == LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: LobbySheet.legalInset(compact: compact)))
+        #expect(cover.top == LobbyMapLogic.buttonBand)
+    }
+
+    /// What the driving layer measured on an iPhone 17 (main, trip-start-swap): the host's map frame is the safe
+    /// area's (y 62, 778 tall), the layer's frame the same, its maxY plus its bottom inset 874.
+    private func iPhone17() -> MapSpace {
+        let space = MapSpace()
+        space.measure(frame: CGRect(x: 0, y: 62, width: 402, height: 778))
+        space.measure(safeTop: 62, safeBottom: 34)
+        return space
+    }
+
+    @Test func drivingsHeightsFromTheOneMapAreWhatTheLayerMeasured() {
+        let space = iPhone17()
+        // mapMaxY - mapFrame.minY, mapMinY - mapFrame.minY, the layer's height, mapMaxY - mapMinY.
+        #expect(space.fullHeight == CGFloat(812))
+        #expect(space.above == 0)
+        #expect(space.layerHeight == 778)
+        #expect(space.fullHeight - space.above == CGFloat(812))
+        // A frame that did start under the status bar: the layer starts the bar's height below it.
+        space.measure(frame: CGRect(x: 0, y: 0, width: 402, height: 840))
+        #expect(space.above == 62 && space.layerHeight == 778 && space.fullHeight == 874)
+        #expect(MapSpace().fullHeight == 0)
+    }
+
+    /// Driving's inputs from the one map equal the old ones from the layer's own measures (camera-sheet-tour logged top
+    /// 68 for the 68 pt stack, bottom 255 then 289 folded, on main and on this branch).
+    @Test(arguments: [(CGFloat(0), CGFloat(0)), (68, 255), (68, 289), (140, 700), (300, 700)])
+    func drivingsInputsFromTheOneMapAreWhatTheLayerMeasured(top: CGFloat, bottom: CGFloat) {
+        let space = iPhone17()
+        let target = CameraTarget.follow(center: MapCoordinate(latitude: 4.2, longitude: 101.26), distance: 2000)
+        let layer = MapObscuredInsets.insets(mapHeight: 778, top: top, bottom: bottom)
+        let measured = CameraInsetMove.Inputs(target: target, top: layer.top + 0, bottom: layer.bottom)
+        #expect(CameraInsetMove.inputs(target: target, layerHeight: space.layerHeight, above: space.above,
+                                       cover: MapCover(top: top, bottom: bottom)) == measured)
+    }
+
+    @Test func homesEntryFitsTheRoutesOnceTheMapHasAHeightElseYouElseTheListCamera() throws {
+        let route = PastTripRoute(id: "r", name: "R", destinationName: "D", destinationLatitude: 5, destinationLongitude: 101,
+                                  points: [[3, 101.5], [5, 101]])
+        let insets = TripsHomeView.obscured(mapHeight: 874)
+        let withRoutes = HomeModel(routes: [route])
+        #expect(withRoutes.entryCamera(mapHeight: 874)
+            == PastTripsMapLogic.region(fitting: [route], bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) })
+        // Before the map has a height: the list camera worked out for a typical phone.
+        #expect(withRoutes.entryCamera(mapHeight: 0) == withRoutes.listCamera)
+        let here = CLLocationCoordinate2D(latitude: 3.1, longitude: 101.6)
+        let noRoutes = HomeModel()
+        noRoutes.here = here
+        #expect(noRoutes.entryCamera(mapHeight: 874)
+            == .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)))
+        #expect(HomeModel().entryCamera(mapHeight: 874) == HomeModel().listCamera)
+        // Where to? or joining open: they keep their own camera, as fit() and showHere() did.
+        withRoutes.flow = NewTripFlow(search: CreateTripModel(route: { _ in BuiltRoute(distance: 1, travelTime: 1, name: "", polyline: "") }))
+        #expect(withRoutes.entryCamera(mapHeight: 874) == nil)
+        noRoutes.flow = withRoutes.flow
+        #expect(noRoutes.entryCamera(mapHeight: 874) == nil)
+    }
+
+    // MARK: Each camera move in the sheet's transaction
+
+    @Test(arguments: [true, false])
+    func homesShortAndTallWriteTheSameCoverSoTheCameraStays(tall: Bool) {
+        let screen = Rig().model(mode: .home)
+        let cover = HomeSheet.cover(.list, compact: HomeSheet.compactHeight)
+        screen.cover(cover, from: .home)
+        if !tall { screen.sheet.resize(to: .home(tall: true)) }
+        var aims = 0
+        let before = screen.sheet.changes
+        let moved = cameraWrites(screen) {
+            withAnimation(Motion.sheet(reduceMotion: false)) {
+                screen.sheetChange(in: .home, { screen.sheet.resize(to: .home(tall: tall)) }, cover: { cover }) { _ in aims += 1 }
+            }
+        }
+        #expect(screen.sheet.changes - before == 1)
+        #expect(aims == 0 && !moved)
+    }
+
+    @Test func homesListToWhereToAimsOnceInsideTheChange() {
+        let screen = Rig().model(mode: .home)
+        screen.cover(HomeSheet.cover(.list, compact: HomeSheet.compactHeight), from: .home)
+        var aimedWith: [MapCover] = []
+        let aimed = screen.sheetChange(in: .home, {}, cover: { HomeSheet.cover(.whereTo, compact: HomeSheet.compactHeight) }) {
+            aimedWith.append($0)
+        }
+        // Synchronously, with the new sheet's cover: the caller's one withAnimation carries it.
+        #expect(aimed && aimedWith == [MapCover(top: 0, bottom: HomeSheet.whereToHeight)])
+    }
+
+    @Test(arguments: [true, false])
+    func theLobbysMediumAndTallWriteTheSameCoverSoTheCameraStays(tall: Bool) {
+        let screen = Rig().model(mode: .lobby)
+        let cover = LobbySheet.cover(compact: LobbySheet.compactHeight)
+        screen.cover(cover, from: .lobby)
+        if !tall { screen.sheet.resize(to: .lobby(tall: true)) }
+        var aims = 0
+        let before = screen.sheet.changes
+        let moved = cameraWrites(screen) {
+            screen.sheetChange(in: .lobby, { screen.sheet.resize(to: .lobby(tall: tall)) }, cover: { cover }) { _ in aims += 1 }
+        }
+        #expect(screen.sheet.changes - before == 1)
+        #expect(aims == 0 && !moved)
+    }
+
+    /// Fold, unfold and pull-up: the resize, the new cover and the camera's move in one call, then the watcher seeing the
+    /// same inputs makes no second move; a banner landing in that update is still its own decision.
+    @Test(arguments: [(PanelSheet.Shown.folded, PanelSheet.Shown.unfolded, CGFloat(500)),
+                      (.unfolded, .folded, 255), (.unfolded, .pulledUp, 700), (.pulledUp, .folded, 255)])
+    func aConvoyResizeMovesTheCameraOnceInItsOwnTransaction(from: PanelSheet.Shown, to: PanelSheet.Shown, bottom: CGFloat) throws {
+        let screen = Rig().model(mode: .driving)
+        screen.sheet.resize(to: .driving(from))
+        let target = CameraTarget.follow(center: MapCoordinate(latitude: 4.2, longitude: 101.26), distance: 2000)
+        let wasBottom: CGFloat = from == .folded ? 255 : from == .unfolded ? 500 : 700
+        screen.cover(MapCover(top: 6, bottom: wasBottom), from: .driving)
+        func inputs() -> CameraInsetMove.Inputs {
+            CameraInsetMove.inputs(target: target, layerHeight: 778, above: 0, cover: screen.space.cover)
+        }
+        var handled: CameraInsetMove.Inputs? = inputs()
+        var moves: [CameraInsetMove.Plan] = []
+        func take(_ new: CameraInsetMove.Inputs) {
+            guard let (old, new) = CameraInsetMove.unhandled(handled, new) else { return }
+            handled = new
+            if let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: 812, aimedTop: 68) { moves.append(plan) }
+        }
+        let before = screen.sheet.changes
+        withAnimation(Motion.sheet(reduceMotion: false)) {
+            screen.sheetChange(in: .driving, { screen.sheet.resize(to: .driving(to)) },
+                               cover: { MapCover(top: 6, bottom: bottom) }) { _ in take(inputs()) }
+        }
+        #expect(screen.sheet.changes - before == 1)
+        #expect(moves == [CameraInsetMove.Plan(targetChanged: false, cause: .sheet)])
+        // The watcher's update after it: the same inputs, no second move.
+        take(inputs())
+        #expect(moves.count == 1)
+        // A banner after the resize: still its own decision for the watcher (D67), from the inputs the resize left
+        // (whether it moves is the banner rule's; over a pulled-up sheet both covers shrink to leave the map's 120 pt).
+        screen.cover(MapCover(top: 140, bottom: bottom), from: .driving)
+        let banner = try #require(CameraInsetMove.unhandled(handled, inputs()))
+        #expect(banner.old == handled && banner.old.top != banner.new.top)
+    }
+
+    @Test func aSheetChangeFromAModeNotOnScreenChangesNothing() {
+        let screen = Rig().model(mode: .driving)
+        var aims = 0
+        let aimed = screen.sheetChange(in: .lobby, { screen.sheet.resize(to: .lobby(tall: true)) },
+                                       cover: { LobbySheet.cover(compact: 470) }) { _ in aims += 1 }
+        #expect(!aimed && aims == 0 && screen.sheet.size == .driving(.folded) && screen.space.cover(in: .lobby) == nil)
+    }
+
+    // MARK: Home's entry with the exit
+
+    @Test func homesEntryMadeWithTheExitIsNotMadeAgainUntilTheNextSwitch() {
+        let screen = Rig().model(mode: .home)
+        screen.open(tripId: "t1", started: false)
+        screen.exit()
+        #expect(!screen.entryMoved)
+        screen.enteredWithCamera()
+        #expect(screen.entryMoved && screen.entryCamera == .homeList)
+        screen.open(tripId: "t2", started: false)
+        #expect(!screen.entryMoved)
+    }
+
+    @Test func askingForTheViewAlreadyAimedAtIsNoMove() {
+        let screen = Rig().model(mode: .home)
+        let region = MapCameraPosition.region(MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 3.1, longitude: 101.6), span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)))
+        screen.move(to: region, animated: false, reduceMotion: true)
+        #expect(screen.camera == region)
+        #expect(!cameraWrites(screen) { screen.move(to: region, animated: true, reduceMotion: true) })
+    }
+}
