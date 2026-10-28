@@ -602,10 +602,11 @@ struct OneMapTests {
         final class Seen: @unchecked Sendable { var count = 0 }
         let seen = Seen()
         space.measure(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
-        space.measure(safeTop: 62)
-        withObservationTracking { _ = space.frame; _ = space.safeTop } onChange: { seen.count += 1 }
+        let layer = LayerFrame(minY: 62, bottomEdge: 874, height: 778, safeTop: 62)
+        space.measure(layer: layer)
+        withObservationTracking { _ = space.frame; _ = space.layer } onChange: { seen.count += 1 }
         space.measure(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
-        space.measure(safeTop: 62)
+        space.measure(layer: layer)
         #expect(seen.count == 0)
         #expect(space.write(MapCover(top: 0, bottom: 300), mode: .home))
         #expect(!space.write(MapCover(top: 0, bottom: 300), mode: .home))
@@ -652,7 +653,7 @@ struct OneMapTests {
     private func iPhone17() -> MapSpace {
         let space = MapSpace()
         space.measure(frame: CGRect(x: 0, y: 62, width: 402, height: 778))
-        space.measure(safeTop: 62, safeBottom: 34)
+        space.measure(layer: LayerFrame(minY: 62, bottomEdge: 874, height: 778, safeTop: 62))
         return space
     }
 
@@ -663,7 +664,7 @@ struct OneMapTests {
         #expect(space.above == 0)
         #expect(space.layerHeight == 778)
         #expect(space.fullHeight - space.above == CGFloat(812))
-        // A frame that did start under the status bar: the layer starts the bar's height below it.
+        // A map frame that did start under the status bar: the layers start the bar's height below it.
         space.measure(frame: CGRect(x: 0, y: 0, width: 402, height: 840))
         #expect(space.above == 62 && space.layerHeight == 778 && space.fullHeight == 874)
         #expect(MapSpace().fullHeight == 0)
@@ -705,21 +706,24 @@ struct OneMapTests {
 
     // MARK: Each camera move in the sheet's transaction
 
+    /// Home's real path: the detent sets `HomeModel.expanded`, which resizes the one sheet; the cover Home's camera reads
+    /// is its short sheet's at either size, so nothing is aimed, now or later.
     @Test(arguments: [true, false])
-    func homesShortAndTallWriteTheSameCoverSoTheCameraStays(tall: Bool) {
+    func homesShortAndTallLeaveTheCoverSoTheCameraStays(tall: Bool) {
         let screen = Rig().model(mode: .home)
-        let cover = HomeSheet.cover(.list, compact: HomeSheet.compactHeight)
-        screen.cover(cover, from: .home)
-        if !tall { screen.sheet.resize(to: .home(tall: true)) }
-        var aims = 0
+        let home = HomeModel(sheet: screen.sheet)
+        let compact = HomeSheet.compactHeight
+        screen.cover(HomeSheet.cover(home.mode, compact: compact), from: .home)
+        if !tall { home.expanded = true }
         let before = screen.sheet.changes
+        let cover = screen.space.cover
         let moved = cameraWrites(screen) {
-            _ = withAnimation(Motion.sheet(reduceMotion: false)) {
-                screen.sheetChange(in: .home, { screen.sheet.resize(to: .home(tall: tall)) }, cover: { cover }) { _ in aims += 1 }
-            }
+            _ = withAnimation(Motion.sheet(reduceMotion: false)) { home.expanded = tall }
+            // What TripsHomeView's cover watcher then writes.
+            screen.cover(HomeSheet.cover(home.mode, compact: compact), from: .home)
         }
-        #expect(screen.sheet.changes - before == 1)
-        #expect(aims == 0 && !moved)
+        #expect(screen.sheet.changes - before == 1 && screen.sheet.size == .home(tall: tall))
+        #expect(screen.space.cover == cover && !moved)
     }
 
     @Test func homesListToWhereToAimsOnceInsideTheChange() {

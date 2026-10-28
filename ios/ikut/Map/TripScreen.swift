@@ -584,9 +584,11 @@ struct TripScreenHost<Content: View>: View {
         content
             // The status bar (and a navigation bar) over the map and the home indicator under it, measured on the layers
             // (the map ignores the safe area, so in it these read 0).
-            .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: {
-                stage.space.measure(safeTop: $0.top, safeBottom: $0.bottom)
-            }
+            .onGeometryChange(for: LayerFrame.self) {
+                let frame = $0.frame(in: .global)
+                return LayerFrame(minY: frame.minY, bottomEdge: frame.maxY + $0.safeAreaInsets.bottom, height: frame.height,
+                                  safeTop: $0.safeAreaInsets.top)
+            } action: { stage.space.measure(layer: $0) }
             .backgroundPreferenceValue(TripMapSpecKey.self) { spec in map(spec ?? TripMapSpec()) }
             .overlayPreferenceValue(TripSheetSpecKey.self) { spec in
                 Color.clear

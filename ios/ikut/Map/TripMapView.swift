@@ -742,7 +742,7 @@ struct TripMapView: View {
     /// The map's height under the pills and banners, where the sheet may reach to at most (the stop pill, a
     /// banner and the trip pill always stay visible above it, at any text size).
     private var sheetRoom: CGFloat? {
-        PanelSheet.room(mapHeight: max(mapFullHeight - mapAbove, 0),
+        PanelSheet.room(mapHeight: stage.space.layer.bottomEdge > 0 ? stage.space.layer.bottomEdge - stage.space.layer.minY : 0,
                         reserved: max(bannerShowing ? 158 : 74, topHeight + Spacing.m))
     }
 
