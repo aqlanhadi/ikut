@@ -3,7 +3,7 @@ import CoreLocation
 import FirebaseFirestore
 import SwiftUI
 
-/// `IKUT_SCREEN=stop-approach`: the map with the planned-stop pill up, 1.9 km short of R&R Tapah (fuel,
+/// `IKUT_SCREEN=slot-stop-approach`: the map with the planned-stop pill up, 1.9 km short of R&R Tapah (fuel,
 /// 20 min). `stop-approach-food` is the same for a food stop in a town ("Lunch, Ipoh Lama"). No sound.
 @MainActor
 enum StopApproachDemo {

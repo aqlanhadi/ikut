@@ -326,7 +326,6 @@ enum DemoScreens {
             let model = CreateTripModel()
             model.showForDemo(query: "zxqv", results: [], origin: kl, originName: "Kuala Lumpur")
             return search(model)
-        case "search-stop-results": return trip(LobbyStopsDemo.addStop(.results))
         case "lobby-organizer": return trip(LobbyStopsDemo.lobby(.organizer))
         case "lobby-tall": return trip(LobbyStopsDemo.lobby(.tall))
         case "lobby-not-ready": return trip(LobbyStopsDemo.lobby(.notReady))
@@ -338,9 +337,8 @@ enum DemoScreens {
         case "suggest-stops-moved": return AnyView(SuggestStopsDemo.sheet(moved: 1))
         case "suggest-stops-short": return AnyView(SuggestStopsDemo.sheet(seconds: 50 * 60))
         case "suggest-stops-large": return AnyView(SuggestStopsDemo.sheet().dynamicTypeSize(.accessibility5))
-        // lobby-member and lobby-waiting: a participant before the organiser starts (the waiting line, D39).
+        // lobby-member: a participant before the organiser starts (the waiting line, D39).
         case "lobby-member": return trip(LobbyStopsDemo.lobby(.member))
-        case "lobby-waiting": return trip(LobbyStopsDemo.lobby(.member))
         case "lobby-turnback": return trip(LobbyStopsDemo.lobby(.turnBack))
         case "lobby-meet-failure": return trip(LobbyStopsDemo.lobby(.meetAndFailure))
         // lobby-started: the organiser back in the lobby after Start trip, the convoy on the move.
@@ -358,7 +356,6 @@ enum DemoScreens {
         case "road-header-parked": return AnyView(PanelHeaderDemo(.parked))
         case "road-header-never": return AnyView(PanelHeaderDemo(.never))
         case "road-header-convoy": return AnyView(PanelHeaderDemo(nil))
-        case "road-panel-short": return AnyView(MapDemo.view())
         case "road-panel-you-offline": return AnyView(MapDemo.view(expanded: true, online: false))
         case "road-panel-tall": return AnyView(MapDemo.view(expanded: true))
         // Five cars: the list is longer than the sheet's room, so the whole panel scrolls as one (D34 7a).
@@ -452,9 +449,7 @@ enum DemoScreens {
         case "stop-request-places": return AnyView(StopCardPreview(scene: "responder", screen: "places"))
         case "stop-request-places-two-reasons": return AnyView(StopCardPreview(scene: "two", screen: "places-two-reasons"))
         case "stop-request-no-places": return AnyView(StopCardPreview(scene: "responder", screen: "no-places"))
-        case "stop-approach": return AnyView(StopApproachDemo.view())
         case "stop-approach-food": return AnyView(StopApproachDemo.view(food: true))
-        case "road-route-rebuilt": return AnyView(StopApproachDemo.routeNotice(waiting: false))
         case "road-route-waiting": return AnyView(StopApproachDemo.routeNotice(waiting: true))
         default: return BannerSlotDemo.view(name)
         }
