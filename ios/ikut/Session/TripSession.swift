@@ -35,6 +35,8 @@ final class TripSession {
     private(set) var membershipLost = false
     /// True while leaving or ending; tracking is not restarted meanwhile.
     private(set) var isClosing = false
+    /// `stop()` ran (Back to trips, the screen's model closing the trip): tracking stays off until `start()`.
+    @ObservationIgnored private var stopped = false
     var isTracking: Bool { duty.isTracking }
     /// Organizer only: rebuilds the main route mid-trip (a new destination, a stop skipped for everyone).
     let rebuilder: RouteRebuilder
@@ -138,6 +140,7 @@ final class TripSession {
     /// Attaches the listeners; calling it again while running does nothing.
     func start() {
         guard tripListener == nil else { return }
+        stopped = false
         // No signed-in user: `members/` with an empty id is not a document path, and Firestore traps on it.
         guard !userId.isEmpty else {
             errorMessage = "Add your name to open this trip."
@@ -148,7 +151,8 @@ final class TripSession {
             let trip = try? snapshot?.data(as: Trip.self)
             let message = error?.localizedDescription
             Task { @MainActor in
-                guard let self else { return }
+                // Queued before stop(): a session that has stopped takes nothing more in (no tracking restarts).
+                guard let self, self.tripListener != nil else { return }
                 if let trip { self.trip = trip }
                 if let message { self.errorMessage = message }
                 self.reevaluate()
@@ -162,7 +166,7 @@ final class TripSession {
                 let member = try? snapshot?.data(as: Member.self)
                 let message = error?.localizedDescription
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, self.memberListener != nil else { return }
                     if let message { self.errorMessage = message }
                     if let exists { self.applyMember(exists ? member : nil) }
                 }
@@ -173,7 +177,7 @@ final class TripSession {
                 let stops = snapshot?.decoded(PlannedStop.self)
                 let message = error?.localizedDescription
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, self.stopsListener != nil else { return }
                     if let stops {
                         self.stops = stops.sorted { $0.order < $1.order }
                         self.reevaluate()
@@ -187,7 +191,7 @@ final class TripSession {
                 let positions = snapshot?.decoded(Position.self)
                 let message = error?.localizedDescription
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, self.positionsListener != nil else { return }
                     if let positions {
                         self.positions = positions.keyedByID()
                     }
@@ -266,8 +270,10 @@ final class TripSession {
         }
     }
 
-    /// Stops tracking and detaches every listener.
+    /// Stops tracking and detaches every listener. Until `start()` again, nothing that arrives late (a snapshot queued
+    /// just before) can start tracking (`reevaluate`).
     func stop() {
+        stopped = true
         stopTrackingNow()
         rebuilder.cancel()
         removeListeners()
@@ -462,7 +468,7 @@ final class TripSession {
     /// A restart happens in exactly one place: here, when the car doc's `route` differs from the one
     /// tracking runs with. A reroute by the car-route service lands here through the snapshot of its own write.
     private func reevaluate() {
-        guard !isClosing else { return }
+        guard !isClosing, !stopped else { return }
         let hasDuty = TripSessionLogic.shouldTrack(
             userId: userId, tripStatus: trip?.status, isMember: member != nil,
             trackerUserId: car?.trackerUserId)
