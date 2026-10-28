@@ -6,6 +6,8 @@ import SwiftUI
 struct MapModeControl: View {
     @Binding var mode: MapMode
     @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
+    /// Bumped by the buttons only: the haptic follows a tap, not a pan that switches the mode to free.
+    @State private var taps = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,11 +17,11 @@ struct MapModeControl: View {
         }
         .frame(width: side)
         .glassSurface(.control)
-        .sensoryFeedback(.selection, trigger: mode)
+        .sensoryFeedback(.selection, trigger: taps)
     }
 
     private func button(_ target: MapMode, symbol: String, label: String) -> some View {
-        Button { mode = target } label: {
+        Button { mode = target; taps += 1 } label: {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(mode == target ? Color.surfaceAccent : Color.primary)
