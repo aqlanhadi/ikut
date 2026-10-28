@@ -3,101 +3,91 @@
 // Shown by Settings > Design (Debug builds only).
 #if DEBUG
 enum DesignInventory {
-    /// name | kind | file | other files that mention it
+    /// name | kind | file | times its name is written elsewhere
     static let viewRows = """
-Announces|ViewModifier|Map/DrivingGlance.swift|0
-CameraTourDemo|View|Map/CameraTourDemo.swift|0
-CardSlice|ViewModifier|Lobby/LobbyStopsViews.swift|0
-FollowDriveDemo|View|Map/CameraTourDemo.swift|0
-GlanceTransition|ViewModifier|Map/DrivingGlance.swift|0
-HapticsIf|ViewModifier|Report/ReportToastView.swift|0
-HazardPing|View|Hazards/HazardMapContent.swift|0
-HomeCreateSwapDemo|View|Lobby/LobbyDemo.swift|0
-MapMarkersDemo|View|Map/MapMarkersDemo.swift|0
-NameLine|View|Map/ConvoyRows.swift|0
-NextStopDemo|View|Convoy/NextStopDemo.swift|0
-OptionalTransition|ViewModifier|Report/ReportToastView.swift|0
-PanelHeaderDemo|View|Map/PanelHeaderDemo.swift|0
-Placement|ViewModifier|Report/ReportToastView.swift|0
-ReportPreviewHost|View|Report/ReportSheet.swift|0
-RowBadge|View|Map/ConvoyRows.swift|0
-StopArrivalDemo|View|Convoy/StopArrivalDemo.swift|0
-StopCardPreview|View|Stops/StopCardDemo.swift|0
-TripMapBehaviour|ViewModifier|Map/TripScreen.swift|0
-TripStartSwapDemo|View|Lobby/LobbyDemo.swift|0
 AddStopContent|View|Trip/AddStopSheet.swift|1
 AlertBannerView|View|Alerts/AlertBannerView.swift|1
 AlwaysLocationExplainerView|View|Location/AlwaysLocationExplainerView.swift|1
+Announces|ViewModifier|Map/DrivingGlance.swift|1
 ApproachPill|View|Alerts/ApproachPill.swift|1
 CarRow|View|Lobby/CarRow.swift|1
+CardSlice|ViewModifier|Lobby/LobbyStopsViews.swift|1
 CatchUpPill|View|Alerts/ApproachPill.swift|1
 ContentView|View|App/ContentView.swift|1
+ConvoyActionBar|View|Map/ConvoyPanel.swift|1
 ConvoyProgressBar|View|Map/ConvoyRows.swift|1
 ConvoyRowView|View|Map/ConvoyRows.swift|1
 CreateTripView|View|Trip/CreateTripView.swift|1
 GlanceErrorBanner|View|Map/DrivingGlance.swift|1
+GlanceTransition|ViewModifier|Map/DrivingGlance.swift|1
+HapticsIf|ViewModifier|Report/ReportToastView.swift|1
+HazardMapContent|View|Hazards/HazardMapContent.swift|1
+HazardPing|View|Hazards/HazardMapContent.swift|1
 HomeHeader|View|App/HomeHeader.swift|1
 HomeNowRow|View|App/HomeTripRows.swift|1
 HomePastRow|View|App/HomeTripRows.swift|1
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|1
-HomeSectionTitle|View|App/HomeTripRows.swift|1
-HomeTripGroup|View|App/HomeTripRows.swift|1
 HomeView|View|App/HomeView.swift|1
 JoinSheet|View|Join/JoinSheet.swift|1
 JoiningRowView|View|Map/ConvoyRows.swift|1
 LobbyMapLayer|View|Lobby/LobbyMap.swift|1
 LobbyPinView|View|Lobby/LobbyMap.swift|1
 LocationDeniedView|View|Location/LocationDeniedView.swift|1
+MapMarkerView|View|Map/MapMarkerView.swift|1
 MapModeControl|View|Map/MapModeControl.swift|1
 MapPickView|View|Trip/MapPickView.swift|1
 MergePointView|View|Map/MapMarkerView.swift|1
 NameEntryView|View|Auth/NameEntryView.swift|1
-NameFieldCard|View|Auth/NameEntryView.swift|1
 NewTripSheet|View|Trip/NewTripSheet.swift|1
+OptionalTransition|ViewModifier|Report/ReportToastView.swift|1
 PassedBanner|View|Alerts/ApproachPill.swift|1
 PickedTripBody|View|App/PickedTripSheet.swift|1
 PickedTripHeader|View|App/PickedTripSheet.swift|1
-PlaceResultRow|View|Trip/PlaceResultRow.swift|1
-QRCodeSheet|View|Lobby/LobbyView.swift|1
-QRScannerView|View|DeepLink/QRScannerView.swift|1
 ReadAloudButton|View|Map/MapModeControl.swift|1
+RecapMapView|View|Recap/RecapMapView.swift|1
 RecapView|View|Recap/RecapView.swift|1
-ReportSheet|View|Report/ReportSheet.swift|1
 RouteNoticeBanner|View|Alerts/ApproachPill.swift|1
-RouteTotalLine|View|Lobby/LobbyStopsViews.swift|1
 StopApproachPill|View|Alerts/ApproachPill.swift|1
-StopMessageTile|View|Stops/StopCardParts.swift|1
-StopNote|View|Lobby/LobbyStopsViews.swift|1
+StopArrivalCard|View|Stops/StopArrivalCard.swift|1
+StopCard|View|Stops/StopCard.swift|1
 StopPillView|View|Stops/StopPillView.swift|1
-StopPlaceRows|View|Stops/StopPlaces.swift|1
-StopRow|View|Lobby/LobbyStopsViews.swift|1
 StopVoterRow|View|Stops/StopCardParts.swift|1
 SuggestStopsSheet|View|Lobby/SuggestStopsSheet.swift|1
+TripMapBehaviour|ViewModifier|Map/TripScreen.swift|1
+TripMapView|View|Map/TripMapView.swift|1
+TripScreenHost|View|Map/TripScreen.swift|1
 WelcomeView|View|App/WelcomeView.swift|1
 WhereToSheet|View|Trip/NewTripSheet.swift|1
-ConvoyActionBar|View|Map/ConvoyPanel.swift|2
-HazardMapContent|View|Hazards/HazardMapContent.swift|2
+ConvoyPanel|View|Map/ConvoyPanel.swift|2
+HomeSectionTitle|View|App/HomeTripRows.swift|2
+HomeTripGroup|View|App/HomeTripRows.swift|2
 LocationAskContent|View|Location/LocationAskStep.swift|2
-MapMarkerView|View|Map/MapMarkerView.swift|2
-MarkerGlide|ViewModifier|Map/TripMapContent.swift|2
+NameFieldCard|View|Auth/NameEntryView.swift|2
+NameLine|View|Map/ConvoyRows.swift|2
 PausedBanner|View|Lobby/PausedBanner.swift|2
-RecapContent|View|Recap/RecapContent.swift|2
-RecapMapView|View|Recap/RecapMapView.swift|2
+QRCodeSheet|View|Lobby/LobbyView.swift|2
+QRScannerView|View|DeepLink/QRScannerView.swift|2
 RecapRouteMap|View|Recap/RecapView.swift|2
+ReportSheet|View|Report/ReportSheet.swift|2
 ReportToastView|View|Report/ReportToastView.swift|2
-StopActionButton|View|Stops/StopCardParts.swift|2
-StopArrivalCard|View|Stops/StopArrivalCard.swift|2
-StopCard|View|Stops/StopCard.swift|2
+RowBadge|View|Map/ConvoyRows.swift|2
+StopMessageTile|View|Stops/StopCardParts.swift|2
+StopPlaceRows|View|Stops/StopPlaces.swift|2
+StopReasonIcon|View|Stops/StopCardParts.swift|2
+StopRow|View|Lobby/LobbyStopsViews.swift|2
 YouTag|View|Map/YouStatus.swift|2
-DarkBanner|View|Alerts/DarkBanner.swift|3
 LobbyView|View|Lobby/LobbyView.swift|3
+MarkerGlide|ViewModifier|Map/TripMapContent.swift|3
 PlaceSearchResults|View|Trip/PlaceSearch.swift|3
-StopReasonIcon|View|Stops/StopCardParts.swift|3
-ConvoyPanel|View|Map/ConvoyPanel.swift|4
-RecapEventDot|View|Recap/RecapView.swift|4
-TripMapView|View|Map/TripMapView.swift|4
-TripScreenHost|View|Map/TripScreen.swift|4
-TripsHomeView|View|App/TripsHomeView.swift|5
+Placement|ViewModifier|Report/ReportToastView.swift|3
+PlaceResultRow|View|Trip/PlaceResultRow.swift|4
+RecapContent|View|Recap/RecapContent.swift|4
+StopNote|View|Lobby/LobbyStopsViews.swift|4
+TripsHomeView|View|App/TripsHomeView.swift|4
+RecapEventDot|View|Recap/RecapView.swift|5
+RouteTotalLine|View|Lobby/LobbyStopsViews.swift|5
+DarkBanner|View|Alerts/DarkBanner.swift|11
+StopActionButton|View|Stops/StopCardParts.swift|18
 """
 
     /// category | value | swatch hex (colours) | file:line
@@ -136,7 +126,6 @@ frame|width 44, height 44||App/PickedTripSheet.swift:41
 frame|minHeight 44||App/PickedTripSheet.swift:73
 font|14||App/PickedTripSheet.swift:101
 frame|width 44, height 44||App/PickedTripSheet.swift:103
-padding|70||App/TripsHomeView.swift:158
 font|42||App/WelcomeView.swift:31
 frame|width 88, height 88||App/WelcomeView.swift:33
 opacity|0.14||App/WelcomeView.swift:35
@@ -153,8 +142,6 @@ padding|3||Hazards/HazardMapContent.swift:37
 opacity|0.15||Hazards/HazardMapContent.swift:39
 frame|width 0||Hazards/HazardMapContent.swift:43
 opacity|0.3||Hazards/HazardMapContent.swift:80
-color|#2563EB|2563EB|Join/JoinDemo.swift:25
-color|#D9480F|D9480F|Join/JoinDemo.swift:26
 frame|minHeight 44||Join/JoinSheet.swift:126
 frame|minHeight 44||Join/JoinSheet.swift:274
 frame|minHeight 54||Join/JoinSheet.swift:330
@@ -163,7 +150,6 @@ color|#8E8E93|8E8E93|Join/JoinSheet.swift:414
 frame|minHeight 46||Join/JoinSheet.swift:425
 frame|minHeight 56||Join/JoinSheet.swift:462
 frame|minHeight 54||Lobby/CarRow.swift:22
-color|#8E8E93|8E8E93|Lobby/LobbyDemo.swift:99
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:179
 opacity|0.5||Lobby/LobbyMap.swift:276
 opacity|0.2||Lobby/LobbyMap.swift:290
@@ -176,10 +162,6 @@ font|12||Lobby/LobbyMap.swift:322
 font|11||Lobby/LobbyMap.swift:324
 font|12||Lobby/LobbyMap.swift:326
 frame|width 8, height 8||Lobby/LobbyMap.swift:328
-color|#2563EB|2563EB|Lobby/LobbyModel.swift:70
-color|#D9480F|D9480F|Lobby/LobbyModel.swift:71
-color|#0F766E|0F766E|Lobby/LobbyModel.swift:72
-color|#7C3AED|7C3AED|Lobby/LobbyModel.swift:73
 frame|minHeight 48||Lobby/LobbySheetSections.swift:89
 font|14||Lobby/LobbySheetSections.swift:193
 frame|width 32, height 32||Lobby/LobbySheetSections.swift:195
@@ -203,7 +185,6 @@ frame|minHeight 44||Lobby/LobbyStopsViews.swift:178
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
 padding|40||Lobby/LobbyView.swift:601
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:794
-color|#D9480F|D9480F|Lobby/OwnWayDemo.swift:17
 frame|minHeight 44||Lobby/PausedBanner.swift:31
 opacity|0.1||Lobby/PausedBanner.swift:32
 opacity|0.12||Lobby/PausedBanner.swift:43
@@ -253,32 +234,10 @@ color|#B54708|B54708|Map/MapColors.swift:38
 color|#FF9E0A|FF9E0A|Map/MapColors.swift:38
 color|#6BB3FF|6BB3FF|Map/MapColors.swift:40
 color|#6BB3FF|6BB3FF|Map/MapColors.swift:40
-color|#2563EB|2563EB|Map/MapDemo.swift:82
-color|#D9480F|D9480F|Map/MapDemo.swift:83
-color|#0F766E|0F766E|Map/MapDemo.swift:84
-color|#7C3AED|7C3AED|Map/MapDemo.swift:85
-color|#BE185D|BE185D|Map/MapDemo.swift:87
-color|#DB2777|DB2777|Map/MapDemo.swift:88
-color|#2563EB|2563EB|Map/MapDemo.swift:240
-color|#D9480F|D9480F|Map/MapDemo.swift:241
-color|#0F766E|0F766E|Map/MapDemo.swift:242
-color|#7C3AED|7C3AED|Map/MapDemo.swift:243
-color|#BE185D|BE185D|Map/MapDemo.swift:244
 opacity|0.25||Map/MapMarkerView.swift:41
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
 opacity|0.12||Map/MapMarkerView.swift:161
-color|#2563EB|2563EB|Map/MapMarkersDemo.swift:30
-color|#D9480F|D9480F|Map/MapMarkersDemo.swift:31
-color|#0F766E|0F766E|Map/MapMarkersDemo.swift:32
-color|#7C3AED|7C3AED|Map/MapMarkersDemo.swift:33
-color|#CA8A04|CA8A04|Map/MapMarkersDemo.swift:34
-color|#0891B2|0891B2|Map/MapMarkersDemo.swift:35
-padding|100||Map/MapMarkersDemo.swift:44
-padding|100||Map/MapMarkersDemo.swift:46
-frame|minHeight 64||Map/MapMarkersDemo.swift:50
-frame|width 40, height 40||Map/MapMarkersDemo.swift:55
-color|white 0.11|1C1C1C|Map/MapMarkersDemo.swift:58
 font|17||Map/MapModeControl.swift:26
 font|17||Map/MapModeControl.swift:45
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
@@ -314,10 +273,6 @@ opacity|0.35||Recap/RecapView.swift:81
 opacity|0.9||Recap/RecapView.swift:114
 color|#F3D08A|F3D08A|Recap/RecapView.swift:114
 frame|width 16, height 16||Recap/RecapView.swift:120
-color|#2563EB|2563EB|Recap/RecapView.swift:172
-color|#D9480F|D9480F|Recap/RecapView.swift:173
-color|#0F766E|0F766E|Recap/RecapView.swift:174
-color|#7C3AED|7C3AED|Recap/RecapView.swift:175
 color|red 0.79, green 0.2, blue 0|C93300|Report/ReportOption.swift:17
 color|red 0.84, green 0, blue 0.08|D60014|Report/ReportOption.swift:18
 color|red 0.54, green 0.42, blue 0.27|8A6B45|Report/ReportOption.swift:19

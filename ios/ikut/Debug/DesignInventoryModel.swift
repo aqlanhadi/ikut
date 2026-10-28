@@ -6,7 +6,7 @@ struct InventoryView: Equatable, Sendable {
     var name: String
     var kind: String
     var file: String
-    var usedIn: Int
+    var uses: Int
 }
 
 /// The kinds of literal `tools/design-inventory.mjs` records.
@@ -44,6 +44,8 @@ struct InventoryLiteral: Equatable, Sendable {
     var swatch: String?
     /// "Trips/TripsHomeView.swift:42"
     var place: String
+    /// Written in `UI/`, the shared layer: not a one-off.
+    var isShared: Bool { place.hasPrefix("UI/") }
 }
 
 /// All the places one value is written.
@@ -60,7 +62,7 @@ enum InventoryParser {
         rows.split(separator: "\n").compactMap { row in
             let f = row.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
             guard f.count == 4, let used = Int(f[3]) else { return nil }
-            return InventoryView(name: f[0], kind: f[1], file: f[2], usedIn: used)
+            return InventoryView(name: f[0], kind: f[1], file: f[2], uses: used)
         }
     }
 
@@ -79,7 +81,7 @@ enum InventoryGroups {
     static func groups(_ literals: [InventoryLiteral], in category: InventoryCategory) -> [LiteralGroup] {
         var order: [String] = []
         var byValue: [String: LiteralGroup] = [:]
-        for l in literals where l.category == category {
+        for l in literals where l.category == category && !l.isShared {
             if byValue[l.value] == nil {
                 order.append(l.value)
                 byValue[l.value] = LiteralGroup(value: l.value, swatch: l.swatch, places: [])
@@ -100,22 +102,29 @@ enum InventoryGroups {
 
     /// "27 literal font sizes, 11 distinct"
     static func totals(_ literals: [InventoryLiteral], in category: InventoryCategory) -> String {
-        let total = literals.filter { $0.category == category }.count
+        let total = literals.filter { $0.category == category && !$0.isShared }.count
         let distinct = groups(literals, in: category).count
         return "\(total) \(category.plural), \(distinct) distinct"
     }
 
-    /// "93 custom views, 70 used in one file or none"
+    /// "83 custom views, 53 used once or not at all"
     static func totals(_ views: [InventoryView]) -> String {
-        "\(views.count) custom views, \(views.filter { $0.usedIn <= 1 }.count) used in one file or none"
+        "\(views.count) custom views, \(views.filter { $0.uses <= 1 }.count) used once or not at all"
     }
 
-    /// "Not reused" / "Used in 3 files": what a view's row says.
+    /// "15 literals inside the shared components (UI/)": counted apart, not one-offs.
+    static func sharedTotal(_ literals: [InventoryLiteral]) -> String {
+        "\(literals.filter(\.isShared).count) literals inside the shared components (UI/), not counted above"
+    }
+
+    static let viewsNote = "Counts each place a view's name is written in the app, not its own declaration, and not demos, previews or Debug code."
+
+    /// What a view's row says.
     static func usage(_ view: InventoryView) -> String {
-        switch view.usedIn {
-        case 0: "Only in its own file"
-        case 1: "Used in 1 other file"
-        default: "Used in \(view.usedIn) other files"
+        switch view.uses {
+        case 0: "Not used anywhere"
+        case 1: "Used once"
+        default: "Used \(view.uses) times"
         }
     }
 }

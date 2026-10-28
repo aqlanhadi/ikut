@@ -20,15 +20,25 @@ let a = Color(hex: "#2563eb"), b = Color(red: 1, green: 0, blue: 0)
 `)
   writeFileSync(join(root, 'Trips/B.swift'), 'struct Uses: View { var body: some View { Twice().modifier(Twice()).font(.system(size: 14)).cornerRadius(6) } }\n')
   writeFileSync(join(root, 'Debug/DesignInventory.swift'), 'Once Twice')
+  writeFileSync(join(root, 'Trips/MapDemo.swift'), 'struct MapDemo: View { var body: some View { Once().font(.system(size: 31)) } }\n')
+  writeFileSync(join(root, 'Trips/C.swift'), `struct Sample {
+  #if DEBUG
+  static let c = Color(hex: "#111111")
+  #else
+  static let c = Color(hex: "#222222")
+  #endif
+}
+struct SomePreviewHost: View { var body: some View { Text("x") } }
+`)
   return root
 }
 
 test('views: counts other files that mention each, skips UI/ and previews', () => {
   const { views } = scan(fixture())
   const by = Object.fromEntries(views.map((v) => [v.name, v]))
-  assert.deepEqual(Object.keys(by).sort(), ['Once', 'Twice', 'Uses'])
-  assert.equal(by.Once.usedIn, 0)
-  assert.equal(by.Twice.usedIn, 1)
+  assert.deepEqual(Object.keys(by).sort(), ['Once', 'Twice', 'Uses']) // not MapDemo, SomePreviewHost
+  assert.equal(by.Once.uses, 0) // demo-file mentions don't count
+  assert.equal(by.Twice.uses, 2) // two use sites in one file
   assert.equal(by.Twice.kind, 'ViewModifier')
 })
 
@@ -37,7 +47,7 @@ test('literals: values, grouping inputs, comments and previews skipped', () => {
   const fonts = literals.filter((l) => l.category === 'font')
   assert.deepEqual(fonts.map((l) => `${l.value}@${l.file}:${l.line}`), ['14@Trips/A.swift:1', '14@Trips/B.swift:1', '99@UI/Theme.swift:2'])
   const colors = literals.filter((l) => l.category === 'color').map((l) => l.value)
-  assert.deepEqual(colors, ['#2563EB', 'red 1, green 0, blue 0'])
+  assert.deepEqual(colors, ['#2563EB', 'red 1, green 0, blue 0', '#222222']) // #if DEBUG side skipped, #else kept
   assert.ok(literals.some((l) => l.category === 'padding' && l.value === '14'))
   assert.ok(literals.some((l) => l.category === 'frame' && l.value === 'width 44, height 44'))
   assert.ok(literals.some((l) => l.category === 'radius' && l.value === '6'))

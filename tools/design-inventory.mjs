@@ -7,7 +7,10 @@
 //
 // It records (a) each View / ViewModifier struct outside UI/ with how many other files mention it, and (b) literal
 // font sizes, raw colours, opacities, paddings, corner radii and frame sizes, each with file:line. Previews, comment
-// lines, Theme.swift's colours and the Debug/ folder (this catalog) are skipped; Lobby/LobbyDemo.swift and Debug/ don't count as a use.
+// lines, #if DEBUG blocks (demo fixtures), files and views named *Demo* or *Preview*, Theme.swift's colours and the
+// Debug/ folder (this catalog) are skipped, so none of them count as a one-off or as a use. A view's count is how many
+// times its name is written elsewhere (its own declaration not counted). Literals in UI/ are the shared layer: they
+// are kept apart (Swift: place starts with UI/) and not counted as one-offs.
 // Same sources in, same file out.
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, relative, dirname, resolve } from 'node:path'
@@ -30,6 +33,7 @@ function swiftFiles(dir) {
 export function codeLines(text) {
   const lines = text.split('\n')
   let depth = 0, inPreview = false, inBlock = false
+  const conds = [] // one per open #if: is it `#if DEBUG`, and are we past its #else
   return lines.map((raw) => {
     let line = raw
     if (inBlock) {
@@ -41,6 +45,13 @@ export function codeLines(text) {
     line = line.replace(/\/\*.*?\*\//g, '')
     if (line.includes('/*')) { inBlock = true; line = line.slice(0, line.indexOf('/*')) }
     line = stripLineComment(line)
+    if (!inPreview) {
+      const t = line.trim()
+      if (/^#if\b/.test(t)) { conds.push({ debug: /^#if\s+DEBUG$/.test(t), inElse: false }); return '' }
+      if (/^#else\b/.test(t) && conds.length) { conds[conds.length - 1].inElse = true; return '' }
+      if (/^#endif\b/.test(t)) { conds.pop(); return '' }
+      if (conds.some((c) => c.debug && !c.inElse)) return ''
+    }
     if (!inPreview && /^\s*#Preview\b/.test(line)) { inPreview = true; depth = 0 }
     if (inPreview) {
       for (const c of stripStrings(line)) { if (c === '{') depth++; else if (c === '}') depth-- }
@@ -101,10 +112,10 @@ export function scan(root) {
   const files = swiftFiles(root).map((p) => relative(root, p)).filter((f) => f !== 'Debug/DesignInventory.swift').sort()
   const code = new Map(files.map((f) => [f, codeLines(readFileSync(join(root, f), 'utf8'))]))
   const joined = new Map([...code].map(([f, l]) => [f, l.join('\n')]))
-  const counts = (f) => !(f.startsWith('Debug/') || f === 'Lobby/LobbyDemo.swift')
+  const skipped = (f) => f.startsWith('Debug/') || /Demo|Preview/.test(f.split('/').pop())
   const views = [], literals = []
   for (const f of files) {
-    if (f.startsWith('Debug/')) continue
+    if (skipped(f)) continue
     code.get(f).forEach((line, i) => {
       for (const l of literalsIn(line, f)) literals.push({ ...l, file: f, line: i + 1 })
       if (f.startsWith('UI/')) return
@@ -112,12 +123,14 @@ export function scan(root) {
       if (!m) return
       const kind = /\bViewModifier\b/.test(m[2]) ? 'ViewModifier' : /\bView\b/.test(m[2]) ? 'View' : null
       if (!kind) return
-      const word = new RegExp(String.raw`\b${m[1]}\b`)
-      const usedIn = files.filter((g) => g !== f && counts(g) && word.test(joined.get(g))).length
-      views.push({ name: m[1], kind, file: f, usedIn })
+      if (/Demo|Preview/.test(m[1])) return
+      const word = new RegExp(String.raw`\b${m[1]}\b`, 'g')
+      let uses = -1 // the declaration itself
+      for (const g of files) if (!skipped(g)) uses += (joined.get(g).match(word) || []).length
+      views.push({ name: m[1], kind, file: f, uses: Math.max(0, uses) })
     })
   }
-  views.sort((a, b) => a.usedIn - b.usedIn || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) || (a.file < b.file ? -1 : 1))
+  views.sort((a, b) => a.uses - b.uses || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) || (a.file < b.file ? -1 : 1))
   return { views, literals }
 }
 
@@ -130,9 +143,9 @@ export function render({ views, literals }) {
 // Shown by Settings > Design (Debug builds only).
 #if DEBUG
 enum DesignInventory {
-    /// name | kind | file | other files that mention it
+    /// name | kind | file | times its name is written elsewhere
     static let viewRows = """
-${views.map((v) => `${v.name}|${v.kind}|${v.file}|${v.usedIn}`).join('\n')}
+${views.map((v) => `${v.name}|${v.kind}|${v.file}|${v.uses}`).join('\n')}
 """
 
     /// category | value | swatch hex (colours) | file:line
@@ -158,9 +171,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log('DesignInventory.swift is up to date')
   } else {
     writeFileSync(out, text)
-    const n = (c) => literals.filter((l) => l.category === c).length
     const { views, literals } = scan(root)
-    console.log(`${views.length} views (${views.filter((v) => v.usedIn <= 1).length} used in one file or none), ` +
+    const n = (c) => literals.filter((l) => l.category === c && !l.file.startsWith('UI/')).length
+    console.log(`${views.length} views (${views.filter((v) => v.uses <= 1).length} used once or not at all), ` +
+      `${literals.filter((l) => l.file.startsWith('UI/')).length} literals inside UI/ (not counted below), ` +
       ['font', 'color', 'opacity', 'padding', 'radius', 'frame'].map((c) => `${n(c)} ${c}`).join(', '))
   }
 }

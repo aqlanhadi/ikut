@@ -36,12 +36,20 @@ struct DesignInventoryTests {
         #expect(InventoryGroups.totals(all, in: .radius) == "0 literal corner radii, 0 distinct")
     }
 
+    @Test func sharedLiteralsAreCountedApartNotAsOneOffs() {
+        let all = InventoryParser.literals("font|13||UI/Theme.swift:1\nfont|13||A.swift:2\nfont|20||UI/X.swift:3")
+        #expect(InventoryGroups.groups(all, in: .font).map(\.value) == ["13"])
+        #expect(InventoryGroups.totals(all, in: .font) == "1 literal font sizes, 1 distinct")
+        #expect(InventoryGroups.sharedTotal(all) == "2 literals inside the shared components (UI/), not counted above")
+    }
+
     @Test func viewsParseAndCountOnesUsedInOneFileOrNone() {
         let views = InventoryParser.views("A|View|X/A.swift|0\nB|ViewModifier|X/B.swift|1\nC|View|X/C.swift|5\nnot|enough")
         #expect(views.count == 3)
-        #expect(InventoryGroups.totals(views) == "3 custom views, 2 used in one file or none")
-        #expect(InventoryGroups.usage(views[0]) == "Only in its own file")
-        #expect(InventoryGroups.usage(views[2]) == "Used in 5 other files")
+        #expect(InventoryGroups.totals(views) == "3 custom views, 2 used once or not at all")
+        #expect(InventoryGroups.usage(views[0]) == "Not used anywhere")
+        #expect(InventoryGroups.usage(views[1]) == "Used once")
+        #expect(InventoryGroups.usage(views[2]) == "Used 5 times")
     }
 
     @Test func theGeneratedInventoryParses() {

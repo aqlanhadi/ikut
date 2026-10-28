@@ -42,6 +42,7 @@ private struct DesignOneOffsSection: View {
                 }
             }
             .ikutCard()
+            InlineNote(InventoryGroups.sharedTotal(literals)).padding(.top, Spacing.s)
         }
     }
 
@@ -88,7 +89,8 @@ struct DesignDrillView: View {
     private var viewList: some View {
         let views = DesignInventory.views
         return VStack(alignment: .leading, spacing: 0) {
-            InlineNote(InventoryGroups.totals(views)).padding(.vertical, Spacing.s)
+            InlineNote(InventoryGroups.totals(views)).padding(.top, Spacing.s)
+            InlineNote(InventoryGroups.viewsNote).padding(.vertical, Spacing.xs)
             VStack(spacing: 0) {
                 ForEach(Array(views.enumerated()), id: \.offset) { index, view in
                     if index > 0 { RowDivider() }
@@ -96,7 +98,7 @@ struct DesignDrillView: View {
                         Text(view.name).font(.body.monospaced())
                         Text("\(view.kind) in \(view.file)").font(.footnote).foregroundStyle(.secondary)
                         Text(InventoryGroups.usage(view)).font(.footnote)
-                            .foregroundStyle(view.usedIn <= 1 ? Color.ikutWarning : Color.ikutPositive)
+                            .foregroundStyle(view.uses <= 1 ? Color.ikutWarning : Color.ikutPositive)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Spacing.l)

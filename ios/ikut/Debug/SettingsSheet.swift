@@ -60,7 +60,7 @@ struct SettingsSheet: View {
             .buttonStyle(.plain)
             .ikutCard()
             .accessibilityIdentifier("settingsName")
-            InlineNote("Everyone in the trip sees this name.").padding(.top, Spacing.s)
+            InlineNote("The convoy sees this name in new trips.").padding(.top, Spacing.s)
         }
     }
 }
