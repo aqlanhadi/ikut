@@ -215,6 +215,92 @@ struct CameraFlightTests {
         #expect(CameraPace.decide(flyingTo: flight().destination, seen: nil, to: ipoh) == .fly)
     }
 
+    /// D67: a banner that arrives while a one-leg flight is in the air moves where it lands; no second move follows.
+    @Test func aCoverChangeMidFlightRetargetsTheLastLegAndDoesNotMoveAgainAfterLanding() async {
+        let flight = flight()
+        let rec = Recorder()
+        let near = CameraView(latitude: johor.latitude + 0.01, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
+        flight.fly(to: .region(near.region), view: near, from: johor, reduceMotion: false) { rec.set.append($0) }
+        #expect(rec.set.count == 1)
+        let nudged = CameraView(latitude: near.latitude + 0.001, longitude: near.longitude, latitudeSpan: near.latitudeSpan)
+        #expect(flight.retarget(to: .region(nudged.region), view: nudged))
+        #expect(flight.destination == nudged)
+        // The last leg in the air is set again, aimed at the new place.
+        #expect(rec.set == [.region(near.region), .region(nudged.region)])
+        await waitUntil { !flight.isFlying }
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(rec.set.count == 2)
+    }
+
+    @Test func aCoverChangeDuringThePullOutAimsTheSettleLegAtTheNewPlace() async {
+        let flight = flight()
+        let rec = Recorder()
+        flight.fly(to: .region(johor.region), view: johor, from: route, reduceMotion: false) { rec.set.append($0) }
+        let nudged = CameraView(latitude: johor.latitude + 0.001, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
+        #expect(flight.retarget(to: .region(nudged.region), view: nudged))
+        #expect(rec.set.count == 1)
+        await waitUntil { !flight.isFlying }
+        #expect(rec.set.count == 2)
+        #expect(rec.set.last == .region(nudged.region))
+    }
+
+    /// D67 review: a follow step held during the flight was aimed under the old cover; the retarget supersedes it.
+    @Test func aRetargetDropsAFollowStepHeldDuringTheFlight() async {
+        let flight = flight()
+        let rec = Recorder()
+        let near = CameraView(latitude: johor.latitude + 0.01, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
+        flight.fly(to: .region(near.region), view: near, from: johor, reduceMotion: false) { rec.set.append($0) }
+        var heldRan = false
+        flight.hold { heldRan = true }
+        let nudged = CameraView(latitude: near.latitude + 0.001, longitude: near.longitude, latitudeSpan: near.latitudeSpan)
+        #expect(flight.retarget(to: .region(nudged.region), view: nudged))
+        await waitUntil { !flight.isFlying }
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(!heldRan)
+        #expect(rec.set == [.region(near.region), .region(nudged.region)])
+    }
+
+    /// D67 review: a retarget just before the landing (the last leg's time is up) still sets once and no second move
+    /// follows the landing.
+    @Test func aRetargetJustBeforeTheLandingSetsOnceAndMovesNoMore() async {
+        let flight = flight()
+        let rec = Recorder()
+        let near = CameraView(latitude: johor.latitude + 0.01, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
+        flight.fly(to: .region(near.region), view: near, from: johor, reduceMotion: false) { rec.set.append($0) }
+        // Past the leg's end without letting the landing run.
+        let end = Date().addingTimeInterval(0.05)
+        while Date() < end {}
+        let nudged = CameraView(latitude: near.latitude + 0.001, longitude: near.longitude, latitudeSpan: near.latitudeSpan)
+        #expect(flight.retarget(to: .region(nudged.region), view: nudged))
+        #expect(rec.set == [.region(near.region), .region(nudged.region)])
+        await waitUntil { !flight.isFlying }
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(rec.set.count == 2)
+    }
+
+    @Test func aRetargetWithReduceMotionSetsOnceAndMovesNoMore() async {
+        let flight = flight()
+        let rec = Recorder()
+        flight.fly(to: .region(johor.region), view: johor, from: route, reduceMotion: true) { rec.set.append($0) }
+        #expect(rec.set.count == 1)
+        let nudged = CameraView(latitude: johor.latitude + 0.001, longitude: johor.longitude, latitudeSpan: johor.latitudeSpan)
+        #expect(flight.retarget(to: .region(nudged.region), view: nudged))
+        #expect(rec.set == [.region(johor.region), .region(nudged.region)])
+        await waitUntil { !flight.isFlying }
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(rec.set.count == 2)
+    }
+
+    @Test func nothingToRetargetWhenNothingFliesOrThePersonTookTheMap() {
+        let flight = flight()
+        #expect(!flight.retarget(to: .region(johor.region), view: johor))
+        var userMoved = false
+        flight.fly(to: .region(johor.region), view: johor, from: route, reduceMotion: false,
+                   continues: { !userMoved }) { _ in }
+        userMoved = true
+        #expect(!flight.retarget(to: .region(johor.region), view: johor))
+    }
+
     /// Review fix 1: a pan mid-flight ends it at once, so a Follow tap or a hazard after the pan runs, never held and
     /// dropped at the landing.
     @Test func aMoveAskedForAfterAPanRuns() async {

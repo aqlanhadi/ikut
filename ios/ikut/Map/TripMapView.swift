@@ -32,6 +32,8 @@ struct TripMapView: View {
     private var stopService: any StopServing = StopService()
     /// The demo can open the card on one of its screens (`IKUT_MAP_DEMO_CARD`); nil in the app.
     private var demoScreen: String?
+    /// `camera-sheet-tour` (Debug launch state): the sheet and the banners come and go by themselves.
+    private var demoTour = false
 
     @Environment(TripMapStage.self) private var stage
     @State private var model: TripMapModel
@@ -102,6 +104,9 @@ struct TripMapView: View {
     @State private var legalInset: CGFloat = 0
     /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
     @State private var latitudePerPointPerMeter = 0.0
+    /// The top cover (banner stack, from the map's top edge) the camera was last aimed with: where my car sits in the visible strip
+    /// (`CameraInsetMove.plan`).
+    @State private var aimedTop: CGFloat = 0
     /// The hazard approach alert being followed: a pill, the hazard pinging and in view, until it's passed.
     @State private var approach: TripAlert?
     /// The camera mode to go back to once the hazard is passed.
@@ -140,7 +145,7 @@ struct TripMapView: View {
     init(
         session: TripSession, model: TripMapModel, stopBoard: StopBoard = .empty,
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
-        demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil,
+        demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil, demoTour: Bool = false,
         stopService: any StopServing = StopService(),
         demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil
     ) {
@@ -151,6 +156,7 @@ struct TripMapView: View {
         liveServices = false
         self.stopService = stopService
         demoScreen = demoCard
+        self.demoTour = demoTour
         _glanceError = State(initialValue: demoError.map { var e = GlanceError(); e.show($0, cause: .send); return e } ?? GlanceError())
         _stopCardOpen = State(initialValue: demoCard != nil && !demoReport)
         if demoReport {
@@ -246,19 +252,43 @@ struct TripMapView: View {
             .task { await watchDriving() }
             .task(id: model.isTracker) { if liveServices { await model.runDeviceLocation() } }
             .onChange(of: sessionSignature) { _, _ in if liveServices { model.sync() } }
-            .onChange(of: model.cameraTarget) { _, target in move(to: target, animated: true) }
-            // The panel folding or a banner coming and going moves the visible middle; recenter on it.
-            .onChange(of: mapInsets, initial: true) { _, insets in
-                if !panelExpanded, cardNow == nil { legalInset = DrivingGlance.legalInset(foldedSheetHeight: insets.bottom) }
-                move(to: model.cameraTarget, animated: true)
-            }
+            // One watcher for everything that moves the camera (D67): the aim itself, and the sheet, the stop card or a
+            // banner changing what the map can see. Several changes in one update are one move, on the motion of the
+            // change that caused it (`CameraInsetMove`).
+            .onChange(of: cameraInputs, initial: true) { old, new in cameraInputsChanged(from: old, to: new) }
             .onChange(of: session.isPaused) { _, paused in if !paused { glanceError.resolve(.pause) } }
             .onChange(of: alerts.current?.id) { followApproachIfNeeded() }
             .task(id: approach?.id) { await watchApproach() }
             .task(id: passedText) { await expirePassed() }
+            .task(id: demoTour) { if demoTour { await playSheetTour() } }
     }
 
     // MARK: Map
+
+    /// `camera-sheet-tour`: unfold and fold the sheet, then a banner and an error come and go, looping, so the camera's
+    /// moves can be watched against each (`IKUT_CAMERA_LOG=1` logs them).
+    private func playSheetTour() async {
+        func pause(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+        var round = 0
+        while !Task.isCancelled {
+            // Following my car first (a banner leaves the road where it is), then the whole convoy (it refits).
+            model.mode = round % 2 == 0 ? .follow : .fit
+            round += 1
+            await pause(3)
+            setShown(.unfolded)
+            await pause(3)
+            setShown(.folded)
+            await pause(3)
+            withAnimation(Motion.banner(reduceMotion: reduceMotion)) { passedText = "Passed the debris" }
+            await pause(4)
+            withAnimation(Motion.banner(reduceMotion: reduceMotion)) { passedText = nil }
+            await pause(2.5)
+            withAnimation(Motion.banner(reduceMotion: reduceMotion)) { glanceError.show("Couldn’t reach the convoy. Try again in a moment.", cause: .pause) }
+            await pause(4)
+            withAnimation(Motion.banner(reduceMotion: reduceMotion)) { glanceError.resolve(.pause) }
+            await pause(2.5)
+        }
+    }
 
     /// What the host's map draws for driving. MapKit centers the camera, and fits regions, inside the map's safe area
     /// (`legalInset`); `cameraRoom` does the same for the rest of what covers the map, so my car is in the middle of
@@ -286,6 +316,25 @@ struct TripMapView: View {
         let measured = latitudePerPointPerMeter
         latitudePerPointPerMeter = reading.latitudeDelta / Double(fullHeight) / reading.distance
         if measured == 0 { move(to: model.cameraTarget, animated: true, reaim: true) }
+    }
+
+    /// What the camera aims at and what covers the map, watched as one value.
+    private var cameraInputs: CameraInsetMove.Inputs {
+        CameraInsetMove.Inputs(target: model.cameraTarget, top: mapInsets.top + mapAbove, bottom: mapInsets.bottom)
+    }
+
+    /// The camera's move for a change of its inputs: none when my car stays comfortably in view under a new banner,
+    /// otherwise one, on the motion of the sheet or banner that caused it.
+    private func cameraInputsChanged(from old: CameraInsetMove.Inputs, to new: CameraInsetMove.Inputs) {
+        if !panelExpanded, cardNow == nil { legalInset = DrivingGlance.legalInset(foldedSheetHeight: new.bottom) }
+        // The first look: aim at the target, as before the watcher.
+        guard old != new else { move(to: model.cameraTarget, animated: true); return }
+        let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: mapFullHeight, aimedTop: aimedTop)
+        #if DEBUG
+        CameraMoveLog.record(inputs: new, plan: plan)
+        #endif
+        guard let plan else { return }
+        move(to: model.cameraTarget, animated: true, plan: plan)
     }
 
     /// What the banner stack and the panel cover, as the map's extra safe area.
@@ -328,23 +377,31 @@ struct TripMapView: View {
         }
     }
 
-    /// Every camera move on the driving map. A nudge (a follow step, a re-centre for the sheet or a banner) keeps the
-    /// short follow glide, and waits for a paced move in flight to land; anything bigger (into follow from the
-    /// lobby, Fit, a hazard, a car) is paced by `CameraPace` and takes over whatever is in flight.
-    private func move(to target: CameraTarget?, animated: Bool, reaim: Bool = false) {
+    /// Every camera move on the driving map. A nudge (a follow step, a re-centre for the sheet or a banner) is a short
+    /// glide, on the motion of the sheet or banner that caused it; a flight in the air takes the change into its
+    /// landing (`retarget`) or waits for it; anything bigger (into follow from the lobby, Fit, a hazard, a car) is
+    /// paced by `CameraPace` and takes over whatever is in flight (`CameraInsetMove.action`).
+    private func move(to target: CameraTarget?, animated: Bool, reaim: Bool = false,
+                      plan: CameraInsetMove.Plan = .init(targetChanged: true, cause: .none)) {
         guard let aimed = cameraRoom.target(target), let next = Self.position(for: aimed) else { return }
+        aimedTop = mapInsets.top + mapAbove
         guard animated else { stage.place(next); return }
         let view = cameraView(for: aimed)
-        let nudge = { [stage, reduceMotion] in
-            withAnimation(DrivingGlance.cameraAnimation(reduceMotion: reduceMotion)) { stage.camera = next }
+        let nudge = { [stage, reduceMotion] (cause: CameraInsetMove.Cause) in
+            withAnimation(CameraInsetMove.animation(cause, reduceMotion: reduceMotion)) { stage.camera = next }
         }
-        switch CameraPace.decide(flyingTo: stage.flight.destination, seen: stage.seenView, to: view, reaim: reaim) {
-        case .hold: stage.flight.hold(nudge)
-        case .nudge: nudge()
+        let paced = CameraPace.decide(flyingTo: stage.flight.destination, seen: stage.seenView, to: view, reaim: reaim)
+        let action = CameraInsetMove.action(plan, paced: paced, flying: stage.flight.isFlying)
+        #if DEBUG
+        CameraMoveLog.record(plan: plan, action: action, from: stage.seenView, to: view)
+        #endif
+        switch action {
+        case .hold: stage.flight.hold { nudge(.none) }
+        case .nudge(let cause): nudge(cause)
+        case .retarget: if !stage.flight.retarget(to: next, view: view) { nudge(plan.cause) }
         case .fly: stage.fly(to: next, view: view, reduceMotion: reduceMotion)
         }
     }
-
 
     // MARK: Top
 
