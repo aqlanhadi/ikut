@@ -93,10 +93,10 @@ struct HomeView: View {
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .create:
-                    // Never pushed: creating a trip happens in Home's sheet (see `creating`).
+                    // Never pushed: creating a trip happens in Home's sheet (see `home.creating`).
                     EmptyView()
                 case .join:
-                    // Never pushed: joining happens in Home's sheet (see `joining`).
+                    // Never pushed: joining happens in Home's sheet (see `home.joining`).
                     EmptyView()
                 case .trip:
                     // Never pushed: a trip opens on the one map (see `openTrip`).
@@ -223,6 +223,8 @@ struct HomeView: View {
     private func openTrip(_ tripId: String, started: Bool) {
         home.creating = false
         home.joining = nil
+        // The flow that made or joined this trip is let go with its steps, not kept until Home comes back.
+        home.coverSheet()
         prepareSession(tripId)
         withAnimation(Motion.sheet(reduceMotion: reduceMotion)) { stage.open(tripId: tripId, started: started) }
     }

@@ -12,7 +12,10 @@ struct TripsHomeView: View {
     @Environment(TripMapStage.self) private var stage
     @Environment(LocationPermission.self) private var location
     /// Home's flows and what they remember (`HomeModel`); HomeView makes it and hands it in.
-    @State var model: HomeModel
+    let given: HomeModel
+    /// A demo's own model, kept across redraws of its parent (which makes a new view, and so a new seeded model, each time).
+    @State private var seeded: HomeModel?
+    var model: HomeModel { seeded ?? given }
     var onNewTrip: () -> Void
     var onJoin: () -> Void
     /// A trip that hasn't ended opens on the same map: its lobby, or driving when Home has read that it started. An
@@ -49,7 +52,7 @@ struct TripsHomeView: View {
          onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, covered: Bool = false,
          sheetUp: Binding<Bool> = .constant(false), onCreated: @escaping (String) -> Void = { _ in },
          onJoined: @escaping (String) -> Void = { _ in }) {
-        _model = State(initialValue: model)
+        given = model
         self.onJoined = onJoined
         self.covered = covered
         self.sheetUp = sheetUp
@@ -90,6 +93,7 @@ struct TripsHomeView: View {
             seeded.listCamera = .region(r)
         }
         self.init(model: seeded, onNewTrip: {}, onJoin: {})
+        _seeded = State(initialValue: seeded)
         _demoModel = State(initialValue: tappable)
         _tour = State(initialValue: tour)
         _cameraTour = State(initialValue: cameraTour)
@@ -148,6 +152,8 @@ struct TripsHomeView: View {
         .onChange(of: model.creating) { _, now in
             if now { beginCreate() } else if model.flow != nil, !model.finishingCreate { closeCreate() }
         }
+        // Before the join request below: a link at launch begins joining with the right motion.
+        .onChange(of: reduceMotion, initial: true) { _, now in model.reduceMotion = now }
         .onChange(of: model.joining, initial: true) { _, now in
             if let now { beginJoin(now) } else if model.joinFlow != nil, !model.finishingJoin, !model.isDemo { closeJoin() }
         }
@@ -157,7 +163,6 @@ struct TripsHomeView: View {
             if keep != model.expanded { withAnimation(sheetMotion) { model.expanded = keep } }
         }
         .onChange(of: model.flow?.cameraKey) { _, _ in refocusCreate(animated: true) }
-        .onChange(of: reduceMotion, initial: true) { _, now in model.reduceMotion = now }
         .onChange(of: model.picked?.model.snapshot != nil) { was, has in
             // The recap arrived, perhaps from Try again: its route is the full one and the dots come with it.
             guard let picked = model.picked, !model.isDemo,

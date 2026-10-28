@@ -127,6 +127,14 @@ struct HomeModelTests {
         #expect(model.closeJoin(camera: camera(0.1)) == .saved(camera(3)))
     }
 
+    @Test func aLinkWhileAPastTripIsPickedPutsThePickAwayAndCloseGoesBackToBeforeThePick() {
+        let model = HomeModel(past: [entry("a")], routes: [drawn("a")])
+        model.pick(entry("a"), camera: camera(3))
+        begin(model, camera: camera(0.2), api: FakeJoinAPI(preview: preview()))
+        #expect(model.picked == nil && model.joinFlow != nil && model.mode == .join)
+        #expect(model.closeJoin(camera: camera(0.1)) == .saved(camera(3)))
+    }
+
     @Test func aLinkMidJoinDoesNotSwapTheStepsButAnotherWhileBrowsingDoes() async {
         let model = HomeModel(routes: [drawn("a")])
         let api = FakeJoinAPI(preview: preview(), joinResult: JoinResult(tripId: "t1", carId: "c9", trackerTaken: true))
@@ -140,7 +148,7 @@ struct HomeModelTests {
         await waitUntil { second?.model.preview != nil }
         // Joined: the steps stay, whatever arrives.
         second?.model.selectNewCar()
-        await second?.model.join()
+        _ = await second?.model.join()
         #expect(second?.model.trackerTakenResult != nil)
         begin(model, code: "AAA111", camera: camera(0.1), api: api)
         #expect(model.joinFlow === second)
