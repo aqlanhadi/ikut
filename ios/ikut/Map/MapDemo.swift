@@ -53,7 +53,7 @@ enum MapDemo {
         func announce(alert: TripAlert) -> Bool { true }
     }
 
-    /// `parked` (D26, `IKUT_MAP_DEMO_PARKED`): "far" adds Mei, parked 30 km ahead of the lead near Gopeng;
+    /// `parked` (D26): "far" adds Mei, parked 30 km ahead of the lead near Gopeng;
     /// "catchup" makes the viewer Mei, parked 3.1 km ahead of the convoy, with "Aqlan’s car is behind you".
     /// The viewer is Hafiz, whose car is still joining (D26 panel header): driving to the merge point, parked at
     /// home, or on a route that never meets the main one.
@@ -157,27 +157,14 @@ enum MapDemo {
 
     static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, card: String? = nil, report: Bool = false) -> some View {
         Backend.configure()
-        let env = ProcessInfo.processInfo.environment
-        let five = fiveCars || env["IKUT_MAP_DEMO_CARS"] == "5"
-        let gallery = env["IKUT_MAP_DEMO_BANNERS"] != nil
-        let model = model(fiveCars: five, parked: env["IKUT_MAP_DEMO_PARKED"])
+        let model = model(fiveCars: fiveCars)
         model.networkUp = online
-        // IKUT_MAP_DEMO_STOP picks what the stop screens show (see `stopBoard`); IKUT_MAP_DEMO_NO_STOP
-        // shows none. IKUT_MAP_DEMO_CARD opens the stop card (or one of its screens), and
-        // IKUT_MAP_DEMO_EXPANDED=1 unfolds the panel, IKUT_MAP_DEMO_DRIVING=1 puts the phone in driving mode.
-        let board = env["IKUT_MAP_DEMO_NO_STOP"] == nil && !gallery
-            ? stopBoard(env["IKUT_MAP_DEMO_STOP"] ?? "lead", fiveCars: five) : StopBoard.empty
         return NavigationStack {
             TripScreenHost(mode: .driving) { TripMapView(
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
-                stopBoard: board, alerts: banner(env["IKUT_MAP_DEMO_ALERT"]),
-                demoCard: card ?? env["IKUT_MAP_DEMO_CARD"], demoReport: report || env["IKUT_MAP_DEMO_REPORT"] != nil, demoDriving: env["IKUT_MAP_DEMO_DRIVING"] != nil,
-                demoExpanded: expanded || env["IKUT_MAP_DEMO_EXPANDED"] != nil,
-                demoError: env["IKUT_MAP_DEMO_ERROR"] == nil ? nil : "Couldn’t reach the convoy. Try again in a moment.",
+                stopBoard: stopBoard("lead", fiveCars: fiveCars),
+                demoCard: card, demoReport: report, demoExpanded: expanded,
                 stopService: DemoStopService())
-                .overlay(alignment: .top) {
-                    if gallery { BannerGallery(model: model).padding(.top, 72) }
-                }
             }
         }
     }
@@ -219,22 +206,6 @@ enum MapDemo {
         id: "demo-debris@approach", eventId: "demo-debris", tripId: "demo", type: .debris, category: .hazard,
         severity: .high, distance: 500, title: "Debris ahead in 500 m",
         body: "Debris reported by Wyna’s car", spoken: "")
-
-    /// `IKUT_MAP_DEMO_ALERT=stop` or `debris` shows that banner at the top, to check it against the card.
-    static func banner(_ kind: String?) -> AlertCenter {
-        let center = AlertCenter(bannerDuration: .seconds(3_600))
-        switch kind {
-        case "stop":
-            center.showForDemo(TripAlert(
-                id: "demo-stop", eventId: "demo-stop", tripId: "demo", type: .stopFuel, category: .stopRequest,
-                severity: .low, distance: nil, title: "Stop request", body: "Wyna’s car wants to stop for fuel",
-                spoken: ""))
-        case "debris":
-            center.showForDemo(debrisAlert)
-        default: break
-        }
-        return center
-    }
 
     /// The stop screens' scenes. Wyna (car 2) asks for fuel; the viewer is Aqlan (car 1, the lead):
     /// `lead` (Wyna's request with a message, Aqlan has not said OK and may say We've stopped),
@@ -288,30 +259,6 @@ enum MapDemo {
         let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
         let degrees = atan2(y, x) * 180 / .pi
         return degrees < 0 ? degrees + 360 : degrees
-    }
-}
-
-/// `IKUT_MAP_DEMO_ERROR=1` on the map shows the error line with its Close button (it stays until closed).
-/// `IKUT_MAP_DEMO_BANNERS=1`: every dark banner the map can show, stacked under the trip pill so
-/// they can be compared on one screen. The map's own top stack would only ever show some of them.
-private struct BannerGallery: View {
-    let model: TripMapModel
-    @State private var alerts = MapDemo.banner("debris")
-    @State private var toast: ReportToastModel = {
-        let toast = ReportToastModel()
-        toast.showForDemo(.reported(label: "debris", eventId: "demo-debris"))
-        return toast
-    }()
-
-    var body: some View {
-        VStack(spacing: 8) {
-            AlertBannerView(center: alerts)
-            ApproachPill(alert: MapDemo.debrisAlert, model: model) {}
-            PassedBanner(text: "Passed the debris")
-            ReportToastView(model: toast)
-            GlanceErrorBanner(message: "Couldn’t reach the convoy. Try again in a moment.") {}
-        }
-        .padding(.horizontal, 12)
     }
 }
 
