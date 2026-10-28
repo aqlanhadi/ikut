@@ -290,11 +290,11 @@ struct LobbyPinView: View {
         switch pin.kind {
         case .stop: Color.ikutAccent
         case .meeting: PlannedStopKind.meet.tint
-        case .destination: Color(red: 0.11, green: 0.11, blue: 0.12)
+        case .destination: MapColors.destinationPin.color
         case .join: Color.car(hex: colorHex)
         // Grey until chosen, then the accent and a little larger with a halo, as in B6.
         case .plannedStop: Color.ikutAccent
-        case .candidate(_, let selected, let taken): taken ? Color(red: 0.56, green: 0.56, blue: 0.58).opacity(0.5) : selected ? Color.ikutAccent : Color(red: 0.56, green: 0.56, blue: 0.58)
+        case .candidate(_, let selected, let taken): taken ? Color(.systemGray).opacity(0.5) : selected ? Color.ikutAccent : Color(.systemGray)
         }
     }
 
@@ -315,11 +315,11 @@ struct LobbyPinView: View {
             .overlay(alignment: .top) {
                 if !pin.name.isEmpty, pin.kind != .join, labelled {
                     Text(pin.name)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(.label))
                         .lineLimit(1)
                         .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .background(Color(.systemBackground).opacity(0.88), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .fixedSize()
                         .offset(y: 32)
                 }

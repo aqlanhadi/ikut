@@ -43,7 +43,7 @@ struct StopNote: View {
     var retry: (() -> Void)?
 
     private var titleColor: Color {
-        tone == .warning ? Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 1, green: 0.62, blue: 0.04, alpha: 1) : UIColor(red: 0.71, green: 0.28, blue: 0.03, alpha: 1) }) : .ikutWarning
+        tone == .warning ? MapColors.warningTitle.color : .ikutWarning
     }
 
     private var fill: Color {
