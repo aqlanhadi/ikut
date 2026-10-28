@@ -299,6 +299,9 @@ class ConvoyUITestCase: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if home.exists || welcome.exists { return }
+            // A trip reopened at launch asks for Always over its sheet once tracking starts: the sheet (and Report or
+            // Back in it) comes back after Not now.
+            if dismissNotNow() { continue }
             if app.drivingReport.exists || back.exists { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
