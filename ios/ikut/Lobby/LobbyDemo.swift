@@ -352,6 +352,9 @@ enum DemoScreens {
             return search(model)
         // Q23: screens that had no launch state. First, the ones before Home: welcome, the name step, the location
         // denied page and the Always explainer, each on its own.
+        // D81: every ikutButton call site with its measured height (Debug/ButtonSizesDemo.swift).
+        case "button-sizes": return AnyView(ButtonSizesDemo())
+        case "button-sizes-ax": return AnyView(ButtonSizesDemo(large: true))
         case "welcome": return AnyView(WelcomeView(onGetStarted: {}, onJoin: {}))
         case "name-entry": return AnyView(NameEntryView().environment(AuthModel()))
         case "location-denied": return AnyView(LocationDeniedView(onOpenSettings: {}))

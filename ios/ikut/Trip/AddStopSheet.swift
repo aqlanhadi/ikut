@@ -90,6 +90,7 @@ struct AddStopContent: View {
             }
             .sheetBottomBar { addBar }
         }
+        .buttonSurface(.glass)
         .sheetTopBar {
             SheetTopRow(title: "Add a stop", subtitle: nil) {
                 RoundGlassIconButton(systemImage: "chevron.backward", label: model.picked == nil ? "Back to the trip" : "Back to the list") {
@@ -223,8 +224,8 @@ struct AddStopContent: View {
                 if model.picked == nil, model.selected != nil { stayRow }
                 Button {
                     if let draft = model.take() { onAdd(draft) }
-                } label: { Text(title).lineLimit(1).minimumScaleFactor(0.8).barActionLabel() }
-                    .ikutButton(.primary, onGlass: true)
+                } label: { Text(title).wrapsAtAccessibilitySizes(lines: 2).font(.headline).frame(maxWidth: .infinity) }
+                    .ikutButton(.primary)
                     .disabled(model.draft == nil)
                     .accessibilityIdentifier("addStop.add")
             }

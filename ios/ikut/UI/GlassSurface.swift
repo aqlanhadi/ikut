@@ -52,7 +52,7 @@ private struct GlassSurfaceModifier: ViewModifier {
 
 extension View {
     func glassSurface(_ kind: GlassSurface.Kind = .floating) -> some View {
-        modifier(GlassSurfaceModifier(kind: kind))
+        modifier(GlassSurfaceModifier(kind: kind)).buttonSurface(.glass)
     }
 
     /// The glass surface only when `on`: inside Apple's own sheet, the sheet is the surface.

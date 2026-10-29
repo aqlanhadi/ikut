@@ -55,6 +55,9 @@ struct MapPickView: View {
 
     private var spot: DestinationResult { namer.place ?? PinName.place(nil, at: center) }
 
+    /// Always filled: a full-screen cover keeps the surface of whatever presented it (Add a stop's glass sheet).
+    static let surface: IkutSurface = .plain
+
     var body: some View {
         NavigationStack {
             MapReader { proxy in
@@ -95,12 +98,13 @@ struct MapPickView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button { onUse(spot) } label: { Text("Use this place").frame(maxWidth: .infinity) }
-                    .ikutButton(.primary)
+                    .ikutButton(.primary, size: .main)
                     .disabled(moving)
                     .ikutBottomBar()
             }
             .onAppear { namer.start(center) }
         }
+        .buttonSurface(Self.surface)
     }
 
     /// The fixed pin, with its label above; the pin's tip sits on the centre of the map.

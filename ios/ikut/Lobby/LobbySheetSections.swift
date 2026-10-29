@@ -37,16 +37,16 @@ extension LobbyView {
                 } label: {
                     Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(.subheadline.weight(.semibold))
-                        .inlineActionLabel()
+                        .frame(maxWidth: .infinity)
                 }
-                .ikutButton(.secondary, onGlass: true)
+                .ikutButton(.link)
                 .sensoryFeedback(.success, trigger: copiedCount)
                 .accessibilityIdentifier("lobby.copyCode")
                 Button { showQR = true } label: {
                     Label("QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
-                        .inlineActionLabel()
+                        .frame(maxWidth: .infinity)
                 }
-                .ikutButton(.secondary, onGlass: true)
+                .ikutButton(.link)
                 .accessibilityIdentifier("lobby.showQR")
             }
             .padding(.top, Spacing.s)

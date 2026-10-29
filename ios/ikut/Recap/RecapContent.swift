@@ -99,7 +99,7 @@ struct RecapContent: View {
             ShareLink(item: Self.shareText(recap)) {
                 Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
             }
-            .ikutButton(.primary)
+            .ikutButton(.primary, size: layout == .screen ? .main : .standard)
             if let onDone {
                 Button(action: onDone) { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link)
             }

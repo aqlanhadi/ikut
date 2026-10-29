@@ -109,7 +109,7 @@ struct RowDivider: View {
     }
 }
 
-/// The round "x" at the top trailing corner of a sheet, 44 pt to tap.
+/// The round "x" at the top trailing corner of a sheet: `SheetButtonSize.round` (48 pt) across, scaled (piece B of D81 resizes it).
 struct SheetCloseButton: View {
     var action: () -> Void
     @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
@@ -259,13 +259,18 @@ struct IconTile: View {
 
 #Preview("Buttons") {
     VStack(spacing: Spacing.m) {
-        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary)
-        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary).disabled(true)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main).disabled(true)
         HStack(spacing: Spacing.s) {
             Button { } label: { Text("Share").frame(maxWidth: .infinity) }.ikutButton(.primary)
             Button { } label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.secondary)
         }
         Button { } label: { Text("Join a trip").frame(maxWidth: .infinity) }.ikutButton(.link)
+        HStack(spacing: Spacing.s) {
+            Button { } label: { Text("Not now").frame(maxWidth: .infinity) }.ikutButton(.secondary)
+            Button { } label: { Text("Add").frame(maxWidth: .infinity) }.ikutButton(.primary)
+        }
+        .buttonSurface(.glass)
     }
     .padding(Spacing.l)
     .frame(maxHeight: .infinity)

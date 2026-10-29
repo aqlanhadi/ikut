@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// One button in the card's action area. `.primary` is the main action (`SheetButtonSize.bar`, as every sheet's bottom
-/// bar, or `height` when the driver needs a huge one), `.secondary` a gray capsule, `.positive` the chosen answer,
-/// `.ghost` plain text (`SheetButtonSize.hit`).
+/// One button in the card's action area, every style `SheetButtonSize.hit` (44) tall and growing with the text size
+/// (or `height` when the driver needs a huge one). `.primary` is the main action, `.secondary` a gray capsule,
+/// `.positive` the chosen answer, `.ghost` plain text, `.destructive` red text (a destructive button role).
 struct StopActionButton: View {
     enum Style { case primary, secondary, positive, ghost, destructive }
 
@@ -10,20 +10,18 @@ struct StopActionButton: View {
     /// A small second line under the title ("Hafiz is 3 min away").
     var subtitle: String?
     var style: Style = .secondary
-    /// Nil: the shared size for the style (bar, or inline for `.ghost`), growing with the text size.
+    /// Nil: the standard 44 `ikutButton` gives, growing with the text size.
     var height: CGFloat?
     var disabled = false
     var id: String
     var action: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .headline) private var barHeight = SheetButtonSize.bar
-    @ScaledMetric(relativeTo: .body) private var inlineHeight = SheetButtonSize.hit
 
     var body: some View {
         // At accessibility sizes a long title wraps to two lines and the button grows, not truncates.
         let large = typeSize.isAccessibilitySize
-        Button(action: action) {
+        Button(role: style == .destructive ? .destructive : nil, action: action) {
             VStack(spacing: 0) {
                 Text(title)
                     .font(.headline)
@@ -36,7 +34,7 @@ struct StopActionButton: View {
                 .multilineTextAlignment(.center)
                 .padding(.vertical, large ? Spacing.s : 0)
                 .padding(.horizontal, large ? Spacing.l : 0)
-                .frame(maxWidth: .infinity, minHeight: height ?? (style == .ghost ? inlineHeight : barHeight))
+                .frame(maxWidth: .infinity, minHeight: height)
         }
         .ikutButton(role, surface: face)
         .disabled(disabled)

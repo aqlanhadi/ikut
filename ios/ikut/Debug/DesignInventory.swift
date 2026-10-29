@@ -152,8 +152,8 @@ frame|width 32, height 32||Lobby/LobbyStopsViews.swift:138
 frame|width 32, height 32||Lobby/LobbyStopsViews.swift:144
 frame|minHeight 44||Lobby/LobbyStopsViews.swift:178
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
-padding|40||Lobby/LobbyView.swift:601
-frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:794
+padding|40||Lobby/LobbyView.swift:602
+frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:795
 frame|minHeight 44||Lobby/PausedBanner.swift:31
 padding|32||Location/AlwaysLocationExplainerView.swift:14
 frame|width 30||Location/LocationAskStep.swift:33
@@ -223,21 +223,21 @@ frame|minHeight 46||Stops/StopArrivalCard.swift:372
 frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
 frame|minHeight 44||Stops/StopCard.swift:237
-opacity|0.85||Stops/StopCardParts.swift:33
-opacity|0.7||Stops/StopCardParts.swift:70
-padding|5||Stops/StopCardParts.swift:133
-opacity|0.4||Stops/StopCardParts.swift:135
-frame|minHeight 44||Stops/StopCardParts.swift:137
+opacity|0.85||Stops/StopCardParts.swift:31
+opacity|0.7||Stops/StopCardParts.swift:68
+padding|5||Stops/StopCardParts.swift:131
+opacity|0.4||Stops/StopCardParts.swift:133
+frame|minHeight 44||Stops/StopCardParts.swift:135
 frame|width 34, height 34||Stops/StopPillView.swift:71
 frame|minHeight 52||Stops/StopPillView.swift:83
 frame|minHeight 44||Stops/StopPlaces.swift:58
-frame|width 28, height 28||Trip/AddStopSheet.swift:170
-frame|minHeight 56||Trip/AddStopSheet.swift:183
-frame|minHeight 50||Trip/AddStopSheet.swift:213
-frame|minHeight 84||Trip/AddStopSheet.swift:306
-frame|minHeight 44||Trip/AddStopSheet.swift:322
-frame|width 32, height 44||Trip/AddStopSheet.swift:337
-frame|minHeight 50||Trip/AddStopSheet.swift:347
+frame|width 28, height 28||Trip/AddStopSheet.swift:171
+frame|minHeight 56||Trip/AddStopSheet.swift:184
+frame|minHeight 50||Trip/AddStopSheet.swift:214
+frame|minHeight 84||Trip/AddStopSheet.swift:307
+frame|minHeight 44||Trip/AddStopSheet.swift:323
+frame|width 32, height 44||Trip/AddStopSheet.swift:338
+frame|minHeight 50||Trip/AddStopSheet.swift:348
 frame|width 12, height 12||Trip/CreateTripView.swift:80
 opacity|0.25||Trip/CreateTripView.swift:81
 frame|width 20||Trip/CreateTripView.swift:82
