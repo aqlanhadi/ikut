@@ -58,8 +58,6 @@ WelcomeView|View|App/WelcomeView.swift|1
 WhereToSheet|View|Trip/NewTripSheet.swift|1
 ConvoyPanel|View|Map/ConvoyPanel.swift|2
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|2
-HomeSectionTitle|View|App/HomeTripRows.swift|2
-HomeTripGroup|View|App/HomeTripRows.swift|2
 LocationAskContent|View|Location/LocationAskStep.swift|2
 NameFieldCard|View|Auth/NameEntryView.swift|2
 NameLine|View|Map/ConvoyRows.swift|2

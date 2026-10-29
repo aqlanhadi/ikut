@@ -478,6 +478,7 @@ struct TripsHomeView: View {
         return ZStack(alignment: .top) {
             if let joinFlow = model.joinFlow {
                 JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: { joined($0, tracks: $1) })
+                    .padding(.horizontal, Spacing.l)
                     .transition(.opacity)
             } else if let flow = model.flow {
                 Group {
@@ -489,37 +490,40 @@ struct TripsHomeView: View {
                     }
                 }
                 .id(flow.ready == nil ? "create-search" : "create-ready")
+                .padding(.horizontal, Spacing.l)
                 .transition(.opacity)
             } else {
             // The header stays put and the rows fade out under it (the system's soft top edge).
             Group {
-                ScrollView {
-                    if let picked = model.picked {
+                if let picked = model.picked {
+                    ScrollView {
                         PickedTripBody(picked: picked, onSelect: selectItem)
-                            .padding(.bottom, Spacing.l)
-                    } else {
-                        pastTrips
+                            .padding(.horizontal, Spacing.l)
                             .padding(.bottom, Spacing.l)
                     }
+                    .scrollBounceBehavior(.basedOnSize)
+                } else {
+                    pastTrips
                 }
-                .scrollBounceBehavior(.basedOnSize)
             }
             .sheetTopBar {
-                if let picked = model.picked {
-                    PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
-                } else {
-                    HomeHeader(onNewTrip: onNewTrip, onJoin: onJoin, profileName: profileName, barHeight: $barHeight) { name in
-                        newName = name
-                        settingsShown = true
+                Group {
+                    if let picked = model.picked {
+                        PickedTripHeader(picked: picked, onBack: closePicked, onShowWholeTrip: showWholeTrip)
+                    } else {
+                        HomeHeader(onNewTrip: onNewTrip, onJoin: onJoin, profileName: profileName, barHeight: $barHeight) { name in
+                            newName = name
+                            settingsShown = true
+                        }
                     }
                 }
+                .padding(.horizontal, Spacing.l)
             }
             .id(model.picked?.entry.id ?? "")
             .transition(.opacity)
             }
         }
         .animation(sheetMotion, value: model.mode)
-        .padding(.horizontal, Spacing.l)
         .padding(.top, HomeSheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents(HomeSheet.detents(model.mode, compact: compact), selection: Binding(
@@ -560,24 +564,35 @@ struct TripsHomeView: View {
     /// The search bar's height, which the name button is made to match (it grows with the text size).
     @State private var barHeight = SheetSearch.height
 
-    /// "Now" (only when a trip hasn't ended) and "Past trips", each a group of rows on a tile.
+    /// "Now" (only when a trip hasn't ended) and "Past trips": a system inset-grouped `List` (D86). The list takes the
+    /// sheet's full width and keeps its own side margin (the sheet's other content insets itself by `Spacing.l`), and the
+    /// sheet's glass shows through (`scrollContentBackground` hidden).
     private var pastTrips: some View {
         let parts = HomeNow.split(model.past)
-        return VStack(alignment: .leading, spacing: 0) {
+        return List {
             if !parts.now.isEmpty {
-                HomeSectionTitle(title: "Now")
-                HomeTripGroup(entries: parts.now, open: open) { HomeNowRow(entry: $0, status: model.nowStatus[$0.id]) }
+                Section("Now") {
+                    ForEach(parts.now) { entry in
+                        Button { open(entry) } label: { HomeNowRow(entry: entry, status: model.nowStatus[entry.id]) }
+                    }
+                }
             }
-            HomeSectionTitle(title: "Past trips")
-            if parts.past.isEmpty {
-                // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
-                EmptyRow("Trips you start or join will show here.")
-                    .foregroundStyle(Color.surfaceSecondary)
-                    .surfaceTile(radius: Radius.inner)
-            } else {
-                HomeTripGroup(entries: parts.past, open: open) { HomePastRow(entry: $0) }
+            Section("Past trips") {
+                if parts.past.isEmpty {
+                    // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
+                    Text("Trips you start or join will show here.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.surfaceSecondary)
+                } else {
+                    ForEach(parts.past) { entry in
+                        Button { open(entry) } label: { HomePastRow(entry: entry) }
+                    }
+                }
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
         .onAppear { if !model.isDemo { model.reloadPast() } }
         // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
         .task(id: parts.now.map(\.id)) {
