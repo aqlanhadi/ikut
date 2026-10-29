@@ -58,7 +58,7 @@ struct AlwaysLocationExplainerView: View {
             Image(systemName: "iphone.gen3.slash")
                 .foregroundStyle(.secondary)
         }
-        .font(.system(size: 44))
+        .ikutGlyph(44, cap: 1.3)
         .imageScale(.large)
         .accessibilityHidden(true)
     }

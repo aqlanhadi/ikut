@@ -28,7 +28,7 @@ struct WelcomeView: View {
         ScrollView {
             VStack(spacing: 0) {
                 Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
-                    .font(.system(size: 42, weight: .semibold))
+                    .ikutGlyph(42, weight: .semibold, cap: 1.3)
                     .foregroundStyle(.white)
                     .frame(width: 88, height: 88)
                     .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.hero, style: .continuous))
@@ -50,7 +50,7 @@ struct WelcomeView: View {
                     ForEach(features) { feature in
                         HStack(alignment: .top, spacing: Spacing.l) {
                             Image(systemName: feature.symbol)
-                                .font(.system(size: 28, weight: .regular))
+                                .ikutGlyph(28, cap: 1.15)
                                 .foregroundStyle(Color.ikutAccent)
                                 .frame(width: 36, height: 36)
                                 .accessibilityHidden(true)

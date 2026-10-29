@@ -62,7 +62,7 @@ struct PlaceResultRow<Trailing: View>: View {
         Button(action: action) {
             HStack(spacing: Spacing.m) {
                 Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .semibold))
+                    .ikutGlyph(14, weight: .semibold, cap: 1.3)
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(color, in: Circle())

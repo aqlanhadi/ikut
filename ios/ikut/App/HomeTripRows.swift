@@ -44,7 +44,7 @@ struct HomeNowRow: View {
     var body: some View {
         HStack(spacing: Spacing.m) {
             Image(systemName: "flag.checkered")
-                .font(.system(size: 14, weight: .semibold))
+                .ikutGlyph(14, weight: .semibold, cap: 1.3)
                 .foregroundStyle(.white)
                 .frame(width: 30, height: 30)
                 .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))

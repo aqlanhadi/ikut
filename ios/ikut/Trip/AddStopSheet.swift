@@ -165,7 +165,7 @@ struct AddStopContent: View {
         return Button { onSelect(row.id) } label: {
             HStack(spacing: Spacing.m) {
                 Text("\(row.number)")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .ikutGlyph(13, weight: .bold, design: .rounded, cap: 1.3)
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
                     .background(selected ? Color.ikutAccent : Color.ikutUnselectedDisc, in: Circle())
@@ -299,7 +299,7 @@ struct AddStopContent: View {
         let selected = model.kind == option
         return Button { model.kind = option } label: {
             VStack(spacing: Spacing.tight) {
-                Image(systemName: option.symbol).font(.system(size: 20, weight: .semibold))
+                Image(systemName: option.symbol).ikutGlyph(20, weight: .semibold, cap: 1.3)
                 Text(StopFormat.kind(option)).font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(selected ? Color.white : Color.primary)

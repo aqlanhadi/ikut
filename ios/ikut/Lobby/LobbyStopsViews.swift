@@ -139,7 +139,7 @@ struct StopRow: View {
                 .background(Color.ikutAccent, in: Circle())
         } else {
             Image(systemName: stop.kind.symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .ikutGlyph(14, weight: .semibold, cap: 1.3)
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
                 .background(stop.kind.tint, in: Circle())
