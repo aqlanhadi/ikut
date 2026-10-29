@@ -35,7 +35,6 @@ MapModeControl|View|Map/MapModeControl.swift|1
 MapPickView|View|Trip/MapPickView.swift|1
 MergePointView|View|Map/MapMarkerView.swift|1
 NameEntryView|View|Auth/NameEntryView.swift|1
-NameFieldCard|View|Auth/NameEntryView.swift|1
 NewTripSheet|View|Trip/NewTripSheet.swift|1
 OptionalTransition|ViewModifier|Report/ReportToastView.swift|1
 PassedBanner|View|Alerts/ApproachPill.swift|1
@@ -143,7 +142,7 @@ frame|height 6||Stops/StopArrivalCard.swift:340
 frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
 opacity|0.4||Stops/StopCardParts.swift:135
-frame|minHeight 84||Trip/AddStopSheet.swift:288
+frame|minHeight 84||Trip/AddStopSheet.swift:290
 frame|width 12, height 12||Trip/CreateTripView.swift:82
 frame|width 20||Trip/CreateTripView.swift:84
 frame|width 20||Trip/CreateTripView.swift:98
