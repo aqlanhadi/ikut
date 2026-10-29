@@ -7,6 +7,19 @@ import Testing
 /// The trip screen's modes over its one map (D53): what switches them, which layer draws, where the camera goes and
 /// the one sheet's sizes.
 struct TripScreenTests {
+    // MARK: Recap popped (D92)
+
+    @Test func poppingTheRecapWithATripOpenClosesTheTrip() {
+        #expect(TripScreenLogic.closesTripAfterRecapLeft(recapWasPushed: true, recapIsPushed: false, openTripId: "t1"))
+    }
+
+    @Test func pushingTheRecapOrOtherPathChangesOrNoTripDoNotClose() {
+        #expect(!TripScreenLogic.closesTripAfterRecapLeft(recapWasPushed: false, recapIsPushed: true, openTripId: "t1"))
+        #expect(!TripScreenLogic.closesTripAfterRecapLeft(recapWasPushed: false, recapIsPushed: false, openTripId: "t1"))
+        #expect(!TripScreenLogic.closesTripAfterRecapLeft(recapWasPushed: true, recapIsPushed: true, openTripId: "t1"))
+        #expect(!TripScreenLogic.closesTripAfterRecapLeft(recapWasPushed: true, recapIsPushed: false, openTripId: nil))
+    }
+
     // MARK: Mode
 
     @Test func startAndShowMapSwitchTheLobbyToDriving() {

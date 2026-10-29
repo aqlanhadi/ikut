@@ -26,6 +26,14 @@ enum TripScreenLogic {
         case exit
     }
 
+    /// Back or the edge swipe on the recap only pops the path, so the ended trip's own screen would show again: the pop
+    /// itself closes the trip, as Done does. True when the recap was on the path and is not any more, with a trip open;
+    /// pushing the recap, other routes and no open trip never close anything (Done clears both at once, so it doesn't
+    /// fire twice).
+    static func closesTripAfterRecapLeft(recapWasPushed: Bool, recapIsPushed: Bool, openTripId: String?) -> Bool {
+        recapWasPushed && !recapIsPushed && openTripId != nil
+    }
+
     static func mode(after event: Event, from mode: TripScreenMode) -> TripScreenMode {
         switch event {
         // Home has no trip open: nothing to start or show.

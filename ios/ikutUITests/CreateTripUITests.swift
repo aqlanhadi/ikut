@@ -35,7 +35,7 @@ final class CreateTripUITests: ConvoyUITestCase {
     /// convoy sheet's three heights (#424): a tap on the header unfolds the list, a swipe up on the list pulls the sheet
     /// up to the lobby below the convoy, and down by the grabber steps back one height at a time, twice (there is no
     /// Back to the lobby, D53); then End trip from the pulled-up sheet: Cancel leaves it pulled up, confirming opens
-    /// the recap, and Done on it returns to Home's list on the same map.
+    /// the recap, and Back on it returns to Home's list on the same map (D92).
     func testLobbyAndHomeSheetsHandOver() throws {
         app = XCUIApplication()
         allowPermissionPrompts()
@@ -114,10 +114,15 @@ final class CreateTripUITests: ConvoyUITestCase {
         confirm.element(boundBy: confirm.count - 1).tap()
         XCTAssertTrue(app.buttons["Share recap"].waitForExistence(timeout: 30), "Ending the trip didn't open the recap")
 
-        // Done on the recap: Home's list on the one map, its sheet back and hittable (D54).
-        closeRecap()
+        // The navigation bar's Back on the recap (D92; Done is what `returnHomeFromAnOpenTrip` taps in the relaunch
+        // tests): Home's list on the one map, its sheet back and hittable (D54), and the ended trip's screen gone.
+        let back = app.navigationBars.buttons["BackButton"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "The recap shows no Back button")
+        back.tap()
         let home = app.buttons["homeWhereTo"]
-        XCTAssertTrue(home.waitForExistence(timeout: 15), "Done on the recap didn't return to Home")
+        XCTAssertTrue(home.waitForExistence(timeout: 15), "Back on the recap didn't return to Home")
+        XCTAssertFalse(app.drivingReport.exists, "Back on the recap left the ended trip's map showing")
+        XCTAssertFalse(app.buttons["lobby.back"].exists, "Back on the recap left the ended trip's lobby showing")
         XCTAssertTrue(home.isHittable, "After the recap, Home's Where to? isn't hittable")
     }
 
