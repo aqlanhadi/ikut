@@ -169,7 +169,7 @@ struct AddStopContent: View {
                     .ikutGlyph(13, weight: .bold, design: .rounded, cap: 1.3)
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(selected ? Color.ikutAccent : Palette.neutralFill.color, in: Circle())
+                    .background(selected ? Color.ikutAccent : Color.neutralFill, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(.primary)

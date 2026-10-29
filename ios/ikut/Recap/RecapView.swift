@@ -69,8 +69,8 @@ struct RecapEventDot: View {
     var body: some View {
         let (fill, ink): (Color, Color) = switch kind {
         case .trip: (.ikutAccent, .white)
-        case .stop: (Color(hex: "#FF3B30")!, .white)
-        case .hazard: (Color(hex: "#FFCC00")!, .black)
+        case .stop: (.recapStopPin, .white)
+        case .hazard: (.recapHazardPin, .black)
         case .car: (Color(.systemGray5), Color(.label))
         }
         Image(systemName: symbol)
@@ -111,7 +111,7 @@ struct RecapRouteMap: View {
         Map(position: $camera, interactionModes: interactive ? .all : []) {
             if route.count > 1 {
                 MapPolyline(coordinates: route)
-                    .stroke(Color(hex: "#F3D08A")!.opacity(0.9), style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
+                    .stroke(Color.recapRouteGlow.opacity(0.9), style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
                 MapPolyline(coordinates: route)
                     .stroke(Color.ikutAccent, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
             }

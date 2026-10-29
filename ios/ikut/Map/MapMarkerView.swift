@@ -60,7 +60,7 @@ struct MapMarkerView: View {
             // A small clock on a car that has gone quiet, at full strength, so stale reads without the fade.
             .overlay(alignment: .bottomLeading) {
                 if MarkerMetrics.showsStaleBadge(marker) {
-                    glyph("clock.fill", weight: .bold, size: 15, fill: Palette.neutralFill.color, ring: 1.5)
+                    glyph("clock.fill", weight: .bold, size: 15, fill: Color.neutralFill, ring: 1.5)
                         .padding(.leading, (frameSize - badge) / 2 - 5 * scale)
                         .padding(.bottom, (frameSize - badge) / 2 - 5 * scale)
                 }

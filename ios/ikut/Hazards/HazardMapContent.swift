@@ -114,7 +114,7 @@ extension HazardTone {
         switch self {
         case .high: .yellow
         case .medium: .orange
-        case .low: Palette.neutralFill.color
+        case .low: Color.neutralFill
         }
     }
 
