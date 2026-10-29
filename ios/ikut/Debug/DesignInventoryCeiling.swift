@@ -11,5 +11,5 @@ enum DesignCeiling {
     static let radius = 1
     static let frame = 46
     /// Views (outside UI/) whose name is written in at most one other place.
-    static let viewsUsedOnce = 52
+    static let viewsUsedOnce = 51
 }
