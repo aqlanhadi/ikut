@@ -57,4 +57,21 @@ struct MapTypeColourTests {
             #expect(contrast(0x000000, fill) >= 4.5)
         }
     }
+
+    @Test func whiteGlyphsOnThePaletteFillsReadInBothModes() {
+        for fill in Palette.underWhite {
+            #expect(contrast(0xFFFFFF, fill.light) >= 4.5)
+            #expect(contrast(0xFFFFFF, fill.dark) >= 4.5)
+        }
+    }
+
+    /// The unpicked number disc is a 13 pt digit on a mid gray, as it was before D73: it holds 3:1, not 4.5:1.
+    @Test func theUnpickedDiscKeepsItsContrast() {
+        #expect(contrast(0xFFFFFF, Palette.unselectedDisc.light) >= 3)
+    }
+
+    @Test func aModeColourWithoutAlphaIsOpaque() {
+        #expect(MapColors.ok.lightAlpha == 1 && MapColors.ok.darkAlpha == 1)
+        #expect(Palette.surfaceTileFill.lightAlpha == 0.5 && Palette.surfaceTileFill.darkAlpha == 0.10)
+    }
 }

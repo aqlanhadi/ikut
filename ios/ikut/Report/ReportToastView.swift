@@ -17,7 +17,7 @@ struct ReportToastView: View {
             case .hidden:
                 EmptyView()
             case .sending(let label):
-                DarkBanner(title: "Sending \(label)…", circle: .white.opacity(0.16)) {
+                DarkBanner(title: "Sending \(label)…", circle: .white.fill(.onDark)) {
                     ProgressView().tint(.white)
                 } trailing: {
                     EmptyView()
@@ -29,7 +29,7 @@ struct ReportToastView: View {
                         .font(.body.weight(.semibold))
                         .padding(.horizontal, Spacing.l)
                         .frame(minHeight: 44)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .background(.white.fill(.onDark), in: Capsule())
                         .foregroundStyle(.white)
                         .accessibilityHint("Removes the report")
                 }

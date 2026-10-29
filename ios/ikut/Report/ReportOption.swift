@@ -14,14 +14,14 @@ struct ReportOption: Identifiable, Equatable, Sendable {
 
     /// The 6 hazards and 2 conditions in the mockup's order (a 2-column grid, 4 rows).
     static let events: [ReportOption] = [
-        ReportOption(type: .debris, label: "Debris", symbol: "exclamationmark.triangle.fill", tint: Color(red: 0.79, green: 0.20, blue: 0)),
-        ReportOption(type: .accident, label: "Accident", symbol: "exclamationmark.octagon.fill", tint: Color(red: 0.84, green: 0, blue: 0.08)),
-        ReportOption(type: .pothole, label: "Pothole", symbol: "circle.bottomhalf.filled", tint: Color(red: 0.54, green: 0.42, blue: 0.27)),
-        ReportOption(type: .animal, label: "Animal", symbol: "pawprint.fill", tint: Color(red: 0.12, green: 0.48, blue: 0.21)),
-        ReportOption(type: .stoppedVehicle, label: "Stopped car", symbol: "car.fill", tint: Color(red: 0.39, green: 0.39, blue: 0.40)),
-        ReportOption(type: .roadworks, label: "Roadworks", symbol: "cone.fill", tint: Color(red: 0.79, green: 0.20, blue: 0)),
-        ReportOption(type: .heavyRain, label: "Heavy rain", symbol: "cloud.heavyrain.fill", tint: Color(red: 0, green: 0.44, blue: 0.89)),
-        ReportOption(type: .trafficJam, label: "Traffic jam", symbol: "car.2.fill", tint: Color(red: 0.84, green: 0, blue: 0.08)),
+        ReportOption(type: .debris, label: "Debris", symbol: "exclamationmark.triangle.fill", tint: Palette.reportOrange.color),
+        ReportOption(type: .accident, label: "Accident", symbol: "exclamationmark.octagon.fill", tint: Palette.reportRed.color),
+        ReportOption(type: .pothole, label: "Pothole", symbol: "circle.bottomhalf.filled", tint: Palette.reportBrown.color),
+        ReportOption(type: .animal, label: "Animal", symbol: "pawprint.fill", tint: Palette.reportGreen.color),
+        ReportOption(type: .stoppedVehicle, label: "Stopped car", symbol: "car.fill", tint: Palette.reportGray.color),
+        ReportOption(type: .roadworks, label: "Roadworks", symbol: "cone.fill", tint: Palette.reportOrange.color),
+        ReportOption(type: .heavyRain, label: "Heavy rain", symbol: "cloud.heavyrain.fill", tint: Palette.reportBlue.color),
+        ReportOption(type: .trafficJam, label: "Traffic jam", symbol: "car.2.fill", tint: Palette.reportRed.color),
     ]
 
     /// "About your car": three pills under the grid.

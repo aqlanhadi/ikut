@@ -14,7 +14,7 @@ struct ConvoyProgressBar: View {
             ZStack(alignment: .leading) {
                 // systemGray5 vanished on the dark glass; secondary keeps a visible track in both modes.
                 Capsule().fill(Color.secondary.opacity(0.3)).frame(height: 4)
-                Capsule().fill(MapPalette.accent).frame(width: max(4, w * fraction), height: 4)
+                Capsule().fill(Color.ikutAccentFill).frame(width: max(4, w * fraction), height: 4)
                 ForEach(Array(hazards.enumerated()), id: \.offset) { _, f in
                     Circle()
                         .fill(Color.yellow)
@@ -27,10 +27,10 @@ struct ConvoyProgressBar: View {
                         .fill(Color.car(hex: car.1))
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .overlay {
-                            if car.2 { Circle().strokeBorder(MapPalette.accent, lineWidth: 2).padding(-2) }
+                            if car.2 { Circle().strokeBorder(Color.ikutAccentFill, lineWidth: 2).padding(-2) }
                         }
                         .frame(width: 18, height: 18)
-                        .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
+                        .elevation(.badge)
                         .position(x: min(max(w * car.0, 9), w - 9), y: 15)
                 }
             }
@@ -74,7 +74,7 @@ struct ConvoyRowView: View {
                 NameLine(name: row.name, mine: row.isMine, online: youOnline)
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
+                    .foregroundStyle(row.subtitleIsWarning ? Color.ikutStaleChipText : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.hasArrived {
@@ -83,14 +83,14 @@ struct ConvoyRowView: View {
                     .foregroundStyle(Color.ikutPositive)
                     .padding(.horizontal, Spacing.gap)
                     .padding(.vertical, 5)
-                    .background(Color.green.opacity(0.14), in: Capsule())
+                    .background(Color.green.fill(.chip), in: Capsule())
                     .accessibilityIdentifier("convoy.row.arrived")
             } else {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(row.trailingPrimary)
                         .font(.body.weight(.semibold))
                         .monospacedDigit()
-                        .foregroundStyle(row.isSeparated ? MapPalette.warning : Color.primary)
+                        .foregroundStyle(row.isSeparated ? Color.ikutWarning : Color.primary)
                     Text(row.trailingSecondary)
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
@@ -132,7 +132,7 @@ struct JoiningRowView: View {
                 NameLine(name: row.name, mine: mine, online: youOnline)
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? MapPalette.staleChipText : Color.surfaceSecondary)
+                    .foregroundStyle(row.subtitleIsWarning ? Color.ikutStaleChipText : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {

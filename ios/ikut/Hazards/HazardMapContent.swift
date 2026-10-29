@@ -24,7 +24,7 @@ struct HazardMapContent: View {
             .frame(width: size, height: size)
             .background(marker.tone.fill, in: Circle())
             .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
-            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+            .elevation(.marker)
             .background { if pinging { HazardPing(color: marker.tone.fill) } }
             .overlay(alignment: .leading) {
                 if showsChip {
@@ -36,7 +36,7 @@ struct HazardMapContent: View {
                         .padding(.horizontal, Spacing.s)
                         .padding(.vertical, 3)
                         .background(.regularMaterial, in: Capsule())
-                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                        .elevation(.hazardDot)
                         // To the left of the circle, as in the mockup: a zero-width box at the circle's
                         // leading edge, with the chip hanging off its trailing side.
                         .padding(.trailing, Spacing.s)

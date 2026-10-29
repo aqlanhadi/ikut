@@ -63,12 +63,12 @@ extension View {
     @ViewBuilder func actionBarStyle(prominent: Bool) -> some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
             if prominent {
-                buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
+                buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(Color.ikutAccentFill)
             } else {
                 buttonStyle(.glass).buttonBorderShape(.capsule).tint(.primary)
             }
         } else if prominent {
-            buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(MapPalette.accent)
+            buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Color.ikutAccentFill)
         } else {
             buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.primary)
         }
@@ -80,7 +80,7 @@ extension View {
     /// elsewhere.
     @ViewBuilder func innerTile(radius: CGFloat = Radius.inner) -> some View {
         if GlassSurface.active {
-            background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            background(Color.primary.fill(.wash), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
         } else {
             ikutSurface(Color.ikutScreen, radius: radius)
         }

@@ -33,10 +33,10 @@ private struct GlassSurfaceModifier: ViewModifier {
         }
     }
 
-    private var shadow: (opacity: Double, radius: CGFloat, y: CGFloat) {
+    private var elevation: Elevation {
         switch kind {
-        case .floating: (0.16, 20, 10)
-        case .pill, .control: (0.12, 12, 6)
+        case .floating: .panel
+        case .pill, .control: .pill
         }
     }
 
@@ -49,7 +49,7 @@ private struct GlassSurfaceModifier: ViewModifier {
             content
                 .clipShape(plain)
                 .background(.regularMaterial, in: plain)
-                .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, y: shadow.y)
+                .elevation(elevation)
         }
     }
 }
@@ -73,7 +73,7 @@ extension View {
             glassEffect(.regular.interactive(), in: Circle())
         } else {
             background(.regularMaterial, in: Circle())
-                .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+                .elevation(.pill)
         }
     }
 }
@@ -140,20 +140,11 @@ extension View {
 }
 
 extension Color {
-    /// Light: a milky white; dark: a faint lift. Both let the glass behind show.
-    static let surfaceTileFill = Color(UIColor { traits in
-        traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.10) : UIColor(white: 1, alpha: 0.5)
-    })
-}
-
-extension Color {
     /// Secondary text on a floating surface. On glass the system gray falls to about 3:1 in dark, so it
     /// is lifted there; elsewhere it is the usual secondary label.
     static var surfaceSecondary: Color {
         guard GlassSurface.active else { return Color.secondary }
-        return Color(UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.78) : UIColor(white: 0, alpha: 0.68)
-        })
+        return Palette.surfaceSecondary.color
     }
 
     /// How much a stale car's row is dimmed: less on glass, where 0.6 went thin.
@@ -164,10 +155,10 @@ extension Color {
     /// The accent colour for an icon on a glass surface: a lifted blue in dark, where the system blue
     /// goes faint over the map; the usual accent in light and off glass.
     static var surfaceAccent: Color {
-        guard GlassSurface.active else { return MapPalette.accent }
+        guard GlassSurface.active else { return Color.ikutAccentFill }
         let lifted = UIColor(MapColors.glassAccentDark.color)
         return Color(UIColor { traits in
-            traits.userInterfaceStyle == .dark ? lifted : UIColor(MapPalette.accent)
+            traits.userInterfaceStyle == .dark ? lifted : UIColor(Color.ikutAccentFill)
         })
     }
 }

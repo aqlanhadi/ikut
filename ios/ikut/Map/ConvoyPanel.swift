@@ -257,7 +257,7 @@ struct ConvoyPanel: View {
         if let joining = parts.joining { text = text + Text(" · \(joining)") }
         if let spread = parts.spread {
             text = text + Text(" · ") + Text(spread.replacingOccurrences(of: " km", with: "\u{00A0}km"))
-                .foregroundStyle(warn ? MapPalette.warning : Color.primary)
+                .foregroundStyle(warn ? Color.ikutWarning : Color.primary)
                 .fontWeight(warn ? .semibold : .regular)
         }
         let fill = Color(.tertiarySystemFill)
@@ -301,7 +301,7 @@ struct ConvoyPanel: View {
         let lead = convoy.snapshot.lead ?? convoy.snapshot.front
         var items: [StatGrid.Item] = [
             .init("Spread", convoy.snapshot.spread.map(ConvoyFormat.distance),
-                  color: model.separationWarning == nil ? nil : MapPalette.warning),
+                  color: model.separationWarning == nil ? nil : Color.ikutWarning),
             .init("Lead", lead.map { ConvoyFormat.speed(metersPerSecond: $0.speed) }),
         ]
         // Planned stops (D25): no stop ahead, no cell. Tapping the cell opens that stop's card.
@@ -340,11 +340,11 @@ struct ConvoyPanel: View {
     private func separation(_ text: String) -> some View {
         Label(text, systemImage: "exclamationmark.triangle.fill")
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(MapPalette.warning)
+            .foregroundStyle(Color.ikutWarning)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.m)
             .padding(.vertical, Spacing.s)
-            .background(MapPalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .background(Color.ikutWarning.fill(.soft), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
             .padding(.bottom, Spacing.tight)
             .accessibilityIdentifier("convoy.separation")
     }

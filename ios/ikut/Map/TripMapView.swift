@@ -654,7 +654,7 @@ struct TripMapView: View {
     /// Gray once ended, amber while paused or not sharing, else live green.
     private var pillDot: Color {
         if model.isEnded { return .gray }
-        return model.isTracker && !session.isPaused ? MapPalette.live : .orange
+        return model.isTracker && !session.isPaused ? Color.ikutLive : .orange
     }
 
     /// "On the move · Sharing location · Code K7M 2QX", the motion in green (or amber when stopped).

@@ -125,9 +125,9 @@ struct TripMapContent: MapContent {
         HomeMapContent(input: input.home, style: style)
         if input.route.count > 1 {
             MapPolyline(coordinates: input.route)
-                .stroke(MapPalette.routeCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
+                .stroke(Color.ikutRouteCasing, style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round))
             MapPolyline(coordinates: input.route)
-                .stroke(MapPalette.route, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
+                .stroke(Color.ikutRoute, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
         }
         if input.ownRoute.count > 1 {
             MapPolyline(coordinates: input.ownRoute)
