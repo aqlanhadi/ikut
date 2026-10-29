@@ -553,7 +553,7 @@ struct TripsHomeView: View {
     private var settingsSheet: SettingsSheet {
         let onRename = { newName = profileName ?? ""; renaming = true }
         #if DEBUG
-        return SettingsSheet(name: profileName ?? "", tab: demoAlert?.hasPrefix("settings-design") == true ? .design : .you,
+        return SettingsSheet(name: profileName ?? "", design: demoAlert?.hasPrefix("settings-design") == true,
                              drill: Self.settingsDrill(demoAlert), onRename: onRename, onClose: { settingsShown = false })
         #else
         return SettingsSheet(name: profileName ?? "", onRename: onRename, onClose: { settingsShown = false })
