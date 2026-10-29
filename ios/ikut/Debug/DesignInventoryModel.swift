@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 
 /// A View or ViewModifier struct outside `UI/` and how many other files mention it.
@@ -133,4 +132,3 @@ extension DesignInventory {
     static var views: [InventoryView] { InventoryParser.views(viewRows) }
     static var literals: [InventoryLiteral] { InventoryParser.literals(literalRows) }
 }
-#endif

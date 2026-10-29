@@ -1,7 +1,6 @@
-#if DEBUG
 import SwiftUI
 
-/// Debug builds only: the name button on Home opens this instead of going straight to the name alert. "You" is the
+/// The name button on Home opens this instead of going straight to the name alert. "You" is the
 /// name row (tap to rename); "Design" is the catalog of the app's visual elements (D72).
 struct SettingsSheet: View {
     enum Tab: String, CaseIterable { case you = "You", design = "Design" }
@@ -64,4 +63,3 @@ struct SettingsSheet: View {
         }
     }
 }
-#endif

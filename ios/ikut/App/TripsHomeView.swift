@@ -32,10 +32,10 @@ struct TripsHomeView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var renameError: String?
+    @State private var settingsShown = false
     #if DEBUG
     /// A launch state opens with a name alert up: `rename` (the field) or `rename-error` (it couldn't be saved).
     var demoAlert: String?
-    @State private var settingsShown = false
     /// `settings-design-fonts` opens Settings on Design with the font sizes list pushed.
     static func settingsDrill(_ demo: String?) -> DesignDrill? { demo == "settings-design-fonts" ? .literals(.font) : nil }
     #endif
@@ -513,11 +513,7 @@ struct TripsHomeView: View {
                 } else {
                     HomeHeader(onNewTrip: onNewTrip, onJoin: onJoin, profileName: profileName, barHeight: $barHeight) { name in
                         newName = name
-                        #if DEBUG
                         settingsShown = true
-                        #else
-                        renaming = true
-                        #endif
                     }
                 }
             }
@@ -536,15 +532,13 @@ struct TripsHomeView: View {
         .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(model.mode, compact: compact))))
         .interactiveDismissDisabled()
         .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
-        #if DEBUG
-        // Debug builds: the name button opens Settings (D72). Its own alerts, since this view's are blocked while it is up.
+        // The name button opens Settings (D72). Its own alerts, since this view's are blocked while it is up.
         .sheet(isPresented: $settingsShown) {
-            SettingsSheet(name: profileName ?? "", tab: demoAlert?.hasPrefix("settings-design") == true ? .design : .you,
-                          drill: Self.settingsDrill(demoAlert), onRename: { newName = profileName ?? ""; renaming = true },
-                          onClose: { settingsShown = false })
+            settingsSheet
                 .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
                 .presentationDetents([.large])
         }
+        #if DEBUG
         .onAppear {
             switch demoAlert {
             case "settings", "settings-design", "settings-design-fonts": settingsShown = true
@@ -553,6 +547,16 @@ struct TripsHomeView: View {
             default: break
             }
         }
+        #endif
+    }
+
+    private var settingsSheet: SettingsSheet {
+        let onRename = { newName = profileName ?? ""; renaming = true }
+        #if DEBUG
+        return SettingsSheet(name: profileName ?? "", tab: demoAlert?.hasPrefix("settings-design") == true ? .design : .you,
+                             drill: Self.settingsDrill(demoAlert), onRename: onRename, onClose: { settingsShown = false })
+        #else
+        return SettingsSheet(name: profileName ?? "", onRename: onRename, onClose: { settingsShown = false })
         #endif
     }
 
