@@ -244,7 +244,7 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
                     line
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
-                        .lineLimit(2)
+                        .wrapsAtAccessibilitySizes(lines: 2)
                         .truncationMode(.middle)
                         .accessibilityIdentifier(subtitleIdentifier ?? "")
                 }

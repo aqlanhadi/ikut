@@ -39,8 +39,8 @@ struct StopPillView: View {
             HStack(spacing: Spacing.m) {
                 StopReasonIcon(symbol: symbol, size: 40)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.headline).lineLimit(2)
-                    Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(1)
+                    Text(title).font(.headline).wrapsAtAccessibilitySizes(lines: 2)
+                    Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes()
                 }
                 Spacer(minLength: 0)
             }
@@ -72,8 +72,8 @@ struct StopPillView: View {
                 .background(Color.ikutPositive, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                Text(detail).font(.footnote).foregroundStyle(Color.secondary).lineLimit(1)
+                Text(title).font(.subheadline.weight(.semibold)).wrapsAtAccessibilitySizes()
+                Text(detail).font(.footnote).foregroundStyle(Color.secondary).wrapsAtAccessibilitySizes()
             }
             Spacer(minLength: 0)
         }

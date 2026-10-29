@@ -148,7 +148,7 @@ struct StopCard: View {
                             Text(reason.label)
                                 .font(.headline)
                                 .minimumScaleFactor(0.8)
-                                .lineLimit(1)
+                                .wrapsAtAccessibilitySizes()
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, Spacing.m)
@@ -331,9 +331,9 @@ struct StopCard: View {
             HStack(spacing: Spacing.m) {
                 StopReasonIcon(symbol: StopLogic.reasonSymbol(state.type), size: 34)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(state.title).font(.body.weight(.semibold)).lineLimit(2)
+                    Text(state.title).font(.body.weight(.semibold)).wrapsAtAccessibilitySizes(lines: 2)
                     Text(state.message ?? StopLogic.statusLine(state)).font(.footnote)
-                        .foregroundStyle(Color.surfaceSecondary).lineLimit(2)
+                        .foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes(lines: 2)
                 }
                 Spacer(minLength: 0)
             }

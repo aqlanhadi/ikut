@@ -20,6 +20,9 @@ enum Spacing {
     static let m: CGFloat = 12
     static let l: CGFloat = 16
     static let xl: CGFloat = 24
+    /// The side margin of a full-screen introduction (Welcome, the Always-location explainer) and the gap above a
+    /// screen's first content: a deliberate big gap.
+    static let hero: CGFloat = 32
 }
 
 /// Continuous corner radii from the design canvas.

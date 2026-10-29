@@ -24,12 +24,12 @@ enum DrivingGlance {
 
     /// `base`, or a short fade with Reduce Motion.
     static func animation(_ base: Animation, reduceMotion: Bool) -> Animation {
-        reduceMotion ? .linear(duration: 0.2) : base
+        reduceMotion ? ikut.Motion.fade : base
     }
 
     /// The camera's glide to a new view; with Reduce Motion it jumps.
     static func cameraAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .easeInOut(duration: 0.8)
+        ikut.Motion.glance(reduceMotion: reduceMotion)
     }
 
     /// How long "Passed the debris" stays; nil (until the next hazard or a Close) while VoiceOver is running.

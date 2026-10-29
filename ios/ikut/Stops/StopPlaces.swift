@@ -51,7 +51,7 @@ struct StopPlaceRows: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 ForEach(places) { place in
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(place.name).font(.body.weight(.semibold)).lineLimit(2)
+                        Text(place.name).font(.body.weight(.semibold)).wrapsAtAccessibilitySizes(lines: 2)
                         Text(place.whereText).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                         Text(place.whyText).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                     }

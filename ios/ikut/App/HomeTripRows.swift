@@ -52,7 +52,7 @@ struct HomeNowRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
                 Text(status ?? HomeNow.fallbackStatus)
-                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(2)
+                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes(lines: 2)
             }
             Spacer(minLength: Spacing.s)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
@@ -74,7 +74,7 @@ struct HomePastRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name).font(.body.weight(.medium)).foregroundStyle(.primary)
                 Text(PastTrips.withPhrase(entry.others) ?? PickedTripLogic.subtitle(entry))
-                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).lineLimit(1)
+                    .font(.footnote).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes()
             }
             Spacer(minLength: Spacing.s)
             if let ended = entry.endedAt {

@@ -64,7 +64,7 @@ struct StopNote: View {
                         .frame(minHeight: 36)
                         .background(Color.ikutCard, in: Capsule())
                         // Drawn 36 pt tall, taps over 44.
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Spacing.xs)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -82,6 +82,8 @@ struct StopNote: View {
 /// One planned stop: its number as on the map's pin (a person symbol for the meeting point, which takes none), its
 /// name with the line under it ("About 1 h 35 min in · stay 20 min"), and for the organizer a drag handle.
 struct StopRow: View {
+    /// A note sits under the stop's name, past its icon (44) and the gap: 60.
+    private static let noteIndent: CGFloat = 60
     var stop: StopDraft
     var text: LobbyContent.StopText
     var editable: Bool
@@ -117,13 +119,13 @@ struct StopRow: View {
             if let turnBack {
                 let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
                 StopNote(tone: .warning, title: text.title, detail: text.detail)
-                    .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
+                    .padding(.leading, Self.noteIndent).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
             }
             if let failure {
                 StopNote(
                     tone: .failure, title: StopNoteText.failureTitle(failure, stopName: stop.name, destinationName: ""),
                     detail: StopNoteText.failureDetail(failure), retry: onRetry)
-                    .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
+                    .padding(.leading, Self.noteIndent).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
             }
         }
         .overlay(alignment: .top) { if !first { Divider() } }
@@ -176,7 +178,7 @@ struct RouteTotalLine: View {
             }
         }
         // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner.
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .ikutRow(fillWidth: true)
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
         .innerTile(radius: Radius.inner)
         .opacity(dimmed ? 0.5 : 1)

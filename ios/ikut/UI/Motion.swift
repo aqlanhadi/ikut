@@ -21,6 +21,23 @@ enum Motion {
     /// Reduce Motion.
     static func camera(reduceMotion: Bool) -> Animation? { reduceMotion ? nil : .smooth(duration: 0.6) }
 
+    /// A control or pill fading as a sheet takes the screen, and the Reduce Motion fade of a driving-glance move:
+    /// linear, 0.2 s.
+    static let fade = Animation.linear(duration: 0.2)
+
+    /// How a pill, banner or toast of the driving glance moves (`DrivingGlance.animation` swaps it for `fade` with
+    /// Reduce Motion). The system's snappy.
+    static let pill = Animation.snappy
+
+    /// The camera's glide to a new view on the driving screen: ease in and out, 0.8 s; `nil` (a jump) with Reduce Motion.
+    static func glance(reduceMotion: Bool) -> Animation? { reduceMotion ? nil : .easeInOut(duration: 0.8) }
+
+    /// A small state change that settles by itself (the "You" online dot's text). The system's smooth.
+    static func gentle(reduceMotion: Bool) -> Animation? { reduceMotion ? reduced : .smooth }
+
+    /// A line appearing under a ticket. The system's ease out.
+    static func line(reduceMotion: Bool) -> Animation? { reduceMotion ? reduced : .easeOut }
+
     /// Following my car and moving the cars between their fixes (D70): linear over `interval` seconds
     /// (`FollowGlide`), so the map moves on steadily. `nil` (a step on each fix) with Reduce Motion, or for no time.
     static func follow(interval: TimeInterval, reduceMotion: Bool) -> Animation? {

@@ -31,7 +31,7 @@ struct HomeHeader: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(width: tileSide, height: tileSide)
-                        .background(Color(.label).opacity(0.9), in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
+                        .background(Color(.label).dimmed(.strong), in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
                         .accessibilityHidden(true)
                     Text("Join with a code").font(.body.weight(.medium)).foregroundStyle(.primary)
                     Spacer(minLength: Spacing.s)

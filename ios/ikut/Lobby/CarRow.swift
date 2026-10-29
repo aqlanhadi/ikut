@@ -11,7 +11,7 @@ struct CarRow: View {
         HStack(spacing: Spacing.m) {
             CarBadge(number: number, colorHex: colorHex, size: IconSize.small.base)
             VStack(alignment: .leading, spacing: 0) {
-                Text(text.name).font(.body).lineLimit(1)
+                Text(text.name).font(.body).wrapsAtAccessibilitySizes()
                 Text(text.line).font(.footnote).foregroundStyle(text.ready ? Color.surfaceSecondary : Color.ikutWarning)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

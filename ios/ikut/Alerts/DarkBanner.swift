@@ -21,13 +21,13 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
                 .background(circle, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(.body.weight(.semibold)).lineLimit(2)
+                Text(title).font(.body.weight(.semibold)).wrapsAtAccessibilitySizes(lines: 2)
                 if let subtitle {
                     Text(subtitle)
                         .font(.footnote)
                         .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(2)
+                        .foregroundStyle(Color.white.dimmed(.faded))
+                        .wrapsAtAccessibilitySizes(lines: 2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

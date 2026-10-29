@@ -161,7 +161,7 @@ struct JoinSheet: View {
                         if model.isJoining {
                             ProgressView().accessibilityLabel("Joining trip")
                         } else {
-                            Text(joinLabel).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(joinLabel).wrapsAtAccessibilitySizes().minimumScaleFactor(0.7)
                         }
                     }
                     .font(.headline).frame(maxWidth: .infinity)
@@ -377,7 +377,7 @@ struct JoinSheet: View {
                 .font(.footnote).foregroundStyle(.secondary)
                 .padding(.top, Spacing.xs)
         }
-        .animation(.easeOut, value: model.ticketDrive)
+        .animation(Motion.line(reduceMotion: reduceMotion), value: model.ticketDrive)
         .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceTile(radius: Radius.inner)

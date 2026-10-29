@@ -91,56 +91,33 @@ StopActionButton|View|Stops/StopCardParts.swift|18
 
     /// category | value | swatch hex (colours) | file:line
     static let literalRows = """
-opacity|0.7||Alerts/ApproachPill.swift:107
 frame|width 40, height 40||Alerts/DarkBanner.swift:20
-opacity|0.7||Alerts/DarkBanner.swift:29
 frame|minHeight 56||Alerts/DarkBanner.swift:41
-opacity|0.9||App/HomeHeader.swift:34
 frame|minHeight 50||App/HomeHeader.swift:41
 opacity|0.9||App/HomeMapContent.swift:55
-opacity|0.6||App/HomeMapContent.swift:100
 opacity|0.9||App/HomeMapContent.swift:118
 frame|width 12, height 12||App/HomeMapContent.swift:124
 frame|width 30, height 30||App/HomeMapContent.swift:134
-frame|width 88, height 88||App/WelcomeView.swift:33
-padding|28||App/WelcomeView.swift:40
-frame|width 36, height 36||App/WelcomeView.swift:54
-padding|44||App/WelcomeView.swift:66
-padding|32||App/WelcomeView.swift:68
-padding|48||App/WelcomeView.swift:69
-padding|32||App/WelcomeView.swift:89
-padding|3||Hazards/HazardMapContent.swift:37
+frame|width 88, height 88||App/WelcomeView.swift:36
+frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
-opacity|0.3||Hazards/HazardMapContent.swift:80
 color|#8E8E93|8E8E93|Join/JoinSheet.swift:410
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:179
 opacity|0.5||Lobby/LobbyMap.swift:266
-opacity|0.2||Lobby/LobbyMap.swift:280
 padding|6||Lobby/LobbyMap.swift:290
 padding|1||Lobby/LobbyMap.swift:290
-opacity|0.88||Lobby/LobbyMap.swift:291
 radius|6||Lobby/LobbyMap.swift:291
 font|12||Lobby/LobbyMap.swift:312
 font|11||Lobby/LobbyMap.swift:314
 font|12||Lobby/LobbyMap.swift:316
 frame|width 8, height 8||Lobby/LobbyMap.swift:318
 frame|minHeight 36||Lobby/LobbyStopsViews.swift:64
-padding|4||Lobby/LobbyStopsViews.swift:67
-padding|60||Lobby/LobbyStopsViews.swift:120
-padding|60||Lobby/LobbyStopsViews.swift:126
-frame|minHeight 44||Lobby/LobbyStopsViews.swift:179
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
-padding|40||Lobby/LobbyView.swift:602
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:795
-padding|32||Location/AlwaysLocationExplainerView.swift:14
 frame|width 30||Location/LocationAskStep.swift:33
-frame|width 14, height 14||Map/ConvoyPanel.swift:269
-opacity|0.8||Map/ConvoyPanel.swift:270
-frame|width 14, height 14||Map/ConvoyPanel.swift:276
-padding|44||Map/ConvoyPanel.swift:328
-padding|44||Map/ConvoyPanel.swift:333
-frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:396
-opacity|0.3||Map/ConvoyRows.swift:16
+frame|width 14, height 14||Map/ConvoyPanel.swift:271
+frame|width 14, height 14||Map/ConvoyPanel.swift:278
+frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:398
 frame|height 4||Map/ConvoyRows.swift:16
 frame|width 12, height 12||Map/ConvoyRows.swift:22
 frame|width 18, height 18||Map/ConvoyRows.swift:32
@@ -151,43 +128,30 @@ frame|width 18, height 18||Map/MapMarkerView.swift:150
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
 frame|width 10, height 10||Map/TripMapView.swift:609
 frame|width 12, height 12||Map/TripMapView.swift:630
-padding|2||Map/TripMapView.swift:632
-padding|6||Map/TripMapView.swift:632
 frame|minHeight 56||Map/TripMapView.swift:642
 frame|height 0||Map/TripMapView.swift:812
 frame|height 150||Recap/RecapContent.swift:60
-padding|11||Recap/RecapContent.swift:64
 frame|height 30||Recap/RecapContent.swift:64
-padding|26||Recap/RecapContent.swift:112
 frame|width 0.5||Recap/RecapContent.swift:123
 frame|width 40, height 40||Recap/RecapContent.swift:157
-padding|5||Recap/RecapContent.swift:205
 frame|width 42||Recap/RecapContent.swift:205
 frame|width 2||Recap/RecapContent.swift:209
 frame|minHeight 12||Recap/RecapContent.swift:209
 frame|width 50||Recap/RecapMapView.swift:78
 frame|width 50||Recap/RecapMapView.swift:85
-padding|40||Recap/RecapView.swift:31
-padding|80||Recap/RecapView.swift:33
-opacity|0.35||Recap/RecapView.swift:81
-opacity|0.9||Recap/RecapView.swift:114
-frame|width 16, height 16||Recap/RecapView.swift:120
+opacity|0.9||Recap/RecapView.swift:116
+frame|width 16, height 16||Recap/RecapView.swift:122
 frame|width 40, height 40||Report/ReportSheet.swift:56
 frame|minHeight 72||Report/ReportSheet.swift:64
 frame|minHeight 60||Report/ReportSheet.swift:78
 frame|height 6||Stops/StopArrivalCard.swift:340
 frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
-opacity|0.85||Stops/StopCardParts.swift:34
-opacity|0.7||Stops/StopCardParts.swift:70
-padding|5||Stops/StopCardParts.swift:133
 opacity|0.4||Stops/StopCardParts.swift:135
 frame|minHeight 84||Trip/AddStopSheet.swift:307
-frame|width 12, height 12||Trip/CreateTripView.swift:80
-opacity|0.25||Trip/CreateTripView.swift:81
-frame|width 20||Trip/CreateTripView.swift:82
-padding|48||Trip/CreateTripView.swift:94
-frame|width 20||Trip/CreateTripView.swift:100
+frame|width 12, height 12||Trip/CreateTripView.swift:82
+frame|width 20||Trip/CreateTripView.swift:84
+frame|width 20||Trip/CreateTripView.swift:102
 font|34||Trip/MapPickView.swift:113
 frame|width 80||Trip/NewTripSheet.swift:101
 color|#2563EB|2563EB|Trip/TripService.swift:18
@@ -197,10 +161,8 @@ color|#7C3AED|7C3AED|Trip/TripService.swift:18
 color|#BE185D|BE185D|Trip/TripService.swift:18
 color|#A16207|A16207|Trip/TripService.swift:18
 opacity|0.25||UI/GlassSurface.swift:86
-frame|minHeight 58||UI/Theme.swift:195
+frame|minHeight 58||UI/Theme.swift:198
 frame|height 28||UI/TripComponents.swift:105
-font|7||UI/TripComponents.swift:199
-padding|5||UI/TripComponents.swift:209
 frame|width 2||UI/TripComponents.swift:227
 """
 
@@ -212,6 +174,7 @@ spacing|s
 spacing|m
 spacing|l
 spacing|xl
+spacing|hero
 radius|icon
 radius|inner
 radius|card

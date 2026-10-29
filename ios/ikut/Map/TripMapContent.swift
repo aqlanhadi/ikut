@@ -228,7 +228,7 @@ struct MarkerGlide: ViewModifier {
         let from = CGSize(width: a.x - b.x + left.width, height: a.y - b.y + left.height)
         guard Self.worthGliding(from) else { stop(); return }
         jump(to: from)
-        withAnimation(.linear(duration: duration)) { offset = .zero }
+        withAnimation(Motion.follow(interval: duration, reduceMotion: false)) { offset = .zero }
         slide = Slide(from: from, start: now, duration: duration)
     }
 

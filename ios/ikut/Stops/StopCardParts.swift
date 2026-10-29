@@ -31,7 +31,7 @@ struct StopActionButton: View {
                     .lineLimit(large ? 2 : 1)
                     .minimumScaleFactor(large ? 1 : 0.8)
                 if let subtitle {
-                    Text(subtitle).font(.caption).opacity(0.85).lineLimit(large ? 2 : 1)
+                    Text(subtitle).font(.caption).dimmed(.strong).lineLimit(large ? 2 : 1)
                 }
             }
                 .multilineTextAlignment(.center)
@@ -67,7 +67,7 @@ struct StopActionButton: View {
     private var background: Color {
         switch style {
         case .primary: Color.ikutAccent
-        case .secondary: Color(.systemGray5).opacity(0.7)
+        case .secondary: Color(.systemGray5).dimmed(.faded)
         case .positive: Color.green.fill(.tint)
         case .ghost, .destructive: .clear
         }
@@ -124,13 +124,13 @@ struct StopVoterRow: View {
         let status = Self.status(row)
         HStack(spacing: Spacing.m) {
             CarBadge(number: row.number, colorHex: row.colorHex, size: IconSize.small.base)
-            Text(row.isMine ? "Me" : row.name).font(.body).lineLimit(1)
+            Text(row.isMine ? "Me" : row.name).font(.body).wrapsAtAccessibilitySizes()
             Spacer(minLength: 4)
             Text(status.text)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(chipText(status.color))
                 .padding(.horizontal, Spacing.s)
-                .padding(.vertical, 5)
+                .padding(.vertical, Spacing.xs)
                 .background(status.color.opacity(GlassSurface.active ? 0.2 : 0.14), in: Capsule())
                 .background(GlassSurface.active && scheme == .dark ? Color.black.opacity(0.4) : .clear, in: Capsule())
         }

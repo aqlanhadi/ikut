@@ -47,7 +47,7 @@ struct ReportToastView: View {
                 .announces(message)
             }
         }
-        .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: model.state)
+        .animation(DrivingGlance.animation(Motion.pill, reduceMotion: reduceMotion), value: model.state)
         .modifier(HapticsIf(model: model, on: haptics))
     }
 

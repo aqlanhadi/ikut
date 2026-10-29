@@ -317,7 +317,7 @@ struct AddStopContent: View {
         Button(action: action) {
             Text(label)
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+                .wrapsAtAccessibilitySizes()
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(selected ? Color.white : Color.primary)
                 .ikutRow(fillWidth: true)
