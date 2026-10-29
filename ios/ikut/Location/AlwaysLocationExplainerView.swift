@@ -34,7 +34,7 @@ struct AlwaysLocationExplainerView: View {
                     } label: {
                         Text("Continue").frame(maxWidth: .infinity)
                     }
-                    .ikutButton(.primary, size: .main)
+                    .ikutButton(.primary)
                     .disabled(isRequesting)
 
                     Button("Not now") { onFinish(permission.status) }

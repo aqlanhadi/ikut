@@ -1,7 +1,7 @@
 #if DEBUG
 import SwiftUI
 
-/// D81: every migrated `ikutButton` call site, built the way the screen builds it, with its laid-out height printed
+/// D81: every migrated `ikutButton` call site (all Apple's large size, about 50 pt, glass and filled alike; links 44; round 44), built the way the screen builds it, with its laid-out height printed
 /// under it (and written as JSON to `IKUT_COMPARE_DUMP` when set). Launch states `button-sizes` (default text size),
 /// `button-sizes-ax` (accessibility text size). Each block is a surface: filled on a plain screen, glass on glass.
 struct ButtonSizesDemo: View {
@@ -11,10 +11,10 @@ struct ButtonSizesDemo: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.l) {
                 block("Plain screen (filled)", surface: .plain) {
-                    row("welcome.getStarted") { Button {} label: { Text("Get started").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main) }
+                    row("welcome.getStarted") { Button {} label: { Text("Get started").frame(maxWidth: .infinity) }.ikutButton(.primary) }
                     row("welcome.join") { Button {} label: { Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity) }.ikutButton(.link) }
-                    row("mapPick.use") { Button {} label: { Text("Use this place").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main) }
-                    row("recapPage.share") { Button {} label: { Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main) }
+                    row("mapPick.use") { Button {} label: { Text("Use this place").frame(maxWidth: .infinity) }.ikutButton(.primary) }
+                    row("recapPage.share") { Button {} label: { Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }.ikutButton(.primary) }
                     row("recapPage.done") { Button {} label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link) }
                     row("secondary") { Button {} label: { Text("Secondary").frame(maxWidth: .infinity) }.ikutButton(.secondary) }
                 }
@@ -50,7 +50,7 @@ struct ButtonSizesDemo: View {
                 block("Plain screen and map overlay (filled)", surface: .plain) {
                     row("round.sheetClosePlain") { SheetCloseButton {} }
                     row("round.mapClose") { MapCloseButton {} }
-                    row("location.main") { Button {} label: { Text("Open Settings").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main) }
+                    row("location.main") { Button {} label: { Text("Open Settings").frame(maxWidth: .infinity) }.ikutButton(.primary) }
                     row("recap.prev") { Button {} label: { Image(systemName: "chevron.left").frame(width: 50) }.ikutButton(.secondary) }
                     row("recap.next") { Button {} label: { Image(systemName: "chevron.right").frame(width: 50) }.ikutButton(.secondary) }
                 }

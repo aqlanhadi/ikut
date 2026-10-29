@@ -104,45 +104,28 @@ struct RowDivider: View {
     }
 }
 
-/// The round "x" at the top trailing corner of a sheet: `SheetButtonSize.hit` (44 pt) across at the default text size,
-/// scaled and capped. Liquid Glass on a glass surface (`buttonSurface`, as `ikutButton` follows it), else a quiet circle.
+/// The round "x" at the top trailing corner of a sheet, in the system's size: Liquid Glass on a glass surface
+/// (`buttonSurface`, as `ikutButton` follows it), else the bordered circle.
 struct SheetCloseButton: View {
     var action: () -> Void
-    @ScaledMetric(relativeTo: .body) private var scaled = SheetButtonSize.hit
     @Environment(\.buttonSurface) private var surface
 
     var body: some View {
-        if surface == .glass, GlassSurface.useGlass, #available(iOS 26, *) {
-            RoundGlassIconButton(systemImage: "xmark", label: "Close", action: action)
-        } else {
-            let side = SheetButtonSize.capped(scaled, base: SheetButtonSize.hit)
-            Button(action: action) {
-                Image(systemName: "xmark")
-                    .font(RoundIconSymbol.standardGlyph)
-                    .foregroundStyle(.secondary)
-                    .frame(width: side, height: side)
-                    .background(.quaternary, in: Circle())
-            }
+        Button(action: action) { Image(systemName: "xmark") }
+            .roundSystemStyle(surface == .glass ? .glass : .quiet)
             .accessibilityLabel("Close")
-        }
     }
 }
 
-/// The round "x" on a screen's top corner, on a material so it reads over a map or a scrolling page. It is
-/// `SheetButtonSize.hit` across, scaled with the text size and capped.
+/// The round "x" on a screen's top corner, over a map or a scrolling page: the system's bordered circle on a material.
 struct MapCloseButton: View {
     var action: () -> Void
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark").font(RoundIconSymbol.standardGlyph)
-                .frame(width: SheetButtonSize.capped(side, base: SheetButtonSize.hit),
-                       height: SheetButtonSize.capped(side, base: SheetButtonSize.hit))
-                .background(.regularMaterial, in: Circle())
-        }
-        .tint(.primary)
-        .accessibilityLabel("Close")
+        Button(action: action) { Image(systemName: "xmark") }
+            .buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
+            .background(.regularMaterial, in: Circle())
+            .accessibilityLabel("Close")
     }
 }
 
@@ -255,8 +238,8 @@ struct IconTile: View {
 
 #Preview("Buttons") {
     VStack(spacing: Spacing.m) {
-        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main)
-        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main).disabled(true)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary).disabled(true)
         HStack(spacing: Spacing.s) {
             Button { } label: { Text("Share").frame(maxWidth: .infinity) }.ikutButton(.primary)
             Button { } label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.secondary)

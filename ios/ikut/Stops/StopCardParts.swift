@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One button in the card's action area, every style `SheetButtonSize.hit` (44) tall and growing with the text size
+/// One button in the card's action area, every style Apple's large size, growing with the text size
 /// (or `height` when the driver needs a huge one). `.primary` is the main action, `.secondary` a gray capsule,
 /// `.positive` the chosen answer, `.ghost` plain text, `.destructive` red text (a destructive button role).
 struct StopActionButton: View {
@@ -10,7 +10,7 @@ struct StopActionButton: View {
     /// A small second line under the title ("Hafiz is 3 min away").
     var subtitle: String?
     var style: Style = .secondary
-    /// Nil: the standard 44 `ikutButton` gives, growing with the text size.
+    /// Nil: the size `ikutButton` gives.
     var height: CGFloat?
     var disabled = false
     var id: String
