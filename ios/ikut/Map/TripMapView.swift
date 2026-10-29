@@ -636,9 +636,9 @@ struct TripMapView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityValue(bannerSlot.errorHeld ? "error waiting" : "")
-        // 6 pt top and bottom, 16 pt either side, so the pill is 56 pt tall in every state.
+        // 4 pt top and bottom, 16 pt either side, so the pill is 56 pt tall in every state.
         .padding(.horizontal, Spacing.l)
-        .padding(.vertical, Spacing.tight)
+        .padding(.vertical, Spacing.xs)
         .frame(minHeight: 56)
         .glassSurface(.pill)
     }

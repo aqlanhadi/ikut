@@ -49,7 +49,7 @@ extension LobbyView {
                 .ikutButton(.secondary, onGlass: true)
                 .accessibilityIdentifier("lobby.showQR")
             }
-            .padding(.top, Spacing.tight)
+            .padding(.top, Spacing.s)
         }
         .padding(Spacing.l)
         .frame(maxWidth: .infinity)

@@ -37,7 +37,7 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
         // 14 on the right as on the canvas; a button there brings its own room.
         .padding(.leading, Spacing.s)
         .padding(.trailing, Trailing.self == EmptyView.self ? Spacing.l : Spacing.s)
-        .padding(.vertical, Spacing.tight)
+        .padding(.vertical, Spacing.xs)
         .frame(minHeight: 56)
         // #1C1C1E, as on the design canvas.
         .background(Color.ikutBannerDark, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
@@ -68,7 +68,8 @@ extension DarkBanner where Icon == Image, Trailing == EmptyView {
             subtitle: "We'll wait at the Tapah R&R, the one after the toll, near the surau. Take your time.",
             symbol: "text.bubble.fill", circle: .white)
         DarkBanner(title: "Heavy rain reported", symbol: "cloud.rain.fill", circle: .yellow) {
-            Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+            Button {} label: { RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white) }
+                .accessibilityLabel("Close")
         }
         DarkBanner(title: "Sending debris…", circle: .white.fill(.tint)) {
             ProgressView().tint(.white)

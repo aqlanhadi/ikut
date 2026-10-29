@@ -191,10 +191,9 @@ struct SuggestStopsSheet: View {
         return VStack(alignment: .leading, spacing: Spacing.s) {
             Text(RequestPlaces.name(pick.place)).font(.headline)
             Text(SuggestStopsModel.along(pick)).font(.subheadline).foregroundStyle(.secondary)
-            HStack(spacing: Spacing.tight) {
+            HStack(spacing: Spacing.s) {
                 ForEach(SuggestStopsModel.chips(pick.place), id: \.self) { chip in
-                    Text(chip).font(.caption.weight(.semibold)).padding(.horizontal, 9).padding(.vertical, 3)
-                        .background(Color.ikutAccent.fill(.tint), in: Capsule())
+                    Chip(text: chip, tone: .accent)
                 }
             }
             HStack(spacing: Spacing.s) {

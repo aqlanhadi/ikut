@@ -334,7 +334,7 @@ struct ConvoyPanel: View {
                 JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline)
             }
         }
-        .padding(.top, Spacing.tight)
+        .padding(.top, Spacing.s)
     }
 
     private func separation(_ text: String) -> some View {
@@ -345,7 +345,7 @@ struct ConvoyPanel: View {
             .padding(.horizontal, Spacing.m)
             .padding(.vertical, Spacing.s)
             .background(Color.ikutWarning.fill(.tint), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-            .padding(.bottom, Spacing.tight)
+            .padding(.bottom, Spacing.s)
             .accessibilityIdentifier("convoy.separation")
     }
 }

@@ -91,7 +91,6 @@ StopActionButton|View|Stops/StopCardParts.swift|18
 
     /// category | value | swatch hex (colours) | file:line
     static let literalRows = """
-frame|width 44, height 44||Alerts/AlertBannerView.swift:38
 opacity|0.7||Alerts/ApproachPill.swift:107
 frame|width 40, height 40||Alerts/DarkBanner.swift:20
 opacity|0.7||Alerts/DarkBanner.swift:29
@@ -121,21 +120,21 @@ opacity|0.3||Hazards/HazardMapContent.swift:80
 frame|minHeight 44||Join/JoinSheet.swift:126
 frame|minHeight 44||Join/JoinSheet.swift:274
 frame|minHeight 54||Join/JoinSheet.swift:330
-color|#8E8E93|8E8E93|Join/JoinSheet.swift:414
-frame|minHeight 46||Join/JoinSheet.swift:425
-frame|minHeight 56||Join/JoinSheet.swift:462
+color|#8E8E93|8E8E93|Join/JoinSheet.swift:409
+frame|minHeight 46||Join/JoinSheet.swift:420
+frame|minHeight 56||Join/JoinSheet.swift:457
 frame|minHeight 54||Lobby/CarRow.swift:22
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:179
-opacity|0.5||Lobby/LobbyMap.swift:276
-opacity|0.2||Lobby/LobbyMap.swift:290
-padding|6||Lobby/LobbyMap.swift:300
-padding|1||Lobby/LobbyMap.swift:300
-opacity|0.88||Lobby/LobbyMap.swift:301
-radius|6||Lobby/LobbyMap.swift:301
-font|12||Lobby/LobbyMap.swift:322
-font|11||Lobby/LobbyMap.swift:324
-font|12||Lobby/LobbyMap.swift:326
-frame|width 8, height 8||Lobby/LobbyMap.swift:328
+opacity|0.5||Lobby/LobbyMap.swift:267
+opacity|0.2||Lobby/LobbyMap.swift:281
+padding|6||Lobby/LobbyMap.swift:291
+padding|1||Lobby/LobbyMap.swift:291
+opacity|0.88||Lobby/LobbyMap.swift:292
+radius|6||Lobby/LobbyMap.swift:292
+font|12||Lobby/LobbyMap.swift:313
+font|11||Lobby/LobbyMap.swift:315
+font|12||Lobby/LobbyMap.swift:317
+frame|width 8, height 8||Lobby/LobbyMap.swift:319
 frame|minHeight 48||Lobby/LobbySheetSections.swift:89
 frame|width 32, height 32||Lobby/LobbySheetSections.swift:195
 frame|minHeight 48||Lobby/LobbySheetSections.swift:204
@@ -156,8 +155,6 @@ color|#D9480F|D9480F|Lobby/LobbyView.swift:70
 padding|40||Lobby/LobbyView.swift:601
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:794
 frame|minHeight 44||Lobby/PausedBanner.swift:31
-padding|9||Lobby/SuggestStopsSheet.swift:196
-padding|3||Lobby/SuggestStopsSheet.swift:196
 padding|32||Location/AlwaysLocationExplainerView.swift:14
 frame|width 30||Location/LocationAskStep.swift:33
 frame|width 14, height 14||Map/ConvoyPanel.swift:269
@@ -175,10 +172,8 @@ frame|width 18, height 18||Map/ConvoyRows.swift:32
 frame|height 30||Map/ConvoyRows.swift:37
 frame|height 30||Map/ConvoyRows.swift:39
 frame|width 30, height 30||Map/ConvoyRows.swift:55
-padding|5||Map/ConvoyRows.swift:85
-frame|minHeight 54||Map/ConvoyRows.swift:100
-frame|minHeight 54||Map/ConvoyRows.swift:143
-frame|width 44, height 44||Map/DrivingGlance.swift:82
+frame|minHeight 54||Map/ConvoyRows.swift:95
+frame|minHeight 54||Map/ConvoyRows.swift:138
 color|#1F7A35|1F7A35|Map/MapColors.swift:27
 color|#23823A|23823A|Map/MapColors.swift:27
 color|#64B5FF|64B5FF|Map/MapColors.swift:30
@@ -223,13 +218,8 @@ frame|width 40, height 40||Report/ReportSheet.swift:56
 frame|minHeight 72||Report/ReportSheet.swift:64
 frame|minHeight 60||Report/ReportSheet.swift:78
 frame|minHeight 44||Report/ReportToastView.swift:31
-frame|width 44, height 44||Report/ReportToastView.swift:43
-padding|10||Stops/StopArrivalCard.swift:311
-padding|5||Stops/StopArrivalCard.swift:311
-padding|10||Stops/StopArrivalCard.swift:333
-padding|5||Stops/StopArrivalCard.swift:333
-frame|height 6||Stops/StopArrivalCard.swift:348
-frame|minHeight 46||Stops/StopArrivalCard.swift:380
+frame|height 6||Stops/StopArrivalCard.swift:340
+frame|minHeight 46||Stops/StopArrivalCard.swift:372
 frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
 frame|minHeight 44||Stops/StopCard.swift:237
@@ -300,22 +290,20 @@ color|#000000|000000|UI/Palette.swift:43
 color|#FFFFFF|FFFFFF|UI/Palette.swift:43
 color|#8A6B45|8A6B45|UI/Palette.swift:48
 color|#8A6B45|8A6B45|UI/Palette.swift:48
-frame|minHeight 48||UI/SheetChrome.swift:299
-frame|width 32, height 44||UI/SheetChrome.swift:372
-frame|minHeight 58||UI/Theme.swift:222
+frame|minHeight 48||UI/SheetChrome.swift:302
+frame|width 32, height 44||UI/SheetChrome.swift:375
+frame|minHeight 58||UI/Theme.swift:218
 frame|height 28||UI/TripComponents.swift:105
-font|7||UI/TripComponents.swift:196
-padding|5||UI/TripComponents.swift:206
-frame|width 2||UI/TripComponents.swift:224
+font|7||UI/TripComponents.swift:199
+padding|5||UI/TripComponents.swift:209
+frame|width 2||UI/TripComponents.swift:227
 """
 
     /// group | token name, for the token ratchet
     static let tokenRows = """
 spacing|xxs
 spacing|xs
-spacing|tight
 spacing|s
-spacing|chipX
 spacing|m
 spacing|l
 spacing|xl

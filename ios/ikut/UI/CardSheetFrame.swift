@@ -75,7 +75,7 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
         .padding(.horizontal, Spacing.xl)
         .padding(.top, Spacing.xl)
         // With actions, the buttons hang into the bottom safe area like the convoy sheet's bar, so the gap under
-        // them equals the gap beside them (`block`); without a safe area they keep the plain padding.
+        // them equals the gap beside them (`Spacing.xl`); without a safe area they keep the plain padding.
         .padding(.bottom, hasActions && lift > 0 ? -lift : Spacing.xl)
         .glassSurface(if: !inSheet)
         .accessibilityElement(children: .contain)

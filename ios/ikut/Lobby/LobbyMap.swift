@@ -184,7 +184,6 @@ struct LobbyMapLayer: View {
 
     @Environment(TripScreenModel.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var roundSide = SheetButtonSize.round
     @State private var onStop = false
     @State private var fitted = false
 
@@ -207,18 +206,10 @@ struct LobbyMapLayer: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                Button { command = command.asking(.wholeTrip) } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: roundSide, height: roundSide)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .roundGlass()
+                RoundGlassIconButton(systemImage: "arrow.up.left.and.arrow.down.right", label: "Show the whole trip",
+                                     glyph: .title3.weight(.semibold)) { command = command.asking(.wholeTrip) }
                 .padding(.trailing, Spacing.m)
                 .padding(.top, stage.space.safeTop + Spacing.xs)
-                .accessibilityLabel("Show the whole trip")
                 .accessibilityIdentifier("lobby.wholeTrip")
             }
             .preference(key: TripMapSpecKey.self, value: TripMapSpec(

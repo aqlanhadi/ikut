@@ -305,11 +305,7 @@ struct StopArrivalCard: View {
     @ViewBuilder private func me(_ status: StopArrival.Status, stop: PlannedStop) -> some View {
         switch status {
         case .here:
-            Text("You’re here")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Color.ikutPositive)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Color.ikutPositive.fill(.tint), in: Capsule())
+            Chip(text: "You’re here", tone: .positive)
                 .accessibilityIdentifier("stop.arrival.you")
         case .away(let distance, let seconds):
             let inConvoy = model.convoy.convoy.contains { $0.id == model.myCarId }
@@ -327,11 +323,7 @@ struct StopArrivalCard: View {
             .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             .accessibilityElement(children: .combine)
         case .passed:
-            Text("You drove past")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Color.surfaceSecondary)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Color(.tertiarySystemFill), in: Capsule())
+            Chip(text: "You drove past", tone: .neutral)
                 .accessibilityIdentifier("stop.arrival.you")
         case .unknown, .lastSeenHere:
             EmptyView()
