@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 /// The "Shared" half of Settings > Design: what `UI/` provides, rendered from sample values and labelled with its
@@ -174,4 +173,3 @@ private extension String {
     /// A code name, in monospace.
     var code: Text { Text(self).font(.footnote.monospaced()) }
 }
-#endif

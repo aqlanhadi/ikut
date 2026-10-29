@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 /// Where a drill-down from the One-offs totals goes.
@@ -157,4 +156,3 @@ struct DesignDrillView: View {
         }
     }
 }
-#endif
