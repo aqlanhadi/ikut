@@ -26,9 +26,10 @@ extension View {
         modifier(CardSlice(top: top, bottom: bottom))
     }
 
-    /// A List row that is one block of the lobby on the screen color, with the screen's side margins.
+    /// A List row that is one of our own blocks (not a system row) on the glass: no insets, since the grouped list's
+    /// section margin is the side margin, and no background or separator.
     func lobbyRow(top: CGFloat = 0, bottom: CGFloat = 0) -> some View {
-        listRowInsets(EdgeInsets(top: top, leading: Spacing.l, bottom: bottom, trailing: Spacing.l))
+        listRowInsets(EdgeInsets(top: top, leading: 0, bottom: bottom, trailing: 0))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
     }

@@ -576,37 +576,45 @@ struct LobbyView: View {
         // The header stays put and the rows fade out under it, as they do above the bottom bar.
         Group {
             List {
-                statusBanner
-                    .lobbyRow()
-                if session.isPaused && !session.isEnded && !session.membershipLost {
-                    PausedBanner(session: session, onError: { actionError = $0 })
-                        .padding(.bottom, Spacing.xs)
-                        .lobbyRow()
-                }
-                if let trip = model.trip {
-                    if rows.ownWay { ownWayTile(trip).lobbyRow(top: Spacing.xs, bottom: Spacing.xs) }
-                    carsRows
-                    if let actionError {
-                        InlineNote(actionError, tone: .alert)
-                            .padding(.top, Spacing.m)
+                // Each hand-drawn part is one Section with one row (zero insets, clear background); the plain
+                // ones (Cars, Trip) are system rows. Stops, code, options and exit follow in later pieces (D86).
+                Section {
+                    statusBanner.lobbyRow()
+                    if session.isPaused && !session.isEnded && !session.membershipLost {
+                        PausedBanner(session: session, onError: { actionError = $0 })
+                            .padding(.bottom, Spacing.xs)
                             .lobbyRow()
                     }
-                    codeCard(trip.code).lobbyRow(top: Spacing.l)
-                    tripRows(trip)
-                    stopsRows(trip)
-                    optionRows
+                }
+                if let trip = model.trip {
+                    if rows.ownWay {
+                        Section { ownWayTile(trip).lobbyRow(top: Spacing.xs, bottom: Spacing.xs) }
+                    }
+                    carsSection
+                    if let actionError {
+                        Section {
+                            InlineNote(actionError, tone: .alert)
+                                .lobbyRow(top: Spacing.m)
+                        }
+                    }
+                    Section { codeCard(trip.code).lobbyRow() }
+                    tripSection(trip)
+                    Section { stopsRows(trip) }
+                    Section { optionRows }
                 } else if let message = model.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
-                        .lobbyRow()
+                    Section {
+                        Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
+                            .lobbyRow()
+                    }
                 } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, Spacing.hero)
-                        .lobbyRow()
+                    Section {
+                        ProgressView().frame(maxWidth: .infinity).padding(.top, Spacing.hero)
+                            .lobbyRow()
+                    }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .listRowSpacing(0)
-            .environment(\.defaultMinListRowHeight, 1)
             .contentMargins(.top, Spacing.xs, for: .scrollContent)
             .contentMargins(.bottom, Spacing.l, for: .scrollContent)
             .sheetBottomBar { bottomBar }
@@ -688,13 +696,11 @@ struct LobbyView: View {
 
     /// "Cars · 4 of 5 ready" and the cars, each with the line under it. Tapping a car does nothing (no other car's
     /// position, #361), except a participant's own row, which shows where they join when the lobby knows.
-    @ViewBuilder var carsRows: some View {
+    @ViewBuilder var carsSection: some View {
         let cars = model.groupedCars
-        sectionLabel(LobbyContent.carsHeader(cars)).lobbyRow(top: Spacing.s)
-        VStack(spacing: 0) {
+        Section {
             if cars.isEmpty { EmptyRow("No cars yet") }
             ForEach(Array(cars.enumerated()), id: \.element.id) { index, item in
-                if index > 0 { RowDivider() }
                 let mine = isMine(item)
                 let carJoin = item.car.id.flatMap { joins[$0] } ?? LobbyContent.carJoin(
                     of: item.car, main: nil, hasMeetingPoint: false)
@@ -708,15 +714,15 @@ struct LobbyView: View {
                 let row = CarRow(text: text, number: item.car.number ?? index + 1, colorHex: item.car.color)
                 if mine, !isOrganizer, ownWay.joinCoordinate != nil {
                     Button { flyTo("join") } label: { row }
-                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.primary)
                         .accessibilityHint("Shows where you join")
                 } else {
                     row
                 }
             }
+        } header: {
+            Text(LobbyContent.carsHeader(cars))
         }
-        .surfaceTile(radius: Radius.card)
-        .lobbyRow()
     }
 
     func sectionLabel(_ title: String) -> some View {

@@ -58,7 +58,43 @@ extension LobbyView {
 
     // MARK: Tall: the trip
 
-    /// Name (the organizer taps to rename) and Destination (the organizer taps to change it; a participant reads it).
+    /// The Trip section of the lobby's list: Name (the organizer taps to rename) and Destination (the organizer taps to
+    /// change it; a participant reads it), as system rows.
+    func tripSection(_ trip: Trip) -> some View {
+        Section {
+            systemTripRow("Name", value: trip.name, tappable: canEdit, id: "lobby.rename", hint: "Rename") {
+                renameText = trip.name
+                renaming = true
+            }
+            systemTripRow("Destination", value: trip.destination.name, tappable: canChangeDestination, id: "lobby.destination", hint: "Change destination") {
+                showChangeDestination = true
+            }
+        } header: {
+            Text("Trip")
+        }
+    }
+
+    @ViewBuilder func systemTripRow(_ title: String, value: String, tappable: Bool, id: String, hint: String = "", action: @escaping () -> Void) -> some View {
+        if tappable {
+            Button(action: action) {
+                LabeledContent(title) {
+                    HStack(spacing: Spacing.s) {
+                        Text(value)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).accessibilityHidden(true)
+                    }
+                }
+            }
+            .foregroundStyle(Color.primary)
+            .disabled(isWorking)
+            .accessibilityHint(hint)
+            .accessibilityIdentifier(id)
+        } else {
+            LabeledContent(title, value: value)
+                .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// The same rows as cards, for the pulled-up driving sheet, which is still a ScrollView (D86: its own piece).
     @ViewBuilder func tripRows(_ trip: Trip) -> some View {
         sectionLabel("Trip").lobbyRow(top: Spacing.m)
         VStack(spacing: 0) {

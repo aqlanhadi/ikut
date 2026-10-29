@@ -23,13 +23,15 @@ final class LobbyStopsUITests: XCTestCase {
     /// The stops sit below the cars, the code and the trip rows: scroll the list until the stop is on screen.
     @discardableResult private func reveal(_ name: String) -> XCUIElement {
         let target = row(name)
-        XCTAssertTrue(target.waitForExistence(timeout: 10), "no row for \(name)")
+        XCTAssertTrue(app.collectionViews.firstMatch.waitForExistence(timeout: 10), "no list")
         var scrolls = 0
-        // Clear of the bottom bar too (the bar's Start trip sits over the last 150 pt).
-        while !(target.isHittable && target.frame.maxY < app.frame.height - 200), scrolls < 8 {
+        // The list is lazy: a row far down is not in the hierarchy until it is scrolled near. Clear of the bottom bar
+        // too (the bar's Start trip sits over the last 150 pt).
+        while !(target.exists && target.isHittable && target.frame.maxY < app.frame.height - 200), scrolls < 8 {
             app.collectionViews.firstMatch.swipeUp()
             scrolls += 1
         }
+        XCTAssertTrue(target.exists, "no row for \(name)")
         return target
     }
 
@@ -43,7 +45,7 @@ final class LobbyStopsUITests: XCTestCase {
         let gone = NSPredicate(format: "exists == false")
         expectation(for: gone, evaluatedWith: row("R&R Bidor"))
         waitForExpectations(timeout: 10)
-        XCTAssertTrue(row("R&R Tapah").exists)
+        reveal("R&R Tapah")
     }
 
     func testDragReordersStops() {
@@ -93,7 +95,7 @@ final class LobbyStopsUITests: XCTestCase {
         XCTAssertTrue(app.textFields["addStop.search"].exists, "no search field")
         back.tap()
         XCTAssertTrue(app.buttons["Start trip"].waitForExistence(timeout: 10), "the lobby did not come back")
-        XCTAssertTrue(row("R&R Tapah").exists)
+        reveal("R&R Tapah")
     }
 
     /// An R&R chosen in the list and added lands in the stop list.
@@ -108,7 +110,6 @@ final class LobbyStopsUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["addStop.stay"].label, "30 min")
         add.tap()
         XCTAssertTrue(app.buttons["Start trip"].waitForExistence(timeout: 10), "the lobby did not come back")
-        app.collectionViews.firstMatch.swipeUp()
-        XCTAssertTrue(row("Tapah R&R").waitForExistence(timeout: 10), "Tapah R&R is not in the stop list: \(app.debugDescription)")
+        reveal("Tapah R&R")
     }
 }
