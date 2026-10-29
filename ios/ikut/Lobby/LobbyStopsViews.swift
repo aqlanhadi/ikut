@@ -1,31 +1,9 @@
 import SwiftUI
 
 /// The pieces of the lobby's route card that belong to stops (LobbyStops.dc.html): a stop's row with its notes,
-/// the total, and the shape that makes rows of a List read as one card.
-
-/// A row of a List drawn as a slice of the lobby's white card: `top` and `bottom` round that end.
-struct CardSlice: ViewModifier {
-    @Environment(\.inPanelSheet) private var inSheet
-    var top = false
-    var bottom = false
-
-    func body(content: Content) -> some View {
-        let r = Radius.card
-        content
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: top ? r : 0, bottomLeadingRadius: bottom ? r : 0,
-                    bottomTrailingRadius: bottom ? r : 0, topTrailingRadius: top ? r : 0, style: .continuous
-                ).fill(inSheet && GlassSurface.active ? Color.surfaceTileFill : Color.ikutCard))
-    }
-}
+/// the total.
 
 extension View {
-    func cardSlice(top: Bool = false, bottom: Bool = false) -> some View {
-        modifier(CardSlice(top: top, bottom: bottom))
-    }
-
     /// A List row that is one of our own blocks (not a system row) on the glass: no insets, since the grouped list's
     /// section margin is the side margin, and no background or separator.
     func lobbyRow(top: CGFloat = 0, bottom: CGFloat = 0) -> some View {
@@ -85,6 +63,8 @@ struct StopNote: View {
 struct StopRow: View {
     /// A note sits under the stop's name, past its icon (44) and the gap: 60.
     private static let noteIndent: CGFloat = 60
+    /// In the system list the row starts at the list's own inset: icon (44) and the gap, so a note lines up with the name.
+    private static let listNoteIndent: CGFloat = 56
     var stop: StopDraft
     var text: LobbyContent.StopText
     var editable: Bool
@@ -94,7 +74,12 @@ struct StopRow: View {
     var failure: StopPlanner.Failure?
     var failed: Bool
     var onRetry: () -> Void
+    /// A row of the lobby's system list: the system gives the insets, height and separators. The pulled-up driving
+    /// sheet's Journey card keeps the hand-drawn row (false).
+    var inList = false
     @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var noteIndent: CGFloat { inList ? Self.listNoteIndent : Self.noteIndent }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,22 +99,21 @@ struct StopRow: View {
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.leading, Spacing.l).padding(.trailing, editable ? 6 : Spacing.l).padding(.vertical, Spacing.xs)
-            .ikutRow()
+            .modifier(StopRowFrame(inList: inList, editable: editable))
 
             if let turnBack {
                 let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
                 StopNote(tone: .warning, title: text.title, detail: text.detail)
-                    .padding(.leading, Self.noteIndent).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
+                    .padding(.leading, noteIndent).padding(.trailing, inList ? 0 : Spacing.m).padding(.bottom, Spacing.s)
             }
             if let failure {
                 StopNote(
                     tone: .failure, title: StopNoteText.failureTitle(failure, stopName: stop.name, destinationName: ""),
                     detail: StopNoteText.failureDetail(failure), retry: onRetry)
-                    .padding(.leading, Self.noteIndent).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
+                    .padding(.leading, noteIndent).padding(.trailing, inList ? 0 : Spacing.m).padding(.bottom, Spacing.s)
             }
         }
-        .overlay(alignment: .top) { if !first { Divider() } }
+        .overlay(alignment: .top) { if !first && !inList { Divider() } }
         .accessibilityElement(children: .combine)
     }
 
@@ -150,6 +134,22 @@ struct StopRow: View {
     }
 }
 
+/// The hand-drawn row's padding and minimum height, or nothing in the system list, which sizes the row itself.
+private struct StopRowFrame: ViewModifier {
+    var inList: Bool
+    var editable: Bool
+
+    func body(content: Content) -> some View {
+        if inList {
+            content
+        } else {
+            content
+                .padding(.leading, Spacing.l).padding(.trailing, editable ? 6 : Spacing.l).padding(.vertical, Spacing.xs)
+                .ikutRow()
+        }
+    }
+}
+
 /// The one line under the stops: "205 km · 2 h 40 + 35 min of stops", or why there is none.
 struct RouteTotalLine: View {
     enum Content {
@@ -161,6 +161,8 @@ struct RouteTotalLine: View {
     }
     var content: Content
     var dimmed = false
+    /// A row of the lobby's system list: the row is the tile, so no tile of its own.
+    var inList = false
 
     var body: some View {
         VStack(spacing: Spacing.xxs) {
@@ -179,10 +181,23 @@ struct RouteTotalLine: View {
             }
         }
         // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner.
-        .ikutRow(fillWidth: true)
-        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-        .innerTile(radius: Radius.inner)
+        .modifier(TotalTile(inList: inList))
         .opacity(dimmed ? 0.5 : 1)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct TotalTile: ViewModifier {
+    var inList: Bool
+
+    func body(content: Content) -> some View {
+        if inList {
+            content.frame(maxWidth: .infinity)
+        } else {
+            content
+                .ikutRow(fillWidth: true)
+                .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+                .innerTile(radius: Radius.inner)
+        }
     }
 }
