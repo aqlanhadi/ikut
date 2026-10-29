@@ -94,6 +94,17 @@ enum SheetButtonSize {
     static let bar: CGFloat = 50
     static let inline: CGFloat = 44
     static let round: CGFloat = 48
+    /// The least a tap target is, whatever the text size.
+    static let hit: CGFloat = 44
+    /// The small square or round icon tile inside a row (Home's "Join with a code").
+    static let tile: CGFloat = 30
+    /// How far a scaled button may grow, as a multiple of its base size, so it never outgrows a sheet header.
+    static let maxScale: CGFloat = 1.6
+
+    /// A scaled side kept between the 44 pt hit target and `maxScale` times the base.
+    static func capped(_ scaled: CGFloat, base: CGFloat) -> CGFloat {
+        min(max(scaled, hit), max(base * maxScale, hit))
+    }
 }
 
 private struct BarActionLabel: ViewModifier {
@@ -124,21 +135,31 @@ private struct InlineRoundLabel: ViewModifier {
 /// A round button for the top corners of a sheet (`SheetButtonSize.round` across by default): Liquid Glass on iOS 26, else a quiet
 /// filled circle. Its face is an SF Symbol (the close "x", Back, Share) or a short text (the name's initial).
 struct RoundGlassIconButton: View {
+    /// `.glass`: Liquid Glass (a quiet circle before iOS 26), `SheetButtonSize.round` across. `.quiet` and `.bare`
+    /// never use glass: a tertiary-filled circle (a sheet's pinned header) or the bare glyph (a button inside a card),
+    /// both `SheetButtonSize.inline` across, scaled and capped.
+    enum Style { case glass, quiet, bare }
     private enum Face { case symbol(String), text(String) }
     private var face: Face
     var label: String
     /// Nil: `SheetButtonSize.round`, scaled.
     var size: CGFloat?
+    var style = Style.glass
+    /// The glyph's font, nil for the footnote bold every round button had.
+    var glyph: Font?
     @ScaledMetric(relativeTo: .body) private var roundSize = SheetButtonSize.round
+    @ScaledMetric(relativeTo: .body) private var inlineSize = SheetButtonSize.inline
     /// The circle is exactly `size` across (Home's name button, which must match the search bar's height as it
     /// grows with the text size), glass included, whatever padding the glass style would add around the face.
     var exact = false
     var action: () -> Void
 
-    init(systemImage: String, label: String, size: CGFloat? = nil, exact: Bool = false, action: @escaping () -> Void) {
+    init(systemImage: String, label: String, size: CGFloat? = nil, style: Style = .glass, glyph: Font? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
         self.label = label
         self.size = size
+        self.style = style
+        self.glyph = glyph
         self.exact = exact
         self.action = action
     }
@@ -154,12 +175,22 @@ struct RoundGlassIconButton: View {
 
     @ViewBuilder private var faceView: some View {
         switch face {
-        case .symbol(let name): Image(systemName: name).font(.footnote.weight(.bold))
+        case .symbol(let name): Image(systemName: name).font(glyph ?? .footnote.weight(.bold))
         case .text(let text): Text(text).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
         }
     }
 
     var body: some View {
+        if style != .glass {
+            Button(action: action) { RoundIconFace(face: faceView, style: style, side: inlineSize) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label)
+        } else {
+            glassBody
+        }
+    }
+
+    @ViewBuilder private var glassBody: some View {
         let size = size ?? roundSize
         if GlassSurface.useGlass, #available(iOS 26, *) {
             if exact {
@@ -192,6 +223,35 @@ struct RoundGlassIconButton: View {
     }
 
     private var isText: Bool { if case .text = face { true } else { false } }
+}
+
+/// The face of a `.quiet` or `.bare` round icon button, also the label of a `ShareLink`: `SheetButtonSize.inline`
+/// across, scaled with the text size and capped, never under the 44 pt hit target.
+struct RoundIconFace<Face: View>: View {
+    var face: Face
+    var style: RoundGlassIconButton.Style = .quiet
+    var side: CGFloat
+
+    var body: some View {
+        let side = SheetButtonSize.capped(side, base: SheetButtonSize.inline)
+        face
+            .foregroundStyle(style == .bare ? Color.secondary : Color.primary)
+            .frame(width: side, height: side)
+            .background(style == .quiet ? AnyShapeStyle(Color(.tertiarySystemFill)) : AnyShapeStyle(.clear), in: Circle())
+            .contentShape(Circle())
+    }
+}
+
+/// A symbol for `RoundIconFace`, for a label that isn't a `Button` (a `ShareLink`).
+struct RoundIconSymbol: View {
+    var systemImage: String
+    var glyph: Font = .footnote.weight(.bold)
+    var style: RoundGlassIconButton.Style = .quiet
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.inline
+
+    var body: some View {
+        RoundIconFace(face: Image(systemName: systemImage).font(glyph), style: style, side: side)
+    }
 }
 
 /// The top row of a sheet over the map: [leading round button] [title over subtitle] [trailing round button], with the

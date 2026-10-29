@@ -121,10 +121,10 @@ struct DesignSharedSection: View {
             InlineNote("Couldn’t reach the server.", systemImage: "exclamationmark.triangle.fill", tone: .alert)
             "EmptyRow, RowDivider".code
             VStack(spacing: 0) { EmptyRow("No cars yet"); RowDivider(); EmptyRow("Nothing else") }.ikutCard()
-            "StatCaption, StatusPill, DashedDivider".code
+            "StatCaption, Chip, DashedDivider".code
             HStack(spacing: Spacing.m) {
                 StatCaption("Distance")
-                StatusPill(text: "On the move", color: .ikutPositive, dot: .ikutPositive)
+                Chip(text: "On the move", tone: .positive, lead: .dot(), fill: .material)
                 DashedDivider().frame(height: 30)
             }
             "SheetSearchButton".code

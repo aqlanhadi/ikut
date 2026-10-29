@@ -96,14 +96,10 @@ opacity|0.7||Alerts/ApproachPill.swift:107
 frame|width 40, height 40||Alerts/DarkBanner.swift:20
 opacity|0.7||Alerts/DarkBanner.swift:29
 frame|minHeight 56||Alerts/DarkBanner.swift:41
-font|15||App/HomeHeader.swift:28
-frame|width 30, height 30||App/HomeHeader.swift:30
-opacity|0.9||App/HomeHeader.swift:31
-frame|minHeight 50||App/HomeHeader.swift:38
-frame|width 44, height 44||App/HomeMapContent.swift:44
+opacity|0.9||App/HomeHeader.swift:34
+frame|minHeight 50||App/HomeHeader.swift:41
 opacity|0.9||App/HomeMapContent.swift:55
 opacity|0.6||App/HomeMapContent.swift:100
-frame|width 44, height 44||App/HomeMapContent.swift:102
 opacity|0.9||App/HomeMapContent.swift:118
 frame|width 12, height 12||App/HomeMapContent.swift:124
 font|13||App/HomeMapContent.swift:132
@@ -112,14 +108,7 @@ font|14||App/HomeTripRows.swift:47
 frame|width 30, height 30||App/HomeTripRows.swift:49
 frame|minHeight 56||App/HomeTripRows.swift:61
 frame|minHeight 56||App/HomeTripRows.swift:86
-font|17||App/PickedTripSheet.swift:17
-frame|width 44, height 44||App/PickedTripSheet.swift:18
-font|16||App/PickedTripSheet.swift:33
-frame|width 44, height 44||App/PickedTripSheet.swift:34
-frame|width 44, height 44||App/PickedTripSheet.swift:41
-frame|minHeight 44||App/PickedTripSheet.swift:73
-font|14||App/PickedTripSheet.swift:101
-frame|width 44, height 44||App/PickedTripSheet.swift:103
+frame|minHeight 44||App/PickedTripSheet.swift:67
 font|42||App/WelcomeView.swift:31
 frame|width 88, height 88||App/WelcomeView.swift:33
 padding|28||App/WelcomeView.swift:41
@@ -338,13 +327,12 @@ color|#636366|636366|UI/Palette.swift:41
 color|#636366|636366|UI/Palette.swift:41
 color|#0070E3|0070E3|UI/Palette.swift:42
 color|#0070E3|0070E3|UI/Palette.swift:42
-frame|minHeight 48||UI/SheetChrome.swift:240
-frame|width 32, height 44||UI/SheetChrome.swift:313
-frame|width 44, height 44||UI/Theme.swift:209
-frame|minHeight 58||UI/Theme.swift:282
+frame|minHeight 48||UI/SheetChrome.swift:300
+frame|width 32, height 44||UI/SheetChrome.swift:373
+frame|minHeight 58||UI/Theme.swift:285
 frame|height 28||UI/TripComponents.swift:105
-font|7||UI/TripComponents.swift:160
-padding|5||UI/TripComponents.swift:168
-frame|width 2||UI/TripComponents.swift:187
+font|7||UI/TripComponents.swift:196
+padding|5||UI/TripComponents.swift:206
+frame|width 2||UI/TripComponents.swift:224
 """
 }
