@@ -3,6 +3,7 @@
 //
 //   node tools/design-inventory.mjs            # rewrites ios/ikut/Debug/DesignInventory.swift
 //   node tools/design-inventory.mjs --check    # exits 1 if that file is out of date (writes nothing)
+//   node tools/design-inventory.mjs --lower   # also lowers the ratchet ceiling (Debug/DesignInventoryCeiling.swift) to today's counts, never raises it
 //   node tools/design-inventory.mjs --root <dir> --out <file>   # another source folder (the node test uses this)
 //
 // It records (a) each View / ViewModifier struct outside UI/ with how many other files mention it, and (b) literal
@@ -134,6 +135,37 @@ export function scan(root) {
   return { views, literals }
 }
 
+export const CEILING_KEYS = ['font', 'color', 'opacity', 'padding', 'radius', 'frame']
+
+/// Today's counts, in the ratchet's terms: ad hoc literals per category (UI/ excluded) and views used once or not at all.
+export function counts({ views, literals }) {
+  const c = Object.fromEntries(CEILING_KEYS.map((k) => [k, literals.filter((l) => l.category === k && !l.file.startsWith('UI/')).length]))
+  c.viewsUsedOnce = views.filter((v) => v.uses <= 1).length
+  return c
+}
+
+/// Reads the ceiling out of DesignInventoryCeiling.swift: `static let font = 23` lines.
+export function readCeiling(text) {
+  const c = {}
+  for (const m of text.matchAll(/static let (\w+) = (\d+)/g)) c[m[1]] = Number(m[2])
+  return c
+}
+
+/// The ceiling file's text for the given numbers.
+export function renderCeiling(c) {
+  return `// The design ratchet (D77). Not generated, but written by \`node tools/design-inventory.mjs --lower\`.
+// DesignInventoryTests fails if any ad hoc count in the generated inventory is above its number here, so the
+// inventory can only go down. A piece that removes literals or merges one-off views MUST lower these: regenerate
+// the inventory, then run \`node tools/design-inventory.mjs --lower\` (keeps the smaller of today's count and the
+// ceiling, so it never raises one), or edit a single number below by hand. Counts exclude UI/, Debug/, previews and demos.
+enum DesignCeiling {
+${CEILING_KEYS.map((k) => `    static let ${k} = ${c[k]}`).join('\n')}
+    /// Views (outside UI/) whose name is written in at most one other place.
+    static let viewsUsedOnce = ${c.viewsUsedOnce}
+}
+`
+}
+
 /// The Swift file's text. Rows are one string each, parsed at run time (`InventoryParser`), so thousands of them
 /// don't slow the build the way a literal array would.
 export function render({ views, literals }) {
@@ -170,6 +202,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   } else {
     writeFileSync(out, text)
     const { views, literals } = scan(root)
+    if (args.includes('--lower')) {
+      const ceilFile = join(dirname(out), 'DesignInventoryCeiling.swift')
+      const now = counts({ views, literals })
+      const old = existsSync(ceilFile) ? readCeiling(readFileSync(ceilFile, 'utf8')) : {}
+      const next = Object.fromEntries(Object.keys(now).map((k) => [k, Math.min(now[k], old[k] ?? Infinity)]))
+      writeFileSync(ceilFile, renderCeiling(next))
+      console.log('ceiling: ' + Object.entries(next).map(([k, v]) => `${k} ${v}`).join(', '))
+    }
     const n = (c) => literals.filter((l) => l.category === c && !l.file.startsWith('UI/')).length
     console.log(`${views.length} views (${views.filter((v) => v.uses <= 1).length} used once or not at all), ` +
       `${literals.filter((l) => l.file.startsWith('UI/')).length} literals inside UI/ (not counted below), ` +

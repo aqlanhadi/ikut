@@ -58,4 +58,29 @@ struct DesignInventoryTests {
         #expect(DesignInventory.viewRows.split(separator: "\n").count == DesignInventory.views.count)
         #expect(DesignInventory.literalRows.split(separator: "\n").count == DesignInventory.literals.count)
     }
+
+    // MARK: the ratchet (D77)
+
+    @Test func theInventoryIsWithinItsCeiling() {
+        let now = InventoryCounts(literals: DesignInventory.literals, views: DesignInventory.views)
+        #expect(now.exceeding(.ceiling).isEmpty, "Ad hoc design literals went up. Reuse the shared look in UI/, or see DesignInventoryCeiling.swift. \(now.exceeding(.ceiling))")
+    }
+
+    @Test func aCountOneOverItsCeilingFails() {
+        var over = InventoryCounts.ceiling
+        over.byCategory[.color, default: 0] += 1
+        #expect(over.exceeding(.ceiling) == ["color: \(DesignCeiling.color + 1) is above the ceiling of \(DesignCeiling.color)"])
+        var more = InventoryCounts.ceiling
+        more.viewsUsedOnce += 1
+        #expect(more.exceeding(.ceiling).count == 1)
+        #expect(InventoryCounts.ceiling.exceeding(.ceiling).isEmpty)
+    }
+
+    @Test func sharedLiteralsAndLowerCountsPassTheRatchet() {
+        let literals = InventoryParser.literals("font|13||UI/X.swift:1\nfont|13||A.swift:2")
+        let now = InventoryCounts(literals: literals, views: [])
+        #expect(now.byCategory[.font] == 1)
+        #expect(now.exceeding(InventoryCounts(byCategory: [.font: 1], viewsUsedOnce: 0)).isEmpty)
+        #expect(now.exceeding(InventoryCounts(byCategory: [.font: 0], viewsUsedOnce: 0)) == ["font: 1 is above the ceiling of 0"])
+    }
 }

@@ -64,3 +64,12 @@ test('literalsIn reads several per line and ignores variables', () => {
   assert.equal(literalsIn('.padding(.top, 4).padding(6)', 'A.swift').length, 2)
   assert.equal(codeLines('a // .opacity(0.3)')[0].includes('opacity'), false)
 })
+
+test('the ceiling file round-trips and --lower keeps the smaller number', async () => {
+  const { counts, renderCeiling, readCeiling } = await import('./design-inventory.mjs')
+  const c = counts(scan(fixture()))
+  assert.equal(c.font, 3)
+  const text = renderCeiling({ ...c, font: 9 })
+  assert.deepEqual(readCeiling(text), { ...c, font: 9 })
+  assert.match(text, /enum DesignCeiling/)
+})

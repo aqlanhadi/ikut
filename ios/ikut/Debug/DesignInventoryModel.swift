@@ -132,3 +132,40 @@ extension DesignInventory {
     static var views: [InventoryView] { InventoryParser.views(viewRows) }
     static var literals: [InventoryLiteral] { InventoryParser.literals(literalRows) }
 }
+
+/// D77: the ratchet. The inventory's ad hoc counts may only go down; the ceilings are in `DesignCeiling`.
+struct InventoryCounts: Equatable, Sendable {
+    var byCategory: [InventoryCategory: Int]
+    var viewsUsedOnce: Int
+
+    init(byCategory: [InventoryCategory: Int], viewsUsedOnce: Int) {
+        self.byCategory = byCategory
+        self.viewsUsedOnce = viewsUsedOnce
+    }
+
+    init(literals: [InventoryLiteral], views: [InventoryView]) {
+        var counts: [InventoryCategory: Int] = [:]
+        for c in InventoryCategory.allCases { counts[c] = literals.filter { $0.category == c && !$0.isShared }.count }
+        self.init(byCategory: counts, viewsUsedOnce: views.filter { $0.uses <= 1 }.count)
+    }
+
+    static var ceiling: InventoryCounts {
+        InventoryCounts(byCategory: [
+            .font: DesignCeiling.font, .color: DesignCeiling.color, .opacity: DesignCeiling.opacity,
+            .padding: DesignCeiling.padding, .radius: DesignCeiling.radius, .frame: DesignCeiling.frame,
+        ], viewsUsedOnce: DesignCeiling.viewsUsedOnce)
+    }
+
+    /// One line per count above its ceiling; empty when the inventory has not grown.
+    func exceeding(_ ceiling: InventoryCounts) -> [String] {
+        var out: [String] = []
+        for c in InventoryCategory.allCases {
+            let (n, max) = (byCategory[c] ?? 0, ceiling.byCategory[c] ?? 0)
+            if n > max { out.append("\(c.rawValue): \(n) is above the ceiling of \(max)") }
+        }
+        if viewsUsedOnce > ceiling.viewsUsedOnce {
+            out.append("views used once or not at all: \(viewsUsedOnce) is above the ceiling of \(ceiling.viewsUsedOnce)")
+        }
+        return out
+    }
+}

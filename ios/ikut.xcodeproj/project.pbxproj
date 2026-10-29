@@ -239,6 +239,7 @@
 		C1EB4787B689F789FCE60B01 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A44815085CACEC69E8C24459 /* FirebaseAuth */; };
 		C2B70671091C8C289A2A2D00 /* TypeSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */; };
 		C44829D343D51C669D1496DC /* PlacesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180A672BC06876630D529E06 /* PlacesLoader.swift */; };
+		C70FA1478B77AF122B72745F /* DesignInventoryCeiling.swift in Sources */ = {isa = PBXBuildFile; fileRef = F484F6559097BE502E7B5CB7 /* DesignInventoryCeiling.swift */; };
 		C70FB1E27983828B0CCE5EF8 /* Car.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151766B65971D28EC0EDCE60 /* Car.swift */; };
 		C8E8AF333911A888C78785A4 /* CardSheetFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD7A72DF2101C9BDF361B74 /* CardSheetFrame.swift */; };
 		C9B6D8310130E882B8E2B893 /* JoinSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8306B24A6C640E45840BC512 /* JoinSheet.swift */; };
@@ -594,6 +595,7 @@
 		EF960678563AF80F4392D216 /* PlaceResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceResultRow.swift; sourceTree = "<group>"; };
 		F0322844C0F9486635E0DB1C /* AddStopModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopModel.swift; sourceTree = "<group>"; };
 		F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportTests.swift; sourceTree = "<group>"; };
+		F484F6559097BE502E7B5CB7 /* DesignInventoryCeiling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignInventoryCeiling.swift; sourceTree = "<group>"; };
 		F56C3DA55D52C315FF1422E4 /* ConvoyOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyOrdering.swift; sourceTree = "<group>"; };
 		F56D59AA9467F430D986EC9F /* HomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSheet.swift; sourceTree = "<group>"; };
 		F849A1145EA5F7AF5598EF32 /* TripMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapContent.swift; sourceTree = "<group>"; };
@@ -1133,6 +1135,7 @@
 			isa = PBXGroup;
 			children = (
 				3A35DDA4D1E6725F5C83A49A /* DesignInventory.swift */,
+				F484F6559097BE502E7B5CB7 /* DesignInventoryCeiling.swift */,
 				A00085429C2DE911F971AEAB /* DesignInventoryModel.swift */,
 				33BBF4A42770388A0C41B7DB /* DesignLanguageView.swift */,
 				0C32E0202EBC37910EABBD67 /* DesignSharedSection.swift */,
@@ -1372,6 +1375,7 @@
 				97C45A59D5F4F8212DA99CE7 /* DarkBanner.swift in Sources */,
 				B80DAA47953098D10019E756 /* DeepLink.swift in Sources */,
 				A9BF97E2558B40399D9290F7 /* DesignInventory.swift in Sources */,
+				C70FA1478B77AF122B72745F /* DesignInventoryCeiling.swift in Sources */,
 				984AD1C07FB1A77E15323F90 /* DesignInventoryModel.swift in Sources */,
 				7C5DB7A555933878ABAAA808 /* DesignLanguageView.swift in Sources */,
 				492C358B52A97BF1B786229D /* DesignSharedSection.swift in Sources */,
