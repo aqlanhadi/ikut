@@ -95,7 +95,7 @@ struct MapPickView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button { onUse(spot) } label: { Text("Use this place").frame(maxWidth: .infinity) }
-                    .actionButton(.primary)
+                    .ikutButton(.primary)
                     .disabled(moving)
                     .ikutBottomBar()
             }

@@ -224,7 +224,7 @@ struct AddStopContent: View {
                 Button {
                     if let draft = model.take() { onAdd(draft) }
                 } label: { Text(title).lineLimit(1).minimumScaleFactor(0.8).barActionLabel() }
-                    .actionButton(.primary, onGlass: true)
+                    .ikutButton(.primary, onGlass: true)
                     .disabled(model.draft == nil)
                     .accessibilityIdentifier("addStop.add")
             }

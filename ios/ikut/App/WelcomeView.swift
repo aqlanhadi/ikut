@@ -80,11 +80,11 @@ struct WelcomeView: View {
                     .multilineTextAlignment(.center)
                     .padding(.bottom, Spacing.cozy)
                 Button(action: onGetStarted) { Text("Get started").frame(maxWidth: .infinity) }
-                    .actionButton(.primary)
+                    .ikutButton(.primary)
                 Button(action: onJoin) {
                     Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity)
                 }
-                .actionButton(.link)
+                .ikutButton(.link)
                 .accessibilityIdentifier("welcomeJoin")
             }
             .padding(.horizontal, 32)
