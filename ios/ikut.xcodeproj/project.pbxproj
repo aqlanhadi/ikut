@@ -178,6 +178,7 @@
 		8E5E18C2273234751092489C /* MapLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2DCD6B9BBE9B44F7A7D956 /* MapLogic.swift */; };
 		902FF2CE4308539543381C77 /* TrackingTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E2C4D6FFA56CAD6008809D /* TrackingTypes.swift */; };
 		90699FA2CC334EB3BF76387C /* LobbyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8576506422AFD08E8778B82 /* LobbyTests.swift */; };
+		909509F297DDF4ACE804C90B /* RowSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD00F611D39EEED53A2FA52 /* RowSize.swift */; };
 		90EAC716678F6670B7A13A91 /* RecapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48AAE1E4ECEB3FDD4AEE0F07 /* RecapView.swift */; };
 		91048901E8ADA438604E985C /* DrivingGlance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1361DC3293C4BFA1B3D9DA1B /* DrivingGlance.swift */; };
 		92645091B22B66E6182B8677 /* Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32A559C01AF2D0E5DF90BFD /* Geometry.swift */; };
@@ -274,6 +275,7 @@
 		E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */; };
 		E2D3E899D1D27546D9CB2795 /* CameraInsetMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EDC4EED1F9D343E5BE454B /* CameraInsetMoveTests.swift */; };
 		E2FCCBB1CF2BBD8C192CD0D9 /* MapSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 306F5AEDCCE78A9D7B55FE90 /* MapSpace.swift */; };
+		E36BCCE893C04A8875AF9A93 /* RowSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC585D55A7FDB8773576DD5 /* RowSizeTests.swift */; };
 		E4ADF72C82298F5582A60C2B /* StopFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65A002CD84457A0B4A1CF7DC /* StopFormat.swift */; };
 		E4DC35787F05705E2D68F628 /* PlacePinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159E03084DFC4F56C746756E /* PlacePinTests.swift */; };
 		E4EF98D0A5B5842B9FC8EA69 /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A479378058FCF0288AE028C1 /* Fakes.swift */; };
@@ -363,6 +365,7 @@
 		1AB0B6EE647875B8999B3F6F /* BackendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendTests.swift; sourceTree = "<group>"; };
 		1AD72135383C0C50AA7ECE9D /* SessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTests.swift; sourceTree = "<group>"; };
 		1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyModel.swift; sourceTree = "<group>"; };
+		1CC585D55A7FDB8773576DD5 /* RowSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowSizeTests.swift; sourceTree = "<group>"; };
 		1DE38EDF4446EB6024A65E6A /* StopPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillView.swift; sourceTree = "<group>"; };
 		1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRebuildTests.swift; sourceTree = "<group>"; };
 		1FBD54228AF7FF7E120CFE04 /* CarRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarRouteTests.swift; sourceTree = "<group>"; };
@@ -567,6 +570,7 @@
 		CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCamera.swift; sourceTree = "<group>"; };
 		CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportOption.swift; sourceTree = "<group>"; };
 		CBAB9007352FC219EF36852D /* README-places.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README-places.md"; sourceTree = "<group>"; };
+		CBD00F611D39EEED53A2FA52 /* RowSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowSize.swift; sourceTree = "<group>"; };
 		CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPullUpTests.swift; sourceTree = "<group>"; };
 		CDE19FBF0F3DAEB02FBEF91E /* TripReadsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripReadsTests.swift; sourceTree = "<group>"; };
 		CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripView.swift; sourceTree = "<group>"; };
@@ -975,6 +979,7 @@
 				7B75C6121526709B8E55645F /* IkutButton.swift */,
 				52C0A56BCBBB39D114D5E659 /* Motion.swift */,
 				AE8926F402B88A4AB4B63842 /* Palette.swift */,
+				CBD00F611D39EEED53A2FA52 /* RowSize.swift */,
 				30345C006D29E7B55E755058 /* SheetChrome.swift */,
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
 				091C79B7B0A90381F07CB73D /* TripComponents.swift */,
@@ -1061,6 +1066,7 @@
 				3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */,
 				1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */,
 				6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */,
+				1CC585D55A7FDB8773576DD5 /* RowSizeTests.swift */,
 				2392E5A1D08103853E77C151 /* ServerWriteTests.swift */,
 				1AD72135383C0C50AA7ECE9D /* SessionTests.swift */,
 				2594C8A2BD1044EE653FE5F2 /* SheetButtonSizeTests.swift */,
@@ -1499,6 +1505,7 @@
 				2209A42F9B1AEA04759BE495 /* RouteBuilder.swift in Sources */,
 				941BE30C2A87EF38E26515B6 /* RouteGeometry.swift in Sources */,
 				32D5CB1E75D2326709EBB6BE /* RouteRebuild.swift in Sources */,
+				909509F297DDF4ACE804C90B /* RowSize.swift in Sources */,
 				182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */,
 				973F6CA434D102F75425B014 /* SettingsSheet.swift in Sources */,
 				5120D81232DF1D6218DB0AF9 /* SheetChrome.swift in Sources */,
@@ -1631,6 +1638,7 @@
 				E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */,
 				1940A6D8FC37BFF48FFF1F6C /* RouteRebuildTests.swift in Sources */,
 				AF04B2967E2DDA9303ECB310 /* RouteTimeoutTests.swift in Sources */,
+				E36BCCE893C04A8875AF9A93 /* RowSizeTests.swift in Sources */,
 				16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */,
 				EDBF46FA09C4587FEFC09278 /* SessionTests.swift in Sources */,
 				1D01BEB729D3C682C3A3BF67 /* SheetButtonSizeTests.swift in Sources */,

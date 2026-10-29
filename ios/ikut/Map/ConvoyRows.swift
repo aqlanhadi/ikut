@@ -52,7 +52,7 @@ private struct RowBadge: View {
         Text(number.map(String.init) ?? "·")
             .font(.system(.subheadline, design: .rounded).weight(.bold))
             .foregroundStyle(dashed ? color : .white)
-            .frame(width: 30, height: 30)
+            .iconFrame(.small)
             .background(dashed ? Color.white : color, in: Circle())
             .overlay {
                 if dashed {
@@ -92,7 +92,7 @@ struct ConvoyRowView: View {
                 }
             }
         }
-        .frame(minHeight: 54)
+        .ikutRow()
         .padding(.horizontal, Spacing.xs)
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
@@ -135,7 +135,7 @@ struct JoiningRowView: View {
                 Text(row.trailingSecondary).font(.footnote).foregroundStyle(Color.surfaceSecondary)
             }
         }
-        .frame(minHeight: 54)
+        .ikutRow()
         .padding(.horizontal, Spacing.xs)
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)

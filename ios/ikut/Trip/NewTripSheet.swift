@@ -107,7 +107,7 @@ struct NewTripSheet: View {
                     .accessibilityIdentifier("newTripNameField")
             }
             .padding(.horizontal, Spacing.l)
-            .frame(minHeight: 46)
+            .ikutRow()
             .surfaceTile()
             .padding(.top, Spacing.m)
 

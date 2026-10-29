@@ -156,7 +156,7 @@ struct RecapContent: View {
                 Image(systemName: style.symbol).ikutGlyph(18, weight: .semibold, cap: 1.4).foregroundStyle(.white)
                     .frame(width: 40, height: 40).background(style.tint, in: Circle())
                 Spacer()
-                if let car { CarBadge(number: car.number, colorHex: car.color, size: 26) }
+                if let car { CarBadge(number: car.number, colorHex: car.color, size: IconSize.small.base) }
             }
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(a.title).font(.headline)

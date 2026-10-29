@@ -28,7 +28,7 @@ struct PausedBanner: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.ikutAccent)
                         .padding(.horizontal, Spacing.l)
-                        .frame(minHeight: 44)
+                        .ikutRow()
                         .background(Color.ikutAccent.fill(.tint), in: Capsule())
                         .contentShape(Capsule())
                 }

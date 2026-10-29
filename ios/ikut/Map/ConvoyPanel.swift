@@ -286,7 +286,7 @@ struct ConvoyPanel: View {
                     .foregroundStyle(Color.surfaceSecondary)
             }
             .padding(.horizontal, Spacing.l)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .ikutRow(fillWidth: true)
             .background(fill, in: Capsule())
             .contentShape(Capsule())
         }
@@ -322,7 +322,7 @@ struct ConvoyPanel: View {
                 Text("Waiting for cars to share their location")
                     .font(.subheadline)
                     .foregroundStyle(Color.surfaceSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .ikutRow(fillWidth: true)
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
                 if index > 0 { Divider().padding(.leading, 44) }

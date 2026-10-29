@@ -68,7 +68,7 @@ struct StopPillView: View {
             Image(systemName: symbol)
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
+                .iconFrame(.regular)
                 .background(Color.ikutPositive, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
@@ -80,7 +80,7 @@ struct StopPillView: View {
         .foregroundStyle(Color.primary)
         .padding(.horizontal, Spacing.m)
         .padding(.vertical, Spacing.s)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .ikutRow(fillWidth: true, alignment: .leading)
         .background(Capsule().fill(.regularMaterial))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(id)

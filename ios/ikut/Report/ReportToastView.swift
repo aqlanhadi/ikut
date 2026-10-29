@@ -28,7 +28,7 @@ struct ReportToastView: View {
                     Button("Undo") { Task { await model.undo() } }
                         .font(.body.weight(.semibold))
                         .padding(.horizontal, Spacing.l)
-                        .frame(minHeight: 44)
+                        .ikutRow()
                         .background(.white.fill(.tint), in: Capsule())
                         .foregroundStyle(.white)
                         .accessibilityHint("Removes the report")

@@ -9,7 +9,7 @@ struct CarRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.m) {
-            CarBadge(number: number, colorHex: colorHex, size: 28)
+            CarBadge(number: number, colorHex: colorHex, size: IconSize.small.base)
             VStack(alignment: .leading, spacing: 0) {
                 Text(text.name).font(.body).lineLimit(1)
                 Text(text.line).font(.footnote).foregroundStyle(text.ready ? Color.surfaceSecondary : Color.ikutWarning)
@@ -19,7 +19,7 @@ struct CarRow: View {
                 .font(.subheadline)
                 .foregroundStyle(text.ready ? Color.ikutPositive : Color.ikutWarning)
         }
-        .frame(minHeight: 54)
+        .ikutRow()
         .padding(.horizontal, Spacing.l)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

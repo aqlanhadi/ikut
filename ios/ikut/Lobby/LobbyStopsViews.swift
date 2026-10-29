@@ -107,12 +107,12 @@ struct StopRow: View {
                 if editable {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(Color.surfaceSecondary)
-                        .frame(width: 32, height: 44)
+                        .padding(.horizontal, Spacing.s)
                         .accessibilityHidden(true)
                 }
             }
             .padding(.leading, Spacing.l).padding(.trailing, editable ? 6 : Spacing.l).padding(.vertical, Spacing.xs)
-            .frame(minHeight: 56)
+            .ikutRow()
 
             if let turnBack {
                 let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
@@ -135,13 +135,13 @@ struct StopRow: View {
             Text("\(number)")
                 .font(.system(.subheadline, design: .rounded).weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
+                .iconFrame(.regular)
                 .background(Color.ikutAccent, in: Circle())
         } else {
             Image(systemName: stop.kind.symbol)
                 .ikutGlyph(14, weight: .semibold, cap: 1.3)
                 .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
+                .iconFrame(.regular)
                 .background(stop.kind.tint, in: Circle())
         }
     }
@@ -175,6 +175,7 @@ struct RouteTotalLine: View {
                 ProgressView().accessibilityLabel("Getting the route")
             }
         }
+        // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner.
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
         .innerTile(radius: Radius.inner)

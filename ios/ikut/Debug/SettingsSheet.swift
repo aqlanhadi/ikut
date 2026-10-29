@@ -63,7 +63,7 @@ struct SettingsSheet: View {
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, Spacing.l)
-        .frame(minHeight: 52)
+        .ikutRow()
         .contentShape(Rectangle())
     }
 }

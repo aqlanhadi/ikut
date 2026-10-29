@@ -88,7 +88,7 @@ struct CreateTripView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, Spacing.l)
-            .frame(minHeight: 50)
+            .ikutRow()
             .accessibilityElement(children: .combine)
 
             Divider().padding(.leading, 48)
@@ -113,22 +113,15 @@ struct CreateTripView: View {
                         .onSubmit { model.submit() }
                 }
                 if !model.query.isEmpty {
-                    Button {
+                    ClearFieldButton {
                         model.query = ""
                         searchFocused = true
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.body)
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 32, height: 44)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.leading, Spacing.l)
             .padding(.trailing, Spacing.s)
-            .frame(minHeight: 54)
+            .ikutRow()
         }
         .ikutCard()
     }

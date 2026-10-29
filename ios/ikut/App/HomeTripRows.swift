@@ -46,7 +46,7 @@ struct HomeNowRow: View {
             Image(systemName: "flag.checkered")
                 .ikutGlyph(14, weight: .semibold, cap: 1.3)
                 .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
+                .iconFrame(.small)
                 .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
@@ -58,7 +58,7 @@ struct HomeNowRow: View {
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
         }
         .padding(.horizontal, Spacing.m)
-        .frame(minHeight: 56)
+        .ikutRow()
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens the trip")
@@ -83,7 +83,7 @@ struct HomePastRow: View {
             }
         }
         .padding(.horizontal, Spacing.m)
-        .frame(minHeight: 56)
+        .ikutRow()
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("Shows the trip on the map")

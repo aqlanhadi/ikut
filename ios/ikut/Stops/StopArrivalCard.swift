@@ -353,7 +353,7 @@ struct StopArrivalCard: View {
 
     private func carRow(_ row: StopArrival.Row) -> some View {
         HStack(spacing: Spacing.m) {
-            CarBadge(number: row.car.number, colorHex: row.car.color, size: 26)
+            CarBadge(number: row.car.number, colorHex: row.car.color, size: IconSize.small.base)
             Text(row.car.name).font(.body).lineLimit(1)
             Spacer(minLength: Spacing.s)
             if row.skipping || row.notSharing {
@@ -369,7 +369,7 @@ struct StopArrivalCard: View {
                     .monospacedDigit()
             }
         }
-        .frame(minHeight: 46)
+        .ikutRow()
         .padding(.horizontal, Spacing.xs)
         .accessibilityElement(children: .combine)
     }
