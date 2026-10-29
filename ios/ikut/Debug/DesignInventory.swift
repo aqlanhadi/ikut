@@ -10,7 +10,6 @@ AlwaysLocationExplainerView|View|Location/AlwaysLocationExplainerView.swift|1
 Announces|ViewModifier|Map/DrivingGlance.swift|1
 ApproachPill|View|Alerts/ApproachPill.swift|1
 CarRow|View|Lobby/CarRow.swift|1
-CardSlice|ViewModifier|Lobby/LobbyStopsViews.swift|1
 CatchUpPill|View|Alerts/ApproachPill.swift|1
 ContentView|View|App/ContentView.swift|1
 ConvoyActionBar|View|Map/ConvoyPanel.swift|1
@@ -49,8 +48,10 @@ StopApproachPill|View|Alerts/ApproachPill.swift|1
 StopArrivalCard|View|Stops/StopArrivalCard.swift|1
 StopCard|View|Stops/StopCard.swift|1
 StopPillView|View|Stops/StopPillView.swift|1
+StopRowFrame|ViewModifier|Lobby/LobbyStopsViews.swift|1
 StopVoterRow|View|Stops/StopCardParts.swift|1
 SuggestStopsSheet|View|Lobby/SuggestStopsSheet.swift|1
+TotalTile|ViewModifier|Lobby/LobbyStopsViews.swift|1
 TripMapBehaviour|ViewModifier|Map/TripScreen.swift|1
 TripMapView|View|Map/TripMapView.swift|1
 TripScreenHost|View|Map/TripScreen.swift|1
@@ -109,7 +110,7 @@ font|12||Lobby/LobbyMap.swift:312
 font|11||Lobby/LobbyMap.swift:314
 font|12||Lobby/LobbyMap.swift:316
 frame|width 8, height 8||Lobby/LobbyMap.swift:318
-frame|minHeight 36||Lobby/LobbyStopsViews.swift:65
+frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:801
 frame|width 30||Location/LocationAskStep.swift:33
