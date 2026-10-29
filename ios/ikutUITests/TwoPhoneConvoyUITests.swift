@@ -133,7 +133,7 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
         }
         var scrolls = 0
         while !(row.exists && row.isHittable), scrolls < 8 {
-            app.collectionViews.firstMatch.swipeUp()
+            app.drivingSheetScroll.swipeUp()
             scrolls += 1
         }
         XCTAssertTrue(row.exists && row.isHittable, "the lobby has no \(id) row")

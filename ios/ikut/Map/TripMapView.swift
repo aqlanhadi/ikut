@@ -938,11 +938,11 @@ struct TripMapView: View {
             .modifier(DrivingList(hasBanner: true))
             .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { probeTop = $0; readBannerProbe() }
             .frame(height: PanelSheet.bannerProbeRoom)
-            // Above the sheet, out of sight and touch (its rows are the banner's own, drawn invisible and with nothing to find by
-            // `DrivingBanner.measure`). Not
-            // `.hidden()`: a hidden list makes no cells, so its row would never be laid out to be read.
+            // Laid out above the sheet and kept out of touch and VoiceOver; not `.hidden()`, which makes no cells to read.
+            // XCUI may still list its empty collection view, so UI tests find the sheet's list by identifier.
             .offset(y: -PanelSheet.bannerProbeRoom)
             .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 
