@@ -20,7 +20,7 @@ struct TripMapView: View {
     /// It is handed where my car is, for the journey's stops ahead.
     private var continuation: PulledUpSheet?
     /// On top of the convoy sheet at every height: the lobby's "You're no longer in this trip" with Back to trips.
-    private var topBanner: AnyView?
+    private var topBanner: DrivingBanner?
     /// A demo's sheet size on its first frame (the app's arrives folded: `TripSheetSize.entry`).
     private var demoShown: PanelSheet.Shown?
     /// The trip ended (organizer or server): the owner shows the recap.
@@ -99,7 +99,7 @@ struct TripMapView: View {
     /// The app's: `model` is the open trip's, made with it by the screen's model (`OpenTrip.map`).
     init(
         session: TripSession, map model: TripMapModel, continuation: PulledUpSheet? = nil,
-        topBanner: AnyView? = nil, onEnded: @escaping () -> Void = {}
+        topBanner: DrivingBanner? = nil, onEnded: @escaping () -> Void = {}
     ) {
         self.session = session
         self.continuation = continuation
@@ -115,7 +115,7 @@ struct TripMapView: View {
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil, demoTour: Bool = false,
         demoInterrupts: Bool = false, stopService: any StopServing = StopService(),
-        demoPulledUp: Bool = false, continuation: PulledUpSheet? = nil, topBanner: AnyView? = nil,
+        demoPulledUp: Bool = false, continuation: PulledUpSheet? = nil, topBanner: DrivingBanner? = nil,
         demoAsk: TripAsk? = nil
     ) {
         _ask = State(initialValue: demoAsk)
@@ -815,7 +815,7 @@ struct TripMapView: View {
         // list, the panel in a clear row of its own and the lobby's sections after it.
         let list = ScrollViewReader { scroller in
             List {
-                if let topBanner { topBanner }
+                if let topBanner { topBanner.rows }
                 Section {
                     // As wide as the list, not as the section: the grouped list insets its sections by its own
                     // margin, and the panel keeps the width its heights were measured at (`probes`).
@@ -923,30 +923,30 @@ struct TripMapView: View {
         .hidden()
     }
 
-    /// The banner on top of the panel, laid out as a list of its own with a one-point row where the panel goes: that row's
+    /// The banner on top of the panel, laid out as a list of its own with a row where the panel goes: that row's
     /// top is how far down the panel sits under the banner, whatever the list's own section gaps are, and the list
     /// never scrolls, so the reading is not a scroll position's.
     @ViewBuilder private var bannerProbe: some View {
         if let topBanner {
             List {
-                topBanner
+                topBanner.measure
                 Section {
-                    Color.clear.frame(height: 1).lobbyRow()
+                    Color.clear.lobbyRow()
                         .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { probeRowY = $0; readBannerProbe() }
                 }
             }
             .modifier(DrivingList(hasBanner: true))
             .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { probeTop = $0; readBannerProbe() }
-            .frame(height: 1200)
-            // Not `.hidden()`: a hidden list makes no cells, so the row would never be laid out to be read. Drawn at zero
-            // opacity, out of touch and of the accessibility tree (UI tests would find its buttons twice).
-            .opacity(0)
+            .frame(height: PanelSheet.bannerProbeRoom)
+            // Above the sheet, out of sight and touch (its rows are the banner's own, drawn invisible and with nothing to find by
+            // `DrivingBanner.measure`). Not
+            // `.hidden()`: a hidden list makes no cells, so its row would never be laid out to be read.
+            .offset(y: -PanelSheet.bannerProbeRoom)
             .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
     }
 
-    /// The banner probe's reading: the one-point row's top less the probe list's own (both on screen), which is how far down
+    /// The banner probe's reading: the marker row's top less the probe list's own (both on screen), which is how far down
     /// the panel sits under the banner. A named coordinate space does not reach into a list's rows.
     private func readBannerProbe() {
         guard let row = probeRowY, let top = probeTop else { return }
@@ -1256,6 +1256,14 @@ struct TripMapView: View {
         model.stop()
         alerts.stop()
     }
+}
+
+/// The banner on top of the driving sheet ("You're no longer in this trip", with Back to trips): the lobby's banner
+/// section, and the same rows drawn invisible and out of the accessibility tree, which the sheet lays out out of sight to
+/// know how far down the panel sits under it (`TripMapView.bannerProbe`).
+struct DrivingBanner {
+    var rows: AnyView
+    var measure: AnyView
 }
 
 /// What continues below the convoy panel when the driving sheet is pulled up: the lobby's journey, code, trip, options and

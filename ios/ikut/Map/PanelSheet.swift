@@ -57,6 +57,9 @@ enum PanelSheet {
     /// What continues below the unfolded panel when it is pulled up, before the room is measured; the room caps it.
     static let continuationEstimate: CGFloat = 600
 
+    /// How tall the hidden list that measures the banner on top of the panel is laid out: more than any banner.
+    static let bannerProbeRoom: CGFloat = 1200
+
     /// The bar's height before it is measured (Report and Pit stop with the space above them).
     static let barEstimate: CGFloat = 62
 

@@ -34,6 +34,19 @@ extension LobbyView {
         }
     }
 
+    /// The same two rows with nothing to touch or find: for laying out, out of sight, what the banner takes.
+    func bannerMeasure(_ title: String, systemImage: String) -> some View {
+        Section {
+            HStack(spacing: Spacing.m) {
+                Image(systemName: systemImage)
+                Text(title)
+            }
+            .font(.headline)
+            .hidden()
+            Text("Back to trips").frame(maxWidth: .infinity).hidden()
+        }
+    }
+
     /// The code large on its own row, Copy and QR code as rows under it, the explanation as the footer.
     func codeSection(_ code: String) -> some View {
         Section {
@@ -350,10 +363,14 @@ extension LobbyView {
 
     /// Driving with this person no longer in the trip: the lobby's banner section, with Back to trips, on top of the
     /// convoy sheet (there is no other way Home mid-trip, #403).
-    var drivingBanner: AnyView? {
+    var drivingBanner: DrivingBanner? {
         LobbyContent.drivingBanner(
             ended: session.isEnded, membershipLost: session.membershipLost || sampleLost, tripLoaded: model.trip != nil)
-            .map { _ in AnyView(bannerSection("You’re no longer in this trip", systemImage: "person.fill.xmark")) }
+            .map { _ in
+                DrivingBanner(
+                    rows: AnyView(bannerSection("You’re no longer in this trip", systemImage: "person.fill.xmark")),
+                    measure: AnyView(bannerMeasure("You’re no longer in this trip", systemImage: "person.fill.xmark")))
+            }
     }
 
     @ViewBuilder

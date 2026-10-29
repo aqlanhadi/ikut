@@ -10,7 +10,7 @@ import SwiftUI
 struct LobbyView: View {
     /// In a sample lobby: the driving layer Start switches to, handed what continues below its convoy when pulled up
     /// and the banner on top of its sheet.
-    typealias SampleDriving = (_ continuation: PulledUpSheet, _ topBanner: AnyView?) -> AnyView
+    typealias SampleDriving = (_ continuation: PulledUpSheet, _ topBanner: DrivingBanner?) -> AnyView
 
     let onExit: () -> Void
     /// The trip ended (by the organizer or the server): show the recap.

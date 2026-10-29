@@ -127,9 +127,6 @@ color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
 frame|width 10, height 10||Map/TripMapView.swift:614
 frame|width 12, height 12||Map/TripMapView.swift:635
 frame|minHeight 56||Map/TripMapView.swift:647
-frame|height 1||Map/TripMapView.swift:934
-frame|height 1200||Map/TripMapView.swift:940
-opacity|0||Map/TripMapView.swift:943
 frame|height 150||Recap/RecapContent.swift:60
 frame|height 30||Recap/RecapContent.swift:64
 frame|width 0.5||Recap/RecapContent.swift:123
