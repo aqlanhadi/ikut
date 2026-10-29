@@ -48,10 +48,8 @@ StopApproachPill|View|Alerts/ApproachPill.swift|1
 StopArrivalCard|View|Stops/StopArrivalCard.swift|1
 StopCard|View|Stops/StopCard.swift|1
 StopPillView|View|Stops/StopPillView.swift|1
-StopRowFrame|ViewModifier|Lobby/LobbyStopsViews.swift|1
 StopVoterRow|View|Stops/StopCardParts.swift|1
 SuggestStopsSheet|View|Lobby/SuggestStopsSheet.swift|1
-TotalTile|ViewModifier|Lobby/LobbyStopsViews.swift|1
 TripMapBehaviour|ViewModifier|Map/TripScreen.swift|1
 TripMapView|View|Map/TripMapView.swift|1
 TripScreenHost|View|Map/TripScreen.swift|1
