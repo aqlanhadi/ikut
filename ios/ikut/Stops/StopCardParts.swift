@@ -35,7 +35,6 @@ struct StopActionButton: View {
                 }
             }
                 .multilineTextAlignment(.center)
-                .padding(.vertical, large ? Spacing.s : 0)
                 .padding(.horizontal, large ? Spacing.l : 0)
                 .frame(maxWidth: .infinity, minHeight: height.map { max($0 - Self.largeExtra, 0) })
         }

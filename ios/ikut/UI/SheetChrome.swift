@@ -131,7 +131,7 @@ struct RoundGlassIconButton: View {
     var exact = false
     var action: () -> Void
     /// What Apple's large circle style adds around its label, measured (46 pt for a 17 pt "xmark").
-    private static let systemPadding: CGFloat = 29
+    private static let systemPadding: CGFloat = 27
 
     init(systemImage: String, label: String, size: CGFloat? = nil, style: Style = .glass, glyph: Font? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
