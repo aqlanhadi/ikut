@@ -25,6 +25,26 @@ struct NameEntryView: View {
     }
     #endif
 
+    /// "Your name" and its field.
+    private var nameFieldCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            CardHeader("Your name", top: Spacing.xl)
+                .accessibilityHidden(true)
+            TextField("Your name", text: $name)
+                .textContentType(.givenName)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.continue)
+                .focused($focused)
+                .disabled(isWorking)
+                .padding(.horizontal, Spacing.l)
+                .ikutRow()
+                .ikutCard()
+                .accessibilityLabel("Your name")
+                .accessibilityIdentifier("nameField")
+                .onSubmit(submit)
+        }
+    }
+
     private var isValid: Bool {
         if case .success = DisplayName.validate(name) { true } else { false }
     }
@@ -37,7 +57,7 @@ struct NameEntryView: View {
                     .accessibilityAddTraits(.isHeader)
                     .padding(.horizontal, Spacing.l)
 
-                NameFieldCard(name: $name, focused: $focused, disabled: isWorking, onSubmit: submit)
+                nameFieldCard
                     .onChange(of: name) { errorMessage = nil }
 
                 if let errorMessage {
@@ -85,33 +105,6 @@ struct NameEntryView: View {
                 errorMessage = error.localizedDescription
                 isWorking = false
             }
-        }
-    }
-}
-
-/// "Your name" and its field, as on the name sheet and the join sheet's first step (H1).
-struct NameFieldCard: View {
-    @Binding var name: String
-    var focused: FocusState<Bool>.Binding
-    var disabled = false
-    var onSubmit: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Your name", top: Spacing.xl)
-                .accessibilityHidden(true)
-            TextField("Your name", text: $name)
-                .textContentType(.givenName)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.continue)
-                .focused(focused)
-                .disabled(disabled)
-                .padding(.horizontal, Spacing.l)
-                .ikutRow()
-                .ikutCard()
-                .accessibilityLabel("Your name")
-                .accessibilityIdentifier("nameField")
-                .onSubmit(onSubmit)
         }
     }
 }

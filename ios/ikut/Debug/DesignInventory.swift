@@ -59,7 +59,6 @@ ConvoyPanel|View|Map/ConvoyPanel.swift|2
 DrivingList|ViewModifier|Map/TripMapView.swift|2
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|2
 LocationAskContent|View|Location/LocationAskStep.swift|2
-NameFieldCard|View|Auth/NameEntryView.swift|2
 NameLine|View|Map/ConvoyRows.swift|2
 PausedBanner|View|Lobby/PausedBanner.swift|2
 QRCodeSheet|View|Lobby/LobbyView.swift|2
@@ -99,7 +98,7 @@ frame|width 30, height 30||App/HomeMapContent.swift:134
 frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
-color|#8E8E93|8E8E93|Join/JoinSheet.swift:410
+color|#8E8E93|8E8E93|Join/JoinSheet.swift:429
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:179
 opacity|0.5||Lobby/LobbyMap.swift:266
 padding|6||Lobby/LobbyMap.swift:290
@@ -143,12 +142,11 @@ frame|height 6||Stops/StopArrivalCard.swift:340
 frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
 opacity|0.4||Stops/StopCardParts.swift:135
-frame|minHeight 84||Trip/AddStopSheet.swift:307
 frame|width 12, height 12||Trip/CreateTripView.swift:82
 frame|width 20||Trip/CreateTripView.swift:84
-frame|width 20||Trip/CreateTripView.swift:102
+frame|width 20||Trip/CreateTripView.swift:98
 font|34||Trip/MapPickView.swift:113
-frame|width 80||Trip/NewTripSheet.swift:101
+frame|width 80||Trip/NewTripSheet.swift:109
 color|#2563EB|2563EB|Trip/TripService.swift:18
 color|#D9480F|D9480F|Trip/TripService.swift:18
 color|#0F766E|0F766E|Trip/TripService.swift:18

@@ -7,8 +7,6 @@ import SwiftUI
 /// Picking a result creates the trip and goes to its lobby. With `changingTripId` it instead
 /// re-points that trip and calls `onDone` with the same id.
 struct CreateTripView: View {
-    /// Where the label starts in a From / To row: the row's margin, the 20 pt icon column and the gap.
-    private static let labelInset = Spacing.l + 20 + Spacing.m
     @Environment(AuthModel.self) private var auth
     @State private var model = CreateTripModel()
     @FocusState private var searchFocused: Bool
@@ -37,31 +35,33 @@ struct CreateTripView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+        List {
+            Section {
                 Text("Where to?")
                     .font(.largeTitle.bold())
-                    .padding(.horizontal, Spacing.xs)
-                    .padding(.top, Spacing.xs)
                     .accessibilityAddTraits(.isHeader)
+                    .lobbyRow(top: Spacing.xs)
+            }
 
-                fromToCard.padding(.top, Spacing.m)
+            fromToSection
 
-                if let message = model.errorMessage {
+            if let message = model.errorMessage {
+                Section {
                     InlineNote(message, tone: .alert)
-                        .padding(.top, Spacing.m)
                         .accessibilityIdentifier("createTripError")
-                }
-
-                if model.showsList || searchFocused {
-                    PlaceSearchResults(
-                        model: model, distance: .fromYou,
-                        workingLabel: changingTripId == nil ? "Creating trip" : "Updating trip", onPick: pick)
+                        .lobbyRow()
                 }
             }
-            .padding(.horizontal, Spacing.l)
-            .padding(.bottom, Spacing.l)
+
+            if model.showsList || searchFocused {
+                PlaceSearchResults(
+                    model: model, distance: .fromYou,
+                    workingLabel: changingTripId == nil ? "Creating trip" : "Updating trip", onPick: pick)
+            }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Spacing.l, for: .scrollContent)
         .scrollDismissesKeyboard(.interactively)
         .background(Color.ikutScreen)
         // One title: "Where to?" in the content, so the bar's title stays empty (HIG toolbars).
@@ -73,9 +73,9 @@ struct CreateTripView: View {
         }
     }
 
-    private var fromToCard: some View {
+    private var fromToSection: some View {
         @Bindable var model = model
-        return VStack(spacing: 0) {
+        return Section {
             HStack(spacing: Spacing.m) {
                 Circle()
                     .fill(Color.blue)
@@ -89,11 +89,7 @@ struct CreateTripView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, Spacing.l)
-            .ikutRow()
             .accessibilityElement(children: .combine)
-
-            Divider().padding(.leading, Self.labelInset)
 
             HStack(spacing: Spacing.m) {
                 Image(systemName: "mappin")
@@ -121,11 +117,9 @@ struct CreateTripView: View {
                     }
                 }
             }
-            .padding(.leading, Spacing.l)
-            .padding(.trailing, Spacing.s)
-            .ikutRow()
+            // The clear button is 44 pt tall on its own, so the row doesn't add the list's padding to it.
+            .listRowInsets(EdgeInsets(top: 0, leading: Spacing.l, bottom: 0, trailing: Spacing.s))
         }
-        .ikutCard()
     }
 
     private func pick(_ result: DestinationResult) {

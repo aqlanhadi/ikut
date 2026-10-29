@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		011158B3DE43983630440367 /* ResultFramesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8A4EAA8AF4570F7C844776A /* ResultFramesTests.swift */; };
 		01E9C9563F574C749E39846C /* PlacesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17421B4EFD9D184F0F10E811 /* PlacesTests.swift */; };
 		024A39ABA6D1550CACA273B3 /* PlacesAlongTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0DD61BCABA3D8EADF2ABE6 /* PlacesAlongTests.swift */; };
 		05D8D98DF55B338C949EC769 /* ReportOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7F3CE994C51D81F900F3D9 /* ReportOption.swift */; };
@@ -602,6 +603,7 @@
 		E715F12926E78F920D452DEC /* ConvoyRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyRows.swift; sourceTree = "<group>"; };
 		E803C8C9331D07C56F506F44 /* LobbyContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyContent.swift; sourceTree = "<group>"; };
 		E8576506422AFD08E8778B82 /* LobbyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyTests.swift; sourceTree = "<group>"; };
+		E8A4EAA8AF4570F7C844776A /* ResultFramesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultFramesTests.swift; sourceTree = "<group>"; };
 		EBD1DFEF46958D1710EC5B2F /* CameraPaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPaceTests.swift; sourceTree = "<group>"; };
 		EBDD23345E4B5753BEC3866D /* JoinService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinService.swift; sourceTree = "<group>"; };
 		ED21589D476E823056C68F4D /* FollowGlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowGlideTests.swift; sourceTree = "<group>"; };
@@ -1063,6 +1065,7 @@
 				5A359927AF19ECCCD8185BBE /* RecapTests.swift */,
 				F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */,
 				9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */,
+				E8A4EAA8AF4570F7C844776A /* ResultFramesTests.swift */,
 				3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */,
 				1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */,
 				6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */,
@@ -1635,6 +1638,7 @@
 				2DAE6B663058967FCC0164DA /* RecapTests.swift in Sources */,
 				E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */,
 				A068D03A44E44AD4E4982A1B /* RequestPlacesTests.swift in Sources */,
+				011158B3DE43983630440367 /* ResultFramesTests.swift in Sources */,
 				E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */,
 				1940A6D8FC37BFF48FFF1F6C /* RouteRebuildTests.swift in Sources */,
 				AF04B2967E2DDA9303ECB310 /* RouteTimeoutTests.swift in Sources */,

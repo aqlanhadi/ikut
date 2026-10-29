@@ -216,41 +216,58 @@ struct PlaceSearchResults: View {
     /// A result's second line with the kind in front ("Petrol station · Perak"), as Add a stop shows it.
     var showsKind = false
     var workingLabel = "Creating trip"
+    /// The id of the result at the top of the list as it scrolls (Where to? follows it with its camera); nil when the
+    /// caller doesn't follow. A List has no scroll position by id, so the rows report their frames in the scroll view.
+    var topResult: Binding<String?>? = nil
+    /// Where the pinned search row ends, from the top of the list's frame: rows behind it do not count as at the top.
+    var topInset: CGFloat = 0
     /// What a tap on a place does with it.
     var onPick: (DestinationResult) -> Void
 
     @State private var choosingOnMap = false
-    @Environment(\.inPanelSheet) private var inSheet
+    @State private var frames = ResultFrames()
 
     private var busy: Bool { model.isWorking || model.resolving != nil }
     private var hasRows: Bool { model.pastedPin || model.showingResults || model.isSearching || !model.suggestions.isEmpty }
+    private var header: String { model.pastedPin ? "Dropped pin" : model.showingResults ? "Results" : "Suggestions" }
 
+    /// Sections of the caller's list: the results, with "Choose on map" as their last row, and the along-the-route note.
     var body: some View {
-        if hasRows { CardHeader(model.pastedPin ? "Dropped pin" : model.showingResults ? "Results" : "Suggestions") }
-        VStack(spacing: 0) {
-            if let pin = model.droppedPin {
-                resultRow(pin, isPin: true)
-            } else if model.showingResults {
-                resultRows
-            } else {
-                suggestionRows
-            }
-            if hasRows { RowDivider() }
-            PlaceResultRow(action: "Choose on map", symbol: "map.fill", color: .blue, disabled: busy, action: { choosingOnMap = true }) {
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-            }
+        if hasRows {
+            Section { rows } header: { Text(header) }
+                .onChange(of: model.results.map(\.id)) { resultsChanged() }
+        } else {
+            Section { rows }
+                .onChange(of: model.results.map(\.id)) { resultsChanged() }
         }
-        .scrollTargetLayout()
-        .tileOrCard(inSheet)
-        .padding(.top, hasRows ? 0 : Spacing.m)
+
+        if distance == .alongRoute, model.along != nil, model.showingResults, !model.results.isEmpty {
+            Section { InlineNote("Distances are along your route.").lobbyRow() }
+        }
+    }
+
+    /// A new or shorter search starts over: no frames from the old rows, no top result kept.
+    private func resultsChanged() {
+        frames.spans = [:]
+        if let topResult, topResult.wrappedValue != nil { topResult.wrappedValue = nil }
+    }
+
+    @ViewBuilder private var rows: some View {
+        if let pin = model.droppedPin {
+            resultRow(pin, isPin: true)
+        } else if model.showingResults {
+            resultRows
+        } else {
+            suggestionRows
+        }
+        PlaceResultRow(action: "Choose on map", symbol: "map.fill", color: .blue, disabled: busy, action: { choosingOnMap = true }) {
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        }
         .fullScreenCover(isPresented: $choosingOnMap) {
             MapPickView(origin: model.origin, along: model.along, geocoder: model.geocoder) { place in
                 choosingOnMap = false
                 onPick(place)
             }
-        }
-        if distance == .alongRoute, model.along != nil, model.showingResults, !model.results.isEmpty {
-            InlineNote("Distances are along your route.").padding(.top, Spacing.s)
         }
     }
 
@@ -258,37 +275,47 @@ struct PlaceSearchResults: View {
         if model.results.isEmpty {
             if model.isSearching {
                 if model.spinnerVisible {
-                    ProgressView().ikutRow(fillWidth: true).accessibilityLabel("Searching")
+                    ProgressView().frame(maxWidth: .infinity).accessibilityLabel("Searching")
                 } else {
                     Color.clear.frame(height: RowSize.minimum)
                 }
             } else if model.errorMessage == nil {
                 Text("No places match “\(model.trimmedQuery)”. Try a town name.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.l)
             }
         }
-        // One view per result, so a scroll position can name it (Where to? follows the list with its camera).
-        ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
-            VStack(spacing: 0) {
-                if index > 0 { RowDivider() }
-                resultRow(result)
-            }
-            .id(result.id)
+        ForEach(model.results) { result in
+            resultRow(result)
+                .onGeometryChange(for: ResultFrames.Span.self) {
+                    let frame = $0.frame(in: .scrollView)
+                    return ResultFrames.Span(top: frame.minY, bottom: frame.maxY)
+                } action: { span in
+                    frames.spans[result.id] = span
+                    reportTop()
+                }
+                .onDisappear {
+                    frames.spans[result.id] = nil
+                    reportTop()
+                }
         }
+    }
+
+    /// Tells the caller which result is at the top: the first one with any of it below the pinned search row.
+    private func reportTop() {
+        guard let topResult else { return }
+        let top = ResultFrames.topID(order: model.results.map(\.id), spans: frames.spans, barBottom: topInset)
+        if topResult.wrappedValue != top, top != nil { topResult.wrappedValue = top }
     }
 
     @ViewBuilder private var suggestionRows: some View {
         if model.suggestions.isEmpty, model.isSearching {
             if model.spinnerVisible {
-                ProgressView().ikutRow(fillWidth: true).accessibilityLabel("Searching")
+                ProgressView().frame(maxWidth: .infinity).accessibilityLabel("Searching")
             } else {
                 Color.clear.frame(height: RowSize.minimum)
             }
         }
-        ForEach(Array(model.suggestions.enumerated()), id: \.element.id) { index, suggestion in
-            if index > 0 { RowDivider() }
+        ForEach(model.suggestions) { suggestion in
             PlaceResultRow(suggestion: suggestion, disabled: busy) {
                 if suggestion.isQuery {
                     model.runSearch(suggestion.title)
@@ -324,21 +351,26 @@ struct PlaceSearchResults: View {
             VStack(alignment: .trailing, spacing: 1) {
                 Text(along.distance)
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                if let time = along.time { Text(time).font(.caption).foregroundStyle(.secondary) }
+                    .monospacedDigit().foregroundStyle(Color.primary)
+                if let time = along.time { Text(time).font(.caption).foregroundStyle(Color.surfaceSecondary) }
             }
         } else if let text = model.distanceText(result) {
             Text(text)
                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
         }
     }
 }
 
-private extension View {
-    /// Grouped rows: the sheet's own tile on the convoy-style glass sheet, the grouped card on a plain screen.
-    @ViewBuilder func tileOrCard(_ inSheet: Bool) -> some View {
-        if inSheet { surfaceTile() } else { ikutCard() }
+/// Where the result rows are in the scroll view, as they report it, and which one is at the top.
+final class ResultFrames {
+    struct Span: Equatable { var top: CGFloat; var bottom: CGFloat }
+    var spans: [String: Span] = [:]
+
+    /// The first result, in list order, whose bottom edge is below the bar: a row behind the bar is skipped, one
+    /// straddling its edge is the top. Ids that are not results any more, and rows that have not reported, are ignored.
+    static func topID(order: [String], spans: [String: Span], barBottom: CGFloat) -> String? {
+        order.first { id in spans[id].map { $0.bottom > barBottom } ?? false }
     }
 }
