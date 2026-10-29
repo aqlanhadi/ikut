@@ -72,56 +72,74 @@ extension View {
     func buttonSurface(_ surface: IkutSurface) -> some View { environment(\.buttonSurface, surface) }
 }
 
+/// Which of the styles an `ikutButton` draws, and whether that style pads the label: decided from the role, the stop
+/// card's flat face, the surface and whether glass is showing (iOS 26 and `GlassSurface.useGlass`).
+struct IkutButtonLook: Equatable {
+    enum Kind: Equatable { case flat, glassProminent, glass, borderedProminent, bordered, borderless }
+    var kind: Kind
+    /// The bordered and glass capsules add their own padding around the label; a link and the flat capsule add none.
+    var addsPadding: Bool { switch kind { case .flat, .borderless: false; default: true } }
+
+    static func resolve(role: IkutButtonRole, face: IkutButtonFace?, surface: IkutSurface, glassActive: Bool) -> IkutButtonLook {
+        switch role {
+        case .flat: return IkutButtonLook(kind: .flat)
+        case .link: return IkutButtonLook(kind: .borderless)
+        case .primary, .secondary:
+            let primary = role.isPrimary
+            if surface == .glass, glassActive { return IkutButtonLook(kind: primary ? .glassProminent : .glass) }
+            if face != nil { return IkutButtonLook(kind: .flat) }
+            return IkutButtonLook(kind: primary ? .borderedProminent : .bordered)
+        }
+    }
+}
+
 /// Gives the button its exact height whatever style draws it: the label gets a minimum height scaled with the text
 /// size, and Apple's style is applied to a button inside, so pressed, disabled and the accessibility element stay the system's.
 private struct SizedButtonStyle: PrimitiveButtonStyle {
     var role: IkutButtonRole
     var size: IkutButtonSize
-    var glass: Bool
+    var look: IkutButtonLook
     var face: IkutButtonFace?
 
     func makeBody(configuration: Configuration) -> some View {
-        Sized(configuration: configuration, role: role, size: size, glass: glass, face: face)
+        Sized(configuration: configuration, role: role, size: size, look: look, face: face)
     }
 
     private struct Sized: View {
         var configuration: PrimitiveButtonStyleConfiguration
         var role: IkutButtonRole
         var size: IkutButtonSize
-        var glass: Bool
+        var look: IkutButtonLook
         var face: IkutButtonFace?
         @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
         var body: some View {
             let total = size.height(scaled: size.base * scale)
-            let minHeight = IkutButtonSize.labelMinHeight(total: total, addsPadding: role.addsStylePadding(face: face, glass: glass))
+            let minHeight = IkutButtonSize.labelMinHeight(total: total, addsPadding: look.addsPadding)
             Button(role: configuration.role, action: configuration.trigger) {
                 configuration.label.frame(minHeight: minHeight).contentShape(Rectangle())
             }
-            .applyStyle(role, glass: glass, face: face)
+            .applyStyle(look, role: role, face: face)
         }
     }
 }
 
 private extension View {
-    @ViewBuilder func applyStyle(_ role: IkutButtonRole, glass: Bool, face: IkutButtonFace?) -> some View {
-        if case .flat(let face) = role {
-            buttonStyle(FilledCapsuleButtonStyle(fill: face.fill, foreground: face.foreground))
-        } else if glass, !role.isLink, #available(iOS 26, *) {
-            if case .primary = role {
-                buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-            } else {
-                buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
+    @ViewBuilder func applyStyle(_ look: IkutButtonLook, role: IkutButtonRole, face: IkutButtonFace?) -> some View {
+        switch look.kind {
+        case .flat:
+            if case .flat(let own) = role {
+                buttonStyle(FilledCapsuleButtonStyle(fill: own.fill, foreground: own.foreground))
+            } else if let face {
+                buttonStyle(FilledCapsuleButtonStyle(fill: face.fill, foreground: face.foreground))
             }
-        } else if let face, !role.isLink {
-            buttonStyle(FilledCapsuleButtonStyle(fill: face.fill, foreground: face.foreground))
-        } else {
-            switch role {
-            case .flat: EmptyView()  // handled first
-            case .primary: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-            case .secondary: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-            case .link: buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-            }
+        case .glassProminent:
+            if #available(iOS 26, *) { buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent) }
+        case .glass:
+            if #available(iOS 26, *) { buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent) }
+        case .borderedProminent: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
+        case .bordered: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
+        case .borderless: buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
         }
     }
 }
@@ -133,8 +151,8 @@ private struct IkutButtonModifier: ViewModifier {
     @Environment(\.buttonSurface) private var surface
 
     func body(content: Content) -> some View {
-        let glass = surface == .glass && GlassSurface.active
-        content.buttonStyle(SizedButtonStyle(role: role, size: size, glass: glass, face: face))
+        let look = IkutButtonLook.resolve(role: role, face: face, surface: surface, glassActive: GlassSurface.active)
+        content.buttonStyle(SizedButtonStyle(role: role, size: size, look: look, face: face))
     }
 }
 
@@ -149,14 +167,7 @@ extension View {
     }
 }
 
-private extension IkutButtonRole {
-    var isLink: Bool { if case .link = self { true } else { false } }
-
-    /// Whether the style around the label adds its own padding (the bordered and glass capsules do; a link and the flat capsule don't).
-    func addsStylePadding(face: IkutButtonFace?, glass: Bool) -> Bool {
-        switch self {
-        case .link, .flat: false
-        case .primary, .secondary: glass || face == nil
-        }
-    }
+extension IkutButtonRole {
+    fileprivate var isLink: Bool { if case .link = self { true } else { false } }
+    fileprivate var isPrimary: Bool { if case .primary = self { true } else { false } }
 }

@@ -43,3 +43,43 @@ struct IkutButtonSizeTests {
         #expect(IkutButtonSize.labelMinHeight(total: 10, addsPadding: true) == 0)
     }
 }
+
+@Suite("IkutButtonLook")
+struct IkutButtonLookTests {
+    private let face = IkutButtonFace(fill: .gray, foreground: .white)
+
+    @Test func glassIsOnlyOnAGlassSurfaceWhenGlassIsShowing() {
+        #expect(IkutButtonLook.resolve(role: .primary, face: nil, surface: .glass, glassActive: true).kind == .glassProminent)
+        #expect(IkutButtonLook.resolve(role: .secondary, face: nil, surface: .glass, glassActive: true).kind == .glass)
+        #expect(IkutButtonLook.resolve(role: .primary, face: nil, surface: .plain, glassActive: true).kind == .borderedProminent)
+        #expect(IkutButtonLook.resolve(role: .secondary, face: nil, surface: .plain, glassActive: true).kind == .bordered)
+    }
+
+    @Test func withoutGlassTheFilledStylesAreUsedAndPadded() {
+        let primary = IkutButtonLook.resolve(role: .primary, face: nil, surface: .glass, glassActive: false)
+        #expect(primary.kind == .borderedProminent)
+        #expect(primary.addsPadding)
+        let secondary = IkutButtonLook.resolve(role: .secondary, face: nil, surface: .glass, glassActive: false)
+        #expect(secondary.kind == .bordered)
+        #expect(secondary.addsPadding)
+    }
+
+    @Test func theStopCardFaceIsFlatAndUnpaddedBeforeGlass() {
+        let look = IkutButtonLook.resolve(role: .primary, face: face, surface: .glass, glassActive: false)
+        #expect(look.kind == .flat)
+        #expect(!look.addsPadding)
+        #expect(IkutButtonLook.resolve(role: .secondary, face: face, surface: .glass, glassActive: true).kind == .glass)
+    }
+
+    @Test func aLinkNeverPadsAndNeverGoesGlass() {
+        for surface in [IkutSurface.plain, .glass] {
+            let look = IkutButtonLook.resolve(role: .link, face: nil, surface: surface, glassActive: true)
+            #expect(look.kind == .borderless)
+            #expect(!look.addsPadding)
+        }
+    }
+
+    @Test func mapPickStaysFilledEvenWhenOpenedFromAGlassSheet() {
+        #expect(MapPickView.surface == .plain)
+    }
+}
