@@ -148,8 +148,8 @@ function enumBody(text, name) {
 }
 
 /// The design tokens defined in UI/Theme.swift, UI/Palette.swift and the colour catalog, as { group, name } rows:
-/// the `static let`s of Spacing and Radius, the cases of Elevation and TintFill, and the colour names of Palette
-/// (one per Color Set in Assets.xcassets/Colors).
+/// the `static let`s of Spacing and Radius, the cases of Elevation and TintFill, and the Color Sets of the catalog
+/// (Contents.json and other non-.colorset entries are ignored).
 export function tokens(root) {
   const read = (f) => (existsSync(join(root, f)) ? codeLines(readFileSync(join(root, f), 'utf8')).join('\n') : '')
   const theme = read('UI/Theme.swift'), palette = read('UI/Palette.swift')

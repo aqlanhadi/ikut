@@ -74,12 +74,14 @@ test('the ceiling file round-trips and --lower keeps the smaller number', async 
   assert.match(text, /enum DesignCeiling/)
 })
 
-test('tokens counts Spacing, Radius, Elevation, TintFill and Palette names, not lists', async () => {
+test('tokens counts Spacing, Radius, Elevation, TintFill and Color Sets, not lists', async () => {
   const { tokens, tokenCounts } = await import('./design-inventory.mjs')
   const root = mkdtempSync(join(tmpdir(), 'di-tok-'))
-  for (const d of ['UI', 'Map']) mkdirSync(join(root, d))
+  mkdirSync(join(root, 'UI'))
+  const colors = join(root, 'Resources/Assets.xcassets/Colors')
+  for (const n of ['a.colorset', 'b.colorset']) mkdirSync(join(colors, n), { recursive: true })
+  writeFileSync(join(colors, 'Contents.json'), '{}')
   writeFileSync(join(root, 'UI/Theme.swift'), 'enum Spacing {\n static let s: CGFloat = 8\n static let l: CGFloat = 16\n}\nenum Radius {\n static let icon: CGFloat = 8\n}\n')
-  writeFileSync(join(root, 'UI/Palette.swift'), 'enum Palette {\n static let a = ModeColor(light: 1, dark: 2)\n static let underWhite: [ModeColor] = [a]\n}\nenum Elevation: CaseIterable {\n case marker\n case floating\n}\nenum TintFill {\n case wash, tint\n}\n')
-  writeFileSync(join(root, 'Map/MapColors.swift'), 'enum MapColors {\n static let ok = ModeColor(light: 1, dark: 2)\n}\n')
+  writeFileSync(join(root, 'UI/Palette.swift'), 'enum Elevation: CaseIterable {\n case marker\n case floating\n}\nenum TintFill {\n case wash, tint\n}\n')
   assert.deepEqual(tokenCounts(tokens(root)), { spacing: 2, radius: 1, elevation: 2, tintFill: 2, colour: 2 })
 })
