@@ -56,6 +56,136 @@ extension LobbyView {
         .surfaceTile(radius: Radius.card)
     }
 
+    // MARK: Tall: banners, code, options and leaving, as system Sections
+
+    /// "Trip ended" / "You're no longer in this trip" with Back to trips as a row, and the paused banner (which stays
+    /// our own tinted view in a clear row: a plain row would lose the warning colour and the Resume pill).
+    @ViewBuilder var bannerSections: some View {
+        switch LobbyContent.exitBanner(ended: session.isEnded, membershipLost: session.membershipLost || sampleLost, tripLoaded: model.trip != nil) {
+        case .ended: bannerSection("Trip ended", systemImage: "flag.checkered")
+        case .noLongerInTrip: bannerSection("You’re no longer in this trip", systemImage: "person.fill.xmark")
+        case nil: EmptyView()
+        }
+        if session.isPaused && !session.isEnded && !session.membershipLost {
+            Section {
+                PausedBanner(session: session, onError: { actionError = $0 }).lobbyRow()
+            }
+        }
+    }
+
+    func bannerSection(_ title: String, systemImage: String) -> some View {
+        Section {
+            HStack(spacing: Spacing.m) {
+                Image(systemName: systemImage).accessibilityHidden(true)
+                Text(title)
+            }
+            .font(.headline)
+            .accessibilityElement(children: .combine)
+            Button(action: backToTrips) { Text("Back to trips").frame(maxWidth: .infinity) }
+        }
+    }
+
+    /// The code large on its own row, Copy and QR code as rows under it, the explanation as the footer.
+    func codeSection(_ code: String) -> some View {
+        Section {
+            Text(LobbyLogic.displayCode(code))
+                .font(.ikutDisplay(scaled: codeSize, base: 36, cap: 1.5, weight: .bold, design: .monospaced))
+                .kerning(5)
+                // The code is one token that must stay on one line, so it shrinks rather than wraps.
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
+            // Copy and QR code side by side in one row (stacked at accessibility sizes, where the labels need the width):
+            // two rows of their own made the section a third taller.
+            let buttons = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
+            buttons {
+                Button {
+                    UIPasteboard.general.string = code
+                    copiedCount += 1
+                    copied = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copied = false
+                    }
+                } label: {
+                    HStack(spacing: Spacing.s) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc").accessibilityHidden(true)
+                        Text(copied ? "Copied" : "Copy")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .ikutButton(.link)
+                .sensoryFeedback(.success, trigger: copiedCount)
+                .accessibilityIdentifier("lobby.copyCode")
+                Button { showQR = true } label: {
+                    HStack(spacing: Spacing.s) {
+                        Image(systemName: "qrcode").accessibilityHidden(true)
+                        Text("QR code")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .ikutButton(.link)
+                .accessibilityIdentifier("lobby.showQR")
+            }
+        } header: {
+            Text("Trip code")
+        } footer: {
+            Text("Anyone with the code can join until the trip ends")
+        }
+    }
+
+    /// Keep screen on (a Toggle) and Pause or Resume sharing, for the phone that shares.
+    @ViewBuilder var optionsSection: some View {
+        if !isSample || sampleSharing || canPause {
+            Section {
+                if !isSample || sampleSharing {
+                    Toggle("Keep screen on", isOn: Binding(
+                        get: { stage.keepScreenOn }, set: { stage.keepScreenOn = $0 }))
+                        .accessibilityIdentifier("lobby.keepAwake")
+                }
+                if canPause {
+                    listOption(
+                        session.isPaused ? "Resume sharing" : "Pause sharing", systemImage: session.isPaused ? "play.fill" : "pause.fill",
+                        id: session.isPaused ? "lobby.resume" : "lobby.pause"
+                    ) { run { session.isPaused ? try await session.resumeSharing() : try await session.pauseSharing() } }
+                }
+            }
+        }
+    }
+
+    /// End trip (the organiser) and Leave trip as destructive rows, each behind its confirmation.
+    @ViewBuilder var exitSection: some View {
+        if canEnd || canLeaveTrip {
+            Section {
+                if canEnd {
+                    listOption("End trip", systemImage: "flag.checkered", id: "lobby.endTrip", destructive: true) { confirmEnd = true }
+                }
+                if canLeaveTrip {
+                    listOption("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", id: "lobby.leaveTrip", destructive: true) {
+                        confirmLeave = true
+                    }
+                }
+            }
+        }
+    }
+
+    func listOption(_ title: String, systemImage: String, id: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(role: destructive ? .destructive : nil, action: action) {
+            HStack(spacing: Spacing.m) {
+                Image(systemName: systemImage).accessibilityHidden(true)
+                Text(title)
+            }
+        }
+        .foregroundStyle(destructive ? Color.red : Color.primary)
+        .disabled(isWorking)
+        .accessibilityIdentifier(id)
+    }
+
     // MARK: Tall: the trip
 
     /// The Trip section of the lobby's list: Name (the organizer taps to rename) and Destination (the organizer taps to
@@ -230,12 +360,6 @@ extension LobbyView {
 
     // MARK: Tall: options and leaving
 
-    /// Keep screen on, Pause or Resume sharing, and at the very end Leave trip or End trip.
-    @ViewBuilder var optionRows: some View {
-        optionsTile.lobbyRow(top: Spacing.l)
-        exitTile.lobbyRow(top: Spacing.m, bottom: Spacing.l)
-    }
-
     /// Keep screen on, and Pause or Resume sharing for the phone that shares.
     @ViewBuilder var optionsTile: some View {
         if !isSample || sampleSharing || canPause {
@@ -370,16 +494,6 @@ extension LobbyView {
             do { try await action() } catch { actionError = error.localizedDescription }
             isWorking = false
         }
-    }
-
-    @ViewBuilder
-    var statusBanner: some View {
-        switch LobbyContent.exitBanner(ended: session.isEnded, membershipLost: session.membershipLost, tripLoaded: model.trip != nil) {
-        case .ended: exitBanner("Trip ended", systemImage: "flag.checkered")
-        case .noLongerInTrip: noLongerInTripBanner
-        case nil: EmptyView()
-        }
-        // Trip in progress and since when, and this phone sharing before the start (#394), are the header's subtitle.
     }
 
     var noLongerInTripBanner: some View {
