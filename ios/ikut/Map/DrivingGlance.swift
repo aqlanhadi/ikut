@@ -77,10 +77,7 @@ struct GlanceErrorBanner: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .combine)
             Button(action: onClose) {
-                Image(systemName: "xmark").font(.body.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
             }
             .accessibilityLabel("Close")
             .accessibilityIdentifier("map.error.close")

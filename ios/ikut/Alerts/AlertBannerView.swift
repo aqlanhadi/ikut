@@ -35,7 +35,7 @@ struct AlertBannerView: View {
             title: alert.title, subtitle: alert.body, symbol: symbol(alert.category), circle: tint(alert.severity)
         ) {
             Button { center.dismiss() } label: {
-                Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+                RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
             }
             .accessibilityLabel("Close")
         }

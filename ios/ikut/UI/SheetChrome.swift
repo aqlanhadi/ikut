@@ -246,10 +246,13 @@ struct RoundIconSymbol: View {
     var systemImage: String
     var glyph: Font = .footnote.weight(.bold)
     var style: RoundGlassIconButton.Style = .quiet
+    /// Nil: the style's own colour. White for a close button on a dark banner.
+    var color: Color?
     @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     var body: some View {
-        RoundIconFace(face: Image(systemName: systemImage).font(glyph), style: style, side: side)
+        RoundIconFace(face: Image(systemName: systemImage).font(glyph).foregroundStyle(color ?? (style == .bare ? .secondary : .primary)),
+                      style: style, side: side)
     }
 }
 

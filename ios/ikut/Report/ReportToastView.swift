@@ -39,8 +39,7 @@ struct ReportToastView: View {
             case .failed(let message):
                 DarkBanner(title: message, symbol: "exclamationmark.triangle.fill", circle: .orange) {
                     Button { model.dismiss() } label: {
-                        Image(systemName: "xmark").font(.body.weight(.semibold))
-                            .frame(width: 44, height: 44)
+                        RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
                     }
                     .accessibilityLabel("Close")
                 }
