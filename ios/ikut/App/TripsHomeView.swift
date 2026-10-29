@@ -478,7 +478,6 @@ struct TripsHomeView: View {
         return ZStack(alignment: .top) {
             if let joinFlow = model.joinFlow {
                 JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: { joined($0, tracks: $1) })
-                    .padding(.horizontal, Spacing.l)
                     .transition(.opacity)
             } else if let flow = model.flow {
                 Group {
@@ -490,7 +489,6 @@ struct TripsHomeView: View {
                     }
                 }
                 .id(flow.ready == nil ? "create-search" : "create-ready")
-                .padding(.horizontal, Spacing.l)
                 .transition(.opacity)
             } else {
             // The header stays put and the rows fade out under it (the system's soft top edge).

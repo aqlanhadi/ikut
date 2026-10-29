@@ -45,24 +45,30 @@ struct JoinSheet: View {
                     .accessibilityIdentifier("sheet.close").disabled(model.isJoining)
             }
             .padding(.top, Spacing.xs)
+            .padding(.horizontal, Spacing.l)
 
-            ScrollView {
-                Group {
-                    switch stepper.step {
-                    case .name: nameStep
-                    case .location: LocationAskContent().padding(.top, Spacing.m)
-                    case .code: codeStep
-                    case .car: carStep
+            // The steps that are rows are one system list on the sheet's glass (D86); the location ask is its own
+            // layout, so it stays a scroll view.
+            Group {
+                switch stepper.step {
+                case .name:
+                    stepList { nameStep }
+                        .onChange(of: model.displayName) { nameError = nil }
+                case .location:
+                    ScrollView {
+                        LocationAskContent().padding(.top, Spacing.m)
+                            .padding(.horizontal, Spacing.l).padding(.bottom, Spacing.l)
                     }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollDismissesKeyboard(.interactively)
+                case .code: stepList { codeStep }
+                case .car: stepList { carStep }
                 }
-                .padding(.bottom, Spacing.l)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.interactively)
             .id(stepper.step)
             .transition(.opacity)
 
-            bottomBar
+            bottomBar.padding(.horizontal, Spacing.l)
         }
         .animation(HomeSheet.motion(reduceMotion: reduceMotion), value: stepper.step)
         .ignoresSafeArea(.container, edges: .bottom)
@@ -80,6 +86,15 @@ struct JoinSheet: View {
         }
         // The keyboard goes once the trip is found, so the card has the room.
         .onChange(of: model.preview != nil) { _, found in if found { codeFocused = false } }
+    }
+
+    private func stepList<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        List { content() }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .contentMargins(.bottom, Spacing.l, for: .scrollContent)
     }
 
     private func focusForStep() {
@@ -206,23 +221,35 @@ struct JoinSheet: View {
 
     // MARK: H1 Name
 
-    private var nameStep: some View {
+    @ViewBuilder private var nameStep: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: Spacing.xs) {
+        Section {
             Text("Drive together. Arrive together.")
                 .font(.title3).foregroundStyle(.secondary)
-                .padding(.top, Spacing.s)
-            NameFieldCard(name: $model.displayName, focused: $nameFocused, disabled: isWorking, onSubmit: submitName)
+                .lobbyRow(top: Spacing.s)
+        }
+        Section {
+            TextField("Your name", text: $model.displayName)
+                .textContentType(.givenName)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.continue)
+                .focused($nameFocused)
+                .disabled(isWorking)
+                .accessibilityLabel("Your name")
+                .accessibilityIdentifier("nameField")
+                .onSubmit(submitName)
+        } header: {
+            Text("Your name")
+        } footer: {
             Text("What the convoy sees in new trips. Joining needs only a name, no account.")
-                .font(.footnote).foregroundStyle(.secondary)
-                .padding(.top, Spacing.s)
-            if let nameError {
+        }
+        if let nameError {
+            Section {
                 InlineNote(nameError, tone: .alert, inset: 0)
-                    .padding(.top, Spacing.s)
+                    .lobbyRow()
                     .accessibilityIdentifier("nameError")
             }
         }
-        .onChange(of: model.displayName) { nameError = nil }
     }
 
     private var firstName: String { (try? DisplayName.validate(model.displayName).get()) ?? model.displayName }
@@ -261,30 +288,31 @@ struct JoinSheet: View {
 
     // MARK: H3 Code
 
-    private var codeStep: some View {
-        VStack(alignment: .leading, spacing: Spacing.m) {
-            codeBoxes
-                .padding(.top, Spacing.m)
-            if let preview = model.preview {
-                tripCard(preview)
+    @ViewBuilder private var codeStep: some View {
+        Section {
+            codeBoxes.lobbyRow(top: Spacing.m)
+            if model.preview == nil { status.lobbyRow(top: Spacing.xs) }
+        }
+        if let preview = model.preview {
+            Section { tripCard(preview) }
+            Section {
                 Button("Use a different code") {
                     codeText = ""
                     codeFocused = true
                 }
-                .font(.subheadline.weight(.semibold))
-                .ikutRow(fillWidth: true)
-            } else {
-                status
-                if QRScannerView.isAvailable {
-                    Button {
-                        codeFocused = false
-                        showScanner = true
-                    } label: {
-                        Label("Scan QR code", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
+            }
+        } else if QRScannerView.isAvailable {
+            Section {
+                Button {
+                    codeFocused = false
+                    showScanner = true
+                } label: {
+                    HStack(spacing: Spacing.m) {
+                        Image(systemName: "qrcode.viewfinder").accessibilityHidden(true)
+                        Text("Scan QR code")
                     }
-                    .ikutButton(.secondary, tint: .primary)
-                    .accessibilityIdentifier("joinScan")
                 }
+                .accessibilityIdentifier("joinScan")
             }
         }
     }
@@ -378,62 +406,59 @@ struct JoinSheet: View {
                 .padding(.top, Spacing.xs)
         }
         .animation(Motion.line(reduceMotion: reduceMotion), value: model.ticketDrive)
-        .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .surfaceTile(radius: Radius.inner)
+        .padding(.vertical, Spacing.xs)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("joinTripCard")
     }
 
     // MARK: H4 Car
 
-    private var carStep: some View {
+    @ViewBuilder private var carStep: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: Spacing.m) {
-            Text("Which car are you in?")
-                .font(.title2.bold())
-                .padding(.top, Spacing.s)
-                .accessibilityAddTraits(.isHeader)
-
-            VStack(spacing: 0) {
-                ForEach(Array(model.cars.enumerated()), id: \.element.id) { index, car in
-                    if index > 0 { RowDivider() }
-                    carRow(
-                        name: car.name,
-                        badge: CarBadge(number: car.number ?? index + 1, colorHex: car.color, size: IconSize.small.base),
-                        detail: car.hasTracker ? "Location shared" : "No one sharing yet",
-                        selected: model.selectedCar?.id == car.id
-                    ) { model.select(car) }
-                }
-                if !model.cars.isEmpty { RowDivider() }
+        Section {
+            ForEach(Array(model.cars.enumerated()), id: \.element.id) { index, car in
                 carRow(
-                    name: "My own car", badge: CarBadge(symbol: "plus", colorHex: "#8E8E93", size: IconSize.small.base),
-                    detail: "Shares this car’s location", selected: model.selection == .newCar
-                ) { model.selectNewCar() }
+                    name: car.name,
+                    badge: CarBadge(number: car.number ?? index + 1, colorHex: car.color, size: IconSize.small.base),
+                    detail: car.hasTracker ? "Location shared" : "No one sharing yet",
+                    selected: model.selectedCar?.id == car.id
+                ) { model.select(car) }
             }
-            .surfaceTile(radius: Radius.inner)
+            carRow(
+                name: "My own car", badge: CarBadge(symbol: "plus", colorHex: "#8E8E93", size: IconSize.small.base),
+                detail: "Shares this car’s location", selected: model.selection == .newCar
+            ) { model.selectNewCar() }
+        } header: {
+            Text("Which car are you in?")
+                .font(.title2.bold()).foregroundStyle(.primary).textCase(nil)
+                .padding(.top, Spacing.s)
+        }
 
-            if model.selection == .newCar {
+        if model.selection == .newCar {
+            Section {
                 TextField("Car name", text: $model.newCarName)
                     .textInputAutocapitalization(.words)
                     .disabled(model.isJoining)
-                    .padding(.horizontal, Spacing.l)
-                    .ikutRow()
-                    .surfaceTile(radius: Radius.inner)
                     .accessibilityLabel("Car name")
                     .accessibilityIdentifier("joinCarNameField")
                     .onChange(of: model.newCarName) { model.newCarNameDidEdit() }
             }
+        }
 
-            if let message = model.errorMessage {
-                InlineNote(message, tone: .alert, inset: 0)
-                    .accessibilityIdentifier("joinError")
+        if model.errorMessage != nil || model.trackerTakenResult != nil {
+            Section {
+                if let message = model.errorMessage {
+                    InlineNote(message, tone: .alert, inset: 0)
+                        .accessibilityIdentifier("joinError")
+                }
+                if model.trackerTakenResult != nil {
+                    InlineNote(
+                        "You’re in. Someone else is already sharing that car’s location, so your phone won’t.",
+                        systemImage: "info.circle", inset: 0)
+                }
             }
-            if model.trackerTakenResult != nil {
-                InlineNote(
-                    "You’re in. Someone else is already sharing that car’s location, so your phone won’t.",
-                    systemImage: "info.circle", inset: 0)
-            }
+            .lobbyRow()
         }
     }
 
@@ -446,7 +471,7 @@ struct JoinSheet: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
                         .wrapsAtAccessibilitySizes(lines: 2)
-                    Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes()
+                    Text(detail).font(.footnote).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
                 }
                 Spacer(minLength: Spacing.s)
                 if selected {
@@ -454,11 +479,7 @@ struct JoinSheet: View {
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, Spacing.m)
-            .ikutRow(fillWidth: true, alignment: .leading)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .disabled(model.isJoining)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
