@@ -72,6 +72,21 @@ struct IkutButtonLook: Equatable {
     }
 }
 
+/// Accent text with no fill. The label itself is at least `SheetButtonSize.hit` (44) tall and the whole of it is
+/// tappable, so the button's tap area is 44, not just the words.
+private struct LinkButtonStyle: ButtonStyle {
+    var tint: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(tint)
+            .frame(minHeight: SheetButtonSize.hit)
+            .contentShape(Rectangle())
+            .opacity(!isEnabled ? 0.4 : configuration.isPressed ? 0.6 : 1)
+    }
+}
+
 private extension View {
     @ViewBuilder func applyStyle(_ look: IkutButtonLook, role: IkutButtonRole, face: IkutButtonFace?, tint: Color) -> some View {
         switch look.kind {
@@ -87,9 +102,7 @@ private extension View {
             if #available(iOS 26, *) { buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(tint) }
         case .borderedProminent: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large).tint(tint)
         case .bordered: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large).tint(tint)
-        case .borderless:
-            // Text with no fill; the tap area is at least 44 tall.
-            buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.large).tint(tint).frame(minHeight: SheetButtonSize.hit)
+        case .borderless: buttonStyle(LinkButtonStyle(tint: tint))
         }
     }
 }

@@ -175,11 +175,11 @@ struct StopCard: View {
                 Text(message).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
             }
             StopActionButton(
-                title: "Tell the convoy", style: .primary, height: big ? 72 : 50, disabled: !ask.canSend, id: "stop.send"
+                title: "Tell the convoy", style: .primary, height: big ? 72 : nil, disabled: !ask.canSend, id: "stop.send"
             ) { send() }
             StopActionButton(
                 title: StopLogic.cleanedMessage(ask.message) == nil ? "Add a message" : "Change the message",
-                style: big ? .ghost : .secondary, height: big ? 44 : 50, id: "stop.addMessage"
+                style: big ? .ghost : .secondary, height: big ? 44 : nil, id: "stop.addMessage"
             ) {
                 model.screen = StopCardGate.needsPassengerCheck(driving: driving, session: model.session)
                     ? .passengerCheck : .message
@@ -275,20 +275,20 @@ struct StopCard: View {
             ForEach(state.rows) { StopVoterRow(row: $0) }
             StopPlaceRows(places: model.places.places)
         } actions: {
-            requestButtons(state, suffix: "", height: big ? 72 : 50, secondaryHeight: big ? 56 : 50)
+            requestButtons(state, suffix: "", height: big ? 72 : nil, secondaryHeight: big ? 56 : nil)
         }
     }
 
     /// OK for a car that has not said it, We’ve stopped for the asker, the lead car and the organizer,
     /// Cancel request for the asker. The first one that applies is the main button.
     @ViewBuilder private func requestButtons(
-        _ state: StopRequestState, suffix: String, height: CGFloat, secondaryHeight: CGFloat
+        _ state: StopRequestState, suffix: String, height: CGFloat?, secondaryHeight: CGFloat?
     ) -> some View {
         let canOK = !StopLogic.viewerIsRequester(state)
         let needsOK = StopLogic.needsAnswer(state)
         let stopHeight = needsOK ? secondaryHeight : height
         let sideBySide = canOK && state.canMarkStopped && !typeSize.isAccessibilitySize
-        let shared = max(height, stopHeight)
+        let shared: CGFloat? = height == nil && stopHeight == nil ? nil : max(height ?? 0, stopHeight ?? 0)
         let ok = StopActionButton(
             title: needsOK ? "OK" : "You said OK", style: needsOK ? .primary : .positive,
             height: sideBySide ? shared : height,
@@ -338,7 +338,7 @@ struct StopCard: View {
                 Spacer(minLength: 0)
             }
             .accessibilityElement(children: .combine)
-            requestButtons(state, suffix: suffix, height: big ? 56 : 44, secondaryHeight: big ? 56 : 44)
+            requestButtons(state, suffix: suffix, height: big ? 56 : nil, secondaryHeight: big ? 56 : nil)
         }
         .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)

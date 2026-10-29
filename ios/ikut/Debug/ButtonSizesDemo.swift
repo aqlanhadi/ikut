@@ -1,7 +1,7 @@
 #if DEBUG
 import SwiftUI
 
-/// D81: every migrated `ikutButton` call site (all Apple's large size, about 50 pt, glass and filled alike; links 44; round 44), built the way the screen builds it, with its laid-out height printed
+/// D81: every migrated `ikutButton` call site (all Apple's large size, about 50 pt, glass and filled alike; links 44 or more; glass round buttons the system's 46 and up, quiet and bare round buttons 44 and growing), built the way the screen builds it, with its laid-out height printed
 /// under it (and written as JSON to `IKUT_COMPARE_DUMP` when set). Launch states `button-sizes` (default text size),
 /// `button-sizes-ax` (accessibility text size). Each block is a surface: filled on a plain screen, glass on glass.
 struct ButtonSizesDemo: View {

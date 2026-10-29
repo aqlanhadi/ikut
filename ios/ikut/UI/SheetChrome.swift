@@ -101,27 +101,22 @@ private struct InlineRoundLabel: ViewModifier {
     func body(content: Content) -> some View { content.frame(width: side, height: side) }
 }
 
-/// The system's round button style for `style`: Liquid Glass on iOS 26 (`.glass`), else the bordered circle; `.quiet` the
-/// bordered circle; `.bare` borderless. The system gives the size (and Dynamic Type); nothing here sets a frame.
+/// The system's glass circle on iOS 26 (the bordered circle before), at the large control size; nothing sets a frame.
 extension View {
-    @ViewBuilder func roundSystemStyle(_ style: RoundGlassIconButton.Style) -> some View {
-        switch style {
-        case .glass:
-            if GlassSurface.useGlass, #available(iOS 26, *) {
-                buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
-            } else {
-                buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
-            }
-        case .quiet: buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
-        case .bare: buttonStyle(.borderless).buttonBorderShape(.circle).controlSize(.large).tint(.secondary)
+    @ViewBuilder func roundGlassStyle() -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
+        } else {
+            buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
         }
     }
 }
 
-/// A round icon button (the close "x", Back, Share, the name's initial) in the system's own size: a plain `Button`
-/// with the symbol and Apple's circle style, no frame. Its face is an SF Symbol or a short text.
+/// A round icon button (the close "x", Back, Share, the name's initial). Glass is the system's circle at its own size
+/// (46 pt and up); the quiet and bare ones draw their own circle (or none) in `RoundIconFace`, at least 44 pt and
+/// growing with the text size, since Apple's bordered circle measured 41 pt.
 struct RoundGlassIconButton: View {
-    /// `.glass`: Liquid Glass (the bordered circle before iOS 26). `.quiet`: the bordered circle. `.bare`: the bare glyph.
+    /// `.glass`: Liquid Glass (the bordered circle before iOS 26). `.quiet`: a tertiary-filled circle. `.bare`: the glyph.
     enum Style { case glass, quiet, bare }
     private enum Face { case symbol(String), text(String) }
     private var face: Face
@@ -135,6 +130,8 @@ struct RoundGlassIconButton: View {
     /// measured by the caller, so `size` is its final side (glass only).
     var exact = false
     var action: () -> Void
+    /// What Apple's large circle style adds around its label, measured (46 pt for a 17 pt "xmark").
+    private static let systemPadding: CGFloat = 29
 
     init(systemImage: String, label: String, size: CGFloat? = nil, style: Style = .glass, glyph: Font? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
@@ -163,35 +160,54 @@ struct RoundGlassIconButton: View {
     }
 
     var body: some View {
-        if exact, let size {
+        if style != .glass {
+            Button(action: action) { RoundIconFace(face: faceView.font(glyph ?? .body.weight(.semibold)), style: style) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label)
+        } else if exact, let size {
             Button(action: action) { faceView.frame(maxWidth: .infinity, maxHeight: .infinity) }
-                .roundSystemStyle(style)
+                .roundGlassStyle()
                 .frame(width: size, height: size)
                 .accessibilityLabel(label)
         } else {
-            // The bare style draws no circle (16 pt measured), so only it gets a 44 pt minimum for the tap.
-            Button(action: action) { faceView.frame(minWidth: style == .bare ? SheetButtonSize.hit : nil, minHeight: style == .bare ? SheetButtonSize.hit : nil) }
-                .roundSystemStyle(style)
+            // A narrow glyph (the chevron) leaves the system's circle at 42.7 pt wide: the label's minimum makes up the
+            // rest of the 44 pt tap (the system pads the label by about 29 pt in all).
+            let least = SheetButtonSize.hit - Self.systemPadding
+            Button(action: action) { faceView.frame(minWidth: least, minHeight: least) }
+                .roundGlassStyle()
                 .accessibilityLabel(label)
         }
     }
 }
 
-/// A symbol for a label that isn't a `Button` (a `ShareLink`, a banner's close): the glyph with a 44 pt hit area, the
-/// least a tap target is.
+/// The face of a quiet or bare round button, also a label that isn't a `Button` (a `ShareLink`, a banner's close):
+/// `SheetButtonSize.hit` across, growing with the text size up to `SheetButtonSize.maxScale` times, never under 44.
+struct RoundIconFace<Face: View>: View {
+    var face: Face
+    var style: RoundGlassIconButton.Style = .quiet
+    /// Nil: the style's own colour. White for a close button on a dark banner.
+    var color: Color?
+    @ScaledMetric(relativeTo: .body) private var scaled = SheetButtonSize.hit
+
+    var body: some View {
+        let side = SheetButtonSize.capped(scaled, base: SheetButtonSize.hit)
+        face
+            .foregroundStyle(color ?? (style == .bare ? .secondary : .primary))
+            .frame(width: side, height: side)
+            .background(style == .quiet ? AnyShapeStyle(Color(.tertiarySystemFill)) : AnyShapeStyle(.clear), in: Circle())
+            .contentShape(Circle())
+    }
+}
+
+/// A symbol for `RoundIconFace`, for a label that isn't a `Button`.
 struct RoundIconSymbol: View {
     var systemImage: String
     var glyph: Font?
     var style: RoundGlassIconButton.Style = .quiet
-    /// Nil: the style's own colour. White for a close button on a dark banner.
     var color: Color?
 
     var body: some View {
-        Image(systemName: systemImage).font(glyph ?? .body.weight(.semibold))
-            .foregroundStyle(color ?? (style == .bare ? .secondary : .primary))
-            .frame(minWidth: SheetButtonSize.hit, minHeight: SheetButtonSize.hit)
-            .background(style == .quiet ? AnyShapeStyle(Color(.tertiarySystemFill)) : AnyShapeStyle(.clear), in: Circle())
-            .contentShape(Circle())
+        RoundIconFace(face: Image(systemName: systemImage).font(glyph ?? .body.weight(.semibold)), style: style, color: color)
     }
 }
 
@@ -249,7 +265,7 @@ struct RoundGlassShareLink: View {
 
     var body: some View {
         ShareLink(item: item) { Image(systemName: "square.and.arrow.up") }
-            .roundSystemStyle(.glass)
+            .roundGlassStyle()
             .accessibilityLabel(label)
     }
 }

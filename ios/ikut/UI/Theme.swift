@@ -111,9 +111,7 @@ struct SheetCloseButton: View {
     @Environment(\.buttonSurface) private var surface
 
     var body: some View {
-        Button(action: action) { Image(systemName: "xmark") }
-            .roundSystemStyle(surface == .glass ? .glass : .quiet)
-            .accessibilityLabel("Close")
+        RoundGlassIconButton(systemImage: "xmark", label: "Close", style: surface == .glass ? .glass : .quiet, action: action)
     }
 }
 
