@@ -254,7 +254,7 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
             .padding(.horizontal, Spacing.m)
             trailing.frame(width: side, height: side)
         }
-        .frame(minHeight: 48)
+        .ikutRow()
     }
 }
 
@@ -314,11 +314,7 @@ struct SheetSearchField<Field: View>: View {
             Image(systemName: "magnifyingglass").foregroundStyle(.primary).accessibilityHidden(true)
             field.font(.body)
             if let clear {
-                Button(action: clear) {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary).frame(width: 32, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+                ClearFieldButton(action: clear)
             }
         }
         .padding(.leading, Spacing.m)

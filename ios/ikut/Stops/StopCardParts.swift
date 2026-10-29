@@ -123,7 +123,7 @@ struct StopVoterRow: View {
     var body: some View {
         let status = Self.status(row)
         HStack(spacing: Spacing.m) {
-            CarBadge(number: row.number, colorHex: row.colorHex, size: 30)
+            CarBadge(number: row.number, colorHex: row.colorHex, size: IconSize.small.base)
             Text(row.isMine ? "Me" : row.name).font(.body).lineLimit(1)
             Spacer(minLength: 4)
             Text(status.text)
@@ -134,7 +134,7 @@ struct StopVoterRow: View {
                 .background(status.color.opacity(GlassSurface.active ? 0.2 : 0.14), in: Capsule())
                 .background(GlassSurface.active && scheme == .dark ? Color.black.opacity(0.4) : .clear, in: Capsule())
         }
-        .frame(minHeight: 44)
+        .ikutRow()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(StopLogic.voterAccessibilityLabel(row))
         .accessibilityIdentifier("stop.voter.\(row.number.map(String.init) ?? row.carId)")

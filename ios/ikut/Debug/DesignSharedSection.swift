@@ -136,9 +136,9 @@ struct DesignSharedSection: View {
         group("Icons and round buttons") {
             "IconTile".code
             HStack(spacing: Spacing.s) {
-                IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
-                IconTile(symbol: "steeringwheel", color: .ikutAccent, size: 30)
-                IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.icon)
+                IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
+                IconTile(symbol: "steeringwheel", color: .ikutAccent, size: .small)
+                IconTile(symbol: "fuelpump.fill", color: .orange, size: .regular, radius: Radius.icon)
             }
             "CarBadge".code
             HStack(spacing: Spacing.s) {

@@ -107,7 +107,7 @@ struct NameFieldCard: View {
                 .focused(focused)
                 .disabled(disabled)
                 .padding(.horizontal, Spacing.l)
-                .frame(minHeight: 50)
+                .ikutRow()
                 .ikutCard()
                 .accessibilityLabel("Your name")
                 .accessibilityIdentifier("nameField")

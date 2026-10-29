@@ -55,7 +55,7 @@ struct StopPlaceRows: View {
                         Text(place.whereText).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                         Text(place.whyText).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .ikutRow(fillWidth: true, alignment: .leading)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("stop.place.\(place.id)")
                 }

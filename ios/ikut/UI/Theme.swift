@@ -200,7 +200,7 @@ struct EmptyRow: View {
 struct IconTile: View {
     var symbol: String
     var color: Color
-    var size: CGFloat
+    var size: IconSize
     var radius: CGFloat = Radius.icon
     var font: Font = .footnote.weight(.semibold)
 
@@ -208,7 +208,7 @@ struct IconTile: View {
         Image(systemName: symbol)
             .font(font)
             .foregroundStyle(.white)
-            .frame(width: size, height: size)
+            .iconFrame(size)
             .background(color, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .accessibilityHidden(true)
     }
@@ -255,8 +255,8 @@ struct IconTile: View {
 }
 
 #Preview("Cards and notes") {
-    func row(_ text: String) -> some View {
-        Text(text).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(.horizontal, Spacing.l)
+    @MainActor func row(_ text: String) -> some View {
+        Text(text).ikutRow(fillWidth: true, alignment: .leading).padding(.horizontal, Spacing.l)
     }
     return ScrollView {
         VStack(spacing: 0) {
@@ -298,9 +298,9 @@ struct IconTile: View {
 
 #Preview("Icon tiles") {
     HStack(spacing: Spacing.s) {
-        IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
-        IconTile(symbol: "steeringwheel", color: .ikutAccent, size: 30)
-        IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.icon)
+        IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
+        IconTile(symbol: "steeringwheel", color: .ikutAccent, size: .small)
+        IconTile(symbol: "fuelpump.fill", color: .orange, size: .regular, radius: Radius.icon)
     }
     .padding(Spacing.l)
 }

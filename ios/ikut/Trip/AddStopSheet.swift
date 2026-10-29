@@ -168,7 +168,7 @@ struct AddStopContent: View {
                 Text("\(row.number)")
                     .ikutGlyph(13, weight: .bold, design: .rounded, cap: 1.3)
                     .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
+                    .iconFrame(.small)
                     .background(selected ? Color.ikutAccent : Color.neutralFill, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
@@ -181,7 +181,7 @@ struct AddStopContent: View {
                 }
             }
             .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-            .frame(minHeight: 56)
+            .ikutRow()
             .contentShape(Rectangle())
             .opacity(taken ? 0.45 : 1)
         }
@@ -211,7 +211,7 @@ struct AddStopContent: View {
             .buttonStyle(.bordered).buttonBorderShape(.circle).tint(Color.ikutAccent)
         }
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-        .frame(minHeight: 50)
+        .ikutRow()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 
@@ -238,7 +238,7 @@ struct AddStopContent: View {
     private func details(_ place: DestinationResult) -> some View {
         VStack(spacing: Spacing.l) {
             HStack(spacing: Spacing.m) {
-                IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
+                IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(place.name).font(.body)
                     Text(placeLine(place)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
@@ -320,7 +320,7 @@ struct AddStopContent: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(selected ? Color.white : Color.primary)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .ikutRow(fillWidth: true)
                 .background(selected ? AnyShapeStyle(Color.ikutAccent) : AnyShapeStyle(Color.primary.fill(.wash)), in: Capsule())
         }
         .buttonStyle(.plain)
@@ -334,18 +334,14 @@ struct AddStopContent: View {
             if let clock = model.meetClock {
                 DatePicker("Time", selection: Binding(get: { clock }, set: { model.meetClock = $0 }), displayedComponents: .hourAndMinute)
                     .labelsHidden()
-                Button { model.meetClock = nil } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary).frame(width: 32, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("No time")
+                ClearFieldButton(label: "No time") { model.meetClock = nil }
             } else {
                 Button("Set a time") { model.meetClock = Self.defaultMeetClock() }
                     .font(.body.weight(.semibold))
             }
         }
         .padding(.horizontal, Spacing.l)
-        .frame(minHeight: 50)
+        .ikutRow()
         .surfaceTile(radius: Radius.card)
     }
 

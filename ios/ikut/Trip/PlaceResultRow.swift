@@ -64,7 +64,7 @@ struct PlaceResultRow<Trailing: View>: View {
                 Image(systemName: symbol)
                     .ikutGlyph(14, weight: .semibold, cap: 1.3)
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .iconFrame(.regular)
                     .background(color, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
@@ -77,7 +77,7 @@ struct PlaceResultRow<Trailing: View>: View {
                 trailing
             }
             .padding(.horizontal, Spacing.l)
-            .frame(minHeight: 58)
+            .ikutRow()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -124,7 +124,7 @@ struct JoinSheet: View {
             .sheetActionBar(sides: false)
             Button("Not now") { goNext() }
                 .font(.body.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .ikutRow(fillWidth: true)
                 .disabled(isWorking)
                 .accessibilityIdentifier("joinLocationSkip")
                 .padding(.bottom, PanelSheet.sideGap)
@@ -272,7 +272,7 @@ struct JoinSheet: View {
                     codeFocused = true
                 }
                 .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .ikutRow(fillWidth: true)
             } else {
                 status
                 if QRScannerView.isAvailable {
@@ -328,7 +328,7 @@ struct JoinSheet: View {
                     // One letter per box: it can't wrap, so it shrinks a little at the largest sizes.
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .ikutRow(fillWidth: true)
                     .surfaceTile(radius: Radius.inner)
                     .overlay {
                         RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
@@ -400,14 +400,14 @@ struct JoinSheet: View {
                     if index > 0 { RowDivider() }
                     carRow(
                         name: car.name,
-                        badge: CarBadge(number: car.number ?? index + 1, colorHex: car.color, size: 28),
+                        badge: CarBadge(number: car.number ?? index + 1, colorHex: car.color, size: IconSize.small.base),
                         detail: car.hasTracker ? "Location shared" : "No one sharing yet",
                         selected: model.selectedCar?.id == car.id
                     ) { model.select(car) }
                 }
                 if !model.cars.isEmpty { RowDivider() }
                 carRow(
-                    name: "My own car", badge: CarBadge(symbol: "plus", colorHex: "#8E8E93", size: 28),
+                    name: "My own car", badge: CarBadge(symbol: "plus", colorHex: "#8E8E93", size: IconSize.small.base),
                     detail: "Shares this car’s location", selected: model.selection == .newCar
                 ) { model.selectNewCar() }
             }
@@ -418,7 +418,7 @@ struct JoinSheet: View {
                     .textInputAutocapitalization(.words)
                     .disabled(model.isJoining)
                     .padding(.horizontal, Spacing.l)
-                    .frame(minHeight: 46)
+                    .ikutRow()
                     .surfaceTile(radius: Radius.inner)
                     .accessibilityLabel("Car name")
                     .accessibilityIdentifier("joinCarNameField")
@@ -455,7 +455,7 @@ struct JoinSheet: View {
                 }
             }
             .padding(.horizontal, Spacing.m)
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .ikutRow(fillWidth: true, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

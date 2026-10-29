@@ -234,7 +234,7 @@ struct StopCard: View {
                 .lineLimit(1...4)
                 .focused($messageFocused)
                 .padding(Spacing.m)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .ikutRow(fillWidth: true, alignment: .leading)
                 .ikutSurface(.quaternary, radius: Radius.inner)
                 .accessibilityIdentifier("stop.messageField")
             Text("\(ask.message.count) of \(StopLogic.maxMessageLength)")

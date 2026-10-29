@@ -86,7 +86,7 @@ extension LobbyView {
             }
         }
         .padding(.horizontal, Spacing.l)
-        .frame(minHeight: 48)
+        .ikutRow()
         .contentShape(Rectangle())
         if tappable {
             Button(action: action) { content }
@@ -192,7 +192,7 @@ extension LobbyView {
                 Image(systemName: systemImage)
                     .ikutGlyph(14, weight: .semibold, cap: 1.3)
                     .foregroundStyle(Color.ikutAccent)
-                    .frame(width: 32, height: 32)
+                    .iconFrame(.regular)
                     .accessibilityHidden(true)
                 Text(title).foregroundStyle(Color.ikutAccent)
                 Spacer(minLength: Spacing.s)
@@ -201,7 +201,7 @@ extension LobbyView {
                 }
             }
             .padding(.horizontal, Spacing.l)
-            .frame(minHeight: 48)
+            .ikutRow()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -224,7 +224,7 @@ extension LobbyView {
                     Toggle("Keep screen on", isOn: Binding(
                         get: { stage.keepScreenOn }, set: { stage.keepScreenOn = $0 }))
                         .padding(.horizontal, Spacing.l)
-                        .frame(minHeight: 48)
+                        .ikutRow()
                         .accessibilityIdentifier("lobby.keepAwake")
                 }
                 if canPause {
@@ -305,7 +305,7 @@ extension LobbyView {
                     Label(behind, systemImage: "checkmark.circle")
                         .font(.subheadline)
                         .foregroundStyle(Color.surfaceSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .ikutRow(fillWidth: true, alignment: .leading)
                         .padding(.horizontal, Spacing.l)
                         .accessibilityIdentifier("trip.journey.behind")
                 }
@@ -318,7 +318,7 @@ extension LobbyView {
                 if journey.ahead.isEmpty {
                     Text("No more stops before \(trip.destination.name)")
                         .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .ikutRow(fillWidth: true, alignment: .leading)
                         .padding(.horizontal, Spacing.l)
                         .overlay(alignment: .top) { if journey.behind != nil { Divider() } }
                 }
@@ -333,7 +333,7 @@ extension LobbyView {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .foregroundStyle(destructive ? Color.red : Color.primary)
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .ikutRow(fillWidth: true, alignment: .leading)
                 .padding(.horizontal, Spacing.l)
                 .contentShape(Rectangle())
         }
