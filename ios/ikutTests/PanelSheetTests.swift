@@ -41,7 +41,7 @@ struct PanelSheetTests {
 
     @Test func aCardsButtonsHangUntilTheGapUnderThemIsTheCardsPadding() {
         // 34 pt safe area, 20 pt card padding: lifted 14, so 20 pt is left under the buttons.
-        #expect(PanelSheet.barLift(safeBottom: 34, gap: Spacing.block) == 14)
+        #expect(PanelSheet.barLift(safeBottom: 34, gap: Spacing.block) == 10)
         #expect(PanelSheet.barLift(safeBottom: 0, gap: Spacing.block) == 0)
     }
 

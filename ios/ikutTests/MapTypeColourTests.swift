@@ -44,7 +44,7 @@ struct MapTypeColourTests {
     }
 
     @Test func whiteGlyphsOnTheMapFillsReadInBothModes() {
-        for fill in [MapColors.ok, MapColors.hazardLow, MapColors.staleBadge] {
+        for fill in [MapColors.ok, MapColors.hazardLow, MapColors.staleBadge, MapColors.errorBanner] {
             #expect(contrast(0xFFFFFF, fill.light) >= 4.5)
             #expect(contrast(0xFFFFFF, fill.dark) >= 4.5)
         }
@@ -65,9 +65,62 @@ struct MapTypeColourTests {
         }
     }
 
-    /// The unpicked number disc is a 13 pt digit on a mid gray, as it was before D73: it holds 3:1, not 4.5:1.
-    @Test func theUnpickedDiscKeepsItsContrast() {
-        #expect(contrast(0xFFFFFF, Palette.unselectedDisc.light) >= 3)
+    /// D78: the unpicked disc is the neutral fill now, so it holds 4.5:1 like every other white-on-fill.
+    @Test func theUnpickedDiscHoldsTheNeutralFill() {
+        #expect(Palette.unselectedDisc == Palette.neutralFill)
+        #expect(contrast(0xFFFFFF, Palette.unselectedDisc.light) >= 4.5)
+        #expect(contrast(0xFFFFFF, Palette.unselectedDisc.dark) >= 4.5)
+    }
+
+    /// Mix `fg` over `bg` at `alpha`, per channel.
+    private func over(_ fg: UInt32, _ bg: UInt32, _ alpha: Double) -> UInt32 {
+        var out: UInt32 = 0
+        for shift: UInt32 in [16, 8, 0] {
+            let f = Double((fg >> shift) & 0xFF), b = Double((bg >> shift) & 0xFF)
+            out |= UInt32((f * alpha + b * (1 - alpha)).rounded()) << shift
+        }
+        return out
+    }
+
+    /// Text tokens read on a card, on the screen and on their own 14% tint over either, in both modes.
+    @Test func textTokensReadOnCardsScreensAndTheirOwnTint() {
+        let texts: [(String, ModeColor)] = [
+            ("warning", Palette.warningText),
+            ("positive", Palette.positiveText),
+            ("accent", Palette.accentText),
+        ]
+        let tint = TintFill.chip.amount
+        #expect(tint == 0.14)
+        for (name, t) in texts {
+            for (fg, bgs) in [(t.light, [0xFFFFFF, 0xF2F2F7] as [UInt32]), (t.dark, [0x1C1C1E, 0x000000])] {
+                for bg in bgs {
+                    #expect(contrast(fg, bg) >= 4.5, "\(name) on \(String(bg, radix: 16))")
+                    #expect(contrast(fg, over(fg, bg, tint)) >= 4.5, "\(name) on its tint over \(String(bg, radix: 16))")
+                }
+            }
+        }
+    }
+
+    /// Known gap, recorded so it is visible: the brand accent and positive (light) are what the app draws as text
+    /// today, and they miss 4.5:1 on the grey screen and on their own 14% tint. D79 moves text uses to
+    /// accentText / positiveText, which pass.
+    @Test func theBrandAccentAndPositiveKeepTheirValuesAndMissTheTextRatioInLight() {
+        let tint = 0.14
+        let accent: UInt32 = 0x0071E3, positive: UInt32 = 0x1F7A35
+        #expect(abs(contrast(accent, 0xF2F2F7) - 4.21) < 0.01)
+        #expect(abs(contrast(accent, over(accent, 0xF2F2F7, tint)) - 3.50) < 0.01)
+        #expect(abs(contrast(positive, over(positive, 0xF2F2F7, tint)) - 4.01) < 0.01)
+        #expect(Palette.accentText.light != accent && Palette.positiveText.light != positive)
+        #expect(Palette.accentFill.light == accent)
+    }
+
+    @Test func theTextTokensAreTheOnesTheAppDraws() {
+        #expect(MapColors.warningTitle == Palette.warningText)
+        #expect(Palette.staleChipText == Palette.warningText)
+        #expect(MapColors.errorBanner == Palette.criticalFill)
+        #expect(Palette.reportRed == Palette.criticalFill)
+        #expect(MapColors.hazardLow == Palette.neutralFill && MapColors.staleBadge == Palette.neutralFill)
+        #expect(MapColors.glassAccentDark == MapColors.pillBlue)
     }
 
     @Test func aModeColourWithoutAlphaIsOpaque() {

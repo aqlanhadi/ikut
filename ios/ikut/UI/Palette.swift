@@ -14,9 +14,23 @@ enum Palette {
     static let route = ModeColor(light: 0x0A84FF, dark: 0x0A84FF)
     static let routeCasing = ModeColor(light: 0x0060DF, dark: 0x0060DF)
     /// Stale-car chip text: the warning red on light, a lighter orange on dark so it stays legible.
-    static let staleChipText = ModeColor(light: 0xB02800, dark: 0xFF9F0A)
+    static let staleChipText = warningText
 
     // MARK: Status
+
+    /// Accent TEXT (not the brand accent, which stays 0071E3): a touch darker in light than the 0071E3 fill so it holds 4.5:1 on a screen and on its own 14% tint.
+    static let accentText = ModeColor(light: 0x005FBF, dark: 0x2997FF)
+    /// Positive TEXT (the brand green ikutPositive stays 1F7A35), same test.
+    static let positiveText = ModeColor(light: 0x1D7031, dark: 0x30D158)
+    /// Warning text (waiting, spread, the stale chip, the lobby warning title): one pair, 4.5:1 on a card, a
+    /// screen and its own 14% tint in both modes.
+    static let warningText = ModeColor(light: 0xB02800, dark: 0xFF9F0A)
+    /// Warning fill under a white label, the same in both modes.
+    static let warningFill = ModeColor(light: 0xC93300, dark: 0xC93300)
+    /// Critical fill under a white label (the error banner, Report's red).
+    static let criticalFill = ModeColor(light: 0xD60014, dark: 0xD60014)
+    /// Neutral gray fill under a white glyph (low hazard, stale badge, the unpicked disc, Report's gray).
+    static let neutralFill = ModeColor(light: 0x636366, dark: 0x6E6E73)
 
     /// Teal of a car that is still joining the convoy; the meeting point wears it too.
     static let joining = ModeColor(light: 0x0F756E, dark: 0x2ED4BF)
@@ -29,21 +43,21 @@ enum Palette {
     static let surfaceTileFill = ModeColor(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 0.5, darkAlpha: 0.10)
     /// Secondary text on glass: black at 68% in light, white at 78% in dark (the system gray falls to about 3:1 there).
     static let surfaceSecondary = ModeColor(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.68, darkAlpha: 0.78)
-    /// The number disc of a stop suggestion that isn't picked, under a white digit.
-    static let unselectedDisc = ModeColor(light: 0x8F8F94, dark: 0x8F8F94)
+    /// The number disc of a stop suggestion that isn't picked, under a white digit (the neutral fill, 4.5:1).
+    static let unselectedDisc = neutralFill
 
     // MARK: Report buttons (a white glyph on each)
 
-    static let reportOrange = ModeColor(light: 0xC93300, dark: 0xC93300)
-    static let reportRed = ModeColor(light: 0xD60014, dark: 0xD60014)
+    static let reportOrange = warningFill
+    static let reportRed = criticalFill
     static let reportBrown = ModeColor(light: 0x8A6B45, dark: 0x8A6B45)
-    static let reportGreen = ModeColor(light: 0x1F7A36, dark: 0x1F7A36)
-    static let reportGray = ModeColor(light: 0x636366, dark: 0x636366)
-    static let reportBlue = ModeColor(light: 0x0070E3, dark: 0x0070E3)
+    static let reportGreen = MapColors.ok
+    static let reportGray = neutralFill
+    static let reportBlue = accentFill
 
     /// What a white glyph sits on; the contrast test walks these.
     static let underWhite: [ModeColor] = [
-        accentFill, reportOrange, reportRed, reportBrown, reportGreen, reportGray, reportBlue,
+        accentFill, warningFill, criticalFill, neutralFill, MapColors.ok, reportOrange, reportRed, reportBrown, reportGreen, reportGray, reportBlue,
     ]
 }
 
@@ -85,50 +99,18 @@ enum Elevation: CaseIterable {
     /// A car marker's label chip.
     case label
 
-    var opacity: Double {
+    /// D78: two shadows. A marker-sized thing (pins, markers, badges, labels, the small round buttons) and a
+    /// floating surface (panel, pill, banner, welcome card), each at the middle of what its group drew before.
+    private var isMarker: Bool {
         switch self {
-        case .panel: 0.16
-        case .pill: 0.12
-        case .welcome: 0.14
-        case .homeButton: 0.15
-        case .pin: 0.25
-        case .marker: 0.25
-        case .hazardDot: 0.15
-        case .banner: 0.22
-        case .badge: 0.2
-        case .label: 0.12
+        case .homeButton, .pin, .marker, .hazardDot, .badge, .label: true
+        case .panel, .pill, .welcome, .banner: false
         }
     }
 
-    var radius: CGFloat {
-        switch self {
-        case .panel: 20
-        case .pill: 12
-        case .welcome: 9
-        case .homeButton: 3
-        case .pin: 3
-        case .marker: 4
-        case .hazardDot: 2
-        case .banner: 10
-        case .badge: 1.5
-        case .label: 2
-        }
-    }
-
-    var y: CGFloat {
-        switch self {
-        case .panel: 10
-        case .pill: 6
-        case .welcome: 3
-        case .homeButton: 1
-        case .pin: 2
-        case .marker: 2
-        case .hazardDot: 1
-        case .banner: 6
-        case .badge: 1
-        case .label: 1
-        }
-    }
+    var opacity: Double { isMarker ? 0.175 : 0.15 }
+    var radius: CGFloat { isMarker ? 2.5 : 11 }
+    var y: CGFloat { isMarker ? 1 : 6 }
 }
 
 extension View {
@@ -140,15 +122,13 @@ extension View {
 // MARK: - Tinted fills
 
 /// How much of a colour a chip, banner or wash is filled with: one case per opacity the app uses.
-enum TintFill: Double {
-    case wash = 0.06
-    case faint = 0.10
-    case soft = 0.12
-    case chip = 0.14
-    case onDark = 0.16
-    case strong = 0.18
+enum TintFill {
+    case wash, faint, soft, chip, onDark, strong
+
+    /// D78: a wash (6%) and one tint (14%); the cases keep their names until the call sites are merged.
+    var amount: Double { self == .wash ? 0.06 : 0.14 }
 }
 
 extension Color {
-    func fill(_ amount: TintFill) -> Color { opacity(amount.rawValue) }
+    func fill(_ amount: TintFill) -> Color { opacity(amount.amount) }
 }
