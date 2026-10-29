@@ -27,9 +27,13 @@ struct DesignSharedSection: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Shared", top: Spacing.s)
-            InlineNote("What UI/ provides, drawn live.")
+        Group {
+            Section {
+            } header: {
+                Text("Shared")
+            } footer: {
+                Text("What UI/ provides, drawn live.")
+            }
             group("Color.ikut*") {
                 ForEach(colors, id: \.0) { name, color in
                     HStack(spacing: Spacing.m) {
@@ -158,13 +162,11 @@ struct DesignSharedSection: View {
         }
     }
 
+    /// One Section per kind of element; its samples are a single row, since they are demos of our components.
     private func group<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            CardHeader(title)
+        Section(title) {
             VStack(alignment: .leading, spacing: Spacing.m) { content() }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Spacing.l)
-                .ikutCard()
         }
     }
 }
