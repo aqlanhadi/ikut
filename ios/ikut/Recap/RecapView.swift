@@ -6,6 +6,8 @@ import SwiftUI
 /// filterable timeline, with Share in the bar and Done below. Opened for every member when the trip ends. Home's past
 /// trips show the same content in the Home sheet instead (`PickedTripSheet`).
 struct RecapView: View {
+    /// The spinner sits a little below the top while the recap loads (twice the hero gap).
+    private static let loadingTop = Spacing.hero * 2
     @State private var model: RecapModel
     var onDone: () -> Void
     @State private var filter: RecapFilter = .all
@@ -30,7 +32,7 @@ struct RecapView: View {
                 } else if let error = model.errorMessage {
                     Text(error).foregroundStyle(.secondary).padding(.top, Spacing.hero)
                 } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, Spacing.hero * 2)
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, Self.loadingTop)
                 }
             }
             .padding(.horizontal, Spacing.l)

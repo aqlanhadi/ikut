@@ -15,7 +15,7 @@ extension LobbyView {
                 .kerning(5)
                 // The code is one token that must stay on one line, so it shrinks rather than wraps.
                 .minimumScaleFactor(0.5)
-                .wrapsAtAccessibilitySizes()
+                .lineLimit(1)
                 .textSelection(.enabled)
                 .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
             Text("Anyone with the code can join until the trip ends")

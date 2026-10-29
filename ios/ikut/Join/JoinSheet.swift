@@ -327,7 +327,7 @@ struct JoinSheet: View {
                     .font(.ikutDisplay(scaled: codeBoxSize, base: 26, cap: 1.4, weight: .semibold, design: .monospaced))
                     // One letter per box: it can't wrap, so it shrinks a little at the largest sizes.
                     .minimumScaleFactor(0.5)
-                    .wrapsAtAccessibilitySizes()
+                    .lineLimit(1)
                     .ikutRow(fillWidth: true)
                     .surfaceTile(radius: Radius.inner)
                     .overlay {

@@ -128,14 +128,14 @@ struct StatGrid: View {
             Text(item.value ?? "–")
                 .font(.system(size: scaledValueSize, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .wrapsAtAccessibilitySizes()
+                .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(item.color ?? (item.value == nil ? Color.secondary : Color.primary))
             if let detail = item.detail {
                 Text(detail)
                     .font(.caption)
                     .monospacedDigit()
-                    .wrapsAtAccessibilitySizes()
+                    .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .foregroundStyle(Color.surfaceSecondary)
             }
