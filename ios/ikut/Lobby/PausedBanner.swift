@@ -29,7 +29,7 @@ struct PausedBanner: View {
                         .foregroundStyle(Color.ikutAccent)
                         .padding(.horizontal, Spacing.cozy)
                         .frame(minHeight: 44)
-                        .background(Color.ikutAccent.opacity(0.10), in: Capsule())
+                        .background(Color.ikutAccent.fill(.faint), in: Capsule())
                         .contentShape(Capsule())
                 }
                 .disabled(isResuming)
@@ -40,7 +40,7 @@ struct PausedBanner: View {
             }
         }
         .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
-        .background(Color.ikutWarning.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
+        .background(Color.ikutWarning.fill(.soft), in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 

@@ -366,7 +366,7 @@ struct JoinSheet: View {
                 .foregroundStyle(Color.ikutPositive)
                 .padding(.horizontal, Spacing.chipX)
                 .padding(.vertical, Spacing.xs)
-                .background(Color.ikutPositive.opacity(0.14), in: Capsule())
+                .background(Color.ikutPositive.fill(.chip), in: Capsule())
             Text(preview.name)
                 .font(.title3.weight(.semibold))
                 .padding(.top, Spacing.xs)

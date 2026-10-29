@@ -66,7 +66,7 @@ struct StopActionButton: View {
         switch style {
         case .primary: Color.ikutAccent
         case .secondary: Color(.systemGray5).opacity(0.7)
-        case .positive: Color.green.opacity(0.16)
+        case .positive: Color.green.fill(.onDark)
         case .ghost, .destructive: .clear
         }
     }

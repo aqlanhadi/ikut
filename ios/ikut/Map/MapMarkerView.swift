@@ -38,7 +38,7 @@ struct MapMarkerView: View {
                     .frame(width: badge, height: badge)
                     .background(Color.car(hex: marker.colorHex), in: Circle())
                     .overlay(Circle().strokeBorder(.white, lineWidth: 3))
-                    .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    .elevation(.marker)
                     .overlay(alignment: .bottomTrailing) {
                         if marker.hasArrived {
                             glyph("checkmark", weight: .heavy, size: 15, fill: Color.ikutPositive, ring: 1.5)
@@ -74,7 +74,7 @@ struct MapMarkerView: View {
                 if marker.isMine { YouTag(online: marker.youOnline) }
             }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? MapPalette.staleChipText : Color.primary))
+                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? Color.ikutStaleChipText : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
                 // No capsule: a halo in the background colour, as on Apple's own map labels, keeps it readable.
@@ -158,7 +158,7 @@ struct MergePointView: View {
                     .padding(.vertical, Spacing.xs)
                     .background(.regularMaterial, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.car(hex: colorHex), lineWidth: 1.5))
-                    .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                    .elevation(.label)
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                     .padding(side == .trailing ? .leading : .trailing, Spacing.xl)
             }

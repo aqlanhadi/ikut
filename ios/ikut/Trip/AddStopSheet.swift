@@ -31,11 +31,6 @@ extension PlannedStopKind {
     }
 }
 
-extension Color {
-    /// Teal of a car that is still joining the convoy; the meeting point wears it too.
-    static let ikutJoining = Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 0.18, green: 0.83, blue: 0.75, alpha: 1) : UIColor(red: 0.06, green: 0.46, blue: 0.43, alpha: 1) })
-}
-
 extension PlaceKind {
     /// "Petrol station", "Restaurant", "Town": the word under a place's name.
     static func word(for result: DestinationResult) -> String {
@@ -173,7 +168,7 @@ struct AddStopContent: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(selected ? Color.ikutAccent : Color(red: 0.56, green: 0.56, blue: 0.58), in: Circle())
+                    .background(selected ? Color.ikutAccent : Color.ikutUnselectedDisc, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(.primary)
@@ -309,7 +304,7 @@ struct AddStopContent: View {
             }
             .foregroundStyle(selected ? Color.white : Color.primary)
             .frame(maxWidth: .infinity, minHeight: 84)
-            .background(selected ? AnyShapeStyle(option.tint) : AnyShapeStyle(Color.primary.opacity(0.06)),
+            .background(selected ? AnyShapeStyle(option.tint) : AnyShapeStyle(Color.primary.fill(.wash)),
                         in: RoundedRectangle(cornerRadius: Radius.row + 2, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -325,7 +320,7 @@ struct AddStopContent: View {
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(selected ? Color.white : Color.primary)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(selected ? AnyShapeStyle(Color.ikutAccent) : AnyShapeStyle(Color.primary.opacity(0.06)), in: Capsule())
+                .background(selected ? AnyShapeStyle(Color.ikutAccent) : AnyShapeStyle(Color.primary.fill(.wash)), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])

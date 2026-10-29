@@ -47,7 +47,7 @@ struct StopNote: View {
     }
 
     private var fill: Color {
-        tone == .warning ? Color.orange.opacity(0.18) : Color.red.opacity(0.14)
+        tone == .warning ? Color.orange.fill(.strong) : Color.red.fill(.chip)
     }
 
     var body: some View {

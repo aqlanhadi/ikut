@@ -18,7 +18,7 @@ struct StopPillView: View {
                 slim(symbol: "checkmark", title: title, detail: detail, id: "stop.pill.asked")
             }
         }
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .elevation(.pill)
         .announces(announcement, id: pill.id)
     }
 

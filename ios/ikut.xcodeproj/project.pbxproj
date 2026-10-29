@@ -247,6 +247,7 @@
 		C9EBB30503561CC0D3A77FD9 /* PickedTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322ED2F251FFDF594FC7D83E /* PickedTrip.swift */; };
 		CC753D5CE3CE3D2B64E15D04 /* LaunchRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78AF9425F9F284ADFB93DDEA /* LaunchRoute.swift */; };
 		CCC5101BA47FF40760B211AC /* TripMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F849A1145EA5F7AF5598EF32 /* TripMapContent.swift */; };
+		CFE1B7D60FB52C4DF0BB850A /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8926F402B88A4AB4B63842 /* Palette.swift */; };
 		D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59B3CC045531B01304008A /* BannerSlot.swift */; };
 		D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D7B5FA67D691851818F691 /* ConvoyTests.swift */; };
 		D24B64843B7AC7116A53B62C /* LocationDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991414E381145C07351D7F20 /* LocationDeniedView.swift */; };
@@ -528,6 +529,7 @@
 		AAF84B4D76AF2635109EAD53 /* CameraTourDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraTourDemo.swift; sourceTree = "<group>"; };
 		AB235466F9BD996ABFB00B97 /* kl-ipoh-north.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "kl-ipoh-north.json"; sourceTree = "<group>"; };
 		AC38E523FC312DCBB9D08A3B /* places.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = places.json; sourceTree = "<group>"; };
+		AE8926F402B88A4AB4B63842 /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsHomeView.swift; sourceTree = "<group>"; };
 		B1304E49E36F2492119BD9EF /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
 		B1C004029CF785E6F7B0DC74 /* PolylineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineTests.swift; sourceTree = "<group>"; };
@@ -961,6 +963,7 @@
 				3FD7A72DF2101C9BDF361B74 /* CardSheetFrame.swift */,
 				4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */,
 				52C0A56BCBBB39D114D5E659 /* Motion.swift */,
+				AE8926F402B88A4AB4B63842 /* Palette.swift */,
 				30345C006D29E7B55E755058 /* SheetChrome.swift */,
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
 				091C79B7B0A90381F07CB73D /* TripComponents.swift */,
@@ -1442,6 +1445,7 @@
 				AE72CCADED8DA399C9756E21 /* OurSide.swift in Sources */,
 				FE481F15A33FCA102C4B35D7 /* OwnWay.swift in Sources */,
 				A889D2AE7ED65EDEDDACD020 /* OwnWayDemo.swift in Sources */,
+				CFE1B7D60FB52C4DF0BB850A /* Palette.swift in Sources */,
 				F6B53E2E7B17959EE85F9245 /* PanelHeaderDemo.swift in Sources */,
 				684CB36C69FD2DA907C54EC7 /* PanelSheet.swift in Sources */,
 				0BAFE3B186247E8A27720E2D /* PastTripsMap.swift in Sources */,

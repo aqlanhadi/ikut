@@ -32,7 +32,7 @@ struct WelcomeView: View {
                     .foregroundStyle(.white)
                     .frame(width: 88, height: 88)
                     .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.hero, style: .continuous))
-                    .shadow(color: .black.opacity(0.14), radius: 9, y: 3)
+                    .elevation(.welcome)
                     .accessibilityHidden(true)
 
                 Text("Welcome to ikut")

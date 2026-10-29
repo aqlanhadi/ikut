@@ -40,8 +40,8 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
         .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
         // #1C1C1E, as on the design canvas.
-        .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
-        .shadow(color: .black.opacity(0.22), radius: 10, y: 6)
+        .background(Color.ikutBannerDark, in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
+        .elevation(.banner)
     }
 }
 
@@ -70,7 +70,7 @@ extension DarkBanner where Icon == Image, Trailing == EmptyView {
         DarkBanner(title: "Heavy rain reported", symbol: "cloud.rain.fill", circle: .yellow) {
             Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
         }
-        DarkBanner(title: "Sending debris…", circle: .white.opacity(0.16)) {
+        DarkBanner(title: "Sending debris…", circle: .white.fill(.onDark)) {
             ProgressView().tint(.white)
         } trailing: {
             EmptyView()
