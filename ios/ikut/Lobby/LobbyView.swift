@@ -557,6 +557,7 @@ struct LobbyView: View {
             }
         }
         .environment(\.inPanelSheet, true)
+        .buttonSurface(.glass)
         .padding(.top, LobbySheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }

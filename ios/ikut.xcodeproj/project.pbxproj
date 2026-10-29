@@ -265,6 +265,7 @@
 		D80A984085D33024BE6B519E /* PausedBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236F0C8AD5686F34C2F35CD8 /* PausedBanner.swift */; };
 		D823810299EDCF93BD262452 /* StopOurSideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C199021086844F76B783FE /* StopOurSideTests.swift */; };
 		D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */; };
+		DCD70003B4B5C9DD7B7B2FE6 /* ButtonSizesDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930848C6717DEC58B1DC47B5 /* ButtonSizesDemo.swift */; };
 		DDFB1D5C15A1D5FEC996A11C /* AlertSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6117F5F8B2493D250C4083B /* AlertSettings.swift */; };
 		DF3245BE5E06371D9D8F78DA /* AlertPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4E3792B5AD023C85CD5AA0 /* AlertPolicy.swift */; };
 		E033FC8BB50C1A84A455E66D /* CreateTripModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34924ABFFA93014C880E890 /* CreateTripModel.swift */; };
@@ -505,6 +506,7 @@
 		8EEB2E053516041BB6ABA3EB /* StopContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopContext.swift; sourceTree = "<group>"; };
 		9256AE8480413335567EC1FC /* HazardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardModel.swift; sourceTree = "<group>"; };
 		92C73E6E157AAC5F01E45FF7 /* GeoPoint+Coordinate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeoPoint+Coordinate.swift"; sourceTree = "<group>"; };
+		930848C6717DEC58B1DC47B5 /* ButtonSizesDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonSizesDemo.swift; sourceTree = "<group>"; };
 		94110B44C36ABA8B33885499 /* TripMapContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapContentTests.swift; sourceTree = "<group>"; };
 		951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefreshTests.swift; sourceTree = "<group>"; };
 		969AB41D53300836956F03B0 /* LobbySheetSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbySheetSections.swift; sourceTree = "<group>"; };
@@ -1148,6 +1150,7 @@
 		F4DD3667C47354E8C65C3481 /* Debug */ = {
 			isa = PBXGroup;
 			children = (
+				930848C6717DEC58B1DC47B5 /* ButtonSizesDemo.swift */,
 				3A35DDA4D1E6725F5C83A49A /* DesignInventory.swift */,
 				F484F6559097BE502E7B5CB7 /* DesignInventoryCeiling.swift */,
 				A00085429C2DE911F971AEAB /* DesignInventoryModel.swift */,
@@ -1367,6 +1370,7 @@
 				B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */,
 				D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */,
 				72445B83188E679CC45FEFED /* BottomSheet.swift in Sources */,
+				DCD70003B4B5C9DD7B7B2FE6 /* ButtonSizesDemo.swift in Sources */,
 				66FF3933C67886B391992ACB /* CameraInsetMove.swift in Sources */,
 				43C7A32C2A143215D37D1AF2 /* CameraTourDemo.swift in Sources */,
 				C70FB1E27983828B0CCE5EF8 /* Car.swift in Sources */,

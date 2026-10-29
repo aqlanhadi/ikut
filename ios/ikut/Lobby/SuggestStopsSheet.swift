@@ -139,6 +139,7 @@ struct SuggestStopsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+        .buttonSurface(.glass)
         .presentationDragIndicator(.visible)
         .presentationDetents([.medium, .large])
         .task { await model.load() }
@@ -197,13 +198,13 @@ struct SuggestStopsSheet: View {
                 }
             }
             HStack(spacing: Spacing.s) {
-                Button { dismiss() } label: { Text("Not now").inlineActionLabel() }
+                Button { dismiss() } label: { Text("Not now").frame(maxWidth: .infinity) }
                     .ikutButton(.secondary)
                 Button {
                     guard model.markAdded(pick) else { return }
                     onAdd(model.draft(for: pick))
                     if model.allAdded { dismiss() }
-                } label: { Text("Add").inlineActionLabel() }
+                } label: { Text("Add").frame(maxWidth: .infinity) }
                     .ikutButton(.primary)
                     .disabled(added || !canAdd())
                     .accessibilityIdentifier("suggest.add")

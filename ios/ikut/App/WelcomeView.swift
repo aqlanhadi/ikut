@@ -83,7 +83,7 @@ struct WelcomeView: View {
                     .multilineTextAlignment(.center)
                     .padding(.bottom, Spacing.l)
                 Button(action: onGetStarted) { Text("Get started").frame(maxWidth: .infinity) }
-                    .ikutButton(.primary)
+                    .ikutButton(.primary, size: .main)
                 Button(action: onJoin) {
                     Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity)
                 }

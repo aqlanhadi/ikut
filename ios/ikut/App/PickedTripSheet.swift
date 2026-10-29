@@ -112,5 +112,6 @@ struct PickedTripBody: View {
                 RecapContent(recap: recap, snapshot: snapshot, layout: .sheet, filter: $picked.filter, onSelect: onSelect)
             }
         }
+        .buttonSurface(.glass)
     }
 }

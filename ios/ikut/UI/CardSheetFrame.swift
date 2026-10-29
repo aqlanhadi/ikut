@@ -78,6 +78,8 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
         // them equals the gap beside them (`Spacing.xl`); without a safe area they keep the plain padding.
         .padding(.bottom, hasActions && lift > 0 ? -lift : Spacing.xl)
         .glassSurface(if: !inSheet)
+        // On the floating panel and in a glass sheet alike, the card's buttons are glass.
+        .buttonSurface(.glass)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(containerIdentifier)
     }

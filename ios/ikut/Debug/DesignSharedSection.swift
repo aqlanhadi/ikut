@@ -70,8 +70,8 @@ struct DesignSharedSection: View {
                 ForEach(["primary", "secondary", "link"], id: \.self) { role in
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         "\(role)".code
-                        button(role, onGlass: false)
-                        if role != "link" { "\(role), onGlass: true".code; button(role, onGlass: true) }
+                        button(role, glass: false)
+                        if role != "link" { "\(role), buttonSurface(.glass)".code; button(role, glass: true) }
                     }
                 }
             }
@@ -84,13 +84,16 @@ struct DesignSharedSection: View {
         }
     }
 
-    @ViewBuilder private func button(_ role: String, onGlass: Bool) -> some View {
+    @ViewBuilder private func button(_ role: String, glass: Bool) -> some View {
         let label = Text("Start trip").frame(maxWidth: .infinity)
-        switch role {
-        case "primary": Button { } label: { label }.ikutButton(.primary, onGlass: onGlass)
-        case "secondary": Button { } label: { label }.ikutButton(.secondary, onGlass: onGlass)
-        default: Button { } label: { label }.ikutButton(.link, onGlass: onGlass)
+        Group {
+            switch role {
+            case "primary": Button { } label: { label }.ikutButton(.primary)
+            case "secondary": Button { } label: { label }.ikutButton(.secondary)
+            default: Button { } label: { label }.ikutButton(.link)
+            }
         }
+        .buttonSurface(glass ? .glass : .plain)
     }
 
     private var surfaces: some View {
