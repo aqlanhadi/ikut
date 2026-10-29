@@ -255,10 +255,10 @@ frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
 frame|minHeight 44||Stops/StopCard.swift:237
 opacity|0.85||Stops/StopCardParts.swift:33
-opacity|0.7||Stops/StopCardParts.swift:68
-padding|5||Stops/StopCardParts.swift:131
-opacity|0.4||Stops/StopCardParts.swift:133
-frame|minHeight 44||Stops/StopCardParts.swift:135
+opacity|0.7||Stops/StopCardParts.swift:70
+padding|5||Stops/StopCardParts.swift:133
+opacity|0.4||Stops/StopCardParts.swift:135
+frame|minHeight 44||Stops/StopCardParts.swift:137
 frame|width 34, height 34||Stops/StopPillView.swift:71
 frame|minHeight 52||Stops/StopPillView.swift:83
 frame|minHeight 44||Stops/StopPlaces.swift:58
@@ -296,7 +296,7 @@ color|#0F766E|0F766E|Trip/TripService.swift:18
 color|#7C3AED|7C3AED|Trip/TripService.swift:18
 color|#BE185D|BE185D|Trip/TripService.swift:18
 color|#A16207|A16207|Trip/TripService.swift:18
-opacity|0.25||UI/GlassSurface.swift:135
+opacity|0.25||UI/GlassSurface.swift:90
 color|#0071E3|0071E3|UI/Palette.swift:12
 color|#0071E3|0071E3|UI/Palette.swift:12
 color|#0A84FF|0A84FF|UI/Palette.swift:14
@@ -329,7 +329,7 @@ color|#0070E3|0070E3|UI/Palette.swift:42
 color|#0070E3|0070E3|UI/Palette.swift:42
 frame|minHeight 48||UI/SheetChrome.swift:300
 frame|width 32, height 44||UI/SheetChrome.swift:373
-frame|minHeight 58||UI/Theme.swift:285
+frame|minHeight 58||UI/Theme.swift:249
 frame|height 28||UI/TripComponents.swift:105
 font|7||UI/TripComponents.swift:196
 padding|5||UI/TripComponents.swift:206
