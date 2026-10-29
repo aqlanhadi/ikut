@@ -10,13 +10,10 @@ struct DesignSharedSection: View {
     ]
     private let spacing: [(String, CGFloat)] = [
         ("xxs", Spacing.xxs), ("xs", Spacing.xs), ("tight", Spacing.tight), ("s", Spacing.s), ("chipX", Spacing.chipX),
-        ("gap", Spacing.gap), ("m", Spacing.m), ("cozy", Spacing.cozy), ("l", Spacing.l), ("section", Spacing.section),
-        ("block", Spacing.block), ("sectionLarge", Spacing.sectionLarge), ("xl", Spacing.xl),
+        ("m", Spacing.m), ("l", Spacing.l), ("xl", Spacing.xl),
     ]
     private let radii: [(String, CGFloat)] = [
-        ("icon", Radius.icon), ("iconLarge", Radius.iconLarge), ("control", Radius.control), ("inner", Radius.inner),
-        ("row", Radius.row), ("hero", Radius.hero), ("tile", Radius.tile), ("card", Radius.card), ("banner", Radius.banner),
-        ("panel", Radius.panel),
+        ("icon", Radius.icon), ("inner", Radius.inner), ("card", Radius.card),
     ]
     private let fonts: [(String, Font)] = [
         (".largeTitle", .largeTitle), (".title", .title), (".title2", .title2), (".title2.bold()", .title2.bold()),
@@ -103,10 +100,10 @@ struct DesignSharedSection: View {
             "ikutTile()".code
             Text("A tile").frame(maxWidth: .infinity, minHeight: 52).ikutTile()
             "ikutSurface(fill, radius:)".code
-            Text("Accent at 15%").frame(maxWidth: .infinity, minHeight: 52).ikutSurface(Color.ikutAccent.opacity(0.15), radius: Radius.control)
+            Text("Accent at 15%").frame(maxWidth: .infinity, minHeight: 52).ikutSurface(Color.ikutAccent.opacity(0.15), radius: Radius.inner)
             "surfaceTile()".code
             Text("A tile on glass").frame(maxWidth: .infinity, minHeight: 52).surfaceTile()
-                .padding(Spacing.s).background(LinearGradient(colors: [.green, .blue], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: Radius.control))
+                .padding(Spacing.s).background(LinearGradient(colors: [.green, .blue], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: Radius.inner))
         }
     }
 
@@ -135,18 +132,18 @@ struct DesignSharedSection: View {
     private var icons: some View {
         group("Icons and round buttons") {
             "IconTile".code
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
                 IconTile(symbol: "steeringwheel", color: .ikutAccent, size: 30)
-                IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.iconLarge)
+                IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.icon)
             }
             "CarBadge".code
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 CarBadge(number: 1, colorHex: "#2563EB"); CarBadge(number: 2, colorHex: "#D9480F")
                 CarBadge(symbol: "plus", colorHex: "#8E8E93")
             }
             "RoundGlassIconButton".code
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 RoundGlassIconButton(systemImage: "location.fill", label: "Centre") {}
                 RoundGlassIconButton(text: "A", label: "Your name") {}
             }

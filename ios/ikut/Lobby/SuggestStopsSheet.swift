@@ -126,7 +126,7 @@ struct SuggestStopsSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.cozy) {
+                VStack(alignment: .leading, spacing: Spacing.l) {
                     Text(summary).font(.subheadline).foregroundStyle(.secondary)
                     content
                 }
@@ -182,8 +182,8 @@ struct SuggestStopsSheet: View {
                 .accessibilityLabel("Later").accessibilityIdentifier("suggest.later")
         }
         .buttonStyle(.bordered).buttonBorderShape(.circle).tint(Color.ikutAccent)
-        .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.s)
-        .ikutSurface(Color(.secondarySystemGroupedBackground), radius: Radius.row + 2)
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+        .ikutSurface(Color(.secondarySystemGroupedBackground), radius: Radius.inner + 2)
     }
 
     private func card(_ pick: StopSuggestion) -> some View {
@@ -194,7 +194,7 @@ struct SuggestStopsSheet: View {
             HStack(spacing: Spacing.tight) {
                 ForEach(SuggestStopsModel.chips(pick.place), id: \.self) { chip in
                     Text(chip).font(.caption.weight(.semibold)).padding(.horizontal, 9).padding(.vertical, 3)
-                        .background(Color.ikutAccent.fill(.soft), in: Capsule())
+                        .background(Color.ikutAccent.fill(.tint), in: Capsule())
                 }
             }
             HStack(spacing: Spacing.s) {
@@ -211,8 +211,8 @@ struct SuggestStopsSheet: View {
             }
             .padding(.top, Spacing.xs)
         }
-        .padding(Spacing.cozy)
+        .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ikutSurface(Color(.secondarySystemGroupedBackground), radius: Radius.row + 2)
+        .ikutSurface(Color(.secondarySystemGroupedBackground), radius: Radius.inner + 2)
     }
 }

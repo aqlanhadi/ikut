@@ -34,7 +34,7 @@ struct WhereToSheet: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .sheetTopBar {
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 SheetSearchField(clear: model.query.isEmpty ? nil : {
                     model.query = ""
                     searchFocused = true

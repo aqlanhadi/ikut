@@ -30,7 +30,7 @@ struct ConvoyProgressBar: View {
                             if car.2 { Circle().strokeBorder(Color.ikutAccentFill, lineWidth: 2).padding(-2) }
                         }
                         .frame(width: 18, height: 18)
-                        .elevation(.badge)
+                        .elevation(.marker)
                         .position(x: min(max(w * car.0, 9), w - 9), y: 15)
                 }
             }
@@ -74,16 +74,16 @@ struct ConvoyRowView: View {
                 NameLine(name: row.name, mine: row.isMine, online: youOnline)
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? Color.ikutStaleChipText : Color.surfaceSecondary)
+                    .foregroundStyle(row.subtitleIsWarning ? Color.ikutWarning : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.hasArrived {
                 Label(row.trailingPrimary, systemImage: "checkmark")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.ikutPositive)
-                    .padding(.horizontal, Spacing.gap)
+                    .padding(.horizontal, Spacing.s)
                     .padding(.vertical, 5)
-                    .background(Color.green.fill(.chip), in: Capsule())
+                    .background(Color.green.fill(.tint), in: Capsule())
                     .accessibilityIdentifier("convoy.row.arrived")
             } else {
                 VStack(alignment: .trailing, spacing: 0) {
@@ -132,7 +132,7 @@ struct JoiningRowView: View {
                 NameLine(name: row.name, mine: mine, online: youOnline)
                 Text(row.subtitle)
                     .font(.footnote)
-                    .foregroundStyle(row.subtitleIsWarning ? Color.ikutStaleChipText : Color.surfaceSecondary)
+                    .foregroundStyle(row.subtitleIsWarning ? Color.ikutWarning : Color.surfaceSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {

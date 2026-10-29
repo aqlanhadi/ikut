@@ -20,7 +20,7 @@ struct CarRow: View {
                 .foregroundStyle(text.ready ? Color.ikutPositive : Color.ikutWarning)
         }
         .frame(minHeight: 54)
-        .padding(.horizontal, Spacing.cozy)
+        .padding(.horizontal, Spacing.l)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("lobby.car.\(number)")

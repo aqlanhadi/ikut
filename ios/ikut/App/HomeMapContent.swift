@@ -98,7 +98,7 @@ struct HomeMapContent: MapContent {
                     .frame(width: latest ? 30 : 22, height: latest ? 30 : 22)
                     .background(latest ? Color.ikutAccent : Color.white, in: Circle())
                     .overlay(Circle().stroke(latest ? Color.white : Color.ikutAccent.opacity(0.6), lineWidth: 2))
-                    .elevation(.homeButton)
+                    .elevation(.marker)
                     .frame(width: SheetButtonSize.hit, height: SheetButtonSize.hit)
                     .contentShape(Circle())
             }
@@ -134,7 +134,7 @@ struct HomeMapContent: MapContent {
                 .frame(width: 30, height: 30)
                 .background(Color.ikutAccent, in: Circle())
                 .overlay(Circle().stroke(.white, lineWidth: 2))
-                .elevation(.homeButton)
+                .elevation(.marker)
                 .accessibilityHidden(true)
         }
         .annotationTitles(.visible)
@@ -148,7 +148,7 @@ struct HomeMapContent: MapContent {
             .frame(width: size, height: size)
             .background(color, in: Circle())
             .overlay(Circle().stroke(.white, lineWidth: 2.5))
-            .elevation(.pin)
+            .elevation(.marker)
             .accessibilityHidden(true)
     }
 }

@@ -37,13 +37,13 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
     }
 
     private func body(of content: Content) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.gap) { content }
+        VStack(alignment: .leading, spacing: Spacing.s) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.cozy) {
+        VStack(alignment: .leading, spacing: Spacing.l) {
             SheetHeader(
                 title: title, subtitle: subtitle, subtitleFont: .subheadline,
                 // 16 pt from the top and trailing edges: the 38 pt corner minus the button's 22 pt radius.
@@ -63,7 +63,7 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
                     .frame(maxHeight: cap + (hasActions ? actionsHeight : 0))
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
-                    .sheetBottomBar { actionArea(top: Spacing.cozy) }
+                    .sheetBottomBar { actionArea(top: Spacing.l) }
             } else {
                 natural
                 actionArea(top: 0)
@@ -72,11 +72,11 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
         // 20 pt on every edge: 16 would put the title inside the 38 pt corner curve. The same surface as the
         // convoy panel. No grabber and no swipe down to close: the body scrolls, so a swipe is for
         // scrolling; the close button is the way out.
-        .padding(.horizontal, Spacing.block)
-        .padding(.top, Spacing.block)
+        .padding(.horizontal, Spacing.xl)
+        .padding(.top, Spacing.xl)
         // With actions, the buttons hang into the bottom safe area like the convoy sheet's bar, so the gap under
         // them equals the gap beside them (`block`); without a safe area they keep the plain padding.
-        .padding(.bottom, hasActions && lift > 0 ? -lift : Spacing.block)
+        .padding(.bottom, hasActions && lift > 0 ? -lift : Spacing.xl)
         .glassSurface(if: !inSheet)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(containerIdentifier)

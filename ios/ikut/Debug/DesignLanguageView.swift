@@ -69,7 +69,7 @@ struct DesignDrillView: View {
                 case .literals(let category): literalList(category)
                 }
             }
-            .padding(.horizontal, Spacing.screenMargin)
+            .padding(.horizontal, Spacing.l)
             .padding(.bottom, Spacing.xl)
         }
         .background(Color.ikutScreen)
@@ -131,7 +131,7 @@ struct DesignDrillView: View {
                 }
                 .padding(.horizontal, Spacing.l)
                 .padding(.vertical, Spacing.s)
-                .ikutCard(radius: Radius.control)
+                .ikutCard(radius: Radius.inner)
                 .padding(.bottom, Spacing.s)
             }
         }

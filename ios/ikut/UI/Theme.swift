@@ -16,8 +16,8 @@ extension Color {
 }
 
 /// The spacing scale. Margins, padding and stack gaps use these instead of literals.
-/// `l` is the screen margin and the card's side padding; `s`/`m` are the usual gaps between rows;
-/// `gap` is the design canvas's 10 pt between tiles in a grid and between an icon and its text.
+/// `l` is the screen margin and the card's side padding; `s`/`m` are the usual gaps between rows and between
+/// tiles in a grid; `xl` is the gap above a closing action group or a long section.
 enum Spacing {
     static let xxs: CGFloat = 2
     static let xs: CGFloat = 4
@@ -26,46 +26,19 @@ enum Spacing {
     static let s: CGFloat = 8
     /// Side padding of a small capsule (status, "Lead", car count).
     static let chipX: CGFloat = 9
-    static let gap: CGFloat = 8
     static let m: CGFloat = 12
-    /// Inside tickets, banners and the pinned-place card, where the canvas uses 14.
-    static let cozy: CGFloat = 16
     static let l: CGFloat = 16
     static let xl: CGFloat = 24
-
-    /// Side margin of every screen's content.
-    static let screenMargin = l
-
-    /// Space above a section header, and a floating panel's top and bottom padding (canvas: 18).
-    static let section: CGFloat = 16
-    /// Space above Home's "Past trips" header and the join code boxes (canvas: 22).
-    static let sectionLarge: CGFloat = 24
-    /// A 20 pt block gap: below a long sheet, above a closing action group.
-    static let block: CGFloat = 24
 }
 
 /// Continuous corner radii from the design canvas.
 enum Radius {
-    /// Small icon square (a 30 pt role icon, a stop's flag).
+    /// Small icon square (a role icon, a stop's flag, an icon in a list row).
     static let icon: CGFloat = 8
-    /// Larger icon square in a list row.
-    static let iconLarge: CGFloat = 8
-    /// The stats strip inside the lobby card.
+    /// The stats strip inside the lobby card, code boxes, warning banners, a selectable car tile.
     static let inner: CGFloat = 16
-    /// Code boxes, warning banners.
-    static let control: CGFloat = 16
-    /// Selectable car tile.
-    static let row: CGFloat = 16
-    /// Tiles inside sheets (report options, stop reasons, places) and the pinned-place card.
-    static let tile: CGFloat = 24
-    /// Inset grouped cards.
+    /// Inset grouped cards, tiles inside sheets, the dark banner and the Recap map header card.
     static let card: CGFloat = 24
-    /// Floating map panels (convoy panel, stop request card).
-    static let panel: CGFloat = 38
-    /// The dark banner and the Recap map header card.
-    static let banner: CGFloat = 24
-    /// The Welcome app icon.
-    static let hero: CGFloat = 20
 }
 
 extension View {
@@ -80,14 +53,14 @@ extension View {
     }
 
     /// Gray tile for use on a sheet's own background (report options, stop reasons, the pinned place).
-    func ikutTile(radius: CGFloat = Radius.tile) -> some View {
+    func ikutTile(radius: CGFloat = Radius.card) -> some View {
         ikutSurface(Color(.secondarySystemBackground), radius: radius)
     }
 
     /// Bottom action area: 16 pt side margins, 8 pt above and below, on the screen color.
     /// Put on the pill inside a bottom `safeAreaInset`.
     func ikutBottomBar() -> some View {
-        padding(.horizontal, Spacing.screenMargin)
+        padding(.horizontal, Spacing.l)
             .padding(.vertical, Spacing.s)
             .background(Color.ikutScreen)
     }
@@ -103,7 +76,7 @@ struct CardHeader<Content: View>: View {
     var content: Content
 
     init(
-        _ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.section, bottom: CGFloat = Spacing.tight,
+        _ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.tight,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -114,7 +87,7 @@ struct CardHeader<Content: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: Spacing.gap) {
+        HStack(spacing: Spacing.s) {
             Text(title.uppercased()).accessibilityAddTraits(.isHeader)
             content
         }
@@ -128,7 +101,7 @@ struct CardHeader<Content: View>: View {
 }
 
 extension CardHeader where Content == EmptyView {
-    init(_ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.section, bottom: CGFloat = Spacing.tight) {
+    init(_ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.tight) {
         self.init(title, inset: inset, top: top, bottom: bottom) { EmptyView() }
     }
 }
@@ -164,16 +137,16 @@ struct SheetCloseButton: View {
 }
 
 /// The round "x" on a screen's top corner, on a material so it reads over a map or a scrolling page. It is
-/// `SheetButtonSize.inline` across, scaled with the text size and capped.
+/// `SheetButtonSize.hit` across, scaled with the text size and capped.
 struct MapCloseButton: View {
     var action: () -> Void
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark").font(.subheadline.weight(.bold))
-                .frame(width: SheetButtonSize.capped(side, base: SheetButtonSize.inline),
-                       height: SheetButtonSize.capped(side, base: SheetButtonSize.inline))
+                .frame(width: SheetButtonSize.capped(side, base: SheetButtonSize.hit),
+                       height: SheetButtonSize.capped(side, base: SheetButtonSize.hit))
                 .background(.regularMaterial, in: Circle())
         }
         .tint(.primary)
@@ -292,7 +265,7 @@ struct IconTile: View {
     VStack(spacing: Spacing.m) {
         Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary)
         Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary).disabled(true)
-        HStack(spacing: Spacing.gap) {
+        HStack(spacing: Spacing.s) {
             Button { } label: { Text("Share").frame(maxWidth: .infinity) }.ikutButton(.primary)
             Button { } label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.secondary)
         }
@@ -327,7 +300,7 @@ struct IconTile: View {
             CardHeader("Tiles", inset: Spacing.xs)
             Text("A tile on a sheet").frame(maxWidth: .infinity, minHeight: 80).ikutTile()
         }
-        .padding(.horizontal, Spacing.screenMargin)
+        .padding(.horizontal, Spacing.l)
     }
     .background(Color.ikutScreen)
 }
@@ -346,10 +319,10 @@ struct IconTile: View {
 }
 
 #Preview("Icon tiles") {
-    HStack(spacing: Spacing.gap) {
+    HStack(spacing: Spacing.s) {
         IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
         IconTile(symbol: "steeringwheel", color: .ikutAccent, size: 30)
-        IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.iconLarge)
+        IconTile(symbol: "fuelpump.fill", color: .orange, size: 34, radius: Radius.icon)
     }
     .padding(Spacing.l)
 }

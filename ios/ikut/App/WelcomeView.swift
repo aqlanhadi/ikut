@@ -5,6 +5,9 @@ struct WelcomeView: View {
     var onGetStarted: () -> Void
     var onJoin: () -> Void
 
+    /// The app icon's corner radius, used nowhere else.
+    private static let heroRadius: CGFloat = 20
+
     private struct Feature: Identifiable {
         let symbol: String
         let title: String
@@ -31,8 +34,8 @@ struct WelcomeView: View {
                     .ikutGlyph(42, weight: .semibold, cap: 1.3)
                     .foregroundStyle(.white)
                     .frame(width: 88, height: 88)
-                    .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Radius.hero, style: .continuous))
-                    .elevation(.welcome)
+                    .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Self.heroRadius, style: .continuous))
+                    .elevation(.floating)
                     .accessibilityHidden(true)
 
                 Text("Welcome to ikut")
@@ -78,7 +81,7 @@ struct WelcomeView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.bottom, Spacing.cozy)
+                    .padding(.bottom, Spacing.l)
                 Button(action: onGetStarted) { Text("Get started").frame(maxWidth: .infinity) }
                     .ikutButton(.primary)
                 Button(action: onJoin) {

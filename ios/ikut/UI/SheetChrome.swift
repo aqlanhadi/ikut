@@ -51,10 +51,10 @@ extension View {
     }
 
     /// The label of a button inside the content (Copy, QR code, the steppers, Suggest's Not now and Add):
-    /// `SheetButtonSize.inline` tall, growing with the text size.
+    /// `SheetButtonSize.hit` tall, growing with the text size.
     func inlineActionLabel(fullWidth: Bool = true) -> some View { modifier(InlineActionLabel(fullWidth: fullWidth)) }
 
-    /// A round icon face inside the content (the steppers' minus and plus): `SheetButtonSize.inline` across.
+    /// A round icon face inside the content (the steppers' minus and plus): `SheetButtonSize.hit` across.
     func inlineRoundLabel() -> some View { modifier(InlineRoundLabel()) }
 
     /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): the main action prominent
@@ -92,9 +92,8 @@ extension View {
 /// content. Round: the round icon buttons, which is also the search bar's height, so Home's avatar matches it.
 enum SheetButtonSize {
     static let bar: CGFloat = 50
-    static let inline: CGFloat = 44
     static let round: CGFloat = 48
-    /// The least a tap target is, whatever the text size.
+    /// The least a tap target is, whatever the text size; also the round close button's base.
     static let hit: CGFloat = 44
     /// The small square or round icon tile inside a row (Home's "Join with a code").
     static let tile: CGFloat = 30
@@ -119,7 +118,7 @@ private struct BarActionLabel: ViewModifier {
 
 private struct InlineActionLabel: ViewModifier {
     var fullWidth: Bool
-    @ScaledMetric(relativeTo: .body) private var height = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var height = SheetButtonSize.hit
 
     func body(content: Content) -> some View {
         content.frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
@@ -127,7 +126,7 @@ private struct InlineActionLabel: ViewModifier {
 }
 
 private struct InlineRoundLabel: ViewModifier {
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     func body(content: Content) -> some View { content.frame(width: side, height: side) }
 }
@@ -137,7 +136,7 @@ private struct InlineRoundLabel: ViewModifier {
 struct RoundGlassIconButton: View {
     /// `.glass`: Liquid Glass (a quiet circle before iOS 26), `SheetButtonSize.round` across. `.quiet` and `.bare`
     /// never use glass: a tertiary-filled circle (a sheet's pinned header) or the bare glyph (a button inside a card),
-    /// both `SheetButtonSize.inline` across, scaled and capped.
+    /// both `SheetButtonSize.hit` across, scaled and capped.
     enum Style { case glass, quiet, bare }
     private enum Face { case symbol(String), text(String) }
     private var face: Face
@@ -148,7 +147,7 @@ struct RoundGlassIconButton: View {
     /// The glyph's font, nil for the footnote bold every round button had.
     var glyph: Font?
     @ScaledMetric(relativeTo: .body) private var roundSize = SheetButtonSize.round
-    @ScaledMetric(relativeTo: .body) private var inlineSize = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var inlineSize = SheetButtonSize.hit
     /// The circle is exactly `size` across (Home's name button, which must match the search bar's height as it
     /// grows with the text size), glass included, whatever padding the glass style would add around the face.
     var exact = false
@@ -225,7 +224,7 @@ struct RoundGlassIconButton: View {
     private var isText: Bool { if case .text = face { true } else { false } }
 }
 
-/// The face of a `.quiet` or `.bare` round icon button, also the label of a `ShareLink`: `SheetButtonSize.inline`
+/// The face of a `.quiet` or `.bare` round icon button, also the label of a `ShareLink`: `SheetButtonSize.hit`
 /// across, scaled with the text size and capped, never under the 44 pt hit target.
 struct RoundIconFace<Face: View>: View {
     var face: Face
@@ -233,7 +232,7 @@ struct RoundIconFace<Face: View>: View {
     var side: CGFloat
 
     var body: some View {
-        let side = SheetButtonSize.capped(side, base: SheetButtonSize.inline)
+        let side = SheetButtonSize.capped(side, base: SheetButtonSize.hit)
         face
             .foregroundStyle(style == .bare ? Color.secondary : Color.primary)
             .frame(width: side, height: side)
@@ -247,7 +246,7 @@ struct RoundIconSymbol: View {
     var systemImage: String
     var glyph: Font = .footnote.weight(.bold)
     var style: RoundGlassIconButton.Style = .quiet
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     var body: some View {
         RoundIconFace(face: Image(systemName: systemImage).font(glyph), style: style, side: side)

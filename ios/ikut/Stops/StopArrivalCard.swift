@@ -309,7 +309,7 @@ struct StopArrivalCard: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(Color.ikutPositive)
                 .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Color.ikutPositive.fill(.chip), in: Capsule())
+                .background(Color.ikutPositive.fill(.tint), in: Capsule())
                 .accessibilityIdentifier("stop.arrival.you")
         case .away(let distance, let seconds):
             let inConvoy = model.convoy.convoy.contains { $0.id == model.myCarId }

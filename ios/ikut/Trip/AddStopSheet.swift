@@ -74,7 +74,7 @@ struct AddStopContent: View {
         Group {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: Spacing.cozy) {
+                    VStack(spacing: Spacing.l) {
                         if let place = model.picked { details(place) } else { chooser }
                     }
                     .padding(.horizontal, Spacing.l)
@@ -168,7 +168,7 @@ struct AddStopContent: View {
                     .ikutGlyph(13, weight: .bold, design: .rounded, cap: 1.3)
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(selected ? Color.ikutAccent : Color.ikutUnselectedDisc, in: Circle())
+                    .background(selected ? Color.ikutAccent : Palette.neutralFill.color, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(.primary)
@@ -235,7 +235,7 @@ struct AddStopContent: View {
     // MARK: A searched place: what it is and how long
 
     private func details(_ place: DestinationResult) -> some View {
-        VStack(spacing: Spacing.cozy) {
+        VStack(spacing: Spacing.l) {
             HStack(spacing: Spacing.m) {
                 IconTile(symbol: "mappin", color: .red, size: 30, font: .footnote.weight(.bold))
                 VStack(alignment: .leading, spacing: 0) {
@@ -244,7 +244,7 @@ struct AddStopContent: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
+            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
             .surfaceTile(radius: Radius.card)
             .accessibilityElement(children: .combine)
 
@@ -305,7 +305,7 @@ struct AddStopContent: View {
             .foregroundStyle(selected ? Color.white : Color.primary)
             .frame(maxWidth: .infinity, minHeight: 84)
             .background(selected ? AnyShapeStyle(option.tint) : AnyShapeStyle(Color.primary.fill(.wash)),
-                        in: RoundedRectangle(cornerRadius: Radius.row + 2, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: Radius.inner + 2, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -343,7 +343,7 @@ struct AddStopContent: View {
                     .font(.body.weight(.semibold))
             }
         }
-        .padding(.horizontal, Spacing.cozy)
+        .padding(.horizontal, Spacing.l)
         .frame(minHeight: 50)
         .surfaceTile(radius: Radius.card)
     }

@@ -127,7 +127,7 @@ struct CreateTripView: View {
                 }
             }
             .padding(.leading, Spacing.l)
-            .padding(.trailing, Spacing.gap)
+            .padding(.trailing, Spacing.s)
             .frame(minHeight: 54)
         }
         .ikutCard()

@@ -43,11 +43,11 @@ struct StopNote: View {
     var retry: (() -> Void)?
 
     private var titleColor: Color {
-        tone == .warning ? MapColors.warningTitle.color : .ikutWarning
+        Color.ikutWarning
     }
 
     private var fill: Color {
-        tone == .warning ? Color.orange.fill(.strong) : Color.red.fill(.chip)
+        tone == .warning ? Color.orange.fill(.tint) : Color.red.fill(.tint)
     }
 
     var body: some View {
@@ -60,7 +60,7 @@ struct StopNote: View {
                 Button(action: retry) {
                     Label("Try again", systemImage: "arrow.clockwise")
                         .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.cozy)
+                        .padding(.horizontal, Spacing.l)
                         .frame(minHeight: 36)
                         .background(Color.ikutCard, in: Capsule())
                         // Drawn 36 pt tall, taps over 44.
@@ -74,8 +74,8 @@ struct StopNote: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.gap)
-        .ikutSurface(fill, radius: Radius.control)
+        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
+        .ikutSurface(fill, radius: Radius.inner)
     }
 }
 
@@ -117,13 +117,13 @@ struct StopRow: View {
             if let turnBack {
                 let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
                 StopNote(tone: .warning, title: text.title, detail: text.detail)
-                    .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.gap)
+                    .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
             }
             if let failure {
                 StopNote(
                     tone: .failure, title: StopNoteText.failureTitle(failure, stopName: stop.name, destinationName: ""),
                     detail: StopNoteText.failureDetail(failure), retry: onRetry)
-                    .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.gap)
+                    .padding(.leading, 60).padding(.trailing, Spacing.m).padding(.bottom, Spacing.s)
             }
         }
         .overlay(alignment: .top) { if !first { Divider() } }
@@ -176,7 +176,7 @@ struct RouteTotalLine: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44)
-        .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
         .innerTile(radius: Radius.inner)
         .opacity(dimmed ? 0.5 : 1)
         .accessibilityElement(children: .combine)

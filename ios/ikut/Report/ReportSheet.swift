@@ -26,7 +26,7 @@ struct ReportSheet: View {
             title: "What’s on the road?", bodyCap: .infinity, closeIdentifier: "sheet.close",
             containerIdentifier: "report.card", onClose: { dismiss() }
         ) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 2), spacing: Spacing.s) {
                 ForEach(ReportOption.events) { option in
                     eventButton(option)
                 }
@@ -63,7 +63,7 @@ struct ReportSheet: View {
             .padding(.horizontal, Spacing.m)
             .frame(maxWidth: .infinity, minHeight: 72)
             .surfaceTile()
-            .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(pinned == nil)
@@ -77,7 +77,7 @@ struct ReportSheet: View {
                 .wrapsAtAccessibilitySizes(lines: 2)
                 .frame(maxWidth: .infinity, minHeight: 60)
                 .surfaceTile()
-                .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(pinned == nil)

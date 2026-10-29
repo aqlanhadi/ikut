@@ -13,7 +13,7 @@ enum GlassSurface {
     }
 
     enum Kind {
-        /// Inset card floating over the map, with a plain Radius.panel rectangle.
+        /// Inset card floating over the map, with a plain 38 pt rectangle.
         case floating
         /// The trip pill at the top of the map: a capsule with a lighter shadow.
         case pill
@@ -25,18 +25,14 @@ enum GlassSurface {
 private struct GlassSurfaceModifier: ViewModifier {
     var kind: GlassSurface.Kind
 
+    /// The floating panel's own corner radius, used nowhere else.
+    private static let panelRadius: CGFloat = 38
+
     private var plain: AnyShape {
         switch kind {
-        case .floating: AnyShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+        case .floating: AnyShape(RoundedRectangle(cornerRadius: Self.panelRadius, style: .continuous))
         case .pill: AnyShape(Capsule())
-        case .control: AnyShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
-        }
-    }
-
-    private var elevation: Elevation {
-        switch kind {
-        case .floating: .panel
-        case .pill, .control: .pill
+        case .control: AnyShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         }
     }
 
@@ -49,7 +45,7 @@ private struct GlassSurfaceModifier: ViewModifier {
             content
                 .clipShape(plain)
                 .background(.regularMaterial, in: plain)
-                .elevation(elevation)
+                .elevation(.floating)
         }
     }
 }
@@ -73,7 +69,7 @@ extension View {
             glassEffect(.regular.interactive(), in: Circle())
         } else {
             background(.regularMaterial, in: Circle())
-                .elevation(.pill)
+                .elevation(.floating)
         }
     }
 }
@@ -82,7 +78,7 @@ extension View {
     /// An inset tile (a stop reason, a message) on a floating surface. On iOS 26 glass it is a
     /// raised, translucent tile, so the glass shows through, not the opaque gray slab the sheets use.
     @ViewBuilder
-    func surfaceTile(radius: CGFloat = Radius.tile) -> some View {
+    func surfaceTile(radius: CGFloat = Radius.card) -> some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
             background(Color.surfaceTileFill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .overlay(
@@ -111,7 +107,7 @@ extension Color {
     /// goes faint over the map; the usual accent in light and off glass.
     static var surfaceAccent: Color {
         guard GlassSurface.active else { return Color.ikutAccentFill }
-        let lifted = UIColor(MapColors.glassAccentDark.color)
+        let lifted = UIColor(MapColors.pillBlue.color)
         return Color(UIColor { traits in
             traits.userInterfaceStyle == .dark ? lifted : UIColor(Color.ikutAccentFill)
         })

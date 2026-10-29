@@ -212,7 +212,7 @@ struct ConvoyPanel: View {
                 hazards: model.hazards.markers.compactMap { $0.mainOffset.map { min(max($0 / length, 0), 1) } }
             )
             .padding(.horizontal, Spacing.xs)
-            .padding(.top, Spacing.gap)
+            .padding(.top, Spacing.s)
             .accessibilityElement()
             .accessibilityLabel("Convoy progress, \(ConvoyFormat.distance(driven)) of \(ConvoyFormat.distance(length))")
 
@@ -262,7 +262,7 @@ struct ConvoyPanel: View {
         }
         let fill = Color(.tertiarySystemFill)
         return Button { expanded = true } label: {
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 HStack(spacing: -5) {
                     ForEach(convoy.convoy) { e in
                         Circle().fill(Color.car(hex: e.car.color))
@@ -285,13 +285,13 @@ struct ConvoyPanel: View {
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(Color.surfaceSecondary)
             }
-            .padding(.horizontal, Spacing.cozy)
+            .padding(.horizontal, Spacing.l)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(fill, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .padding(.top, Spacing.gap)
+        .padding(.top, Spacing.s)
         .accessibilityLabel([parts.driving, parts.joining, parts.spread].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint("Shows the convoy list")
         .accessibilityIdentifier("convoy.summary")
@@ -309,7 +309,7 @@ struct ConvoyPanel: View {
             items.append(.init("Next stop", cell.name, detail: cell.detail, action: cell.stopId.map { id in { onNextStop(id) } }))
         }
         return StatGrid(items, background: Color(.tertiarySystemFill), valueSize: 20)
-        .padding(.top, Spacing.cozy)
+        .padding(.top, Spacing.l)
     }
 
     /// The cars, in the sheet's own scroll: the list has none of its own, so the whole panel moves as one.
@@ -344,7 +344,7 @@ struct ConvoyPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.m)
             .padding(.vertical, Spacing.s)
-            .background(Color.ikutWarning.fill(.soft), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .background(Color.ikutWarning.fill(.tint), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             .padding(.bottom, Spacing.tight)
             .accessibilityIdentifier("convoy.separation")
     }
@@ -366,7 +366,7 @@ struct ConvoyActionBar: View {
         // At accessibility sizes Report and Pit stop take a row each; otherwise they share one.
         let stacked = typeSize.isAccessibilitySize
         let layout = stacked
-            ? AnyLayout(VStackLayout(spacing: Spacing.gap)) : AnyLayout(HStackLayout(spacing: Spacing.gap))
+            ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
         return layout {
             Button(action: onReport) {
                 Label("Report", systemImage: "exclamationmark.triangle")

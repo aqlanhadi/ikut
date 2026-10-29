@@ -31,7 +31,7 @@ struct HomeTripGroup<Row: View>: View {
                     .buttonStyle(.plain)
             }
         }
-        .surfaceTile(radius: Radius.control)
+        .surfaceTile(radius: Radius.inner)
     }
 }
 

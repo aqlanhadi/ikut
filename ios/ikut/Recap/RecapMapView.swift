@@ -74,7 +74,7 @@ struct RecapMapView: View {
                 .id(item.id)
                 .transition(.opacity)
             }
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 Button { step(to: max(0, index - 1)) } label: { Image(systemName: "chevron.left").frame(width: 50, height: 44) }
                     .buttonStyle(.bordered).buttonBorderShape(.capsule)
                     .disabled(index == 0)
@@ -91,7 +91,7 @@ struct RecapMapView: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(Spacing.l)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { stepperTop = $0 }
         .padding(.horizontal, Spacing.m)
         .padding(.bottom, Spacing.s)

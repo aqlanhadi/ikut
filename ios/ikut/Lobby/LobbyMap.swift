@@ -288,7 +288,7 @@ struct LobbyPinView: View {
                                             topTrailingRadius: 14, style: .continuous).strokeBorder(.white, lineWidth: 2.5))
             .frame(width: side, height: side)
             .background { if pin.isSelectedCandidate { Circle().fill(Color.ikutAccent.opacity(0.2)).frame(width: side + 16, height: side + 16) } }
-            .elevation(.pin)
+            .elevation(.marker)
             .rotationEffect(.degrees(-45))
             .overlay { glyph }
             .overlay(alignment: .top) {

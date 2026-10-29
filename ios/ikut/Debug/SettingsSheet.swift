@@ -39,14 +39,14 @@ struct SettingsSheet: View {
                     .ikutCard()
                     .accessibilityIdentifier("settingsDesign")
             }
-            .padding(.horizontal, Spacing.screenMargin)
+            .padding(.horizontal, Spacing.l)
             .padding(.top, Spacing.l)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Color.ikutScreen)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Page.self) { _ in
                 DesignLanguageView()
-                    .padding(.horizontal, Spacing.screenMargin)
+                    .padding(.horizontal, Spacing.l)
                     .background(Color.ikutScreen)
                     .navigationTitle("Design language")
                     .navigationBarTitleDisplayMode(.inline)
