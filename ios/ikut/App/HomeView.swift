@@ -22,6 +22,9 @@ struct HomeView: View {
     @Binding var pendingJoinCode: String?
 
     @State private var path: [Route] = []
+    /// The trip whose recap was pushed. The lobby reports the end again whenever it reappears (its `onChange` is
+    /// `initial`), which is what popping the recap does, so the path alone can't tell a new end from that echo (D92).
+    @State private var recapPushedFor: String?
     /// The one map's mode, camera and open trip with its session and models, shared by Home and the trip (D54). The
     /// trip's objects are made and dropped by it (`open`, `exit`), not here.
     @State private var stage: TripScreenModel
@@ -140,6 +143,15 @@ struct HomeView: View {
                     if stage.tripId != nil { closeTrip() }
                 }
             }
+            .onChange(of: path) { old, new in
+                // Back and the edge swipe pop the recap without Done: the ended trip closes with the pop, so its lobby or
+                // map never shows again (D92). Done clears the path and closes the trip together, so this doesn't repeat.
+                let recapShown: ([Route]) -> Bool = { $0.contains { if case .recap = $0 { true } else { false } } }
+                if TripScreenLogic.closesTripAfterRecapLeft(recapWasPushed: recapShown(old), recapIsPushed: recapShown(new),
+                                                            openTripId: stage.tripId) {
+                    exitTrip()
+                }
+            }
             .onChange(of: pendingJoinCode, initial: true) { handlePendingJoin() }
             .onChange(of: homeCovers, initial: true) { _, covers in stage.sheet.cover(covers, among: TripSheetCover.home) }
         }
@@ -201,7 +213,8 @@ struct HomeView: View {
             LobbyView(trip: trip, onExit: exitTrip, onEnded: { ended in
                 // The recap is its own screen, pushed over the trip; its Done returns to Home's list (`closeRecap`).
                 // The lobby and the driving map both report the end, and may again when the recap is closed: once.
-                guard ended == stage.tripId, !path.contains(.recap(tripId: ended)) else { return }
+                guard ended == stage.tripId, recapPushedFor != ended, !path.contains(.recap(tripId: ended)) else { return }
+                recapPushedFor = ended
                 path = [.recap(tripId: ended)]
             })
             // A different trip is a new session, model and planner.
@@ -241,6 +254,7 @@ struct HomeView: View {
 
     /// The map back to Home; the trip's session stops and goes with its objects (`TripScreenModel.exit`).
     private func closeTrip() {
+        recapPushedFor = nil
         stage.exit()
         home = HomeModel.launching(sheet: stage.sheet)
         enterHome()
