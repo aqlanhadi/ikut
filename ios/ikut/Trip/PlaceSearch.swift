@@ -217,13 +217,15 @@ struct PlaceSearchResults: View {
     var showsKind = false
     var workingLabel = "Creating trip"
     /// The id of the result at the top of the list as it scrolls (Where to? follows it with its camera); nil when the
-    /// caller doesn't follow. A List has no scroll position by id, so the rows report when they come and go.
+    /// caller doesn't follow. A List has no scroll position by id, so the rows report their frames in the scroll view.
     var topResult: Binding<String?>? = nil
+    /// Where the pinned search row ends, from the top of the list's frame: rows behind it do not count as at the top.
+    var topInset: CGFloat = 0
     /// What a tap on a place does with it.
     var onPick: (DestinationResult) -> Void
 
     @State private var choosingOnMap = false
-    @State private var visible: Set<String> = []
+    @State private var frames = ResultFrames()
 
     private var busy: Bool { model.isWorking || model.resolving != nil }
     private var hasRows: Bool { model.pastedPin || model.showingResults || model.isSearching || !model.suggestions.isEmpty }
@@ -233,12 +235,21 @@ struct PlaceSearchResults: View {
     var body: some View {
         if hasRows {
             Section { rows } header: { Text(header) }
+                .onChange(of: model.results.map(\.id)) { resultsChanged() }
         } else {
             Section { rows }
+                .onChange(of: model.results.map(\.id)) { resultsChanged() }
         }
+
         if distance == .alongRoute, model.along != nil, model.showingResults, !model.results.isEmpty {
             Section { InlineNote("Distances are along your route.").lobbyRow() }
         }
+    }
+
+    /// A new or shorter search starts over: no frames from the old rows, no top result kept.
+    private func resultsChanged() {
+        frames.spans = [:]
+        if let topResult, topResult.wrappedValue != nil { topResult.wrappedValue = nil }
     }
 
     @ViewBuilder private var rows: some View {
@@ -275,16 +286,24 @@ struct PlaceSearchResults: View {
         }
         ForEach(model.results) { result in
             resultRow(result)
-                .onAppear { shown(result.id, true) }
-                .onDisappear { shown(result.id, false) }
+                .onGeometryChange(for: ResultFrames.Span.self) {
+                    let frame = $0.frame(in: .scrollView)
+                    return ResultFrames.Span(top: frame.minY, bottom: frame.maxY)
+                } action: { span in
+                    frames.spans[result.id] = span
+                    reportTop()
+                }
+                .onDisappear {
+                    frames.spans[result.id] = nil
+                    reportTop()
+                }
         }
     }
 
-    /// Tells the caller which result is at the top: the first of the list that is on screen.
-    private func shown(_ id: String, _ on: Bool) {
+    /// Tells the caller which result is at the top: the first one with any of it below the pinned search row.
+    private func reportTop() {
         guard let topResult else { return }
-        if on { visible.insert(id) } else { visible.remove(id) }
-        let top = model.results.first { visible.contains($0.id) }?.id
+        let top = ResultFrames.topID(order: model.results.map(\.id), spans: frames.spans, barBottom: topInset)
         if topResult.wrappedValue != top, top != nil { topResult.wrappedValue = top }
     }
 
@@ -332,14 +351,26 @@ struct PlaceSearchResults: View {
             VStack(alignment: .trailing, spacing: 1) {
                 Text(along.distance)
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                if let time = along.time { Text(time).font(.caption).foregroundStyle(.secondary) }
+                    .monospacedDigit().foregroundStyle(Color.primary)
+                if let time = along.time { Text(time).font(.caption).foregroundStyle(Color.surfaceSecondary) }
             }
         } else if let text = model.distanceText(result) {
             Text(text)
                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
         }
+    }
+}
+
+/// Where the result rows are in the scroll view, as they report it, and which one is at the top.
+final class ResultFrames {
+    struct Span: Equatable { var top: CGFloat; var bottom: CGFloat }
+    var spans: [String: Span] = [:]
+
+    /// The first result, in list order, whose bottom edge is below the bar: a row behind the bar is skipped, one
+    /// straddling its edge is the top. Ids that are not results any more, and rows that have not reported, are ignored.
+    static func topID(order: [String], spans: [String: Span], barBottom: CGFloat) -> String? {
+        order.first { id in spans[id].map { $0.bottom > barBottom } ?? false }
     }
 }

@@ -238,7 +238,7 @@ struct JoinSheet: View {
             VStack(alignment: .leading, spacing: Spacing.m) {
                 Text("Drive together. Arrive together.")
                     .font(.title3).foregroundStyle(.secondary).textCase(nil)
-                Text("Your name")
+                Text("Your name").accessibilityHidden(true)
             }
         } footer: {
             Text("What the convoy sees in new trips. Joining needs only a name, no account.")
@@ -469,9 +469,9 @@ struct JoinSheet: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(name)
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                         .wrapsAtAccessibilitySizes(lines: 2)
-                    Text(detail).font(.footnote).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
+                    Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes()
                 }
                 Spacer(minLength: Spacing.s)
                 if selected {

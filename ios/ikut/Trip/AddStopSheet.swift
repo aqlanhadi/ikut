@@ -166,8 +166,8 @@ struct AddStopContent: View {
                     .background(selected ? Color.ikutAccent : Color.neutralFill, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(.primary)
-                    Text(AddStopLogic.detail(row, selected: selected)).font(.footnote).foregroundStyle(.secondary)
+                    Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(Color.primary)
+                    Text(AddStopLogic.detail(row, selected: selected)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if selected {
@@ -287,7 +287,8 @@ struct AddStopContent: View {
                 Text(StopFormat.kind(option)).font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(selected ? Color.white : Color.primary)
-            .frame(maxWidth: .infinity, minHeight: 84)
+            .padding(.vertical, Spacing.xs)
+            .frame(maxWidth: .infinity)
             .background(selected ? AnyShapeStyle(option.tint) : AnyShapeStyle(Color.primary.fill(.wash)),
                         in: RoundedRectangle(cornerRadius: Radius.inner + 2, style: .continuous))
         }

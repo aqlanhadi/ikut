@@ -9,6 +9,8 @@ struct WhereToSheet: View {
     @FocusState private var searchFocused: Bool
     /// The search bar's height, which Cancel is made to match.
     @State private var barHeight = SheetSearch.height
+    /// Where the pinned search row ends in the list's frame (the list's top safe area).
+    @State private var listTopInset: CGFloat = 0
 
     private var model: CreateTripModel { flow.search }
 
@@ -24,7 +26,7 @@ struct WhereToSheet: View {
                             .lobbyRow(top: Spacing.m)
                     }
                 }
-                PlaceSearchResults(model: model, distance: .fromYou, workingLabel: "Finding the route", topResult: $flow.topResultID) { place in
+                PlaceSearchResults(model: model, distance: .fromYou, workingLabel: "Finding the route", topResult: $flow.topResultID, topInset: listTopInset) { place in
                     searchFocused = false
                     Task { await flow.pick(place) }
                 }
@@ -33,6 +35,7 @@ struct WhereToSheet: View {
             .scrollContentBackground(.hidden)
             .contentMargins(.bottom, Spacing.l, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { listTopInset = $0 }
         }
         .sheetTopBar {
             HStack(spacing: Spacing.s) {
