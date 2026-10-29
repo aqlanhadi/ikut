@@ -1,7 +1,7 @@
 import MapKit
 import SwiftUI
 
-/// One search line: its kind's icon, name (the typed part in bold for a suggestion) and subtitle, then whatever
+/// One search line, a row of a system list (D86): its kind's icon, name (the typed part in bold for a suggestion) and subtitle, then whatever
 /// `trailing` says (a distance, a spinner). Shared by Where to?, Change destination and Add a stop.
 struct PlaceResultRow<Trailing: View>: View {
     var title: AttributedString
@@ -12,7 +12,6 @@ struct PlaceResultRow<Trailing: View>: View {
     var disabled = false
     var action: () -> Void
     @ViewBuilder var trailing: Trailing
-    @Environment(\.inPanelSheet) private var inSheet
 
     init(result: DestinationResult, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
         let kind = PlaceKind(result)
@@ -70,17 +69,13 @@ struct PlaceResultRow<Trailing: View>: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).foregroundStyle(.primary).wrapsAtAccessibilitySizes()
                     if !subtitle.isEmpty {
-                        Text(subtitle).font(.footnote).foregroundStyle(inSheet ? Color.surfaceSecondary : Color.secondary).wrapsAtAccessibilitySizes()
+                        Text(subtitle).font(.footnote).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 trailing
             }
-            .padding(.horizontal, Spacing.l)
-            .ikutRow()
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .disabled(disabled)
         .accessibilityLabel(label)
     }

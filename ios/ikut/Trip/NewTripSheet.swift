@@ -16,21 +16,22 @@ struct WhereToSheet: View {
         @Bindable var model = flow.search
         // The search row stays put and the results fade out under it (the system's soft top edge).
         Group {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let message = model.errorMessage {
+            List {
+                if let message = model.errorMessage {
+                    Section {
                         InlineNote(message, tone: .alert)
-                            .padding(.top, Spacing.m)
                             .accessibilityIdentifier("createTripError")
-                    }
-                    PlaceSearchResults(model: model, distance: .fromYou, workingLabel: "Finding the route") { place in
-                        searchFocused = false
-                        Task { await flow.pick(place) }
+                            .lobbyRow(top: Spacing.m)
                     }
                 }
-                .padding(.bottom, Spacing.l)
+                PlaceSearchResults(model: model, distance: .fromYou, workingLabel: "Finding the route", topResult: $flow.topResultID) { place in
+                    searchFocused = false
+                    Task { await flow.pick(place) }
+                }
             }
-            .scrollPosition(id: $flow.topResultID, anchor: .top)
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, Spacing.l, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
         }
         .sheetTopBar {
@@ -54,6 +55,7 @@ struct WhereToSheet: View {
                 glassCapsule("Cancel", action: onClose)
             }
             .padding(.top, Spacing.xs)
+            .padding(.horizontal, Spacing.l)
         }
         .environment(\.inPanelSheet, true)
         .task {
@@ -95,34 +97,40 @@ struct NewTripSheet: View {
                     .accessibilityIdentifier("sheet.close").disabled(flow.isCreating)
             }
             .padding(.top, Spacing.xs)
-
-            HStack(spacing: Spacing.m) {
-                Text("Name")
-                    .frame(width: 80, alignment: .leading)
-                TextField(flow.namePlaceholder, text: $flow.name)
-                    .textInputAutocapitalization(.words)
-                    .submitLabel(.done)
-                    .disabled(flow.isCreating)
-                    .accessibilityLabel("Trip name")
-                    .accessibilityIdentifier("newTripNameField")
-            }
             .padding(.horizontal, Spacing.l)
-            .ikutRow()
-            .surfaceTile()
-            .padding(.top, Spacing.m)
 
-            if let message = flow.createError {
-                InlineNote(message, tone: .alert)
-                    .padding(.top, Spacing.m)
-                    .accessibilityIdentifier("createTripError")
+            List {
+                Section {
+                    HStack(spacing: Spacing.m) {
+                        Text("Name")
+                            .frame(width: 80, alignment: .leading)
+                        TextField(flow.namePlaceholder, text: $flow.name)
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.done)
+                            .disabled(flow.isCreating)
+                            .accessibilityLabel("Trip name")
+                            .accessibilityIdentifier("newTripNameField")
+                    }
+                }
+                if let message = flow.createError {
+                    Section {
+                        InlineNote(message, tone: .alert)
+                            .accessibilityIdentifier("createTripError")
+                            .lobbyRow()
+                    }
+                }
             }
-
-            Spacer(minLength: Spacing.m)
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .contentMargins(.top, Spacing.xs, for: .scrollContent)
 
             Text("Next you get a code for the group chat. Add a meeting point and stops once the trip is made.")
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .padding(.horizontal, Spacing.l)
             Button(action: onCreate) {
                 Group {
                     if flow.isCreating { ProgressView().accessibilityLabel("Creating trip") } else { Text("Create trip") }
@@ -135,6 +143,7 @@ struct NewTripSheet: View {
             // (`PanelSheet.sideGap`, what `barLift` gives the other bars). Home's sheet gives the side insets; the bar
             // runs into the home indicator's strip rather than measuring it, which looped the layout.
             .sheetActionBar(sides: false)
+            .padding(.horizontal, Spacing.l)
             .padding(.bottom, PanelSheet.sideGap)
         }
         .ignoresSafeArea(.container, edges: .bottom)

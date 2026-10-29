@@ -73,14 +73,13 @@ struct AddStopContent: View {
         // The header stays put and the rows fade out under it, as they do above the Add bar.
         Group {
             ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: Spacing.l) {
-                        if let place = model.picked { details(place) } else { chooser }
-                    }
-                    .padding(.horizontal, Spacing.l)
-                    .padding(.top, Spacing.xs)
-                    .padding(.bottom, Spacing.l)
+                List {
+                    if let place = model.picked { details(place) } else { chooser }
                 }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .contentMargins(.top, Spacing.xs, for: .scrollContent)
+                .contentMargins(.bottom, Spacing.l, for: .scrollContent)
                 .scrollDismissesKeyboard(.interactively)
                 // A tap on a pin brings its row into view.
                 .onChange(of: model.selectedId) { _, id in
@@ -109,19 +108,23 @@ struct AddStopContent: View {
 
     @ViewBuilder private var chooser: some View {
         @Bindable var search = model.search
-        SheetSearchField(clear: search.query.isEmpty ? nil : { search.query = ""; searchFocused = true }) {
-            TextField("Search along the route", text: $search.query)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .focused($searchFocused)
-                .accessibilityIdentifier("addStop.search")
-                .onChange(of: search.query) { model.search.queryChanged() }
-                .onSubmit { model.search.submit() }
+        // The search bar is the sheet's own capsule, a clear row on the glass.
+        Section {
+            SheetSearchField(clear: search.query.isEmpty ? nil : { search.query = ""; searchFocused = true }) {
+                TextField("Search along the route", text: $search.query)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .focused($searchFocused)
+                    .accessibilityIdentifier("addStop.search")
+                    .onChange(of: search.query) { model.search.queryChanged() }
+                    .onSubmit { model.search.submit() }
+            }
+            .onChange(of: searchFocused) { _, focused in if focused { onExpand() } }
+            .lobbyRow()
         }
-        .onChange(of: searchFocused) { _, focused in if focused { onExpand() } }
         if let message = model.search.errorMessage {
-            InlineNote(message, tone: .alert)
+            Section { InlineNote(message, tone: .alert).lobbyRow() }
         }
         if model.search.showsList || searchFocused {
             PlaceSearchResults(model: model.search, distance: .alongRoute, showsKind: true, onPick: { place in
@@ -134,29 +137,18 @@ struct AddStopContent: View {
     }
 
     @ViewBuilder private var rnrList: some View {
-        Text("R&R along the way, in order")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Color.surfaceSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.m)
-            .padding(.top, Spacing.xs)
-            .accessibilityAddTraits(.isHeader)
-        if model.loading {
-            ProgressView().frame(maxWidth: .infinity).padding(.vertical, Spacing.l).accessibilityLabel("Looking for R&Rs")
-        } else if model.rows.isEmpty {
-            Text("No R&R on our side of the road along this trip. Search for a place instead.")
-                .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Spacing.m)
-                .accessibilityIdentifier("addStop.none")
-        } else {
-            VStack(spacing: 0) {
-                ForEach(Array(model.rows.enumerated()), id: \.element.id) { index, row in
-                    if index > 0 { RowDivider() }
-                    rnrRow(row)
-                }
+        Section {
+            if model.loading {
+                ProgressView().frame(maxWidth: .infinity).accessibilityLabel("Looking for R&Rs")
+            } else if model.rows.isEmpty {
+                Text("No R&R on our side of the road along this trip. Search for a place instead.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("addStop.none")
+            } else {
+                ForEach(model.rows) { row in rnrRow(row) }
             }
-            .surfaceTile(radius: Radius.card)
+        } header: {
+            Text("R&R along the way, in order")
         }
     }
 
@@ -173,19 +165,15 @@ struct AddStopContent: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.name).font(.callout.weight(selected ? .semibold : .medium)).foregroundStyle(.primary)
-                    Text(AddStopLogic.detail(row, selected: selected)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
+                    Text(AddStopLogic.detail(row, selected: selected)).font(.footnote).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if selected {
                     Image(systemName: "checkmark").font(.body.weight(.bold)).foregroundStyle(Color.ikutAccent).accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-            .ikutRow()
-            .contentShape(Rectangle())
             .opacity(taken ? 0.45 : 1)
         }
-        .buttonStyle(.plain)
         .disabled(taken)
         .id(row.id)
         .accessibilityElement(children: .combine)
@@ -235,52 +223,50 @@ struct AddStopContent: View {
 
     // MARK: A searched place: what it is and how long
 
-    private func details(_ place: DestinationResult) -> some View {
-        VStack(spacing: Spacing.l) {
+    @ViewBuilder private func details(_ place: DestinationResult) -> some View {
+        Section {
             HStack(spacing: Spacing.m) {
                 IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(place.name).font(.body)
-                    Text(placeLine(place)).font(.footnote).foregroundStyle(Color.surfaceSecondary)
+                    Text(placeLine(place)).font(.footnote).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-            .surfaceTile(radius: Radius.card)
             .accessibilityElement(children: .combine)
+        }
 
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                caption("What for?")
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 3), spacing: Spacing.s) {
-                    ForEach(AddStopLogic.kinds(canMeet: model.canMeet), id: \.self) { option in kindTile(option) }
-                }
+        // The kinds are a grid of tiles, not rows: the grid stays its own layout, a clear row of the list.
+        Section {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 3), spacing: Spacing.s) {
+                ForEach(AddStopLogic.kinds(canMeet: model.canMeet), id: \.self) { option in kindTile(option) }
             }
+            .lobbyRow()
+        } header: {
+            Text("What for?")
+        }
 
-            if model.kind == .meet {
-                VStack(alignment: .leading, spacing: Spacing.s) {
-                    caption("Meet at (optional)")
-                    meetTimeRow
-                }
+        if model.kind == .meet {
+            Section {
+                meetTimeRow
+            } header: {
+                Text("Meet at (optional)")
+            } footer: {
                 Text("The trip starts here. Everyone drives to this spot first, and the lead car taps Leave when you’re all there.")
-                    .font(.footnote).foregroundStyle(Color.surfaceSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Spacing.xs)
-            } else {
-                VStack(alignment: .leading, spacing: Spacing.s) {
-                    caption("How long? (optional)")
-                    HStack(spacing: Spacing.s) {
-                        chip("None", selected: model.searchedMinutes == nil) { model.searchedMinutes = nil }
-                        ForEach(PlannedStop.allowedMinutes, id: \.self) { value in
-                            chip(StopFormat.length(minutes: value), selected: model.searchedMinutes == value) { model.searchedMinutes = value }
-                        }
+            }
+        } else {
+            Section {
+                HStack(spacing: Spacing.s) {
+                    chip("None", selected: model.searchedMinutes == nil) { model.searchedMinutes = nil }
+                    ForEach(PlannedStop.allowedMinutes, id: \.self) { value in
+                        chip(StopFormat.length(minutes: value), selected: model.searchedMinutes == value) { model.searchedMinutes = value }
                     }
                 }
-                if !model.canMeet {
-                    Text("A meeting point can only be the first stop.")
-                        .font(.footnote).foregroundStyle(Color.surfaceSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, Spacing.xs)
-                }
+                .lobbyRow()
+            } header: {
+                Text("How long? (optional)")
+            } footer: {
+                if !model.canMeet { Text("A meeting point can only be the first stop.") }
             }
         }
     }
@@ -289,11 +275,6 @@ struct AddStopContent: View {
         let word = PlaceKind.word(for: place)
         guard let along = model.search.along?.place(for: place.coordinate) else { return word }
         return "\(word) · \(along)"
-    }
-
-    private func caption(_ text: String) -> some View {
-        Text(text.uppercased()).font(.footnote).foregroundStyle(Color.surfaceSecondary).padding(.horizontal, Spacing.xs)
-            .accessibilityAddTraits(.isHeader)
     }
 
     private func kindTile(_ option: PlannedStopKind) -> some View {
@@ -340,9 +321,6 @@ struct AddStopContent: View {
                     .font(.body.weight(.semibold))
             }
         }
-        .padding(.horizontal, Spacing.l)
-        .ikutRow()
-        .surfaceTile(radius: Radius.card)
     }
 
     /// 9:00 today, the starting point for the picker.
