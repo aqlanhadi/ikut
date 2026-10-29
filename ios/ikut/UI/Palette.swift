@@ -18,9 +18,9 @@ enum Palette {
 
     // MARK: Status
 
-    /// Accent text and icons: a touch darker in light than the 0071E3 fill so it holds 4.5:1 on a screen and on its own 14% tint.
+    /// Accent TEXT (not the brand accent, which stays 0071E3): a touch darker in light than the 0071E3 fill so it holds 4.5:1 on a screen and on its own 14% tint.
     static let accentText = ModeColor(light: 0x005FBF, dark: 0x2997FF)
-    /// Positive status text, same test.
+    /// Positive TEXT (the brand green ikutPositive stays 1F7A35), same test.
     static let positiveText = ModeColor(light: 0x1D7031, dark: 0x30D158)
     /// Warning text (waiting, spread, the stale chip, the lobby warning title): one pair, 4.5:1 on a card, a
     /// screen and its own 14% tint in both modes.

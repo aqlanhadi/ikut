@@ -302,7 +302,7 @@ color|#8A6B45|8A6B45|UI/Palette.swift:53
 color|#8A6B45|8A6B45|UI/Palette.swift:53
 frame|minHeight 48||UI/SheetChrome.swift:300
 frame|width 32, height 44||UI/SheetChrome.swift:373
-frame|minHeight 58||UI/Theme.swift:250
+frame|minHeight 58||UI/Theme.swift:249
 frame|height 28||UI/TripComponents.swift:105
 font|7||UI/TripComponents.swift:196
 padding|5||UI/TripComponents.swift:206

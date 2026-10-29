@@ -6,10 +6,9 @@ import UIKit
 extension Color {
     private static func dynamic(light: UInt32, dark: UInt32) -> Color { ModeColor(light: light, dark: dark).color }
 
-    /// Accent text and icons: a touch darker in light than the 0071E3 fill so it holds 4.5:1 on a screen and on its own 14% tint.
-    static let ikutAccent = Palette.accentText.color
+    static let ikutAccent = dynamic(light: 0x0071E3, dark: 0x2997FF)
     /// "Tracking" and other positive status text (darker than system green for contrast on white).
-    static let ikutPositive = Palette.positiveText.color
+    static let ikutPositive = dynamic(light: 0x1F7A35, dark: 0x30D158)
     /// "Waiting" status text.
     static let ikutWarning = Palette.warningText.color
     static let ikutScreen = Color(.systemGroupedBackground)

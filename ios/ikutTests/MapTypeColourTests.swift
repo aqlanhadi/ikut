@@ -101,6 +101,19 @@ struct MapTypeColourTests {
         }
     }
 
+    /// Known gap, recorded so it is visible: the brand accent and positive (light) are what the app draws as text
+    /// today, and they miss 4.5:1 on the grey screen and on their own 14% tint. D79 moves text uses to
+    /// accentText / positiveText, which pass.
+    @Test func theBrandAccentAndPositiveKeepTheirValuesAndMissTheTextRatioInLight() {
+        let tint = 0.14
+        let accent: UInt32 = 0x0071E3, positive: UInt32 = 0x1F7A35
+        #expect(abs(contrast(accent, 0xF2F2F7) - 4.21) < 0.01)
+        #expect(abs(contrast(accent, over(accent, 0xF2F2F7, tint)) - 3.50) < 0.01)
+        #expect(abs(contrast(positive, over(positive, 0xF2F2F7, tint)) - 4.01) < 0.01)
+        #expect(Palette.accentText.light != accent && Palette.positiveText.light != positive)
+        #expect(Palette.accentFill.light == accent)
+    }
+
     @Test func theTextTokensAreTheOnesTheAppDraws() {
         #expect(MapColors.warningTitle == Palette.warningText)
         #expect(Palette.staleChipText == Palette.warningText)
