@@ -106,13 +106,13 @@ frame|width 30, height 30||App/HomeTripRows.swift:49
 frame|minHeight 56||App/HomeTripRows.swift:61
 frame|minHeight 56||App/HomeTripRows.swift:86
 frame|minHeight 44||App/PickedTripSheet.swift:67
-frame|width 88, height 88||App/WelcomeView.swift:36
-padding|28||App/WelcomeView.swift:44
-frame|width 36, height 36||App/WelcomeView.swift:58
-padding|44||App/WelcomeView.swift:70
-padding|32||App/WelcomeView.swift:72
-padding|48||App/WelcomeView.swift:73
-padding|32||App/WelcomeView.swift:93
+frame|width 88, height 88||App/WelcomeView.swift:33
+padding|28||App/WelcomeView.swift:40
+frame|width 36, height 36||App/WelcomeView.swift:54
+padding|44||App/WelcomeView.swift:66
+padding|32||App/WelcomeView.swift:68
+padding|48||App/WelcomeView.swift:69
+padding|32||App/WelcomeView.swift:89
 frame|minHeight 50||Auth/NameEntryView.swift:110
 padding|3||Hazards/HazardMapContent.swift:37
 frame|width 0||Hazards/HazardMapContent.swift:43
@@ -246,7 +246,7 @@ padding|48||Trip/CreateTripView.swift:94
 frame|width 20||Trip/CreateTripView.swift:100
 frame|width 32, height 44||Trip/CreateTripView.swift:123
 frame|minHeight 54||Trip/CreateTripView.swift:131
-font|34||Trip/MapPickView.swift:109
+font|34||Trip/MapPickView.swift:113
 frame|width 80||Trip/NewTripSheet.swift:100
 frame|minHeight 46||Trip/NewTripSheet.swift:109
 frame|width 32, height 32||Trip/PlaceResultRow.swift:67
