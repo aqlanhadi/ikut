@@ -61,25 +61,18 @@ struct StopNote: View {
 /// One planned stop: its number as on the map's pin (a person symbol for the meeting point, which takes none), its
 /// name with the line under it ("About 1 h 35 min in · stay 20 min"), and for the organizer a drag handle.
 struct StopRow: View {
-    /// A note sits under the stop's name, past its icon (44) and the gap: 60.
-    private static let noteIndent: CGFloat = 60
-    /// In the system list the row starts at the list's own inset: icon (44) and the gap, so a note lines up with the name.
-    private static let listNoteIndent: CGFloat = 56
+    /// A row of a system list (the system gives the insets, height and separators): a note sits under the stop's name,
+    /// past its icon (44) and the gap, so it lines up with the name.
+    private static let noteIndent: CGFloat = 56
     var stop: StopDraft
     var text: LobbyContent.StopText
     var editable: Bool
-    var first: Bool
     /// Extra meters the road turns back on itself near this stop, when it does.
     var turnBack: Double?
     var failure: StopPlanner.Failure?
     var failed: Bool
     var onRetry: () -> Void
-    /// A row of the lobby's system list: the system gives the insets, height and separators. The pulled-up driving
-    /// sheet's Journey card keeps the hand-drawn row (false).
-    var inList = false
     @Environment(\.dynamicTypeSize) private var typeSize
-
-    private var noteIndent: CGFloat { inList ? Self.listNoteIndent : Self.noteIndent }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,23 +92,19 @@ struct StopRow: View {
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.leading, inList ? 0 : Spacing.l).padding(.trailing, inList ? 0 : (editable ? 6 : Spacing.l))
-            .padding(.vertical, inList ? 0 : Spacing.xs)
-            .frame(minHeight: inList ? nil : RowSize.minimum)
 
             if let turnBack {
                 let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
                 StopNote(tone: .warning, title: text.title, detail: text.detail)
-                    .padding(.leading, noteIndent).padding(.trailing, inList ? 0 : Spacing.m).padding(.bottom, Spacing.s)
+                    .padding(.leading, Self.noteIndent).padding(.bottom, Spacing.s)
             }
             if let failure {
                 StopNote(
                     tone: .failure, title: StopNoteText.failureTitle(failure, stopName: stop.name, destinationName: ""),
                     detail: StopNoteText.failureDetail(failure), retry: onRetry)
-                    .padding(.leading, noteIndent).padding(.trailing, inList ? 0 : Spacing.m).padding(.bottom, Spacing.s)
+                    .padding(.leading, Self.noteIndent).padding(.bottom, Spacing.s)
             }
         }
-        .overlay(alignment: .top) { if !first && !inList { Divider() } }
         .accessibilityElement(children: .combine)
     }
 
@@ -147,11 +136,9 @@ struct RouteTotalLine: View {
     }
     var content: Content
     var dimmed = false
-    /// A row of the lobby's system list: the row is the tile, so no tile of its own.
-    var inList = false
 
     var body: some View {
-        let lines = VStack(spacing: Spacing.xxs) {
+        VStack(spacing: Spacing.xxs) {
             switch content {
             case .total(let line, let caption):
                 Text(line).font(.system(.headline, design: .rounded)).monospacedDigit().multilineTextAlignment(.center)
@@ -166,17 +153,8 @@ struct RouteTotalLine: View {
                 ProgressView().accessibilityLabel("Getting the route")
             }
         }
-        // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner. In the system
-        // list the row is the tile.
-        Group {
-            if inList {
-                lines.frame(maxWidth: .infinity)
-            } else {
-                lines.ikutRow(fillWidth: true)
-                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-                    .innerTile(radius: Radius.inner)
-            }
-        }
+        // Not a tappable row; a row of the system list, so the row is the tile.
+        .frame(maxWidth: .infinity)
         .opacity(dimmed ? 0.5 : 1)
         .accessibilityElement(children: .combine)
     }

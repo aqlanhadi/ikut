@@ -56,6 +56,7 @@ TripScreenHost|View|Map/TripScreen.swift|1
 WelcomeView|View|App/WelcomeView.swift|1
 WhereToSheet|View|Trip/NewTripSheet.swift|1
 ConvoyPanel|View|Map/ConvoyPanel.swift|2
+DrivingList|ViewModifier|Map/TripMapView.swift|2
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|2
 LocationAskContent|View|Location/LocationAskStep.swift|2
 NameFieldCard|View|Auth/NameEntryView.swift|2
@@ -110,7 +111,7 @@ font|12||Lobby/LobbyMap.swift:316
 frame|width 8, height 8||Lobby/LobbyMap.swift:318
 frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
-frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:791
+frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:781
 frame|width 30||Location/LocationAskStep.swift:33
 frame|width 14, height 14||Map/ConvoyPanel.swift:271
 frame|width 14, height 14||Map/ConvoyPanel.swift:278
@@ -123,10 +124,9 @@ frame|height 30||Map/ConvoyRows.swift:39
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
-frame|width 10, height 10||Map/TripMapView.swift:609
-frame|width 12, height 12||Map/TripMapView.swift:630
-frame|minHeight 56||Map/TripMapView.swift:642
-frame|height 0||Map/TripMapView.swift:812
+frame|width 10, height 10||Map/TripMapView.swift:614
+frame|width 12, height 12||Map/TripMapView.swift:635
+frame|minHeight 56||Map/TripMapView.swift:647
 frame|height 150||Recap/RecapContent.swift:60
 frame|height 30||Recap/RecapContent.swift:64
 frame|width 0.5||Recap/RecapContent.swift:123
