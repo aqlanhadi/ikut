@@ -298,7 +298,7 @@ struct AddStopContent: View {
     private func kindTile(_ option: PlannedStopKind) -> some View {
         let selected = model.kind == option
         return Button { model.kind = option } label: {
-            VStack(spacing: Spacing.tight) {
+            VStack(spacing: Spacing.s) {
                 Image(systemName: option.symbol).ikutGlyph(20, weight: .semibold, cap: 1.3)
                 Text(StopFormat.kind(option)).font(.subheadline.weight(.semibold))
             }

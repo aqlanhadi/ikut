@@ -76,7 +76,7 @@ struct WelcomeView: View {
         .scrollBounceBehavior(.basedOnSize)
         .background(Color(.systemBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: Spacing.tight) {
+            VStack(spacing: Spacing.s) {
                 Text("Joining needs only a name, no account.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)

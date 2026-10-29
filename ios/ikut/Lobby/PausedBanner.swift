@@ -12,7 +12,7 @@ struct PausedBanner: View {
     @State private var error: String?
 
     var body: some View {
-        VStack(spacing: Spacing.tight) {
+        VStack(spacing: Spacing.s) {
             HStack(spacing: Spacing.m) {
                 Image(systemName: "pause.circle.fill")
                     .font(.title3)

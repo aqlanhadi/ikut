@@ -73,7 +73,7 @@ struct RecapContent: View {
         }
         .ikutCard()
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        .padding(.top, layout == .screen ? Spacing.l : Spacing.l)
+        .padding(.top, Spacing.l)
 
         if !recap.awards.isEmpty {
             sectionTitle("Road trip awards")

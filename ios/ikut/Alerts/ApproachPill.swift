@@ -20,7 +20,7 @@ struct ApproachPill: View {
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(Color.yellow)
-                        .padding(.trailing, Spacing.tight)
+                        .padding(.trailing, Spacing.s)
                 }
             }
             .buttonStyle(.plain)
@@ -45,7 +45,7 @@ struct StopApproachPill: View {
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(Color.ikutPillBlue)
-                    .padding(.trailing, Spacing.tight)
+                    .padding(.trailing, Spacing.s)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(alert.title), \(alert.body), \(ConvoyFormat.distance(distance))")
@@ -72,7 +72,7 @@ struct CatchUpPill: View {
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(Color.green)
-                    .padding(.trailing, Spacing.tight)
+                    .padding(.trailing, Spacing.s)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel([title, subtitle, ConvoyFormat.distance(distance)].compactMap { $0 }.joined(separator: ", "))

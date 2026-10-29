@@ -154,7 +154,7 @@ struct MergePointView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.primary)
                     .fixedSize()
-                    .padding(.horizontal, Spacing.chipX)
+                    .padding(.horizontal, Spacing.s)
                     .padding(.vertical, Spacing.xs)
                     .background(.regularMaterial, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.car(hex: colorHex), lineWidth: 1.5))

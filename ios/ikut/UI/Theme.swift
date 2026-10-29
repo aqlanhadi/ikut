@@ -21,11 +21,7 @@ extension Color {
 enum Spacing {
     static let xxs: CGFloat = 2
     static let xs: CGFloat = 4
-    /// Between a capsule's label and its edge, top and bottom.
-    static let tight: CGFloat = 6
     static let s: CGFloat = 8
-    /// Side padding of a small capsule (status, "Lead", car count).
-    static let chipX: CGFloat = 9
     static let m: CGFloat = 12
     static let l: CGFloat = 16
     static let xl: CGFloat = 24
@@ -76,7 +72,7 @@ struct CardHeader<Content: View>: View {
     var content: Content
 
     init(
-        _ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.tight,
+        _ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.s,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -101,7 +97,7 @@ struct CardHeader<Content: View>: View {
 }
 
 extension CardHeader where Content == EmptyView {
-    init(_ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.tight) {
+    init(_ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.s) {
         self.init(title, inset: inset, top: top, bottom: bottom) { EmptyView() }
     }
 }

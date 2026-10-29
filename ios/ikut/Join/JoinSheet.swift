@@ -361,12 +361,7 @@ struct JoinSheet: View {
     /// The found trip: name, "Code found", where to and who is in, the meeting point and stops, and what the map shows.
     private func tripCard(_ preview: TripPreview) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Label("Code found", systemImage: "checkmark")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.ikutPositive)
-                .padding(.horizontal, Spacing.chipX)
-                .padding(.vertical, Spacing.xs)
-                .background(Color.ikutPositive.fill(.tint), in: Capsule())
+            Chip(text: "Code found", tone: .positive, lead: .symbol("checkmark"))
             Text(preview.name)
                 .font(.title3.weight(.semibold))
                 .padding(.top, Spacing.xs)

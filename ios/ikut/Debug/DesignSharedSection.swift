@@ -9,7 +9,7 @@ struct DesignSharedSection: View {
         ("surfaceSecondary", .surfaceSecondary), ("surfaceAccent", .surfaceAccent),
     ]
     private let spacing: [(String, CGFloat)] = [
-        ("xxs", Spacing.xxs), ("xs", Spacing.xs), ("tight", Spacing.tight), ("s", Spacing.s), ("chipX", Spacing.chipX),
+        ("xxs", Spacing.xxs), ("xs", Spacing.xs), ("s", Spacing.s),
         ("m", Spacing.m), ("l", Spacing.l), ("xl", Spacing.xl),
     ]
     private let radii: [(String, CGFloat)] = [

@@ -186,8 +186,11 @@ struct Chip: View {
     var lead: Lead = .none
     var fill: Fill = .tint
 
+    /// Between the lead item and the words: 6 pt, used nowhere else.
+    private static let gap: CGFloat = 6
+
     var body: some View {
-        HStack(spacing: Spacing.tight) {
+        HStack(spacing: Self.gap) {
             switch lead {
             case .none: EmptyView()
             case .symbol(let name): Image(systemName: name).accessibilityHidden(true)
