@@ -38,7 +38,7 @@ struct StopActionButton: View {
                 .padding(.horizontal, large ? Spacing.l : 0)
                 .frame(maxWidth: .infinity, minHeight: height ?? (style == .ghost ? inlineHeight : barHeight))
         }
-        .ikutButton(role, onGlass: true, flatFallback: face)
+        .ikutButton(role, surface: face)
         .disabled(disabled)
         .accessibilityIdentifier(id)
     }

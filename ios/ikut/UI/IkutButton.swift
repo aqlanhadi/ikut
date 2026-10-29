@@ -21,7 +21,7 @@ enum IkutButtonRole {
 }
 
 /// A flat capsule: the face of the flat role, and of a surface button before iOS 26.
-struct FilledCapsuleButtonStyle: ButtonStyle {
+private struct FilledCapsuleButtonStyle: ButtonStyle {
     var fill: Color
     var foreground: Color
 
@@ -36,16 +36,16 @@ struct FilledCapsuleButtonStyle: ButtonStyle {
 
 extension View {
     /// The one button API. Apply to a `Button` (or `ShareLink`); a full-width label has `.frame(maxWidth: .infinity)`.
-    /// `onGlass`: the button sits on a Liquid Glass sheet, so on iOS 26 primary and secondary use the glass styles.
-    /// `flatFallback`: a surface button (the stop card). Its label brings its own size, and where glass is not
-    /// used the button is that flat capsule instead of Apple's bordered style.
+    /// `onGlass`: a bar button on a Liquid Glass sheet, so on iOS 26 primary and secondary use the glass styles.
+    /// `surface`: a button on a floating surface (the stop card), primary or secondary only. Its label brings its
+    /// own size, it is glass on iOS 26, and otherwise it is that flat capsule instead of Apple's bordered style.
     @ViewBuilder
     func ikutButton(
-        _ role: IkutButtonRole, onGlass: Bool = false, flatFallback: IkutButtonFace? = nil
+        _ role: IkutButtonRole, onGlass: Bool = false, surface: IkutButtonFace? = nil
     ) -> some View {
         if case .flat(let face) = role {
             buttonStyle(FilledCapsuleButtonStyle(fill: face.fill, foreground: face.foreground))
-        } else if let face = flatFallback {
+        } else if let face = surface, !role.isLink {
             if GlassSurface.useGlass, #available(iOS 26, *) {
                 if case .primary = role {
                     buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(Color.ikutAccent)
@@ -62,8 +62,11 @@ extension View {
                 buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
             }
         } else {
+            let _ = assert(surface == nil, "a link button has no surface face")
             switch role {
-            case .primary, .flat:
+            case .flat:
+                EmptyView()  // handled first
+            case .primary:
                 buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
             case .secondary:
                 buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)

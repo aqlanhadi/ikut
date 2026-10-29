@@ -26,7 +26,7 @@ struct DesignSharedSection: View {
     /// In `UI/` but needing a live model, a map or a URL, so only listed.
     private let listed = [
         "BottomSheet", "CameraFlight", "CameraView", "CardSheetFrame", "RoundGlassShareLink", "RouteEnds", "SheetSearchField",
-        "SheetTopRow", "StatGrid", "TripExitMenu", "FilledCapsuleButtonStyle (via ikutButton)",
+        "SheetTopRow", "StatGrid", "TripExitMenu",
     ]
 
     var body: some View {
