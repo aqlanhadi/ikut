@@ -9,7 +9,7 @@ enum DesignCeiling {
     static let opacity = 6
     static let padding = 2
     static let radius = 1
-    static let frame = 45
+    static let frame = 43
     /// Views (outside UI/) whose name is written in at most one other place.
     static let viewsUsedOnce = 51
 }
