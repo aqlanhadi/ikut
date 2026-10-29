@@ -159,6 +159,7 @@
 		7E6E1801B96D4FC4E6A46128 /* LobbyMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D682C5C9F984EC55FF14A11 /* LobbyMap.swift */; };
 		7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C963869E69413A0E655BFED4 /* SpeechQueue.swift */; };
 		7F0F1E9387E6DF47B36D0E2D /* NextStop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B30BE299BB81EFCED8F1A8 /* NextStop.swift */; };
+		7F240A0DA3CBFE7964486BA4 /* TypeRoles.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D429A710F97F8DE1B7D75A /* TypeRoles.swift */; };
 		7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26B2BCA0CDF418B0CA82119 /* FirestorePaths.swift */; };
 		80D285211412E053AE968E46 /* CarRouteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22B87A46A5250E86D1E67E5D /* CarRouteService.swift */; };
 		843411F16EA0BC70B57A05EB /* StopAnswer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CD4811E9FF9FE7940656C0 /* StopAnswer.swift */; };
@@ -586,6 +587,7 @@
 		E0D7B5FA67D691851818F691 /* ConvoyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyTests.swift; sourceTree = "<group>"; };
 		E15CBEF7B0C3614BFEFF1F8A /* PanelSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSheetTests.swift; sourceTree = "<group>"; };
 		E25E6FF35596B79CECC7C289 /* CreateTripUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTripUITests.swift; sourceTree = "<group>"; };
+		E2D429A710F97F8DE1B7D75A /* TypeRoles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeRoles.swift; sourceTree = "<group>"; };
 		E32B7A73296BE953B6A5F8B1 /* MapMarkersDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapMarkersDemo.swift; sourceTree = "<group>"; };
 		E5E2C4D6FFA56CAD6008809D /* TrackingTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingTypes.swift; sourceTree = "<group>"; };
 		E6DA41E66D3D8B93F91BEADF /* StopDelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopDelay.swift; sourceTree = "<group>"; };
@@ -973,6 +975,7 @@
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
 				091C79B7B0A90381F07CB73D /* TripComponents.swift */,
 				456F6193440599A0317F386C /* TripExitMenu.swift */,
+				E2D429A710F97F8DE1B7D75A /* TypeRoles.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -1539,6 +1542,7 @@
 				7296DE8EDE46EEF454129D03 /* TripSessionLogic.swift in Sources */,
 				8CB57967F325C9B9457E3983 /* TripsHomeView+Demo.swift in Sources */,
 				57F8B464EC89FCDCF61E28B2 /* TripsHomeView.swift in Sources */,
+				7F240A0DA3CBFE7964486BA4 /* TypeRoles.swift in Sources */,
 				519A8EFE7DB25FA48F9DD13D /* WelcomeView.swift in Sources */,
 				7942FF1B470903985D10313B /* YouStatus.swift in Sources */,
 			);

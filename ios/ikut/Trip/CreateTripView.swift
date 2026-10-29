@@ -95,7 +95,7 @@ struct CreateTripView: View {
 
             HStack(spacing: Spacing.m) {
                 Image(systemName: "mappin")
-                    .font(.system(size: 17, weight: .bold))
+                    .ikutGlyph(17, weight: .bold, cap: 1.15)
                     .foregroundStyle(.red)
                     .frame(width: 20)
                     .accessibilityHidden(true)

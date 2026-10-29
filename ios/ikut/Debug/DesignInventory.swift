@@ -102,17 +102,13 @@ opacity|0.9||App/HomeMapContent.swift:55
 opacity|0.6||App/HomeMapContent.swift:100
 opacity|0.9||App/HomeMapContent.swift:118
 frame|width 12, height 12||App/HomeMapContent.swift:124
-font|13||App/HomeMapContent.swift:132
 frame|width 30, height 30||App/HomeMapContent.swift:134
-font|14||App/HomeTripRows.swift:47
 frame|width 30, height 30||App/HomeTripRows.swift:49
 frame|minHeight 56||App/HomeTripRows.swift:61
 frame|minHeight 56||App/HomeTripRows.swift:86
 frame|minHeight 44||App/PickedTripSheet.swift:67
-font|42||App/WelcomeView.swift:31
 frame|width 88, height 88||App/WelcomeView.swift:33
 padding|28||App/WelcomeView.swift:41
-font|28||App/WelcomeView.swift:53
 frame|width 36, height 36||App/WelcomeView.swift:55
 padding|44||App/WelcomeView.swift:67
 padding|32||App/WelcomeView.swift:69
@@ -141,7 +137,6 @@ font|11||Lobby/LobbyMap.swift:324
 font|12||Lobby/LobbyMap.swift:326
 frame|width 8, height 8||Lobby/LobbyMap.swift:328
 frame|minHeight 48||Lobby/LobbySheetSections.swift:89
-font|14||Lobby/LobbySheetSections.swift:193
 frame|width 32, height 32||Lobby/LobbySheetSections.swift:195
 frame|minHeight 48||Lobby/LobbySheetSections.swift:204
 frame|minHeight 48||Lobby/LobbySheetSections.swift:227
@@ -155,7 +150,6 @@ frame|minHeight 56||Lobby/LobbyStopsViews.swift:115
 padding|60||Lobby/LobbyStopsViews.swift:120
 padding|60||Lobby/LobbyStopsViews.swift:126
 frame|width 32, height 32||Lobby/LobbyStopsViews.swift:138
-font|14||Lobby/LobbyStopsViews.swift:142
 frame|width 32, height 32||Lobby/LobbyStopsViews.swift:144
 frame|minHeight 44||Lobby/LobbyStopsViews.swift:178
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
@@ -165,8 +159,6 @@ frame|minHeight 44||Lobby/PausedBanner.swift:31
 padding|9||Lobby/SuggestStopsSheet.swift:196
 padding|3||Lobby/SuggestStopsSheet.swift:196
 padding|32||Location/AlwaysLocationExplainerView.swift:14
-font|44||Location/AlwaysLocationExplainerView.swift:61
-font|22||Location/LocationAskStep.swift:31
 frame|width 30||Location/LocationAskStep.swift:33
 frame|width 14, height 14||Map/ConvoyPanel.swift:269
 opacity|0.8||Map/ConvoyPanel.swift:270
@@ -205,8 +197,6 @@ color|#6BB3FF|6BB3FF|Map/MapColors.swift:42
 color|#6BB3FF|6BB3FF|Map/MapColors.swift:42
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
-font|17||Map/MapModeControl.swift:26
-font|17||Map/MapModeControl.swift:45
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
 frame|width 10, height 10||Map/TripMapView.swift:609
 frame|width 12, height 12||Map/TripMapView.swift:630
@@ -224,7 +214,6 @@ color|#1F7A35|1F7A35|Recap/RecapContent.swift:145
 color|#B25000|B25000|Recap/RecapContent.swift:146
 color|#D70015|D70015|Recap/RecapContent.swift:147
 color|#5856D6|5856D6|Recap/RecapContent.swift:148
-font|18||Recap/RecapContent.swift:156
 frame|width 40, height 40||Recap/RecapContent.swift:157
 padding|5||Recap/RecapContent.swift:205
 frame|width 42||Recap/RecapContent.swift:205
@@ -262,11 +251,9 @@ frame|minHeight 44||Stops/StopCardParts.swift:137
 frame|width 34, height 34||Stops/StopPillView.swift:71
 frame|minHeight 52||Stops/StopPillView.swift:83
 frame|minHeight 44||Stops/StopPlaces.swift:58
-font|13||Trip/AddStopSheet.swift:168
 frame|width 28, height 28||Trip/AddStopSheet.swift:170
 frame|minHeight 56||Trip/AddStopSheet.swift:183
 frame|minHeight 50||Trip/AddStopSheet.swift:213
-font|20||Trip/AddStopSheet.swift:302
 frame|minHeight 84||Trip/AddStopSheet.swift:306
 frame|minHeight 44||Trip/AddStopSheet.swift:322
 frame|width 32, height 44||Trip/AddStopSheet.swift:337
@@ -276,14 +263,12 @@ opacity|0.25||Trip/CreateTripView.swift:81
 frame|width 20||Trip/CreateTripView.swift:82
 frame|minHeight 50||Trip/CreateTripView.swift:91
 padding|48||Trip/CreateTripView.swift:94
-font|17||Trip/CreateTripView.swift:98
 frame|width 20||Trip/CreateTripView.swift:100
 frame|width 32, height 44||Trip/CreateTripView.swift:123
 frame|minHeight 54||Trip/CreateTripView.swift:131
 font|34||Trip/MapPickView.swift:109
 frame|width 80||Trip/NewTripSheet.swift:100
 frame|minHeight 46||Trip/NewTripSheet.swift:109
-font|14||Trip/PlaceResultRow.swift:65
 frame|width 32, height 32||Trip/PlaceResultRow.swift:67
 frame|minHeight 58||Trip/PlaceResultRow.swift:80
 frame|minHeight 58||Trip/PlaceSearch.swift:261

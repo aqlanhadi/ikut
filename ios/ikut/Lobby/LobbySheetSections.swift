@@ -11,7 +11,7 @@ extension LobbyView {
         VStack(spacing: Spacing.xs) {
             Text("Trip code").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
             Text(LobbyLogic.displayCode(code))
-                .font(.system(size: ScaledSize.capped(codeSize, base: 36, cap: 1.5), weight: .bold, design: .monospaced))
+                .font(.ikutDisplay(scaled: codeSize, base: 36, cap: 1.5, weight: .bold, design: .monospaced))
                 .kerning(5)
                 // The code is one token that must stay on one line, so it shrinks rather than wraps.
                 .minimumScaleFactor(0.5)
@@ -190,7 +190,7 @@ extension LobbyView {
         Button(action: action) {
             HStack(spacing: Spacing.m) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .semibold))
+                    .ikutGlyph(14, weight: .semibold, cap: 1.3)
                     .foregroundStyle(Color.ikutAccent)
                     .frame(width: 32, height: 32)
                     .accessibilityHidden(true)

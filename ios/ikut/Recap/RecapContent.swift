@@ -130,8 +130,8 @@ struct RecapContent: View {
     private func statTile(_ s: RecapStat) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xxs) {
             Text(s.label).font(.footnote).foregroundStyle(.secondary)
-            (Text(s.value).font(.system(size: ScaledSize.capped(statValueSize, base: 28, cap: 1.6), weight: .bold, design: .rounded))
-                + Text(s.unit.isEmpty ? "" : " \(s.unit)").font(.system(size: ScaledSize.capped(statUnitSize, base: 17, cap: 1.6), weight: .semibold)).foregroundStyle(.secondary))
+            (Text(s.value).font(.ikutDisplay(scaled: statValueSize, base: 28, cap: 1.6, weight: .bold, design: .rounded))
+                + Text(s.unit.isEmpty ? "" : " \(s.unit)").font(.ikutDisplay(scaled: statUnitSize, base: 17, cap: 1.6, weight: .semibold)).foregroundStyle(.secondary))
                 .monospacedDigit()
             Text(s.note.isEmpty ? " " : s.note).font(.footnote).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
         }
@@ -153,7 +153,7 @@ struct RecapContent: View {
         let car = s.cars.first { $0.id == a.carId }
         return VStack(alignment: .leading, spacing: Spacing.gap) {
             HStack {
-                Image(systemName: style.symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
+                Image(systemName: style.symbol).ikutGlyph(18, weight: .semibold, cap: 1.4).foregroundStyle(.white)
                     .frame(width: 40, height: 40).background(style.tint, in: Circle())
                 Spacer()
                 if let car { CarBadge(number: car.number, colorHex: car.color, size: 26) }

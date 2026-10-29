@@ -23,7 +23,7 @@ struct MapModeControl: View {
     private func button(_ target: MapMode, symbol: String, label: String) -> some View {
         Button { mode = target; taps += 1 } label: {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
+                .ikutGlyph(17, weight: .semibold)
                 .foregroundStyle(mode == target ? Color.surfaceAccent : Color.primary)
                 .frame(width: side, height: side)
         }
@@ -42,7 +42,7 @@ struct ReadAloudButton: View {
     var body: some View {
         Button { isOn.toggle() } label: {
             Image(systemName: isOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                .font(.system(size: 17, weight: .semibold))
+                .ikutGlyph(17, weight: .semibold)
                 .foregroundStyle(isOn ? Color.surfaceAccent : Color.primary)
                 .frame(width: side, height: side)
         }

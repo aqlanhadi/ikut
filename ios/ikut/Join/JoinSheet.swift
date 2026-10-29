@@ -323,7 +323,7 @@ struct JoinSheet: View {
             ForEach(0..<length, id: \.self) { index in
                 let active = codeFocused && index == min(characters.count, length - 1)
                 Text(index < characters.count ? String(characters[index]) : "")
-                    .font(.system(size: ScaledSize.capped(codeBoxSize, base: 26, cap: 1.4), weight: .semibold, design: .monospaced))
+                    .font(.ikutDisplay(scaled: codeBoxSize, base: 26, cap: 1.4, weight: .semibold, design: .monospaced))
                     // One letter per box: it can't wrap, so it shrinks a little at the largest sizes.
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)

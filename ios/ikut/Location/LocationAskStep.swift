@@ -28,7 +28,7 @@ struct LocationAskContent: View {
                 ForEach(promises) { promise in
                     HStack(alignment: .top, spacing: Spacing.m) {
                         Image(systemName: promise.symbol)
-                            .font(.system(size: 22))
+                            .ikutGlyph(22, cap: 1.25)
                             .foregroundStyle(Color.ikutAccent)
                             .frame(width: 30)
                             .accessibilityHidden(true)
