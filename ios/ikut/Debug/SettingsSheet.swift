@@ -25,45 +25,34 @@ struct SettingsSheet: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(spacing: 0) {
                 SheetHeader(title: "Settings", onClose: onClose)
-                CardHeader("Name")
-                Button(action: onRename) { row("Your name", value: name) }
-                    .buttonStyle(.plain)
-                    .ikutCard()
-                    .accessibilityIdentifier("settingsName")
-                InlineNote("The convoy sees this name in new trips.").padding(.top, Spacing.s)
-                CardHeader("Developer", top: Spacing.xl)
-                NavigationLink(value: Page.design) { row("Design language") }
-                    .buttonStyle(.plain)
-                    .ikutCard()
-                    .accessibilityIdentifier("settingsDesign")
+                    .padding(.horizontal, Spacing.l)
+                    .padding(.top, Spacing.l)
+                List {
+                    Section {
+                        Button(action: onRename) { LabeledContent("Your name", value: name) }
+                            .foregroundStyle(.primary)
+                            .accessibilityIdentifier("settingsName")
+                    } header: {
+                        Text("Name")
+                    } footer: {
+                        Text("The convoy sees this name in new trips.")
+                    }
+                    Section("Developer") {
+                        NavigationLink("Design language", value: Page.design)
+                            .accessibilityIdentifier("settingsDesign")
+                    }
+                }
+                .listStyle(.insetGrouped)
             }
-            .padding(.horizontal, Spacing.l)
-            .padding(.top, Spacing.l)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(Color.ikutScreen)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Page.self) { _ in
                 DesignLanguageView()
-                    .padding(.horizontal, Spacing.l)
-                    .background(Color.ikutScreen)
                     .navigationTitle("Design language")
                     .navigationBarTitleDisplayMode(.inline)
             }
             .navigationDestination(for: DesignDrill.self) { DesignDrillView(drill: $0) }
         }
-    }
-
-    private func row(_ title: String, value: String? = nil) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.primary)
-            Spacer()
-            if let value { Text(value).foregroundStyle(.secondary) }
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, Spacing.l)
-        .ikutRow()
-        .contentShape(Rectangle())
     }
 }
