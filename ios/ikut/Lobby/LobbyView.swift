@@ -106,13 +106,14 @@ struct LobbyView: View {
     /// organizer's card (editable) rather than a member's.
     init(
         sample model: LobbyModel, planner: StopPlanner, organizer: Bool, ownWay: OwnWayInfo? = nil, tall: Bool = false,
-        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil, sharing: Bool = false, lost: Bool = false,
+        joinTowns: JoinTowns? = nil, adding: AddStopModel? = nil, sharing: Bool = false, lost: Bool = false, paused: Bool = false,
         driving: LobbyView.SampleDriving? = nil
     ) {
         self.init(sample: model)
         sampleDriving = driving
         sampleSharing = sharing
         sampleLost = lost
+        if paused { session.pauseForDemo() }
         // A sample lobby never looks a town up unless the demo gives it a geocoder.
         if let joinTowns { _joinTowns = State(initialValue: joinTowns) }
         sampleTall = tall
@@ -576,19 +577,10 @@ struct LobbyView: View {
         // The header stays put and the rows fade out under it, as they do above the bottom bar.
         Group {
             List {
-                // Each hand-drawn part is one Section with one row (zero insets, clear background); the plain
-                // ones (Cars, Trip, Stops) are system rows. Code, options and exit follow in later pieces (D86).
-                Section {
-                    statusBanner.lobbyRow()
-                    if session.isPaused && !session.isEnded && !session.membershipLost {
-                        PausedBanner(session: session, onError: { actionError = $0 })
-                            .padding(.bottom, Spacing.xs)
-                            .lobbyRow()
-                    }
-                }
+                bannerSections
                 if let trip = model.trip {
                     if rows.ownWay {
-                        Section { ownWayTile(trip).lobbyRow(top: Spacing.xs, bottom: Spacing.xs) }
+                        ownWaySection(trip)
                     }
                     carsSection
                     if let actionError {
@@ -597,10 +589,11 @@ struct LobbyView: View {
                                 .lobbyRow(top: Spacing.m)
                         }
                     }
-                    Section { codeCard(trip.code).lobbyRow() }
+                    codeSection(trip.code)
                     tripSection(trip)
                     if showsStops { stopsSection(trip) }
-                    Section { optionRows }
+                    optionsSection
+                    exitSection
                 } else if let message = model.errorMessage {
                     Section {
                         Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
@@ -738,17 +731,14 @@ struct LobbyView: View {
     // MARK: A participant's own way in
 
     /// FROM to TO, where they join the convoy, and their drive (D26).
-    func ownWayTile(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.s) {
+    func ownWaySection(_ trip: Trip) -> some View {
+        Section {
             RouteEnds(from: ownWay.fromName, to: trip.destination.name)
             if let line = ownWay.joinLine {
                 Text(line).font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             }
-            routeTotal(trip, stops: shownStops)
+            routeTotal(trip, stops: shownStops, inList: true)
         }
-        .padding(Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .surfaceTile(radius: Radius.card)
     }
 
     /// The viewer's car colour for their own route on the map preview.

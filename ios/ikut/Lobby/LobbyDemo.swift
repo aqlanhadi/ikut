@@ -35,6 +35,8 @@ enum LobbyStopsDemo {
         case notReady
         /// The organiser's lobby before the start with this phone sharing: "Sharing" leads the subtitle (#394).
         case sharing
+        /// The same with sharing paused (the tinted banner with Resume), and a member who is no longer in the trip (the status banner).
+        case paused, noLonger
         /// Driving, the organiser's convoy sheet pulled up with R&R Bidor passed (D53, canvas row L).
         case pulledUp
         /// Driving, a participant no longer in the trip: the banner with Back to trips on the folded sheet (#403).
@@ -141,6 +143,13 @@ enum LobbyStopsDemo {
                         session: TripSession(tripId: "demo", userId: "u-c1"), model: map, stopService: DemoStopService(),
                         demoPulledUp: !lost, continuation: continuation, topBanner: banner))
                 })
+        case .paused:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            return LobbyView(
+                sample: joining(model(stopsOnRoute)), planner: planner, organizer: true, joinTowns: towns, sharing: true, paused: true)
+        case .noLonger:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: false, lost: true)
         case .started:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(sample: model(stopsOnRoute, started: true), planner: planner, organizer: true)
@@ -430,6 +439,9 @@ enum DemoScreens {
         case "road-pulled-up": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.pulledUp) })
         // The organiser's lobby before the start while this phone shares: "➤ Sharing" leads the subtitle (#394).
         case "lobby-sharing": return trip(LobbyStopsDemo.lobby(.sharing))
+        // The same lobby with sharing paused (Resume banner), and a member who is no longer in the trip (D86).
+        case "lobby-paused": return trip(LobbyStopsDemo.lobby(.paused))
+        case "lobby-no-longer": return trip(LobbyStopsDemo.lobby(.noLonger))
         // Driving, no longer in the trip: "You’re no longer in this trip" and Back to trips on top of the sheet (#403).
         case "road-no-longer-in-trip": return nav(TripScreenHost(mode: .driving) { LobbyStopsDemo.lobby(.drivingLost) })
         case "road-markers": return AnyView(MapMarkersDemo())
