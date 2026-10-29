@@ -8,14 +8,14 @@ struct PickedTripHeader: View {
     var picked: PickedTrip
     var onBack: () -> Void
     var onShowWholeTrip: () -> Void
-    @ScaledMetric(relativeTo: .body) private var buttonSide = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var buttonSide = SheetButtonSize.hit
     /// Holds Share's place while the recap loads, so the title doesn't shift when it arrives.
-    private var placeholderSide: CGFloat { SheetButtonSize.capped(buttonSide, base: SheetButtonSize.inline) }
+    private var placeholderSide: CGFloat { SheetButtonSize.capped(buttonSide, base: SheetButtonSize.hit) }
 
     var body: some View {
         let model = picked.model
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 RoundGlassIconButton(systemImage: "chevron.left", label: "Back to trips", style: .quiet,
                                      glyph: .body.weight(.semibold), action: onBack)
                 VStack(alignment: .leading, spacing: 1) {
@@ -44,7 +44,7 @@ struct PickedTripHeader: View {
                     Text(PickedTripLogic.leftLine).font(.footnote).foregroundStyle(.secondary)
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.gap)
+                .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.s)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("picked.left")
             } else if model.recap != nil {
@@ -54,13 +54,13 @@ struct PickedTripHeader: View {
                     Text(line)
                         .font(.subheadline.weight(.semibold)).monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.gap)
+                        .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.s)
                 }
             } else if let message = model.errorMessage {
                 Text(message)
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.gap)
+                    .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.s)
                 Button("Try again") { Task { await model.retry(myUserId: Auth.auth().currentUser?.uid) } }
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.ikutAccent)
@@ -94,7 +94,7 @@ struct PickedTripHeader: View {
             RoundGlassIconButton(systemImage: "xmark", label: "Show the whole trip", style: .bare,
                                  glyph: .subheadline.weight(.semibold), action: onShowWholeTrip)
         }
-        .padding(.leading, Spacing.m).padding(.trailing, Spacing.s).padding(.vertical, Spacing.gap)
+        .padding(.leading, Spacing.m).padding(.trailing, Spacing.s).padding(.vertical, Spacing.s)
         .ikutCard(radius: 18)
         .padding(.top, Spacing.m)
     }

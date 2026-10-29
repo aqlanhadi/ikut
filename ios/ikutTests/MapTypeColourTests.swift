@@ -44,7 +44,7 @@ struct MapTypeColourTests {
     }
 
     @Test func whiteGlyphsOnTheMapFillsReadInBothModes() {
-        for fill in [MapColors.ok, MapColors.hazardLow, MapColors.staleBadge, MapColors.errorBanner] {
+        for fill in [MapColors.ok, Palette.neutralFill, Palette.criticalFill] {
             #expect(contrast(0xFFFFFF, fill.light) >= 4.5)
             #expect(contrast(0xFFFFFF, fill.dark) >= 4.5)
         }
@@ -65,11 +65,10 @@ struct MapTypeColourTests {
         }
     }
 
-    /// D78: the unpicked disc is the neutral fill now, so it holds 4.5:1 like every other white-on-fill.
-    @Test func theUnpickedDiscHoldsTheNeutralFill() {
-        #expect(Palette.unselectedDisc == Palette.neutralFill)
-        #expect(contrast(0xFFFFFF, Palette.unselectedDisc.light) >= 4.5)
-        #expect(contrast(0xFFFFFF, Palette.unselectedDisc.dark) >= 4.5)
+    /// D78: the unpicked disc, the low hazard and the stale badge draw the neutral fill, so it holds 4.5:1 like every other white-on-fill.
+    @Test func theNeutralFillHoldsUnderWhite() {
+        #expect(contrast(0xFFFFFF, Palette.neutralFill.light) >= 4.5)
+        #expect(contrast(0xFFFFFF, Palette.neutralFill.dark) >= 4.5)
     }
 
     /// Mix `fg` over `bg` at `alpha`, per channel.
@@ -89,7 +88,7 @@ struct MapTypeColourTests {
             ("positive", Palette.positiveText),
             ("accent", Palette.accentText),
         ]
-        let tint = TintFill.chip.amount
+        let tint = TintFill.tint.amount
         #expect(tint == 0.14)
         for (name, t) in texts {
             for (fg, bgs) in [(t.light, [0xFFFFFF, 0xF2F2F7] as [UInt32]), (t.dark, [0x1C1C1E, 0x000000])] {
@@ -115,12 +114,7 @@ struct MapTypeColourTests {
     }
 
     @Test func theTextTokensAreTheOnesTheAppDraws() {
-        #expect(MapColors.warningTitle == Palette.warningText)
-        #expect(Palette.staleChipText == Palette.warningText)
-        #expect(MapColors.errorBanner == Palette.criticalFill)
-        #expect(Palette.reportRed == Palette.criticalFill)
-        #expect(MapColors.hazardLow == Palette.neutralFill && MapColors.staleBadge == Palette.neutralFill)
-        #expect(MapColors.glassAccentDark == MapColors.pillBlue)
+        #expect(TintFill.wash.amount == 0.06 && TintFill.tint.amount == 0.14)
     }
 
     @Test func aModeColourWithoutAlphaIsOpaque() {

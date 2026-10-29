@@ -135,7 +135,7 @@ struct StopCard: View {
     private var tilesScreen: some View {
         CardSheetFrame(title: "Ask to stop", subtitle: nil, onClose: onClose) {
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.gap), count: 2), spacing: Spacing.gap
+                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 2), spacing: Spacing.s
             ) {
                 ForEach(StopReason.all) { reason in
                     Button { model.ask.choose(reason) } label: {
@@ -154,7 +154,7 @@ struct StopCard: View {
                         .padding(.horizontal, Spacing.m)
                         .frame(maxWidth: .infinity, minHeight: 72)
                         .surfaceTile()
-                        .contentShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(reason.label)
@@ -235,7 +235,7 @@ struct StopCard: View {
                 .focused($messageFocused)
                 .padding(Spacing.m)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .ikutSurface(.quaternary, radius: Radius.control)
+                .ikutSurface(.quaternary, radius: Radius.inner)
                 .accessibilityIdentifier("stop.messageField")
             Text("\(ask.message.count) of \(StopLogic.maxMessageLength)")
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
@@ -340,7 +340,7 @@ struct StopCard: View {
             .accessibilityElement(children: .combine)
             requestButtons(state, suffix: suffix, height: big ? 56 : 44, secondaryHeight: big ? 56 : 44)
         }
-        .padding(Spacing.cozy)
+        .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceTile()
         .accessibilityElement(children: .contain)

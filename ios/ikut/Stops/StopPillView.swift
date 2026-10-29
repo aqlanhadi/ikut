@@ -18,7 +18,7 @@ struct StopPillView: View {
                 slim(symbol: "checkmark", title: title, detail: detail, id: "stop.pill.asked")
             }
         }
-        .elevation(.pill)
+        .elevation(.floating)
         .announces(announcement, id: pill.id)
     }
 

@@ -152,13 +152,13 @@ extension LobbyView {
                     tone: .failure,
                     title: StopNoteText.failureTitle(failure, stopName: nil, destinationName: trip.destination.name),
                     detail: StopNoteText.failureDetail(failure), retry: { planner.retry() })
-                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.s)
                     .cardSlice()
                     .lobbyRow()
             }
             if planner.queued && canEditStops {
                 StopNote(tone: .warning, title: StopNoteText.queuedTitle, detail: StopNoteText.queuedDetail)
-                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.gap)
+                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.s)
                     .cardSlice()
                     .lobbyRow()
             }
@@ -212,7 +212,7 @@ extension LobbyView {
 
     /// Keep screen on, Pause or Resume sharing, and at the very end Leave trip or End trip.
     @ViewBuilder var optionRows: some View {
-        optionsTile.lobbyRow(top: Spacing.section)
+        optionsTile.lobbyRow(top: Spacing.l)
         exitTile.lobbyRow(top: Spacing.m, bottom: Spacing.l)
     }
 
@@ -267,15 +267,15 @@ extension LobbyView {
             VStack(spacing: 0) {
                 ForEach(LobbyContent.pulledUp(rows), id: \.self) { section in
                     switch section {
-                    case .journey: journeyRows(trip, here: here).padding(.top, Spacing.section)
-                    case .code: codeCard(trip.code).padding(.top, Spacing.section)
+                    case .journey: journeyRows(trip, here: here).padding(.top, Spacing.l)
+                    case .code: codeCard(trip.code).padding(.top, Spacing.l)
                     case .trip: VStack(spacing: 0) { tripRows(trip) }.padding(.top, Spacing.m)
                     case .options:
                         // A Pause, Resume, Leave or End that didn't go through says so here, above the rows.
                         if let actionError {
-                            InlineNote(actionError, tone: .alert).padding(.top, Spacing.section)
+                            InlineNote(actionError, tone: .alert).padding(.top, Spacing.l)
                         }
-                        optionsTile.padding(.top, actionError == nil ? Spacing.section : Spacing.m)
+                        optionsTile.padding(.top, actionError == nil ? Spacing.l : Spacing.m)
                     case .exit: exitTile.padding(.top, Spacing.m)
                     }
                 }

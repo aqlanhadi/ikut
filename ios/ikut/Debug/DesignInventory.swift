@@ -107,13 +107,13 @@ frame|width 30, height 30||App/HomeTripRows.swift:49
 frame|minHeight 56||App/HomeTripRows.swift:61
 frame|minHeight 56||App/HomeTripRows.swift:86
 frame|minHeight 44||App/PickedTripSheet.swift:67
-frame|width 88, height 88||App/WelcomeView.swift:33
-padding|28||App/WelcomeView.swift:41
-frame|width 36, height 36||App/WelcomeView.swift:55
-padding|44||App/WelcomeView.swift:67
-padding|32||App/WelcomeView.swift:69
-padding|48||App/WelcomeView.swift:70
-padding|32||App/WelcomeView.swift:90
+frame|width 88, height 88||App/WelcomeView.swift:36
+padding|28||App/WelcomeView.swift:44
+frame|width 36, height 36||App/WelcomeView.swift:58
+padding|44||App/WelcomeView.swift:70
+padding|32||App/WelcomeView.swift:72
+padding|48||App/WelcomeView.swift:73
+padding|32||App/WelcomeView.swift:93
 frame|minHeight 50||Auth/NameEntryView.swift:110
 padding|3||Hazards/HazardMapContent.swift:37
 frame|width 0||Hazards/HazardMapContent.swift:43
@@ -181,10 +181,10 @@ frame|minHeight 54||Map/ConvoyRows.swift:143
 frame|width 44, height 44||Map/DrivingGlance.swift:82
 color|#1F7A35|1F7A35|Map/MapColors.swift:27
 color|#23823A|23823A|Map/MapColors.swift:27
-color|#64B5FF|64B5FF|Map/MapColors.swift:34
-color|#64B5FF|64B5FF|Map/MapColors.swift:34
-color|#1C1C1E|1C1C1E|Map/MapColors.swift:38
-color|#48484A|48484A|Map/MapColors.swift:38
+color|#64B5FF|64B5FF|Map/MapColors.swift:30
+color|#64B5FF|64B5FF|Map/MapColors.swift:30
+color|#1C1C1E|1C1C1E|Map/MapColors.swift:32
+color|#48484A|48484A|Map/MapColors.swift:32
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
@@ -271,41 +271,77 @@ color|#0F766E|0F766E|Trip/TripService.swift:18
 color|#7C3AED|7C3AED|Trip/TripService.swift:18
 color|#BE185D|BE185D|Trip/TripService.swift:18
 color|#A16207|A16207|Trip/TripService.swift:18
-opacity|0.25||UI/GlassSurface.swift:90
+opacity|0.25||UI/GlassSurface.swift:86
 color|#0071E3|0071E3|UI/Palette.swift:12
 color|#0071E3|0071E3|UI/Palette.swift:12
 color|#0A84FF|0A84FF|UI/Palette.swift:14
 color|#0A84FF|0A84FF|UI/Palette.swift:14
 color|#0060DF|0060DF|UI/Palette.swift:15
 color|#0060DF|0060DF|UI/Palette.swift:15
-color|#005FBF|005FBF|UI/Palette.swift:22
-color|#2997FF|2997FF|UI/Palette.swift:22
-color|#1D7031|1D7031|UI/Palette.swift:24
-color|#30D158|30D158|UI/Palette.swift:24
-color|#B02800|B02800|UI/Palette.swift:27
-color|#FF9F0A|FF9F0A|UI/Palette.swift:27
-color|#C93300|C93300|UI/Palette.swift:29
-color|#C93300|C93300|UI/Palette.swift:29
-color|#D60014|D60014|UI/Palette.swift:31
-color|#D60014|D60014|UI/Palette.swift:31
-color|#636366|636366|UI/Palette.swift:33
-color|#6E6E73|6E6E73|UI/Palette.swift:33
-color|#0F756E|0F756E|UI/Palette.swift:36
-color|#2ED4BF|2ED4BF|UI/Palette.swift:36
-color|#1C1C1C|1C1C1C|UI/Palette.swift:41
-color|#1C1C1C|1C1C1C|UI/Palette.swift:41
+color|#005FBF|005FBF|UI/Palette.swift:20
+color|#2997FF|2997FF|UI/Palette.swift:20
+color|#1D7031|1D7031|UI/Palette.swift:22
+color|#30D158|30D158|UI/Palette.swift:22
+color|#B02800|B02800|UI/Palette.swift:25
+color|#FF9F0A|FF9F0A|UI/Palette.swift:25
+color|#C93300|C93300|UI/Palette.swift:27
+color|#C93300|C93300|UI/Palette.swift:27
+color|#D60014|D60014|UI/Palette.swift:29
+color|#D60014|D60014|UI/Palette.swift:29
+color|#636366|636366|UI/Palette.swift:31
+color|#6E6E73|6E6E73|UI/Palette.swift:31
+color|#0F756E|0F756E|UI/Palette.swift:34
+color|#2ED4BF|2ED4BF|UI/Palette.swift:34
+color|#1C1C1C|1C1C1C|UI/Palette.swift:39
+color|#1C1C1C|1C1C1C|UI/Palette.swift:39
+color|#FFFFFF|FFFFFF|UI/Palette.swift:41
+color|#FFFFFF|FFFFFF|UI/Palette.swift:41
+color|#000000|000000|UI/Palette.swift:43
 color|#FFFFFF|FFFFFF|UI/Palette.swift:43
-color|#FFFFFF|FFFFFF|UI/Palette.swift:43
-color|#000000|000000|UI/Palette.swift:45
-color|#FFFFFF|FFFFFF|UI/Palette.swift:45
-color|#8A6B45|8A6B45|UI/Palette.swift:53
-color|#8A6B45|8A6B45|UI/Palette.swift:53
-frame|minHeight 48||UI/SheetChrome.swift:300
-frame|width 32, height 44||UI/SheetChrome.swift:373
-frame|minHeight 58||UI/Theme.swift:249
+color|#8A6B45|8A6B45|UI/Palette.swift:48
+color|#8A6B45|8A6B45|UI/Palette.swift:48
+frame|minHeight 48||UI/SheetChrome.swift:299
+frame|width 32, height 44||UI/SheetChrome.swift:372
+frame|minHeight 58||UI/Theme.swift:222
 frame|height 28||UI/TripComponents.swift:105
 font|7||UI/TripComponents.swift:196
 padding|5||UI/TripComponents.swift:206
 frame|width 2||UI/TripComponents.swift:224
+"""
+
+    /// group | token name, for the token ratchet
+    static let tokenRows = """
+spacing|xxs
+spacing|xs
+spacing|tight
+spacing|s
+spacing|chipX
+spacing|m
+spacing|l
+spacing|xl
+radius|icon
+radius|inner
+radius|card
+elevation|marker
+elevation|floating
+tintFill|wash
+tintFill|tint
+colour|accentFill
+colour|route
+colour|routeCasing
+colour|accentText
+colour|positiveText
+colour|warningText
+colour|warningFill
+colour|criticalFill
+colour|neutralFill
+colour|joining
+colour|bannerDark
+colour|surfaceTileFill
+colour|surfaceSecondary
+colour|reportBrown
+colour|ok
+colour|pillBlue
+colour|destinationPin
 """
 }

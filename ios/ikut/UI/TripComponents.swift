@@ -44,7 +44,7 @@ struct RouteEnds: View {
     var size: CGFloat = 30
 
     var body: some View {
-        HStack(spacing: Spacing.gap) {
+        HStack(spacing: Spacing.s) {
             if let from {
                 Text(from)
                 Image(systemName: "arrow.right")
@@ -146,7 +146,7 @@ struct StatGrid: View {
 }
 
 /// The app's one chip: a capsule with a label, an optional leading symbol or dot, and a tone. The fill is the tone's
-/// colour at `TintFill.chip` (or a material, for a chip over the map); nothing here is a colour literal.
+/// colour at `TintFill.tint` (or a material, for a chip over the map); nothing here is a colour literal.
 struct Chip: View {
     enum Tone: CaseIterable {
         case accent, positive, warning, neutral
@@ -166,8 +166,8 @@ struct Chip: View {
         /// The tinted fill: the tone's colour at its `TintFill`.
         var tint: Color {
             switch self {
-            case .onDark: Color.white.fill(.onDark)
-            default: text.fill(.chip)
+            case .onDark: Color.white.fill(.tint)
+            default: text.fill(.tint)
             }
         }
     }
@@ -202,7 +202,7 @@ struct Chip: View {
         }
         .font(.footnote.weight(.semibold))
         .foregroundStyle(tone.text)
-        .padding(.horizontal, Spacing.gap)
+        .padding(.horizontal, Spacing.s)
         .padding(.vertical, 5)
         .background(background, in: Capsule())
         .accessibilityElement(children: .combine)
@@ -252,7 +252,7 @@ struct DashedDivider: View {
             .init("Lead", "96 km/h"),
             .init("Cars", "5"),
         ], background: Color(.secondarySystemBackground), valueSize: 15)
-        HStack(spacing: Spacing.gap) {
+        HStack(spacing: Spacing.s) {
             Chip(text: "Gathering", tone: .warning, lead: .dot(.orange), fill: .material)
             Chip(text: "On the move", tone: .positive, lead: .dot(.green), fill: .material)
             Chip(text: "Tinted", tone: .accent, lead: .symbol("flag.checkered"))

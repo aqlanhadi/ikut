@@ -328,9 +328,9 @@ struct JoinSheet: View {
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, minHeight: 54)
-                    .surfaceTile(radius: Radius.control)
+                    .surfaceTile(radius: Radius.inner)
                     .overlay {
-                        RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
                             .strokeBorder(Color.ikutAccent, lineWidth: active ? 2 : 0)
                     }
             }
@@ -366,7 +366,7 @@ struct JoinSheet: View {
                 .foregroundStyle(Color.ikutPositive)
                 .padding(.horizontal, Spacing.chipX)
                 .padding(.vertical, Spacing.xs)
-                .background(Color.ikutPositive.fill(.chip), in: Capsule())
+                .background(Color.ikutPositive.fill(.tint), in: Capsule())
             Text(preview.name)
                 .font(.title3.weight(.semibold))
                 .padding(.top, Spacing.xs)
@@ -384,7 +384,7 @@ struct JoinSheet: View {
         .animation(.easeOut, value: model.ticketDrive)
         .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .surfaceTile(radius: Radius.control)
+        .surfaceTile(radius: Radius.inner)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("joinTripCard")
     }
@@ -415,7 +415,7 @@ struct JoinSheet: View {
                     detail: "Shares this car’s location", selected: model.selection == .newCar
                 ) { model.selectNewCar() }
             }
-            .surfaceTile(radius: Radius.control)
+            .surfaceTile(radius: Radius.inner)
 
             if model.selection == .newCar {
                 TextField("Car name", text: $model.newCarName)
@@ -423,7 +423,7 @@ struct JoinSheet: View {
                     .disabled(model.isJoining)
                     .padding(.horizontal, Spacing.l)
                     .frame(minHeight: 46)
-                    .surfaceTile(radius: Radius.control)
+                    .surfaceTile(radius: Radius.inner)
                     .accessibilityLabel("Car name")
                     .accessibilityIdentifier("joinCarNameField")
                     .onChange(of: model.newCarName) { model.newCarNameDidEdit() }

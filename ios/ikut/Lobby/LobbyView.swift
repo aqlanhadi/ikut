@@ -172,7 +172,7 @@ struct LobbyView: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                         .accessibilityIdentifier("lobby.waitingForCars")
                 }
                 Button {
@@ -590,12 +590,12 @@ struct LobbyView: View {
                             .padding(.top, Spacing.m)
                             .lobbyRow()
                     }
-                    codeCard(trip.code).lobbyRow(top: Spacing.section)
+                    codeCard(trip.code).lobbyRow(top: Spacing.l)
                     tripRows(trip)
                     stopsRows(trip)
                     optionRows
                 } else if let message = model.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.block)
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
                         .lobbyRow()
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
@@ -732,7 +732,7 @@ struct LobbyView: View {
 
     /// FROM to TO, where they join the convoy, and their drive (D26).
     func ownWayTile(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.gap) {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             RouteEnds(from: ownWay.fromName, to: trip.destination.name)
             if let line = ownWay.joinLine {
                 Text(line).font(.subheadline).foregroundStyle(Color.surfaceSecondary)
@@ -793,7 +793,7 @@ struct QRCodeSheet: View {
                     .scaledToFit()
                     .frame(maxWidth: 260, maxHeight: 260)
                     .padding(Spacing.m)
-                    .background(.white, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                    .background(.white, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                     .accessibilityLabel("QR code to join with code \(code)")
             }
             Text(LobbyLogic.displayCode(code))

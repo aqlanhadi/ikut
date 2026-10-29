@@ -169,3 +169,41 @@ struct InventoryCounts: Equatable, Sendable {
         return out
     }
 }
+
+/// D78: the token ratchet. How many tokens the shared look defines (spacing, corner radii, shadows, tint fills,
+/// colours), parsed by `tools/design-inventory.mjs` into `DesignInventory.tokenRows`. It may only go down; the
+/// ceilings are in `TokenCeiling`.
+struct TokenCounts: Equatable, Sendable {
+    static let groups = ["spacing", "radius", "elevation", "tintFill", "colour"]
+    var byGroup: [String: Int]
+
+    /// `rows` is `group|name` per line.
+    init(rows: String) {
+        var counts: [String: Int] = [:]
+        for line in rows.split(separator: "\n") {
+            let parts = line.split(separator: "|", omittingEmptySubsequences: false)
+            guard parts.count == 2 else { continue }
+            counts[String(parts[0]), default: 0] += 1
+        }
+        byGroup = counts
+    }
+
+    init(byGroup: [String: Int]) { self.byGroup = byGroup }
+
+    static var now: TokenCounts { TokenCounts(rows: DesignInventory.tokenRows) }
+
+    static var ceiling: TokenCounts {
+        TokenCounts(byGroup: [
+            "spacing": TokenCeiling.spacing, "radius": TokenCeiling.radius, "elevation": TokenCeiling.elevation,
+            "tintFill": TokenCeiling.tintFill, "colour": TokenCeiling.colour,
+        ])
+    }
+
+    /// One line per group above its ceiling; empty when no scale has grown.
+    func exceeding(_ ceiling: TokenCounts) -> [String] {
+        Self.groups.compactMap { g in
+            let (n, max) = (byGroup[g] ?? 0, ceiling.byGroup[g] ?? 0)
+            return n > max ? "\(g): \(n) tokens is above the ceiling of \(max)" : nil
+        }
+    }
+}

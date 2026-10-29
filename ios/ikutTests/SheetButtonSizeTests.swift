@@ -6,16 +6,16 @@ import Testing
 struct SheetButtonSizeTests {
     @Test func neverUnderTheHitTarget() {
         // At the smallest text size a 44 pt button would scale below 44; it stays tappable.
-        #expect(SheetButtonSize.capped(38, base: SheetButtonSize.inline) == SheetButtonSize.hit)
+        #expect(SheetButtonSize.capped(38, base: SheetButtonSize.hit) == SheetButtonSize.hit)
     }
 
     @Test func scalesWithinTheCap() {
-        #expect(SheetButtonSize.capped(52, base: SheetButtonSize.inline) == 52)
+        #expect(SheetButtonSize.capped(52, base: SheetButtonSize.hit) == 52)
     }
 
     @Test func neverOutgrowsTheCap() {
-        let cap = SheetButtonSize.inline * SheetButtonSize.maxScale
-        #expect(SheetButtonSize.capped(200, base: SheetButtonSize.inline) == cap)
+        let cap = SheetButtonSize.hit * SheetButtonSize.maxScale
+        #expect(SheetButtonSize.capped(200, base: SheetButtonSize.hit) == cap)
     }
 
     @Test func aSmallBaseStillKeepsTheHitTarget() {

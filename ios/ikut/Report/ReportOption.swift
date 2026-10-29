@@ -14,14 +14,14 @@ struct ReportOption: Identifiable, Equatable, Sendable {
 
     /// The 6 hazards and 2 conditions in the mockup's order (a 2-column grid, 4 rows).
     static let events: [ReportOption] = [
-        ReportOption(type: .debris, label: "Debris", symbol: "exclamationmark.triangle.fill", tint: Palette.reportOrange.color),
-        ReportOption(type: .accident, label: "Accident", symbol: "exclamationmark.octagon.fill", tint: Palette.reportRed.color),
+        ReportOption(type: .debris, label: "Debris", symbol: "exclamationmark.triangle.fill", tint: Palette.warningFill.color),
+        ReportOption(type: .accident, label: "Accident", symbol: "exclamationmark.octagon.fill", tint: Palette.criticalFill.color),
         ReportOption(type: .pothole, label: "Pothole", symbol: "circle.bottomhalf.filled", tint: Palette.reportBrown.color),
-        ReportOption(type: .animal, label: "Animal", symbol: "pawprint.fill", tint: Palette.reportGreen.color),
-        ReportOption(type: .stoppedVehicle, label: "Stopped car", symbol: "car.fill", tint: Palette.reportGray.color),
-        ReportOption(type: .roadworks, label: "Roadworks", symbol: "cone.fill", tint: Palette.reportOrange.color),
-        ReportOption(type: .heavyRain, label: "Heavy rain", symbol: "cloud.heavyrain.fill", tint: Palette.reportBlue.color),
-        ReportOption(type: .trafficJam, label: "Traffic jam", symbol: "car.2.fill", tint: Palette.reportRed.color),
+        ReportOption(type: .animal, label: "Animal", symbol: "pawprint.fill", tint: MapColors.ok.color),
+        ReportOption(type: .stoppedVehicle, label: "Stopped car", symbol: "car.fill", tint: Palette.neutralFill.color),
+        ReportOption(type: .roadworks, label: "Roadworks", symbol: "cone.fill", tint: Palette.warningFill.color),
+        ReportOption(type: .heavyRain, label: "Heavy rain", symbol: "cloud.heavyrain.fill", tint: Palette.accentFill.color),
+        ReportOption(type: .trafficJam, label: "Traffic jam", symbol: "car.2.fill", tint: Palette.criticalFill.color),
     ]
 
     /// "About your car": three pills under the grid.

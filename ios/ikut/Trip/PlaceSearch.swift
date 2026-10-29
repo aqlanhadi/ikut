@@ -266,7 +266,7 @@ struct PlaceSearchResults: View {
                 Text("No places match “\(model.trimmedQuery)”. Try a town name.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.section)
+                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.l)
             }
         }
         // One view per result, so a scroll position can name it (Where to? follows the list with its camera).

@@ -36,7 +36,7 @@ struct HazardMapContent: View {
                         .padding(.horizontal, Spacing.s)
                         .padding(.vertical, 3)
                         .background(.regularMaterial, in: Capsule())
-                        .elevation(.hazardDot)
+                        .elevation(.marker)
                         // To the left of the circle, as in the mockup: a zero-width box at the circle's
                         // leading edge, with the chip hanging off its trailing side.
                         .padding(.trailing, Spacing.s)
@@ -112,9 +112,9 @@ extension HazardTone {
     /// white glyph.
     var fill: Color {
         switch self {
-        case .high: .ikutLeadYellow
+        case .high: .yellow
         case .medium: .orange
-        case .low: MapColors.hazardLow.color
+        case .low: Palette.neutralFill.color
         }
     }
 

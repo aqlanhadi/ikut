@@ -49,7 +49,7 @@ struct MapMarkerView: View {
                         if marker.isLead {
                             Image(systemName: "star.fill")
                                 .font(.system(size: 8 * scale, weight: .bold))
-                                .foregroundStyle(Color.ikutLeadYellow)
+                                .foregroundStyle(Color.yellow)
                                 .frame(width: 14 * scale, height: 14 * scale)
                                 .background(.white, in: Circle())
                                 .offset(x: 5 * scale, y: -5 * scale)
@@ -60,7 +60,7 @@ struct MapMarkerView: View {
             // A small clock on a car that has gone quiet, at full strength, so stale reads without the fade.
             .overlay(alignment: .bottomLeading) {
                 if MarkerMetrics.showsStaleBadge(marker) {
-                    glyph("clock.fill", weight: .bold, size: 15, fill: MapColors.staleBadge.color, ring: 1.5)
+                    glyph("clock.fill", weight: .bold, size: 15, fill: Palette.neutralFill.color, ring: 1.5)
                         .padding(.leading, (frameSize - badge) / 2 - 5 * scale)
                         .padding(.bottom, (frameSize - badge) / 2 - 5 * scale)
                 }
@@ -74,7 +74,7 @@ struct MapMarkerView: View {
                 if marker.isMine { YouTag(online: marker.youOnline) }
             }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? Color.ikutStaleChipText : Color.primary))
+                .foregroundStyle(marker.isPaused ? Color.secondary : (marker.isStale ? Color.ikutWarning : Color.primary))
                 .lineLimit(1)
                 .fixedSize()
                 // No capsule: a halo in the background colour, as on Apple's own map labels, keeps it readable.
@@ -158,7 +158,7 @@ struct MergePointView: View {
                     .padding(.vertical, Spacing.xs)
                     .background(.regularMaterial, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.car(hex: colorHex), lineWidth: 1.5))
-                    .elevation(.label)
+                    .elevation(.marker)
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipWidth = $0 }
                     .padding(side == .trailing ? .leading : .trailing, Spacing.xl)
             }

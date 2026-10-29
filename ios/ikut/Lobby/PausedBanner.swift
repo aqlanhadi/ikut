@@ -27,9 +27,9 @@ struct PausedBanner: View {
                     Text("Resume")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.ikutAccent)
-                        .padding(.horizontal, Spacing.cozy)
+                        .padding(.horizontal, Spacing.l)
                         .frame(minHeight: 44)
-                        .background(Color.ikutAccent.fill(.faint), in: Capsule())
+                        .background(Color.ikutAccent.fill(.tint), in: Capsule())
                         .contentShape(Capsule())
                 }
                 .disabled(isResuming)
@@ -39,8 +39,8 @@ struct PausedBanner: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, Spacing.cozy).padding(.vertical, Spacing.gap)
-        .background(Color.ikutWarning.fill(.soft), in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+        .background(Color.ikutWarning.fill(.tint), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 

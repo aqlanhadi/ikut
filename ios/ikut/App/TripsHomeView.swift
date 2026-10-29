@@ -573,7 +573,7 @@ struct TripsHomeView: View {
                 // The server has no per-user trip list; PastTrips remembers trips opened on this phone.
                 EmptyRow("Trips you start or join will show here.")
                     .foregroundStyle(Color.surfaceSecondary)
-                    .surfaceTile(radius: Radius.control)
+                    .surfaceTile(radius: Radius.inner)
             } else {
                 HomeTripGroup(entries: parts.past, open: open) { HomePastRow(entry: $0) }
             }

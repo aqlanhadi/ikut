@@ -13,7 +13,7 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: Spacing.gap) {
+        HStack(spacing: Spacing.s) {
             icon
                 .font(.title3.weight(.bold))
                 .foregroundStyle(.black)
@@ -36,12 +36,12 @@ struct DarkBanner<Icon: View, Trailing: View>: View {
         .foregroundStyle(.white)
         // 14 on the right as on the canvas; a button there brings its own room.
         .padding(.leading, Spacing.s)
-        .padding(.trailing, Trailing.self == EmptyView.self ? Spacing.cozy : Spacing.s)
+        .padding(.trailing, Trailing.self == EmptyView.self ? Spacing.l : Spacing.s)
         .padding(.vertical, Spacing.tight)
         .frame(minHeight: 56)
         // #1C1C1E, as on the design canvas.
-        .background(Color.ikutBannerDark, in: RoundedRectangle(cornerRadius: Radius.banner, style: .continuous))
-        .elevation(.banner)
+        .background(Color.ikutBannerDark, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .elevation(.floating)
     }
 }
 
@@ -70,7 +70,7 @@ extension DarkBanner where Icon == Image, Trailing == EmptyView {
         DarkBanner(title: "Heavy rain reported", symbol: "cloud.rain.fill", circle: .yellow) {
             Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
         }
-        DarkBanner(title: "Sending debris…", circle: .white.fill(.onDark)) {
+        DarkBanner(title: "Sending debris…", circle: .white.fill(.tint)) {
             ProgressView().tint(.white)
         } trailing: {
             EmptyView()

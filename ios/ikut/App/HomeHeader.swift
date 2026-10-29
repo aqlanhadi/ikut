@@ -17,7 +17,7 @@ struct HomeHeader: View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             // Apple Maps' top row: the search bar and the name's avatar. Tapping the bar starts the same flow, in
             // Where to?, where the bar becomes editable.
-            HStack(spacing: Spacing.gap) {
+            HStack(spacing: Spacing.s) {
                 SheetSearchButton(placeholder: "Where to?", action: onNewTrip)
                     .trackingHeight($barHeight)
                     .accessibilityIdentifier("homeWhereTo")
@@ -40,7 +40,7 @@ struct HomeHeader: View {
                 .padding(.horizontal, Spacing.m)
                 .frame(minHeight: 50)
                 .contentShape(Rectangle())
-                .surfaceTile(radius: Radius.control)
+                .surfaceTile(radius: Radius.inner)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("homeJoin")

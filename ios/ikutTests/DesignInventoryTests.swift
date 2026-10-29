@@ -83,4 +83,20 @@ struct DesignInventoryTests {
         #expect(now.exceeding(InventoryCounts(byCategory: [.font: 1], viewsUsedOnce: 0)).isEmpty)
         #expect(now.exceeding(InventoryCounts(byCategory: [.font: 0], viewsUsedOnce: 0)) == ["font: 1 is above the ceiling of 0"])
     }
+
+    // MARK: the token ratchet (D78)
+
+    @Test func theTokenCountIsWithinItsCeiling() {
+        let now = TokenCounts.now
+        #expect(now.byGroup.values.reduce(0, +) > 0, "no tokens parsed: regenerate with node tools/design-inventory.mjs")
+        #expect(now.exceeding(.ceiling).isEmpty, "A token was added. Reuse one that exists, or merge another away, or see DesignTokenCeiling.swift. \(now.exceeding(.ceiling))")
+    }
+
+    @Test func aTokenOverItsCeilingFails() {
+        var over = TokenCounts.ceiling
+        over.byGroup["colour", default: 0] += 1
+        #expect(over.exceeding(.ceiling) == ["colour: \(TokenCeiling.colour + 1) tokens is above the ceiling of \(TokenCeiling.colour)"])
+        #expect(TokenCounts.ceiling.exceeding(.ceiling).isEmpty)
+        #expect(TokenCounts(rows: "spacing|a\nspacing|b\nradius|c\nbad").byGroup == ["spacing": 2, "radius": 1])
+    }
 }

@@ -98,7 +98,7 @@ struct NameFieldCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Your name", top: Spacing.sectionLarge)
+            CardHeader("Your name", top: Spacing.xl)
                 .accessibilityHidden(true)
             TextField("Your name", text: $name)
                 .textContentType(.givenName)

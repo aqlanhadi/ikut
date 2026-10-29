@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One button in the card's action area. `.primary` is the main action (`SheetButtonSize.bar`, as every sheet's bottom
 /// bar, or `height` when the driver needs a huge one), `.secondary` a gray capsule, `.positive` the chosen answer,
-/// `.ghost` plain text (`SheetButtonSize.inline`).
+/// `.ghost` plain text (`SheetButtonSize.hit`).
 struct StopActionButton: View {
     enum Style { case primary, secondary, positive, ghost, destructive }
 
@@ -18,7 +18,7 @@ struct StopActionButton: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .headline) private var barHeight = SheetButtonSize.bar
-    @ScaledMetric(relativeTo: .body) private var inlineHeight = SheetButtonSize.inline
+    @ScaledMetric(relativeTo: .body) private var inlineHeight = SheetButtonSize.hit
 
     var body: some View {
         // At accessibility sizes a long title wraps to two lines and the button grows, not truncates.
@@ -68,7 +68,7 @@ struct StopActionButton: View {
         switch style {
         case .primary: Color.ikutAccent
         case .secondary: Color(.systemGray5).opacity(0.7)
-        case .positive: Color.green.fill(.onDark)
+        case .positive: Color.green.fill(.tint)
         case .ghost, .destructive: .clear
         }
     }
@@ -105,7 +105,7 @@ struct StopMessageTile: View {
                 .font(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, Spacing.cozy)
+        .padding(.horizontal, Spacing.l)
         .padding(.vertical, Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceTile()
@@ -129,7 +129,7 @@ struct StopVoterRow: View {
             Text(status.text)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(chipText(status.color))
-                .padding(.horizontal, Spacing.gap)
+                .padding(.horizontal, Spacing.s)
                 .padding(.vertical, 5)
                 .background(status.color.opacity(GlassSurface.active ? 0.2 : 0.14), in: Capsule())
                 .background(GlassSurface.active && scheme == .dark ? Color.black.opacity(0.4) : .clear, in: Capsule())

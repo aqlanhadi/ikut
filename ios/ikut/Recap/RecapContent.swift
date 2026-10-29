@@ -47,7 +47,7 @@ struct RecapContent: View {
         if layout == .screen {
             Text("Trip complete")
                 .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ikutAccent)
-                .padding(.horizontal, Spacing.xs).padding(.top, Spacing.cozy)
+                .padding(.horizontal, Spacing.xs).padding(.top, Spacing.l)
             Text(recap.subtitle)
                 .font(.subheadline).foregroundStyle(.secondary)
                 .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xxs)
@@ -73,11 +73,11 @@ struct RecapContent: View {
         }
         .ikutCard()
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        .padding(.top, layout == .screen ? Spacing.section : Spacing.l)
+        .padding(.top, layout == .screen ? Spacing.l : Spacing.l)
 
         if !recap.awards.isEmpty {
             sectionTitle("Road trip awards")
-            LazyVGrid(columns: columns == 1 ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: Spacing.gap), GridItem(.flexible())], spacing: Spacing.gap) {
+            LazyVGrid(columns: columns == 1 ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: Spacing.s), GridItem(.flexible())], spacing: Spacing.s) {
                 ForEach(recap.awards, id: \.kind) { award(of: $0, snapshot) }
             }
         }
@@ -104,7 +104,7 @@ struct RecapContent: View {
                 Button(action: onDone) { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link)
             }
         }
-        .padding(.top, Spacing.block)
+        .padding(.top, Spacing.xl)
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -136,7 +136,7 @@ struct RecapContent: View {
             Text(s.note.isEmpty ? " " : s.note).font(.footnote).foregroundStyle(.secondary).wrapsAtAccessibilitySizes()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.cozy)
+        .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.l)
         .accessibilityElement(children: .combine)
     }
 
@@ -151,7 +151,7 @@ struct RecapContent: View {
     private func award(of a: RecapAward, _ s: RecapSnapshot) -> some View {
         let style = Self.awardStyle[a.kind] ?? ("star.fill", .ikutAccent)
         let car = s.cars.first { $0.id == a.carId }
-        return VStack(alignment: .leading, spacing: Spacing.gap) {
+        return VStack(alignment: .leading, spacing: Spacing.s) {
             HStack {
                 Image(systemName: style.symbol).ikutGlyph(18, weight: .semibold, cap: 1.4).foregroundStyle(.white)
                     .frame(width: 40, height: 40).background(style.tint, in: Circle())
@@ -164,7 +164,7 @@ struct RecapContent: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(Spacing.cozy)
+        .padding(Spacing.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .ikutCard()
         .accessibilityElement(children: .combine)
