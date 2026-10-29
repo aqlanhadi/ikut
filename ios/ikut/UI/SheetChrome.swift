@@ -44,7 +44,7 @@ extension View {
 
     /// The label of a full-width bottom-bar action (Start trip, Show map, Create trip, Add <place>, Report, Pit stop,
     /// a card's main button): headline, as wide as the bar, `SheetButtonSize.bar` tall, growing with the text size.
-    /// With `actionBarStyle` (or `actionButton`, `surfaceButton`) and inside `sheetActionBar`, every bar is one shape.
+    /// With `actionBarStyle` (or `ikutButton`) and inside `sheetActionBar`, every bar is one shape.
     /// `font`: the lobby's waiting line keeps its quieter text in the same shape.
     func barActionLabel(fullWidth: Bool = true, font: Font = .headline) -> some View {
         modifier(BarActionLabel(fullWidth: fullWidth, font: font))

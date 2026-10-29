@@ -39,14 +39,14 @@ extension LobbyView {
                         .font(.subheadline.weight(.semibold))
                         .inlineActionLabel()
                 }
-                .actionButton(.secondary, onGlass: true)
+                .ikutButton(.secondary, onGlass: true)
                 .sensoryFeedback(.success, trigger: copiedCount)
                 .accessibilityIdentifier("lobby.copyCode")
                 Button { showQR = true } label: {
                     Label("QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold))
                         .inlineActionLabel()
                 }
-                .actionButton(.secondary, onGlass: true)
+                .ikutButton(.secondary, onGlass: true)
                 .accessibilityIdentifier("lobby.showQR")
             }
             .padding(.top, Spacing.tight)

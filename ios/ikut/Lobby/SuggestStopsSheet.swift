@@ -199,13 +199,13 @@ struct SuggestStopsSheet: View {
             }
             HStack(spacing: Spacing.s) {
                 Button { dismiss() } label: { Text("Not now").inlineActionLabel() }
-                    .actionButton(.secondary)
+                    .ikutButton(.secondary)
                 Button {
                     guard model.markAdded(pick) else { return }
                     onAdd(model.draft(for: pick))
                     if model.allAdded { dismiss() }
                 } label: { Text("Add").inlineActionLabel() }
-                    .actionButton(.primary)
+                    .ikutButton(.primary)
                     .disabled(added || !canAdd())
                     .accessibilityIdentifier("suggest.add")
             }

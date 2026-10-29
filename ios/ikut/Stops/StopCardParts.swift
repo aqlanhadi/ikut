@@ -38,19 +38,21 @@ struct StopActionButton: View {
                 .padding(.horizontal, large ? Spacing.l : 0)
                 .frame(maxWidth: .infinity, minHeight: height ?? (style == .ghost ? inlineHeight : barHeight))
         }
-        .surfaceButton(role, fill: background, foreground: foreground)
+        .ikutButton(role, onGlass: true, flatFallback: face)
         .disabled(disabled)
         .accessibilityIdentifier(id)
     }
 
     /// Primary and secondary are Liquid Glass buttons on iOS 26; the rest stay flat.
-    private var role: SurfaceButtonRole {
+    private var role: IkutButtonRole {
         switch style {
         case .primary: .primary
         case .secondary: .secondary
-        case .positive, .ghost, .destructive: .flat
+        case .positive, .ghost, .destructive: .flat(face)
         }
     }
+
+    private var face: IkutButtonFace { IkutButtonFace(fill: background, foreground: foreground) }
 
     private var foreground: Color {
         switch style {

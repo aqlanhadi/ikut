@@ -26,7 +26,7 @@ struct DesignSharedSection: View {
     /// In `UI/` but needing a live model, a map or a URL, so only listed.
     private let listed = [
         "BottomSheet", "CameraFlight", "CameraView", "CardSheetFrame", "RoundGlassShareLink", "RouteEnds", "SheetSearchField",
-        "SheetTopRow", "StatGrid", "TripExitMenu", "FilledCapsuleButtonStyle (via surfaceButton)",
+        "SheetTopRow", "StatGrid", "TripExitMenu", "FilledCapsuleButtonStyle (via ikutButton)",
     ]
 
     var body: some View {
@@ -69,7 +69,7 @@ struct DesignSharedSection: View {
                     }
                 }
             }
-            group("ActionButtonRole (actionButton)") {
+            group("IkutButtonRole (ikutButton)") {
                 ForEach(["primary", "secondary", "link"], id: \.self) { role in
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         "\(role)".code
@@ -90,9 +90,9 @@ struct DesignSharedSection: View {
     @ViewBuilder private func button(_ role: String, onGlass: Bool) -> some View {
         let label = Text("Start trip").frame(maxWidth: .infinity)
         switch role {
-        case "primary": Button { } label: { label }.actionButton(.primary, onGlass: onGlass)
-        case "secondary": Button { } label: { label }.actionButton(.secondary, onGlass: onGlass)
-        default: Button { } label: { label }.actionButton(.link, onGlass: onGlass)
+        case "primary": Button { } label: { label }.ikutButton(.primary, onGlass: onGlass)
+        case "secondary": Button { } label: { label }.ikutButton(.secondary, onGlass: onGlass)
+        default: Button { } label: { label }.ikutButton(.link, onGlass: onGlass)
         }
     }
 

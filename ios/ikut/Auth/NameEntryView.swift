@@ -55,7 +55,7 @@ struct NameEntryView: View {
                         Text("Continue").frame(maxWidth: .infinity)
                     }
                 }
-                .actionButton(.primary)
+                .ikutButton(.primary)
                 .disabled(!isValid || isWorking)
             }
             .padding(Spacing.l)

@@ -99,9 +99,9 @@ struct RecapContent: View {
             ShareLink(item: Self.shareText(recap)) {
                 Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
             }
-            .actionButton(.primary)
+            .ikutButton(.primary)
             if let onDone {
-                Button(action: onDone) { Text("Done").frame(maxWidth: .infinity) }.actionButton(.link)
+                Button(action: onDone) { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link)
             }
         }
         .padding(.top, Spacing.block)

@@ -237,6 +237,7 @@
 		BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34759F3D28A64C5908B2C7D /* AuthTests.swift */; };
 		BEFD37A841FAEB09281F0EDB /* JoinModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DD0AB1BDC90D15EA18EE2B /* JoinModel.swift */; };
 		BF856415E97C93CCF1248A8E /* MapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D7948AC8E4880C3065A836 /* MapTests.swift */; };
+		C1209D9DE92A621C3831B15A /* IkutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B75C6121526709B8E55645F /* IkutButton.swift */; };
 		C1EB4787B689F789FCE60B01 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A44815085CACEC69E8C24459 /* FirebaseAuth */; };
 		C2B70671091C8C289A2A2D00 /* TypeSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */; };
 		C44829D343D51C669D1496DC /* PlacesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180A672BC06876630D529E06 /* PlacesLoader.swift */; };
@@ -469,6 +470,7 @@
 		78AF9425F9F284ADFB93DDEA /* LaunchRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchRoute.swift; sourceTree = "<group>"; };
 		78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatchUpHeadsUp.swift; sourceTree = "<group>"; };
 		7965946011270463EE3762F1 /* MapColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapColors.swift; sourceTree = "<group>"; };
+		7B75C6121526709B8E55645F /* IkutButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkutButton.swift; sourceTree = "<group>"; };
 		7BC7EB105E449EB09482E179 /* TripRouteInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripRouteInfo.swift; sourceTree = "<group>"; };
 		7C2769228FEE1D9534950492 /* TripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripService.swift; sourceTree = "<group>"; };
 		7CAC79F1BB254D2FFA7FF24B /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
@@ -964,6 +966,7 @@
 				A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */,
 				3FD7A72DF2101C9BDF361B74 /* CardSheetFrame.swift */,
 				4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */,
+				7B75C6121526709B8E55645F /* IkutButton.swift */,
 				52C0A56BCBBB39D114D5E659 /* Motion.swift */,
 				AE8926F402B88A4AB4B63842 /* Palette.swift */,
 				30345C006D29E7B55E755058 /* SheetChrome.swift */,
@@ -1409,6 +1412,7 @@
 				8546143B2A277BBB562AAF21 /* HomeTripRows.swift in Sources */,
 				F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */,
 				FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */,
+				C1209D9DE92A621C3831B15A /* IkutButton.swift in Sources */,
 				386D45F03FBA22A2820ED469 /* JoinDemo.swift in Sources */,
 				BEFD37A841FAEB09281F0EDB /* JoinModel.swift in Sources */,
 				66E1D3BEB35CA17544C67084 /* JoinService.swift in Sources */,

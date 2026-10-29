@@ -93,42 +93,6 @@ extension View {
     }
 }
 
-/// The three looks of a full-width action. Each is Apple's own button style, so pressed, disabled
-/// and Dynamic Type come from the system.
-enum ActionButtonRole {
-    /// Accent filled capsule (`.borderedProminent`).
-    case primary
-    /// The quiet one beside it (`.bordered`).
-    case secondary
-    /// Accent text with no fill, under a primary (`.borderless`).
-    case link
-}
-
-extension View {
-    /// Apply to a `Button` (or `ShareLink`) whose label has `.frame(maxWidth: .infinity)` so it spans the
-    /// row. `onGlass`: the button sits on a Liquid Glass sheet, so on iOS 26 it uses the glass styles
-    /// (the same rule as `surfaceButton`).
-    @ViewBuilder
-    func actionButton(_ role: ActionButtonRole, onGlass: Bool = false) -> some View {
-        if onGlass, role != .link, GlassSurface.useGlass, #available(iOS 26, *) {
-            if role == .primary {
-                buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
-            } else {
-                buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
-            }
-        } else {
-            switch role {
-            case .primary:
-                buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
-            case .secondary:
-                buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
-            case .link:
-                buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.large).tint(Color.ikutAccent)
-            }
-        }
-    }
-}
-
 /// Small uppercase caption above a card, or above a group of tiles (`inset: Spacing.xs`).
 /// `content` sits after the title, e.g. the lobby's progress bar and "3 of 4 ready".
 struct CardHeader<Content: View>: View {
@@ -326,13 +290,13 @@ struct IconTile: View {
 
 #Preview("Buttons") {
     VStack(spacing: Spacing.m) {
-        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.actionButton(.primary)
-        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.actionButton(.primary).disabled(true)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary)
+        Button { } label: { Text("Start trip").frame(maxWidth: .infinity) }.ikutButton(.primary).disabled(true)
         HStack(spacing: Spacing.gap) {
-            Button { } label: { Text("Share").frame(maxWidth: .infinity) }.actionButton(.primary)
-            Button { } label: { Text("Done").frame(maxWidth: .infinity) }.actionButton(.secondary)
+            Button { } label: { Text("Share").frame(maxWidth: .infinity) }.ikutButton(.primary)
+            Button { } label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.secondary)
         }
-        Button { } label: { Text("Join a trip").frame(maxWidth: .infinity) }.actionButton(.link)
+        Button { } label: { Text("Join a trip").frame(maxWidth: .infinity) }.ikutButton(.link)
     }
     .padding(Spacing.l)
     .frame(maxHeight: .infinity)
