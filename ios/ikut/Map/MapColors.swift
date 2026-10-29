@@ -26,20 +26,20 @@ enum MapColors {
     /// The stop pill's OK button, under a white label: 4.5:1 or better in both modes.
     static let ok = ModeColor(light: 0x1F7A35, dark: 0x23823A)
     /// A low-severity hazard, under a white glyph.
-    static let hazardLow = ModeColor(light: 0x636366, dark: 0x6E6E73)
+    static let hazardLow = Palette.neutralFill
     /// The stale-car clock badge, under a white glyph.
-    static let staleBadge = ModeColor(light: 0x636366, dark: 0x6E6E73)
+    static let staleBadge = Palette.neutralFill
     /// The planned-stop pill's blue. Its banner is dark in both modes, so the value is the same in both;
     /// the glyph on it is black.
     static let pillBlue = ModeColor(light: 0x64B5FF, dark: 0x64B5FF)
     /// The red error banner under white text.
-    static let errorBanner = ModeColor(light: 0xC4281C, dark: 0xB3261E)
+    static let errorBanner = Palette.criticalFill
     /// The lobby's destination pin: near-black in light, a lifted graphite in dark so it shows on a dark map.
     static let destinationPin = ModeColor(light: 0x1C1C1E, dark: 0x48484A)
     /// The lobby stop warning's title: dark orange on its pale fill, bright orange in dark.
-    static let warningTitle = ModeColor(light: 0xB54708, dark: 0xFF9E0A)
+    static let warningTitle = Palette.warningText
     /// The accent for an icon on a glass surface in dark, where the system blue goes faint over the map.
-    static let glassAccentDark = ModeColor(light: 0x6BB3FF, dark: 0x6BB3FF)
+    static let glassAccentDark = pillBlue
 }
 
 extension Color {

@@ -6,11 +6,12 @@ import UIKit
 extension Color {
     private static func dynamic(light: UInt32, dark: UInt32) -> Color { ModeColor(light: light, dark: dark).color }
 
-    static let ikutAccent = dynamic(light: 0x0071E3, dark: 0x2997FF)
+    /// Accent text and icons: a touch darker in light than the 0071E3 fill so it holds 4.5:1 on a screen and on its own 14% tint.
+    static let ikutAccent = Palette.accentText.color
     /// "Tracking" and other positive status text (darker than system green for contrast on white).
-    static let ikutPositive = dynamic(light: 0x1F7A35, dark: 0x30D158)
+    static let ikutPositive = Palette.positiveText.color
     /// "Waiting" status text.
-    static let ikutWarning = dynamic(light: 0xC93400, dark: 0xFF9F0A)
+    static let ikutWarning = Palette.warningText.color
     static let ikutScreen = Color(.systemGroupedBackground)
     static let ikutCard = Color(.secondarySystemGroupedBackground)
 }
@@ -26,10 +27,10 @@ enum Spacing {
     static let s: CGFloat = 8
     /// Side padding of a small capsule (status, "Lead", car count).
     static let chipX: CGFloat = 9
-    static let gap: CGFloat = 10
+    static let gap: CGFloat = 8
     static let m: CGFloat = 12
     /// Inside tickets, banners and the pinned-place card, where the canvas uses 14.
-    static let cozy: CGFloat = 14
+    static let cozy: CGFloat = 16
     static let l: CGFloat = 16
     static let xl: CGFloat = 24
 
@@ -37,11 +38,11 @@ enum Spacing {
     static let screenMargin = l
 
     /// Space above a section header, and a floating panel's top and bottom padding (canvas: 18).
-    static let section: CGFloat = 18
+    static let section: CGFloat = 16
     /// Space above Home's "Past trips" header and the join code boxes (canvas: 22).
-    static let sectionLarge: CGFloat = 22
+    static let sectionLarge: CGFloat = 24
     /// A 20 pt block gap: below a long sheet, above a closing action group.
-    static let block: CGFloat = 20
+    static let block: CGFloat = 24
 }
 
 /// Continuous corner radii from the design canvas.
@@ -49,21 +50,21 @@ enum Radius {
     /// Small icon square (a 30 pt role icon, a stop's flag).
     static let icon: CGFloat = 8
     /// Larger icon square in a list row.
-    static let iconLarge: CGFloat = 10
+    static let iconLarge: CGFloat = 8
     /// The stats strip inside the lobby card.
     static let inner: CGFloat = 16
     /// Code boxes, warning banners.
-    static let control: CGFloat = 14
+    static let control: CGFloat = 16
     /// Selectable car tile.
-    static let row: CGFloat = 18
+    static let row: CGFloat = 16
     /// Tiles inside sheets (report options, stop reasons, places) and the pinned-place card.
-    static let tile: CGFloat = 22
+    static let tile: CGFloat = 24
     /// Inset grouped cards.
     static let card: CGFloat = 24
     /// Floating map panels (convoy panel, stop request card).
     static let panel: CGFloat = 38
     /// The dark banner and the Recap map header card.
-    static let banner: CGFloat = 28
+    static let banner: CGFloat = 24
     /// The Welcome app icon.
     static let hero: CGFloat = 20
 }
