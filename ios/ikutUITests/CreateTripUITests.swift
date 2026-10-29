@@ -85,7 +85,7 @@ final class CreateTripUITests: ConvoyUITestCase {
             XCTAssertTrue(app.pullUpTripSheet(), "Round \(round): pulling the sheet up didn't show the lobby below the convoy")
             XCTAssertTrue(app.buttons["lobby.copyCode"].exists, "Round \(round): no trip code card when pulled up")
             XCTAssertFalse(app.buttons["Close"].exists, "Round \(round): a card is stuck over the pulled-up sheet")
-            XCTAssertEqual(app.otherElements.matching(identifier: "trip.pulledUp").count, 1,
+            XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "trip.pulledUp").count, 1,
                            "Round \(round): the pulled-up lobby shows more than once")
             app.pullDownTripSheet()
             XCTAssertTrue(waitForGone(app.pulledUpSheet, timeout: 5), "Round \(round): pulling down left the lobby below the convoy")

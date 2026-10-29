@@ -6,12 +6,16 @@ extension XCUIApplication {
     var drivingReport: XCUIElement { buttons["convoy.report"] }
     /// What continues below the convoy when the driving sheet is pulled up to its tallest (the journey, code, trip,
     /// options, Leave or End), by identifier. There is no Back to the lobby (D53, #424).
-    var pulledUpSheet: XCUIElement { otherElements["trip.pulledUp"] }
+    /// The driving sheet's own list carries the identifier, only while the lobby continues below the convoy.
+    var pulledUpSheet: XCUIElement { descendants(matching: .any)["trip.pulledUp"].firstMatch }
     /// The convoy panel's header button when the list is folded, and when it is unfolded.
     var expandConvoy: XCUIElement { buttons["Expand convoy list"] }
     var collapseConvoy: XCUIElement { buttons["Collapse convoy list"] }
-    /// The driving sheet's own scroll view (its middle is on screen, unlike a row far down it).
-    var drivingSheetScroll: XCUIElement { scrollViews.containing(.staticText, identifier: "convoy.header").firstMatch }
+    /// The driving sheet's own list (its middle is on screen, unlike a row far down it); the convoy header can be
+    /// scrolled out of a lazy list, so it is found by its own identifier.
+    var drivingSheetScroll: XCUIElement {
+        collectionViews.matching(NSPredicate(format: "identifier IN %@", ["driving.sheet", "trip.pulledUp"])).firstMatch
+    }
     var sheetGrabber: XCUIElement { descendants(matching: .any)["Sheet Grabber"].firstMatch }
 
     /// Drags the convoy sheet up by its grabber until the lobby continues below the convoy; true once it does.

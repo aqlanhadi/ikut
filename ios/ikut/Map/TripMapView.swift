@@ -13,12 +13,12 @@ let cardSheetLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ikut", cat
 /// what to draw (`TripMapSpec`) and moves its camera, and fills the one sheet with the convoy panel. The trip screen's
 /// model puts it on screen with the open trip's one session (never a second one). The Stop button opens the request sheet, and an open stop
 /// request shows as a card above the panel. Pulled up to its tallest, the convoy sheet continues with the lobby's
-/// journey, code, trip, options and Leave or End (`continuation`, canvas row L): there is no Back.
+/// journey, code, trip, options and Leave or End as system list sections (`continuation`, canvas row L): there is no Back.
 struct TripMapView: View {
     let session: TripSession
     /// What continues below the convoy when the sheet is pulled up: the lobby's, which owns its rows and their asks.
     /// It is handed where my car is, for the journey's stops ahead.
-    private var continuation: ((LobbyContent.JourneyHere?) -> AnyView)?
+    private var continuation: PulledUpSheet?
     /// On top of the convoy sheet at every height: the lobby's "You're no longer in this trip" with Back to trips.
     private var topBanner: AnyView?
     /// A demo's sheet size on its first frame (the app's arrives folded: `TripSheetSize.entry`).
@@ -42,6 +42,11 @@ struct TripMapView: View {
     /// The convoy sheet's measured heights and card hand-over (`ConvoySheetState`); its size and whether it is up are
     /// the one sheet's (`stage.sheet`).
     @State private var sheet = ConvoySheetState()
+    /// The driving sheet's list is this wide (`panelSheet`).
+    @State private var listWidth: CGFloat = 0
+    /// The banner probe's row and list tops on screen (`bannerProbe`).
+    @State private var probeRowY: CGFloat?
+    @State private var probeTop: CGFloat?
     private var shown: PanelSheet.Shown { stage.sheet.size.shown }
     private var panelExpanded: Bool { shown.listUnfolded }
     @State private var reportContext: ReportContext?
@@ -93,7 +98,7 @@ struct TripMapView: View {
 
     /// The app's: `model` is the open trip's, made with it by the screen's model (`OpenTrip.map`).
     init(
-        session: TripSession, map model: TripMapModel, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil,
+        session: TripSession, map model: TripMapModel, continuation: PulledUpSheet? = nil,
         topBanner: AnyView? = nil, onEnded: @escaping () -> Void = {}
     ) {
         self.session = session
@@ -110,7 +115,7 @@ struct TripMapView: View {
         alerts: AlertCenter = AlertCenter(), demoCard: String? = nil, demoReport: Bool = false, demoDriving: Bool = false, demoExpanded: Bool = false, demoError: String? = nil,
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil, demoTour: Bool = false,
         demoInterrupts: Bool = false, stopService: any StopServing = StopService(),
-        demoPulledUp: Bool = false, continuation: ((LobbyContent.JourneyHere?) -> AnyView)? = nil, topBanner: AnyView? = nil,
+        demoPulledUp: Bool = false, continuation: PulledUpSheet? = nil, topBanner: AnyView? = nil,
         demoAsk: TripAsk? = nil
     ) {
         _ask = State(initialValue: demoAsk)
@@ -806,34 +811,40 @@ struct TripMapView: View {
     private var panelSheet: some View {
         let shown = self.shown
         let heights = sheetHeights
-        // Pulled up, the lobby continues below the unfolded panel, which stays where it was (canvas row L).
-        return ScrollViewReader { scroller in ScrollView {
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 0).id(Self.sheetTop)
-                if let topBanner {
-                    topBanner
-                        .padding(.horizontal, Spacing.l)
-                        .padding(.top, Spacing.xs + BottomSheet.indicatorRoom)
-                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { sheet.topContent = $0 }
+        // Pulled up, the lobby continues below the unfolded panel, which stays where it was (canvas row L): one system
+        // list, the panel in a clear row of its own and the lobby's sections after it.
+        let list = ScrollViewReader { scroller in
+            List {
+                if let topBanner { topBanner }
+                Section {
+                    // As wide as the list, not as the section: the grouped list insets its sections by its own
+                    // margin, and the panel keeps the width its heights were measured at (`probes`).
+                    panel
+                        .frame(width: listWidth > 0 ? listWidth : nil)
+                        .frame(maxWidth: .infinity)
+                        .lobbyRow().id(Self.sheetTop)
                 }
-                panel
                 if continuationShown, let continuation {
-                    continuation(journeyHere).transition(.opacity)
+                    continuation.sections(journeyHere)
                 }
             }
+            .modifier(DrivingList(hasBanner: topBanner != nil))
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { listWidth = $0 }
+            // The pulled-up marker: UI tests and VoiceOver find the lobby below the convoy by it.
+            .accessibilityIdentifier(continuationShown ? "trip.pulledUp" : "driving.sheet")
+            // On the list itself: around the ScrollViewReader the bar did not inset the content, so the last rows
+            // (Leave trip, End trip) stayed under it.
+            .sheetBottomBar { actionBar }
+            // The lobby below the convoy went (the grabber, the header, a stop request, a hazard): the sheet starts at the
+            // convoy's header again, not partway down.
+            .onChange(of: continuationShown) { _, shown in if !shown, topBanner == nil { scroller.scrollTo(Self.sheetTop, anchor: .top) } }
         }
-        .scrollBounceBehavior(.basedOnSize)
-        // On the scroll view itself: around the ScrollViewReader the bar did not inset the content, so the last rows
-        // (Leave trip, End trip) stayed under it.
-        .sheetBottomBar { actionBar }
-        // The lobby below the convoy went (the grabber, the header, a stop request, a hazard): the sheet starts at the
-        // convoy's header again, not partway down.
-        .onChange(of: continuationShown) { _, shown in if !shown { scroller.scrollTo(Self.sheetTop, anchor: .top) } }
-        }
+        return (continuation?.asks(AnyView(list)) ?? AnyView(list))
         .environment(\.inPanelSheet, true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheet.sheetSafeBottom = $0 }
         .background(alignment: .top) { probes }
+        .background(alignment: .top) { bannerProbe }
         .presentationDetents(TripScreenLogic.Sheet.driving(heights).detents, selection: Binding(
             get: { PanelSheet.detent(shown, in: heights) },
             set: {
@@ -910,6 +921,36 @@ struct TripMapView: View {
         }
         // Laid out but not drawn, and left out of the accessibility tree (UI tests would find its buttons twice).
         .hidden()
+    }
+
+    /// The banner on top of the panel, laid out as a list of its own with a one-point row where the panel goes: that row's
+    /// top is how far down the panel sits under the banner, whatever the list's own section gaps are, and the list
+    /// never scrolls, so the reading is not a scroll position's.
+    @ViewBuilder private var bannerProbe: some View {
+        if let topBanner {
+            List {
+                topBanner
+                Section {
+                    Color.clear.frame(height: 1).lobbyRow()
+                        .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { probeRowY = $0; readBannerProbe() }
+                }
+            }
+            .modifier(DrivingList(hasBanner: true))
+            .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).minY }) { probeTop = $0; readBannerProbe() }
+            .frame(height: 1200)
+            // Not `.hidden()`: a hidden list makes no cells, so the row would never be laid out to be read. Drawn at zero
+            // opacity, out of touch and of the accessibility tree (UI tests would find its buttons twice).
+            .opacity(0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// The banner probe's reading: the one-point row's top less the probe list's own (both on screen), which is how far down
+    /// the panel sits under the banner. A named coordinate space does not reach into a list's rows.
+    private func readBannerProbe() {
+        guard let row = probeRowY, let top = probeTop else { return }
+        sheet.topContent = max(0, row - top)
     }
 
     private func probe(unfolded: Bool) -> some View {
@@ -1214,5 +1255,31 @@ struct TripMapView: View {
         guard liveServices else { return }
         model.stop()
         alerts.stop()
+    }
+}
+
+/// What continues below the convoy panel when the driving sheet is pulled up: the lobby's journey, code, trip, options and
+/// Leave or End as system list sections (`sections`, handed where my car is), and what presents from inside the sheet
+/// (`asks`: the QR code, the confirmations, the rename), which the lobby owns.
+struct PulledUpSheet {
+    var sections: (LobbyContent.JourneyHere?) -> AnyView
+    var asks: (AnyView) -> AnyView
+}
+
+/// The driving sheet's list: grouped sections on the sheet's own glass, with nothing of its own above, below or between
+/// the panel and the banner on top of it, so the detents are the panel's measured heights.
+private struct DrivingList: ViewModifier {
+    var hasBanner: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .environment(\.defaultMinListHeaderHeight, 0)
+            // The banner's grabber room (the panel's own header has it when there is no banner).
+            .contentMargins(.top, hasBanner ? Spacing.xs + BottomSheet.indicatorRoom : 0, for: .scrollContent)
+            .contentMargins(.bottom, 0, for: .scrollContent)
+            .listSectionSpacing(.custom(Spacing.s))
     }
 }

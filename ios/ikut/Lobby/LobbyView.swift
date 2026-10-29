@@ -6,11 +6,11 @@ import SwiftUI
 /// QR and share, and the live list of cars. It is the trip screen's lobby layer over the one map (`TripScreenHost`), and
 /// holds the trip's session; Start trip and Show map switch the screen to driving (`TripMapView`, the driving layer)
 /// without a new screen. While driving, the lobby's journey, code, trip, options and Leave or End continue below the
-/// convoy when its sheet is pulled up (`pulledUpContent`).
+/// convoy when its sheet is pulled up (`pulledUpSections`).
 struct LobbyView: View {
     /// In a sample lobby: the driving layer Start switches to, handed what continues below its convoy when pulled up
     /// and the banner on top of its sheet.
-    typealias SampleDriving = (_ continuation: @escaping (LobbyContent.JourneyHere?) -> AnyView, _ topBanner: AnyView?) -> AnyView
+    typealias SampleDriving = (_ continuation: PulledUpSheet, _ topBanner: AnyView?) -> AnyView
 
     let onExit: () -> Void
     /// The trip ended (by the organizer or the server): show the recap.
@@ -336,10 +336,10 @@ struct LobbyView: View {
                 lobbyLayer
             case .driving:
                 if let sampleDriving {
-                    sampleDriving({ AnyView(pulledUpContent(here: $0)) }, drivingBanner)
+                    sampleDriving(pulledUp, drivingBanner)
                 } else if let map = stage.trip?.map {
                     TripMapView(
-                        session: session, map: map, continuation: { AnyView(pulledUpContent(here: $0)) },
+                        session: session, map: map, continuation: pulledUp,
                         topBanner: drivingBanner,
                         onEnded: { onEnded(model.tripId) })
                 }
@@ -414,7 +414,7 @@ struct LobbyView: View {
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
         // In the lobby's mode its asks present here, once its sheet has stepped aside; driving, the pulled-up sheet
-        // presents them itself (`pulledUpContent`).
+        // presents them itself (`pulledUpSections`).
         .alert("Trip name", isPresented: Binding(
             get: { inLobby && BottomSheet.presents(wanted: renaming, sheetUp: sheetsUp) }, set: { renaming = $0 })) {
             renameActions
@@ -718,16 +718,6 @@ struct LobbyView: View {
         }
     }
 
-    func sectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Color.surfaceSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.m)
-            .padding(.bottom, Spacing.xs)
-            .accessibilityAddTraits(.isHeader)
-    }
-
     // MARK: A participant's own way in
 
     /// FROM to TO, where they join the convoy, and their drive (D26).
@@ -737,7 +727,7 @@ struct LobbyView: View {
             if let line = ownWay.joinLine {
                 Text(line).font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             }
-            routeTotal(trip, stops: shownStops, inList: true)
+            routeTotal(trip, stops: shownStops)
         }
     }
 
