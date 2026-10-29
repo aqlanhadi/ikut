@@ -258,9 +258,9 @@ struct PlaceSearchResults: View {
         if model.results.isEmpty {
             if model.isSearching {
                 if model.spinnerVisible {
-                    ProgressView().frame(maxWidth: .infinity, minHeight: 58).accessibilityLabel("Searching")
+                    ProgressView().ikutRow(fillWidth: true).accessibilityLabel("Searching")
                 } else {
-                    Color.clear.frame(height: 58)
+                    Color.clear.frame(height: RowSize.minimum)
                 }
             } else if model.errorMessage == nil {
                 Text("No places match “\(model.trimmedQuery)”. Try a town name.")
@@ -282,9 +282,9 @@ struct PlaceSearchResults: View {
     @ViewBuilder private var suggestionRows: some View {
         if model.suggestions.isEmpty, model.isSearching {
             if model.spinnerVisible {
-                ProgressView().frame(maxWidth: .infinity, minHeight: 58).accessibilityLabel("Searching")
+                ProgressView().ikutRow(fillWidth: true).accessibilityLabel("Searching")
             } else {
-                Color.clear.frame(height: 58)
+                Color.clear.frame(height: RowSize.minimum)
             }
         }
         ForEach(Array(model.suggestions.enumerated()), id: \.element.id) { index, suggestion in

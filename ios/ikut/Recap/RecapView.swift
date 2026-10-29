@@ -132,7 +132,7 @@ struct RecapRouteMap: View {
             ForEach(snapshot.positions, id: \.carId) { p in
                 if let car = snapshot.cars.first(where: { $0.id == p.carId }) {
                     Annotation(car.name, coordinate: p.coordinate, anchor: .center) {
-                        CarBadge(number: car.number, colorHex: car.color, size: IconSize.small.base)
+                        CarBadge(number: car.number, colorHex: car.color, size: 26)
                             .overlay(Circle().stroke(.white, lineWidth: 2))
                     }
                     .annotationTitles(interactive ? .automatic : .hidden)

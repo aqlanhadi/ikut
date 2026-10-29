@@ -175,6 +175,7 @@ struct RouteTotalLine: View {
                 ProgressView().accessibilityLabel("Getting the route")
             }
         }
+        // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner.
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
         .innerTile(radius: Radius.inner)

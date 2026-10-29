@@ -21,6 +21,9 @@ enum IconSize {
     case small
     case regular
 
+    /// The most an icon grows with the text, so a badge never outgrows its row.
+    static let maxScale: CGFloat = 1.3
+
     var base: CGFloat {
         switch self {
         case .small: 28
@@ -31,10 +34,17 @@ enum IconSize {
 
 private struct IconFrame: ViewModifier {
     @ScaledMetric private var side: CGFloat
+    private let cap: CGFloat
 
-    init(_ size: IconSize) { _side = ScaledMetric(wrappedValue: size.base, relativeTo: .body) }
+    init(_ size: IconSize) {
+        _side = ScaledMetric(wrappedValue: size.base, relativeTo: .body)
+        cap = size.base * IconSize.maxScale
+    }
 
-    func body(content: Content) -> some View { content.frame(width: side, height: side) }
+    func body(content: Content) -> some View {
+        let drawn = min(side, cap)
+        return content.frame(width: drawn, height: drawn)
+    }
 }
 
 extension View {

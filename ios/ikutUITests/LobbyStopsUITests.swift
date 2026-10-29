@@ -83,7 +83,7 @@ final class LobbyStopsUITests: XCTestCase {
         launchLobby()
         let add = app.buttons["stops.add"]
         var scrolls = 0
-        while !add.isHittable, scrolls < 8 {
+        while !(add.isHittable && add.frame.maxY < app.frame.height - 200), scrolls < 8 {
             app.collectionViews.firstMatch.swipeUp()
             scrolls += 1
         }
