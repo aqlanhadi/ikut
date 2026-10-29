@@ -67,6 +67,7 @@ struct JoinSheet: View {
         .animation(HomeSheet.motion(reduceMotion: reduceMotion), value: stepper.step)
         .ignoresSafeArea(.container, edges: .bottom)
         .environment(\.inPanelSheet, true)
+        .buttonSurface(.glass)
         .task {
             if model.displayName.isEmpty { model.displayName = auth.displayName ?? "" }
             focusForStep()
@@ -103,9 +104,9 @@ struct JoinSheet: View {
                 Group {
                     if isWorking { ProgressView().accessibilityLabel("Signing in") } else { Text("Get started") }
                 }
-                .barActionLabel()
+                .font(.headline).frame(maxWidth: .infinity)
             }
-            .actionBarStyle(prominent: true)
+            .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(!stepper.canContinue || isWorking)
             .accessibilityIdentifier("joinNameContinue")
             .sheetActionBar(sides: false)
@@ -115,9 +116,9 @@ struct JoinSheet: View {
                 Group {
                     if isWorking { ProgressView().accessibilityLabel("Asking") } else { Text("Continue") }
                 }
-                .barActionLabel()
+                .font(.headline).frame(maxWidth: .infinity)
             }
-            .actionBarStyle(prominent: true)
+            .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(isWorking)
             .accessibilityIdentifier("joinLocationContinue")
             .sheetActionBar(sides: false)
@@ -130,17 +131,17 @@ struct JoinSheet: View {
         case .code:
             if stepper.canContinue {
                 Button { goNext() } label: {
-                    Text("Continue").barActionLabel()
+                    Text("Continue").font(.headline).frame(maxWidth: .infinity)
                 }
-                .actionBarStyle(prominent: true)
+                .ikutButton(.primary, tint: .ikutAccentFill)
                 .accessibilityIdentifier("joinContinue")
                 .sheetActionBar(sides: false)
                 .padding(.bottom, PanelSheet.sideGap)
             }
         case .car:
             if let taken = model.trackerTakenResult {
-                Button { onJoined(taken.tripId, model.tracks) } label: { Text("Continue").barActionLabel() }
-                    .actionBarStyle(prominent: true)
+                Button { onJoined(taken.tripId, model.tracks) } label: { Text("Continue").font(.headline).frame(maxWidth: .infinity) }
+                    .ikutButton(.primary, tint: .ikutAccentFill)
                     .accessibilityIdentifier("joinContinue")
                     .sheetActionBar(sides: false)
                     .padding(.bottom, PanelSheet.sideGap)
@@ -163,9 +164,9 @@ struct JoinSheet: View {
                             Text(joinLabel).lineLimit(1).minimumScaleFactor(0.7)
                         }
                     }
-                    .barActionLabel()
+                    .font(.headline).frame(maxWidth: .infinity)
                 }
-                .actionBarStyle(prominent: true)
+                .ikutButton(.primary, tint: .ikutAccentFill)
                 .disabled(!stepper.canContinue || auth.userID == nil)
                 .accessibilityIdentifier("joinConfirm")
                 .sheetActionBar(sides: false)
@@ -279,9 +280,9 @@ struct JoinSheet: View {
                         codeFocused = false
                         showScanner = true
                     } label: {
-                        Label("Scan QR code", systemImage: "qrcode.viewfinder").inlineActionLabel()
+                        Label("Scan QR code", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
                     }
-                    .actionBarStyle(prominent: false)
+                    .ikutButton(.secondary, tint: .primary)
                     .accessibilityIdentifier("joinScan")
                 }
             }

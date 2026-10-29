@@ -377,7 +377,7 @@ extension LobbyView {
     func exitBanner(_ title: String, systemImage: String) -> some View {
         VStack(spacing: Spacing.m) {
             Label(title, systemImage: systemImage).font(.headline)
-            Button("Back to trips", action: backToTrips).buttonStyle(.bordered)
+            Button(action: backToTrips) { Text("Back to trips").frame(maxWidth: .infinity) }.ikutButton(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(Spacing.l)

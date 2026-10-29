@@ -65,8 +65,9 @@ struct WhereToSheet: View {
     /// Cancel: a glass capsule on the sheet (iOS 26), plain accent text otherwise.
     @ViewBuilder private func glassCapsule(_ title: String, action: @escaping () -> Void) -> some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
-            Button(action: action) { Text(title).frame(maxHeight: .infinity) }
-                .buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(.primary)
+            Button(action: action) { Text(title) }
+                .ikutButton(.secondary, tint: .primary)
+                .buttonSurface(.glass)
                 .frame(height: barHeight)
         } else {
             Button(title, action: action).foregroundStyle(Color.ikutAccent).frame(minHeight: barHeight)
@@ -126,9 +127,9 @@ struct NewTripSheet: View {
                 Group {
                     if flow.isCreating { ProgressView().accessibilityLabel("Creating trip") } else { Text("Create trip") }
                 }
-                .barActionLabel()
+                .font(.headline).frame(maxWidth: .infinity)
             }
-            .actionBarStyle(prominent: true)
+            .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(flow.isCreating)
             // The same bar as every sheet's: as tall, and as far above the sheet's bottom edge as from its sides
             // (`PanelSheet.sideGap`, what `barLift` gives the other bars). Home's sheet gives the side insets; the bar
@@ -138,6 +139,7 @@ struct NewTripSheet: View {
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .environment(\.inPanelSheet, true)
+        .buttonSurface(.glass)
     }
 
     private var backButton: some View {

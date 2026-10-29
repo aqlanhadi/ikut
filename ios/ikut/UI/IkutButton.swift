@@ -100,9 +100,10 @@ private struct SizedButtonStyle: PrimitiveButtonStyle {
     var size: IkutButtonSize
     var look: IkutButtonLook
     var face: IkutButtonFace?
+    var tint: Color?
 
     func makeBody(configuration: Configuration) -> some View {
-        Sized(configuration: configuration, role: role, size: size, look: look, face: face)
+        Sized(configuration: configuration, role: role, size: size, look: look, face: face, tint: tint)
     }
 
     private struct Sized: View {
@@ -111,6 +112,7 @@ private struct SizedButtonStyle: PrimitiveButtonStyle {
         var size: IkutButtonSize
         var look: IkutButtonLook
         var face: IkutButtonFace?
+        var tint: Color?
         @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
         var body: some View {
@@ -119,13 +121,13 @@ private struct SizedButtonStyle: PrimitiveButtonStyle {
             Button(role: configuration.role, action: configuration.trigger) {
                 configuration.label.frame(minHeight: minHeight).contentShape(Rectangle())
             }
-            .applyStyle(look, role: role, face: face)
+            .applyStyle(look, role: role, face: face, tint: tint ?? Color.ikutAccent)
         }
     }
 }
 
 private extension View {
-    @ViewBuilder func applyStyle(_ look: IkutButtonLook, role: IkutButtonRole, face: IkutButtonFace?) -> some View {
+    @ViewBuilder func applyStyle(_ look: IkutButtonLook, role: IkutButtonRole, face: IkutButtonFace?, tint: Color) -> some View {
         switch look.kind {
         case .flat:
             if case .flat(let own) = role {
@@ -134,12 +136,12 @@ private extension View {
                 buttonStyle(FilledCapsuleButtonStyle(fill: face.fill, foreground: face.foreground))
             }
         case .glassProminent:
-            if #available(iOS 26, *) { buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent) }
+            if #available(iOS 26, *) { buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(tint) }
         case .glass:
-            if #available(iOS 26, *) { buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent) }
-        case .borderedProminent: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-        case .bordered: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-        case .borderless: buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
+            if #available(iOS 26, *) { buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.regular).tint(tint) }
+        case .borderedProminent: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(tint)
+        case .bordered: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular).tint(tint)
+        case .borderless: buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.regular).tint(tint)
         }
     }
 }
@@ -148,11 +150,12 @@ private struct IkutButtonModifier: ViewModifier {
     var role: IkutButtonRole
     var size: IkutButtonSize
     var face: IkutButtonFace?
+    var tint: Color?
     @Environment(\.buttonSurface) private var surface
 
     func body(content: Content) -> some View {
         let look = IkutButtonLook.resolve(role: role, face: face, surface: surface, glassActive: GlassSurface.active)
-        content.buttonStyle(SizedButtonStyle(role: role, size: size, look: look, face: face))
+        content.buttonStyle(SizedButtonStyle(role: role, size: size, look: look, face: face, tint: tint))
     }
 }
 
@@ -162,8 +165,9 @@ extension View {
     /// glass or filled look from the surface (`buttonSurface`).
     /// `surface`: the flat face a stop card button keeps before iOS 26 in place of Apple's bordered style (the card's
     /// primary and secondary are gray and accent capsules there); a link has none.
-    func ikutButton(_ role: IkutButtonRole, size: IkutButtonSize = .standard, surface: IkutButtonFace? = nil) -> some View {
-        modifier(IkutButtonModifier(role: role, size: size, face: surface))
+    /// `tint`: a colour other than the accent, for a bar that keeps its own (the blue fill, or primary text on a clear button).
+    func ikutButton(_ role: IkutButtonRole, size: IkutButtonSize = .standard, surface: IkutButtonFace? = nil, tint: Color? = nil) -> some View {
+        modifier(IkutButtonModifier(role: role, size: size, face: surface, tint: tint))
     }
 }
 

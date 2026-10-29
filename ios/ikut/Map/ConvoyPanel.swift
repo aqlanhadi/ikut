@@ -370,9 +370,9 @@ struct ConvoyActionBar: View {
         return layout {
             Button(action: onReport) {
                 Label("Report", systemImage: "exclamationmark.triangle")
-                    .barActionLabel()
+                    .font(.headline).frame(maxWidth: .infinity)
             }
-            .actionBarStyle(prominent: true)
+            .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(!canReport)
             .accessibilityIdentifier("convoy.report")
             Button(action: onStop) {
@@ -385,7 +385,8 @@ struct ConvoyActionBar: View {
                     .fixedSize(horizontal: !stacked, vertical: false)
                     .padding(.horizontal, Spacing.l)
                     .frame(minWidth: stacked ? nil : 146)
-                    .barActionLabel(fullWidth: stacked)
+                    .font(.headline)
+                    .frame(maxWidth: stacked ? .infinity : nil)
                     .overlay(alignment: .topTrailing) {
                         if stopButton.badge > 0 {
                             Text("\(stopButton.badge)")
@@ -401,12 +402,13 @@ struct ConvoyActionBar: View {
                         }
                     }
             }
-            .actionBarStyle(prominent: false)
+            .ikutButton(.secondary, tint: .primary)
             .layoutPriority(1)
             .accessibilityLabel(stopButton.accessibilityLabel)
             .accessibilityIdentifier("stop.button")
         }
         .sheetActionBar(lift: lift)
+        .buttonSurface(.glass)
     }
 }
 

@@ -104,20 +104,21 @@ struct RowDivider: View {
     }
 }
 
-/// The round "x" at the top trailing corner of a sheet: `SheetButtonSize.round` (48 pt) across, scaled (piece B of D81 resizes it).
+/// The round "x" at the top trailing corner of a sheet: `SheetButtonSize.hit` (44 pt) across at the default text size,
+/// scaled and capped. Liquid Glass on a glass surface (`buttonSurface`, as `ikutButton` follows it), else a quiet circle.
 struct SheetCloseButton: View {
     var action: () -> Void
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
-    /// A Liquid Glass button (iOS 26), for a close button on a glass surface.
-    var onGlass = false
+    @ScaledMetric(relativeTo: .body) private var scaled = SheetButtonSize.hit
+    @Environment(\.buttonSurface) private var surface
 
     var body: some View {
-        if onGlass, GlassSurface.useGlass, #available(iOS 26, *) {
+        if surface == .glass, GlassSurface.useGlass, #available(iOS 26, *) {
             RoundGlassIconButton(systemImage: "xmark", label: "Close", action: action)
         } else {
+            let side = SheetButtonSize.capped(scaled, base: SheetButtonSize.hit)
             Button(action: action) {
                 Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
+                    .font(RoundIconSymbol.standardGlyph)
                     .foregroundStyle(.secondary)
                     .frame(width: side, height: side)
                     .background(.quaternary, in: Circle())
@@ -135,7 +136,7 @@ struct MapCloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark").font(.subheadline.weight(.bold))
+            Image(systemName: "xmark").font(RoundIconSymbol.standardGlyph)
                 .frame(width: SheetButtonSize.capped(side, base: SheetButtonSize.hit),
                        height: SheetButtonSize.capped(side, base: SheetButtonSize.hit))
                 .background(.regularMaterial, in: Circle())
@@ -166,7 +167,7 @@ struct SheetHeader: View {
             // Without a subtitle the title sits level with the middle of the 44 pt close button.
             .frame(minHeight: subtitle == nil ? 44 : nil, alignment: .leading)
             Spacer(minLength: 0)
-            SheetCloseButton(action: onClose, onGlass: closeOnGlass)
+            SheetCloseButton(action: onClose)
                 .offset(closeOffset)
                 .accessibilityIdentifier(closeIdentifier ?? "sheet.close")
         }
