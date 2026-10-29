@@ -110,7 +110,7 @@ font|12||Lobby/LobbyMap.swift:316
 frame|width 8, height 8||Lobby/LobbyMap.swift:318
 frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#D9480F|D9480F|Lobby/LobbyView.swift:70
-frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:801
+frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:791
 frame|width 30||Location/LocationAskStep.swift:33
 frame|width 14, height 14||Map/ConvoyPanel.swift:271
 frame|width 14, height 14||Map/ConvoyPanel.swift:278
