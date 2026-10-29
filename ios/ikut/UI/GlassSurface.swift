@@ -95,7 +95,7 @@ extension Color {
     /// is lifted there; elsewhere it is the usual secondary label.
     static var surfaceSecondary: Color {
         guard GlassSurface.active else { return Color.secondary }
-        return Palette.surfaceSecondary.color
+        return Color.glassSecondaryText
     }
 
     /// How much a stale car's row is dimmed: less on glass, where 0.6 went thin.
@@ -107,7 +107,7 @@ extension Color {
     /// goes faint over the map; the usual accent in light and off glass.
     static var surfaceAccent: Color {
         guard GlassSurface.active else { return Color.ikutAccentFill }
-        let lifted = UIColor(MapColors.pillBlue.color)
+        let lifted = UIColor(Color.ikutPillBlue)
         return Color(UIColor { traits in
             traits.userInterfaceStyle == .dark ? lifted : UIColor(Color.ikutAccentFill)
         })

@@ -174,12 +174,6 @@ frame|height 30||Map/ConvoyRows.swift:39
 frame|width 30, height 30||Map/ConvoyRows.swift:55
 frame|minHeight 54||Map/ConvoyRows.swift:95
 frame|minHeight 54||Map/ConvoyRows.swift:138
-color|#1F7A35|1F7A35|Map/MapColors.swift:27
-color|#23823A|23823A|Map/MapColors.swift:27
-color|#64B5FF|64B5FF|Map/MapColors.swift:30
-color|#64B5FF|64B5FF|Map/MapColors.swift:30
-color|#1C1C1E|1C1C1E|Map/MapColors.swift:32
-color|#48484A|48484A|Map/MapColors.swift:32
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
@@ -194,11 +188,6 @@ padding|11||Recap/RecapContent.swift:64
 frame|height 30||Recap/RecapContent.swift:64
 padding|26||Recap/RecapContent.swift:112
 frame|width 0.5||Recap/RecapContent.swift:123
-color|#C93400|C93400|Recap/RecapContent.swift:144
-color|#1F7A35|1F7A35|Recap/RecapContent.swift:145
-color|#B25000|B25000|Recap/RecapContent.swift:146
-color|#D70015|D70015|Recap/RecapContent.swift:147
-color|#5856D6|5856D6|Recap/RecapContent.swift:148
 frame|width 40, height 40||Recap/RecapContent.swift:157
 padding|5||Recap/RecapContent.swift:205
 frame|width 42||Recap/RecapContent.swift:205
@@ -208,11 +197,8 @@ frame|width 50, height 44||Recap/RecapMapView.swift:78
 frame|width 50, height 44||Recap/RecapMapView.swift:85
 padding|40||Recap/RecapView.swift:31
 padding|80||Recap/RecapView.swift:33
-color|#FF3B30|FF3B30|Recap/RecapView.swift:72
-color|#FFCC00|FFCC00|Recap/RecapView.swift:73
 opacity|0.35||Recap/RecapView.swift:81
 opacity|0.9||Recap/RecapView.swift:114
-color|#F3D08A|F3D08A|Recap/RecapView.swift:114
 frame|width 16, height 16||Recap/RecapView.swift:120
 frame|width 40, height 40||Report/ReportSheet.swift:56
 frame|minHeight 72||Report/ReportSheet.swift:64
@@ -262,37 +248,9 @@ color|#7C3AED|7C3AED|Trip/TripService.swift:18
 color|#BE185D|BE185D|Trip/TripService.swift:18
 color|#A16207|A16207|Trip/TripService.swift:18
 opacity|0.25||UI/GlassSurface.swift:86
-color|#0071E3|0071E3|UI/Palette.swift:12
-color|#0071E3|0071E3|UI/Palette.swift:12
-color|#0A84FF|0A84FF|UI/Palette.swift:14
-color|#0A84FF|0A84FF|UI/Palette.swift:14
-color|#0060DF|0060DF|UI/Palette.swift:15
-color|#0060DF|0060DF|UI/Palette.swift:15
-color|#005FBF|005FBF|UI/Palette.swift:20
-color|#2997FF|2997FF|UI/Palette.swift:20
-color|#1D7031|1D7031|UI/Palette.swift:22
-color|#30D158|30D158|UI/Palette.swift:22
-color|#B02800|B02800|UI/Palette.swift:25
-color|#FF9F0A|FF9F0A|UI/Palette.swift:25
-color|#C93300|C93300|UI/Palette.swift:27
-color|#C93300|C93300|UI/Palette.swift:27
-color|#D60014|D60014|UI/Palette.swift:29
-color|#D60014|D60014|UI/Palette.swift:29
-color|#636366|636366|UI/Palette.swift:31
-color|#6E6E73|6E6E73|UI/Palette.swift:31
-color|#0F756E|0F756E|UI/Palette.swift:34
-color|#2ED4BF|2ED4BF|UI/Palette.swift:34
-color|#1C1C1C|1C1C1C|UI/Palette.swift:39
-color|#1C1C1C|1C1C1C|UI/Palette.swift:39
-color|#FFFFFF|FFFFFF|UI/Palette.swift:41
-color|#FFFFFF|FFFFFF|UI/Palette.swift:41
-color|#000000|000000|UI/Palette.swift:43
-color|#FFFFFF|FFFFFF|UI/Palette.swift:43
-color|#8A6B45|8A6B45|UI/Palette.swift:48
-color|#8A6B45|8A6B45|UI/Palette.swift:48
 frame|minHeight 48||UI/SheetChrome.swift:302
 frame|width 32, height 44||UI/SheetChrome.swift:375
-frame|minHeight 58||UI/Theme.swift:218
+frame|minHeight 58||UI/Theme.swift:213
 frame|height 28||UI/TripComponents.swift:105
 font|7||UI/TripComponents.swift:199
 padding|5||UI/TripComponents.swift:209
@@ -314,22 +272,32 @@ elevation|marker
 elevation|floating
 tintFill|wash
 tintFill|tint
-colour|accentFill
-colour|route
-colour|routeCasing
 colour|accentText
-colour|positiveText
-colour|warningText
-colour|warningFill
 colour|criticalFill
-colour|neutralFill
-colour|joining
-colour|bannerDark
-colour|surfaceTileFill
-colour|surfaceSecondary
-colour|reportBrown
-colour|ok
-colour|pillBlue
 colour|destinationPin
+colour|glassSecondaryText
+colour|ikutAccent
+colour|ikutAccentFill
+colour|ikutBannerDark
+colour|ikutJoining
+colour|ikutOK
+colour|ikutPillBlue
+colour|ikutPositive
+colour|ikutRoute
+colour|ikutRouteCasing
+colour|ikutWarning
+colour|neutralFill
+colour|positiveText
+colour|recapFirstIn
+colour|recapHazardPin
+colour|recapLead
+colour|recapReporter
+colour|recapRouteGlow
+colour|recapStopCaller
+colour|recapStopPin
+colour|recapSweeper
+colour|reportBrown
+colour|surfaceTileFill
+colour|warningFill
 """
 }

@@ -14,14 +14,14 @@ struct ReportOption: Identifiable, Equatable, Sendable {
 
     /// The 6 hazards and 2 conditions in the mockup's order (a 2-column grid, 4 rows).
     static let events: [ReportOption] = [
-        ReportOption(type: .debris, label: "Debris", symbol: "exclamationmark.triangle.fill", tint: Palette.warningFill.color),
-        ReportOption(type: .accident, label: "Accident", symbol: "exclamationmark.octagon.fill", tint: Palette.criticalFill.color),
-        ReportOption(type: .pothole, label: "Pothole", symbol: "circle.bottomhalf.filled", tint: Palette.reportBrown.color),
-        ReportOption(type: .animal, label: "Animal", symbol: "pawprint.fill", tint: MapColors.ok.color),
-        ReportOption(type: .stoppedVehicle, label: "Stopped car", symbol: "car.fill", tint: Palette.neutralFill.color),
-        ReportOption(type: .roadworks, label: "Roadworks", symbol: "cone.fill", tint: Palette.warningFill.color),
-        ReportOption(type: .heavyRain, label: "Heavy rain", symbol: "cloud.heavyrain.fill", tint: Palette.accentFill.color),
-        ReportOption(type: .trafficJam, label: "Traffic jam", symbol: "car.2.fill", tint: Palette.criticalFill.color),
+        ReportOption(type: .debris, label: "Debris", symbol: "exclamationmark.triangle.fill", tint: Color.warningFill),
+        ReportOption(type: .accident, label: "Accident", symbol: "exclamationmark.octagon.fill", tint: Color.criticalFill),
+        ReportOption(type: .pothole, label: "Pothole", symbol: "circle.bottomhalf.filled", tint: Color.reportBrown),
+        ReportOption(type: .animal, label: "Animal", symbol: "pawprint.fill", tint: Color.ikutOK),
+        ReportOption(type: .stoppedVehicle, label: "Stopped car", symbol: "car.fill", tint: Color.neutralFill),
+        ReportOption(type: .roadworks, label: "Roadworks", symbol: "cone.fill", tint: Color.warningFill),
+        ReportOption(type: .heavyRain, label: "Heavy rain", symbol: "cloud.heavyrain.fill", tint: Color.ikutAccentFill),
+        ReportOption(type: .trafficJam, label: "Traffic jam", symbol: "car.2.fill", tint: Color.criticalFill),
     ]
 
     /// "About your car": three pills under the grid.

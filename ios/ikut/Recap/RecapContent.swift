@@ -141,11 +141,11 @@ struct RecapContent: View {
     }
 
     private static let awardStyle: [RecapAward.Kind: (symbol: String, tint: Color)] = [
-        .lead: ("bolt.fill", Color(hex: "#C93400")!),
-        .firstIn: ("flag.checkered", Color(hex: "#1F7A35")!),
-        .reporter: ("eye.fill", Color(hex: "#B25000")!),
-        .stopCaller: ("fuelpump.fill", Color(hex: "#D70015")!),
-        .sweeper: ("shield.fill", Color(hex: "#5856D6")!),
+        .lead: ("bolt.fill", .recapLead),
+        .firstIn: ("flag.checkered", .recapFirstIn),
+        .reporter: ("eye.fill", .recapReporter),
+        .stopCaller: ("fuelpump.fill", .recapStopCaller),
+        .sweeper: ("shield.fill", .recapSweeper),
     ]
 
     private func award(of a: RecapAward, _ s: RecapSnapshot) -> some View {

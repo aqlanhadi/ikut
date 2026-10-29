@@ -147,12 +147,12 @@ function enumBody(text, name) {
   return text.slice(start, i - 1)
 }
 
-/// The design tokens defined in UI/Theme.swift, UI/Palette.swift and Map/MapColors.swift, as { group, name } rows:
+/// The design tokens defined in UI/Theme.swift, UI/Palette.swift and the colour catalog, as { group, name } rows:
 /// the `static let`s of Spacing and Radius, the cases of Elevation and TintFill, and the colour names of Palette
-/// (its ModeColor values, not its lists) and MapColors.
+/// (one per Color Set in Assets.xcassets/Colors).
 export function tokens(root) {
   const read = (f) => (existsSync(join(root, f)) ? codeLines(readFileSync(join(root, f), 'utf8')).join('\n') : '')
-  const theme = read('UI/Theme.swift'), palette = read('UI/Palette.swift'), mapColors = read('Map/MapColors.swift')
+  const theme = read('UI/Theme.swift'), palette = read('UI/Palette.swift')
   const lets = (body) => [...body.matchAll(/^\s*(?:private\s+)?static let (\w+)\s*(?::\s*(?!\[)[\w.]+)?\s*=/gm)].map((m) => m[1])
   const cases = (body) => [...body.matchAll(/^\s*case\s+([\w\s,]+?)\s*$/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim()))
   const rows = []
@@ -161,8 +161,9 @@ export function tokens(root) {
   add('radius', lets(enumBody(theme, 'Radius')))
   add('elevation', cases(enumBody(palette, 'Elevation')))
   add('tintFill', cases(enumBody(palette, 'TintFill')))
-  add('colour', lets(enumBody(palette, 'Palette')).filter((n) => n !== 'underWhite'))
-  add('colour', lets(enumBody(mapColors, 'MapColors')))
+  // D87: the colour tokens are the Color Sets in Assets.xcassets/Colors (one name each).
+  const colorsDir = join(root, 'Resources/Assets.xcassets/Colors')
+  add('colour', existsSync(colorsDir) ? readdirSync(colorsDir).filter((f) => f.endsWith('.colorset')).map((f) => f.replace(/\.colorset$/, '')).sort() : [])
   return rows
 }
 
@@ -173,7 +174,7 @@ export function tokenCounts(rows) {
 export function renderTokenCeiling(c) {
   return `// The design-token ratchet (D78). Not generated, but written by \`node tools/design-inventory.mjs --lower\`.
 // DesignInventoryTests fails if the number of tokens defined in UI/Theme.swift (Spacing, Radius), UI/Palette.swift
-// (Elevation, TintFill, Palette colours) and Map/MapColors.swift is above its number here, so the scales can only
+// (Elevation, TintFill) and the Color Sets of Assets.xcassets/Colors is above its number here, so the scales can only
 // shrink. Adding a token means merging another one away. A piece that removes tokens MUST lower these: regenerate
 // the inventory, then run \`node tools/design-inventory.mjs --lower\` (keeps the smaller of today's count and the
 // ceiling, so it never raises one), or edit a single number below by hand.

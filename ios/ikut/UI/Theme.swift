@@ -4,13 +4,8 @@ import UIKit
 /// Shared look from the design canvas: grouped background, 24 pt inset cards,
 /// 50 pt pill buttons and the #0071E3 accent. All colors adapt to dark mode.
 extension Color {
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color { ModeColor(light: light, dark: dark).color }
-
-    static let ikutAccent = dynamic(light: 0x0071E3, dark: 0x2997FF)
-    /// "Tracking" and other positive status text (darker than system green for contrast on white).
-    static let ikutPositive = dynamic(light: 0x1F7A35, dark: 0x30D158)
-    /// "Waiting" status text.
-    static let ikutWarning = Palette.warningText.color
+    // ikutAccent, ikutPositive ("Tracking" and other positive status text), ikutWarning ("Waiting" status text) are
+    // Color Sets in Assets.xcassets/Colors (D87).
     static let ikutScreen = Color(.systemGroupedBackground)
     static let ikutCard = Color(.secondarySystemGroupedBackground)
 }

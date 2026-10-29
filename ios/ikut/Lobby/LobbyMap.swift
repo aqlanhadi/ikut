@@ -260,7 +260,7 @@ struct LobbyPinView: View {
         switch pin.kind {
         case .stop: Color.ikutAccent
         case .meeting: PlannedStopKind.meet.tint
-        case .destination: MapColors.destinationPin.color
+        case .destination: Color.destinationPin
         case .join: Color.car(hex: colorHex)
         // Grey until chosen, then the accent and a little larger with a halo, as in B6.
         case .plannedStop: Color.ikutAccent

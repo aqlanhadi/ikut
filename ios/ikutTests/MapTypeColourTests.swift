@@ -1,8 +1,55 @@
 import Foundation
 import Testing
+import UIKit
 @testable import ikut
 
 struct MapTypeColourTests {
+    /// D87: every colour is a Color Set in the catalog. These are today's values (the ones the code held as
+    /// numbers before the move), the one place hex stays: name, light, dark, light alpha, dark alpha.
+    static let expected: [(name: String, light: UInt32, dark: UInt32, lightAlpha: Double, darkAlpha: Double)] = [
+        ("ikutAccent", 0x0071E3, 0x2997FF, 1, 1), ("ikutPositive", 0x1F7A35, 0x30D158, 1, 1),
+        ("ikutWarning", 0xB02800, 0xFF9F0A, 1, 1), ("ikutAccentFill", 0x0071E3, 0x0071E3, 1, 1),
+        ("ikutRoute", 0x0A84FF, 0x0A84FF, 1, 1), ("ikutRouteCasing", 0x0060DF, 0x0060DF, 1, 1),
+        ("accentText", 0x005FBF, 0x2997FF, 1, 1), ("positiveText", 0x1D7031, 0x30D158, 1, 1),
+        ("warningFill", 0xC93300, 0xC93300, 1, 1), ("criticalFill", 0xD60014, 0xD60014, 1, 1),
+        ("neutralFill", 0x636366, 0x6E6E73, 1, 1), ("ikutJoining", 0x0F756E, 0x2ED4BF, 1, 1),
+        ("ikutBannerDark", 0x1C1C1C, 0x1C1C1C, 1, 1), ("surfaceTileFill", 0xFFFFFF, 0xFFFFFF, 0.5, 0.10),
+        ("glassSecondaryText", 0x000000, 0xFFFFFF, 0.68, 0.78), ("reportBrown", 0x8A6B45, 0x8A6B45, 1, 1),
+        ("ikutOK", 0x1F7A35, 0x23823A, 1, 1), ("ikutPillBlue", 0x64B5FF, 0x64B5FF, 1, 1),
+        ("destinationPin", 0x1C1C1E, 0x48484A, 1, 1),
+        ("recapLead", 0xC93400, 0xC93400, 1, 1), ("recapFirstIn", 0x1F7A35, 0x1F7A35, 1, 1),
+        ("recapReporter", 0xB25000, 0xB25000, 1, 1), ("recapStopCaller", 0xD70015, 0xD70015, 1, 1),
+        ("recapSweeper", 0x5856D6, 0x5856D6, 1, 1), ("recapStopPin", 0xFF3B30, 0xFF3B30, 1, 1),
+        ("recapHazardPin", 0xFFCC00, 0xFFCC00, 1, 1), ("recapRouteGlow", 0xF3D08A, 0xF3D08A, 1, 1),
+    ]
+
+    /// The colour as the app draws it in light or dark: resolved from the catalog, not from numbers in code.
+    private func resolved(_ name: String, dark: Bool) -> (rgb: UInt32, alpha: Double)? {
+        let traits = UITraitCollection(userInterfaceStyle: dark ? .dark : .light)
+        guard let named = UIColor(named: name, in: Bundle.main, compatibleWith: traits) else { return nil }
+        let c = named.resolvedColor(with: traits)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard c.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        func byte(_ x: CGFloat) -> UInt32 { UInt32(min(max((x * 255).rounded(), 0), 255)) }
+        return ((byte(r) << 16) | (byte(g) << 8) | byte(b), Double(a))
+    }
+    private func light(_ name: String) -> UInt32 { resolved(name, dark: false)?.rgb ?? 0xFF00FF }
+    private func dark(_ name: String) -> UInt32 { resolved(name, dark: true)?.rgb ?? 0xFF00FF }
+
+    @Test func everyNamedColourResolvesInBothModesToTheValueItHadInCode() {
+        for e in Self.expected {
+            let l = resolved(e.name, dark: false), d = resolved(e.name, dark: true)
+            #expect(l != nil && d != nil, "\(e.name) resolves")
+            #expect(l?.rgb == e.light, "\(e.name) light")
+            #expect(d?.rgb == e.dark, "\(e.name) dark")
+            #expect(abs((l?.alpha ?? -1) - e.lightAlpha) < 0.005, "\(e.name) light alpha")
+            #expect(abs((d?.alpha ?? -1) - e.darkAlpha) < 0.005, "\(e.name) dark alpha")
+        }
+    }
+
+    /// What a white glyph sits on; the contrast test walks these.
+    private let underWhite = ["ikutAccentFill", "warningFill", "criticalFill", "neutralFill", "ikutOK", "reportBrown"]
+
     private func marker(stale: Bool, paused: Bool = false) -> MapMarker {
         MapMarker(
             id: "c", number: 1, name: "Car", colorHex: "#2563EB", coordinate: MapCoordinate(latitude: 4, longitude: 101),
@@ -44,31 +91,31 @@ struct MapTypeColourTests {
     }
 
     @Test func whiteGlyphsOnTheMapFillsReadInBothModes() {
-        for fill in [MapColors.ok, Palette.neutralFill, Palette.criticalFill] {
-            #expect(contrast(0xFFFFFF, fill.light) >= 4.5)
-            #expect(contrast(0xFFFFFF, fill.dark) >= 4.5)
+        for fill in ["ikutOK", "neutralFill", "criticalFill"] {
+            #expect(contrast(0xFFFFFF, light(fill)) >= 4.5, "\(fill) light")
+            #expect(contrast(0xFFFFFF, dark(fill)) >= 4.5, "\(fill) dark")
         }
     }
 
     @Test func blackGlyphsOnTheBrightFillsReadInBothModes() {
         // System yellow (FFCC00 light, FFD60A dark), system orange (FF9500, FF9F0A) and the banner blue.
         for fill: UInt32 in [0xFFCC00, 0xFFD60A, 0xFF9500, 0xFF9F0A, // also the stop reason icon
-             MapColors.pillBlue.light, MapColors.pillBlue.dark] {
+             light("ikutPillBlue"), dark("ikutPillBlue")] {
             #expect(contrast(0x000000, fill) >= 4.5)
         }
     }
 
     @Test func whiteGlyphsOnThePaletteFillsReadInBothModes() {
-        for fill in Palette.underWhite {
-            #expect(contrast(0xFFFFFF, fill.light) >= 4.5)
-            #expect(contrast(0xFFFFFF, fill.dark) >= 4.5)
+        for fill in underWhite {
+            #expect(contrast(0xFFFFFF, light(fill)) >= 4.5, "\(fill) light")
+            #expect(contrast(0xFFFFFF, dark(fill)) >= 4.5, "\(fill) dark")
         }
     }
 
     /// D78: the unpicked disc, the low hazard and the stale badge draw the neutral fill, so it holds 4.5:1 like every other white-on-fill.
     @Test func theNeutralFillHoldsUnderWhite() {
-        #expect(contrast(0xFFFFFF, Palette.neutralFill.light) >= 4.5)
-        #expect(contrast(0xFFFFFF, Palette.neutralFill.dark) >= 4.5)
+        #expect(contrast(0xFFFFFF, light("neutralFill")) >= 4.5)
+        #expect(contrast(0xFFFFFF, dark("neutralFill")) >= 4.5)
     }
 
     /// Mix `fg` over `bg` at `alpha`, per channel.
@@ -83,15 +130,11 @@ struct MapTypeColourTests {
 
     /// Text tokens read on a card, on the screen and on their own 14% tint over either, in both modes.
     @Test func textTokensReadOnCardsScreensAndTheirOwnTint() {
-        let texts: [(String, ModeColor)] = [
-            ("warning", Palette.warningText),
-            ("positive", Palette.positiveText),
-            ("accent", Palette.accentText),
-        ]
+        let texts = [("warning", "ikutWarning"), ("positive", "positiveText"), ("accent", "accentText")]
         let tint = TintFill.tint.amount
         #expect(tint == 0.14)
-        for (name, t) in texts {
-            for (fg, bgs) in [(t.light, [0xFFFFFF, 0xF2F2F7] as [UInt32]), (t.dark, [0x1C1C1E, 0x000000])] {
+        for (name, token) in texts {
+            for (fg, bgs) in [(light(token), [0xFFFFFF, 0xF2F2F7] as [UInt32]), (dark(token), [0x1C1C1E, 0x000000])] {
                 for bg in bgs {
                     #expect(contrast(fg, bg) >= 4.5, "\(name) on \(String(bg, radix: 16))")
                     #expect(contrast(fg, over(fg, bg, tint)) >= 4.5, "\(name) on its tint over \(String(bg, radix: 16))")
@@ -109,16 +152,12 @@ struct MapTypeColourTests {
         #expect(abs(contrast(accent, 0xF2F2F7) - 4.21) < 0.01)
         #expect(abs(contrast(accent, over(accent, 0xF2F2F7, tint)) - 3.50) < 0.01)
         #expect(abs(contrast(positive, over(positive, 0xF2F2F7, tint)) - 4.01) < 0.01)
-        #expect(Palette.accentText.light != accent && Palette.positiveText.light != positive)
-        #expect(Palette.accentFill.light == accent)
+        #expect(light("accentText") != accent && light("positiveText") != positive)
+        #expect(light("ikutAccent") == accent && light("ikutPositive") == positive)
+        #expect(light("ikutAccentFill") == accent)
     }
 
     @Test func theTextTokensAreTheOnesTheAppDraws() {
         #expect(TintFill.wash.amount == 0.06 && TintFill.tint.amount == 0.14)
-    }
-
-    @Test func aModeColourWithoutAlphaIsOpaque() {
-        #expect(MapColors.ok.lightAlpha == 1 && MapColors.ok.darkAlpha == 1)
-        #expect(Palette.surfaceTileFill.lightAlpha == 0.5 && Palette.surfaceTileFill.darkAlpha == 0.10)
     }
 }
