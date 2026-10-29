@@ -32,6 +32,28 @@ struct ButtonSizesDemo: View {
                         }
                     }
                 }
+                block("Round buttons on glass", surface: .glass) {
+                    row("round.back") { RoundGlassIconButton(systemImage: "chevron.left", label: "Back") {} }
+                    row("round.close") { RoundGlassIconButton(systemImage: "xmark", label: "Close") {} }
+                    row("round.share") { RoundGlassShareLink(item: "ikut") }
+                    row("round.initial") { RoundGlassIconButton(text: "A", label: "Name") {} }
+                    row("round.homeName") { RoundGlassIconButton(text: "A", label: "Name", size: 50, exact: true) {} }
+                    row("round.sheetClose") { SheetCloseButton {} }
+                    row("round.backQuiet") { RoundGlassIconButton(systemImage: "chevron.left", label: "Back", style: .quiet) {} }
+                    row("round.bare") { RoundGlassIconButton(systemImage: "xmark", label: "Close", style: .bare) {} }
+                    row("round.symbol") { RoundIconSymbol(systemImage: "square.and.arrow.up") }
+                    row("bar.primary") { Button {} label: { Text("Create trip").font(.headline).frame(maxWidth: .infinity) }.ikutButton(.primary, tint: .ikutAccentFill) }
+                    row("bar.secondary") { Button {} label: { Label("Pit stop", systemImage: "mappin").font(.headline).frame(maxWidth: .infinity) }.ikutButton(.secondary, tint: .primary) }
+                    row("cancel") { Button {} label: { Text("Cancel") }.ikutButton(.secondary, tint: .primary) }
+                    row("backToTrips") { Button {} label: { Text("Back to trips").frame(maxWidth: .infinity) }.ikutButton(.secondary) }
+                }
+                block("Plain screen and map overlay (filled)", surface: .plain) {
+                    row("round.sheetClosePlain") { SheetCloseButton {} }
+                    row("round.mapClose") { MapCloseButton {} }
+                    row("location.main") { Button {} label: { Text("Open Settings").frame(maxWidth: .infinity) }.ikutButton(.primary, size: .main) }
+                    row("recap.prev") { Button {} label: { Image(systemName: "chevron.left").frame(width: 50) }.ikutButton(.secondary) }
+                    row("recap.next") { Button {} label: { Image(systemName: "chevron.right").frame(width: 50) }.ikutButton(.secondary) }
+                }
             }
             .padding(Spacing.l)
         }

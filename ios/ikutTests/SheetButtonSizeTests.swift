@@ -83,3 +83,20 @@ struct IkutButtonLookTests {
         #expect(MapPickView.surface == .plain)
     }
 }
+
+@Suite("Round icon buttons")
+struct RoundButtonSizeTests {
+    @Test func theStandardRoundSizeIsTheHitTarget() {
+        #expect(SheetButtonSize.hit == 44)
+        #expect(SheetButtonSize.capped(44, base: SheetButtonSize.hit) == 44)
+    }
+
+    @Test func roundButtonsStopAt70PointsAtTheLargestAccessibilitySize() {
+        // accessibility3 scales a 44 pt base to about 100; the cap is 1.6 times the base.
+        #expect(SheetButtonSize.capped(100, base: SheetButtonSize.hit) == 70.4)
+    }
+
+    @Test func aLargerBaseKeepsItsOwnCap() {
+        #expect(SheetButtonSize.capped(200, base: 50) == 80)
+    }
+}
