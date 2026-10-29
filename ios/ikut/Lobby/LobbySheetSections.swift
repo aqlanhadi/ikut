@@ -97,17 +97,41 @@ extension LobbyView {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity)
                 .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
-            stopAction(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc", caption: nil, id: "lobby.copyCode") {
-                UIPasteboard.general.string = code
-                copiedCount += 1
-                copied = true
-                Task {
-                    try? await Task.sleep(for: .seconds(1.5))
-                    copied = false
+            // Copy and QR code side by side in one row (stacked at accessibility sizes, where the labels need the width):
+            // two rows of their own made the section a third taller.
+            let buttons = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
+            buttons {
+                Button {
+                    UIPasteboard.general.string = code
+                    copiedCount += 1
+                    copied = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copied = false
+                    }
+                } label: {
+                    HStack(spacing: Spacing.s) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc").accessibilityHidden(true)
+                        Text(copied ? "Copied" : "Copy")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
                 }
+                .ikutButton(.link)
+                .sensoryFeedback(.success, trigger: copiedCount)
+                .accessibilityIdentifier("lobby.copyCode")
+                Button { showQR = true } label: {
+                    HStack(spacing: Spacing.s) {
+                        Image(systemName: "qrcode").accessibilityHidden(true)
+                        Text("QR code")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .ikutButton(.link)
+                .accessibilityIdentifier("lobby.showQR")
             }
-            .sensoryFeedback(.success, trigger: copiedCount)
-            stopAction("QR code", systemImage: "qrcode", caption: nil, id: "lobby.showQR") { showQR = true }
         } header: {
             Text("Trip code")
         } footer: {
