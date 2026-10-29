@@ -206,8 +206,7 @@ struct LobbyMapLayer: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                RoundGlassIconButton(systemImage: "arrow.up.left.and.arrow.down.right", label: "Show the whole trip",
-                                     glyph: .title3.weight(.semibold)) { command = command.asking(.wholeTrip) }
+                RoundGlassIconButton(systemImage: "arrow.up.left.and.arrow.down.right", label: "Show the whole trip") { command = command.asking(.wholeTrip) }
                 .padding(.trailing, Spacing.m)
                 .padding(.top, stage.space.safeTop + Spacing.xs)
                 .accessibilityIdentifier("lobby.wholeTrip")

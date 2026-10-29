@@ -75,15 +75,15 @@ struct RecapMapView: View {
                 .transition(.opacity)
             }
             HStack(spacing: Spacing.s) {
-                Button { step(to: max(0, index - 1)) } label: { Image(systemName: "chevron.left").frame(width: 50, height: 44) }
-                    .buttonStyle(.bordered).buttonBorderShape(.capsule)
+                Button { step(to: max(0, index - 1)) } label: { Image(systemName: "chevron.left").frame(width: 50) }
+                    .ikutButton(.secondary)
                     .disabled(index == 0)
                     .accessibilityLabel("Previous")
                 Text(steps.isEmpty ? "No events" : "\(index + 1) of \(steps.count)")
                     .font(.subheadline.weight(.semibold)).monospacedDigit()
                     .frame(maxWidth: .infinity)
-                Button { step(to: min(steps.count - 1, index + 1)) } label: { Image(systemName: "chevron.right").frame(width: 50, height: 44) }
-                    .buttonStyle(.bordered).buttonBorderShape(.capsule)
+                Button { step(to: min(steps.count - 1, index + 1)) } label: { Image(systemName: "chevron.right").frame(width: 50) }
+                    .ikutButton(.secondary)
                     .disabled(index >= steps.count - 1)
                     .accessibilityLabel("Next")
             }

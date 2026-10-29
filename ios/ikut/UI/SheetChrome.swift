@@ -44,35 +44,14 @@ extension View {
 
     /// The label of a full-width bottom-bar action (Start trip, Show map, Create trip, Add <place>, Report, Pit stop,
     /// a card's main button): headline, as wide as the bar, `SheetButtonSize.bar` tall, growing with the text size.
-    /// With `actionBarStyle` (or `ikutButton`) and inside `sheetActionBar`, every bar is one shape.
+    /// Only for what is not a button (the waiting line); buttons go through `ikutButton`.
     /// `font`: the lobby's waiting line keeps its quieter text in the same shape.
     func barActionLabel(fullWidth: Bool = true, font: Font = .headline) -> some View {
         modifier(BarActionLabel(fullWidth: fullWidth, font: font))
     }
 
-    /// The label of a button inside the content (Copy, QR code, the steppers, Suggest's Not now and Add):
-    /// `SheetButtonSize.hit` tall, growing with the text size.
-    func inlineActionLabel(fullWidth: Bool = true) -> some View { modifier(InlineActionLabel(fullWidth: fullWidth)) }
-
     /// A round icon face inside the content (the steppers' minus and plus): `SheetButtonSize.hit` across.
     func inlineRoundLabel() -> some View { modifier(InlineRoundLabel()) }
-
-    /// Liquid Glass buttons on iOS 26 (the owner chose glass on the sheet, 2026-10-25): the main action prominent
-    /// and tinted with the accent, the quieter one clear (`GlassSurface.useGlass` is the switch). Before iOS 26,
-    /// the tinted and bordered capsules as before.
-    @ViewBuilder func actionBarStyle(prominent: Bool) -> some View {
-        if GlassSurface.useGlass, #available(iOS 26, *) {
-            if prominent {
-                buttonStyle(.glassProminent).buttonBorderShape(.capsule).tint(Color.ikutAccentFill)
-            } else {
-                buttonStyle(.glass).buttonBorderShape(.capsule).tint(.primary)
-            }
-        } else if prominent {
-            buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Color.ikutAccentFill)
-        } else {
-            buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.primary)
-        }
-    }
 }
 
 extension View {
@@ -116,42 +95,43 @@ private struct BarActionLabel: ViewModifier {
     }
 }
 
-private struct InlineActionLabel: ViewModifier {
-    var fullWidth: Bool
-    @ScaledMetric(relativeTo: .body) private var height = SheetButtonSize.hit
-
-    func body(content: Content) -> some View {
-        content.frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
-    }
-}
-
 private struct InlineRoundLabel: ViewModifier {
     @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     func body(content: Content) -> some View { content.frame(width: side, height: side) }
 }
 
-/// A round button for the top corners of a sheet (`SheetButtonSize.round` across by default): Liquid Glass on iOS 26, else a quiet
-/// filled circle. Its face is an SF Symbol (the close "x", Back, Share) or a short text (the name's initial).
+/// The system's glass circle on iOS 26 (the bordered circle before), at the large control size; nothing sets a frame.
+extension View {
+    @ViewBuilder func roundGlassStyle() -> some View {
+        if GlassSurface.useGlass, #available(iOS 26, *) {
+            buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
+        } else {
+            buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
+        }
+    }
+}
+
+/// A round icon button (the close "x", Back, Share, the name's initial). Glass is the system's circle at its own size
+/// (46 pt and up); the quiet and bare ones draw their own circle (or none) in `RoundIconFace`, at least 44 pt and
+/// growing with the text size, since Apple's bordered circle measured 41 pt.
 struct RoundGlassIconButton: View {
-    /// `.glass`: Liquid Glass (a quiet circle before iOS 26), `SheetButtonSize.round` across. `.quiet` and `.bare`
-    /// never use glass: a tertiary-filled circle (a sheet's pinned header) or the bare glyph (a button inside a card),
-    /// both `SheetButtonSize.hit` across, scaled and capped.
+    /// `.glass`: Liquid Glass (the bordered circle before iOS 26). `.quiet`: a tertiary-filled circle. `.bare`: the glyph.
     enum Style { case glass, quiet, bare }
     private enum Face { case symbol(String), text(String) }
     private var face: Face
     var label: String
-    /// Nil: `SheetButtonSize.round`, scaled.
+    /// Only with `exact`: the final side.
     var size: CGFloat?
     var style = Style.glass
-    /// The glyph's font, nil for the footnote bold every round button had.
+    /// The glyph's font, nil for the system's own.
     var glyph: Font?
-    @ScaledMetric(relativeTo: .body) private var roundSize = SheetButtonSize.round
-    @ScaledMetric(relativeTo: .body) private var inlineSize = SheetButtonSize.hit
-    /// The circle is exactly `size` across (Home's name button, which must match the search bar's height as it
-    /// grows with the text size), glass included, whatever padding the glass style would add around the face.
+    /// The one custom size: Home's name button must line up with the search bar, which grows with the text size and is
+    /// measured by the caller, so `size` is its final side (glass only).
     var exact = false
     var action: () -> Void
+    /// What Apple's large circle style adds around its label, measured (46 pt for a 17 pt "xmark").
+    private static let systemPadding: CGFloat = 27
 
     init(systemImage: String, label: String, size: CGFloat? = nil, style: Style = .glass, glyph: Font? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
@@ -163,7 +143,7 @@ struct RoundGlassIconButton: View {
         self.action = action
     }
 
-    /// A text face, such as the person's initial: .primary and semibold, shrinking to fit the circle.
+    /// A text face, such as the person's initial: semibold, shrinking to fit the circle.
     init(text: String, label: String, size: CGFloat? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .text(text)
         self.label = label
@@ -174,85 +154,60 @@ struct RoundGlassIconButton: View {
 
     @ViewBuilder private var faceView: some View {
         switch face {
-        case .symbol(let name): Image(systemName: name).font(glyph ?? .footnote.weight(.bold))
+        case .symbol(let name): Image(systemName: name).font(glyph)
         case .text(let text): Text(text).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
         }
     }
 
     var body: some View {
         if style != .glass {
-            Button(action: action) { RoundIconFace(face: faceView, style: style, side: inlineSize) }
+            Button(action: action) { RoundIconFace(face: faceView.font(glyph ?? .body.weight(.semibold)), style: style) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)
-        } else {
-            glassBody
-        }
-    }
-
-    @ViewBuilder private var glassBody: some View {
-        let size = size ?? roundSize
-        if GlassSurface.useGlass, #available(iOS 26, *) {
-            if exact {
-                Button(action: action) {
-                    faceView.frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .tint(.primary)
+        } else if exact, let size {
+            Button(action: action) { faceView.frame(maxWidth: .infinity, maxHeight: .infinity) }
+                .roundGlassStyle()
                 .frame(width: size, height: size)
                 .accessibilityLabel(label)
-            } else {
-                Button(action: action) {
-                    faceView.frame(width: size, height: size)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .tint(.primary)
-                .accessibilityLabel(label)
-            }
         } else {
-            Button(action: action) {
-                faceView
-                    .foregroundStyle(isText ? Color.primary : Color.secondary)
-                    .frame(width: size, height: size)
-                    .background(.quaternary, in: Circle())
-            }
-            .accessibilityLabel(label)
+            // A narrow glyph (the chevron) leaves the system's circle at 42.7 pt wide: the label's minimum makes up the
+            // rest of the 44 pt tap (the system pads the label by about 29 pt in all).
+            let least = SheetButtonSize.hit - Self.systemPadding
+            Button(action: action) { faceView.frame(minWidth: least, minHeight: least) }
+                .roundGlassStyle()
+                .accessibilityLabel(label)
         }
     }
-
-    private var isText: Bool { if case .text = face { true } else { false } }
 }
 
-/// The face of a `.quiet` or `.bare` round icon button, also the label of a `ShareLink`: `SheetButtonSize.hit`
-/// across, scaled with the text size and capped, never under the 44 pt hit target.
+/// The face of a quiet or bare round button, also a label that isn't a `Button` (a `ShareLink`, a banner's close):
+/// `SheetButtonSize.hit` across, growing with the text size up to `SheetButtonSize.maxScale` times, never under 44.
 struct RoundIconFace<Face: View>: View {
     var face: Face
     var style: RoundGlassIconButton.Style = .quiet
-    var side: CGFloat
+    /// Nil: the style's own colour. White for a close button on a dark banner.
+    var color: Color?
+    @ScaledMetric(relativeTo: .body) private var scaled = SheetButtonSize.hit
 
     var body: some View {
-        let side = SheetButtonSize.capped(side, base: SheetButtonSize.hit)
+        let side = SheetButtonSize.capped(scaled, base: SheetButtonSize.hit)
         face
-            .foregroundStyle(style == .bare ? Color.secondary : Color.primary)
+            .foregroundStyle(color ?? (style == .bare ? .secondary : .primary))
             .frame(width: side, height: side)
             .background(style == .quiet ? AnyShapeStyle(Color(.tertiarySystemFill)) : AnyShapeStyle(.clear), in: Circle())
             .contentShape(Circle())
     }
 }
 
-/// A symbol for `RoundIconFace`, for a label that isn't a `Button` (a `ShareLink`).
+/// A symbol for `RoundIconFace`, for a label that isn't a `Button`.
 struct RoundIconSymbol: View {
     var systemImage: String
-    var glyph: Font = .footnote.weight(.bold)
+    var glyph: Font?
     var style: RoundGlassIconButton.Style = .quiet
-    /// Nil: the style's own colour. White for a close button on a dark banner.
     var color: Color?
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.hit
 
     var body: some View {
-        RoundIconFace(face: Image(systemName: systemImage).font(glyph).foregroundStyle(color ?? (style == .bare ? .secondary : .primary)),
-                      style: style, side: side)
+        RoundIconFace(face: Image(systemName: systemImage).font(glyph ?? .body.weight(.semibold)), style: style, color: color)
     }
 }
 
@@ -307,24 +262,12 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
 struct RoundGlassShareLink: View {
     var item: String
     var label = "Share invite"
-    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.round
 
     var body: some View {
-        if GlassSurface.useGlass, #available(iOS 26, *) {
-            ShareLink(item: item) { face.frame(width: side, height: side) }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .tint(.primary)
-                .accessibilityLabel(label)
-        } else {
-            ShareLink(item: item) {
-                face.foregroundStyle(.secondary).frame(width: side, height: side).background(.quaternary, in: Circle())
-            }
+        ShareLink(item: item) { Image(systemName: "square.and.arrow.up") }
+            .roundGlassStyle()
             .accessibilityLabel(label)
-        }
     }
-
-    private var face: some View { Image(systemName: "square.and.arrow.up").font(.footnote.weight(.bold)) }
 }
 
 /// The search bar of an Apple-Maps-style sheet (Home's Where to?, then the live search): a full-width capsule at

@@ -182,9 +182,9 @@ struct LobbyView: View {
                         switchMode(.showMap)
                     }
                 } label: {
-                    Text(bar.label).barActionLabel()
+                    Text(bar.label).font(.headline).frame(maxWidth: .infinity)
                 }
-                .actionBarStyle(prominent: true)
+                .ikutButton(.primary, tint: .ikutAccentFill)
                 // An alert, not a dialog: on iOS 26 a confirmation dialog is a small popover with no Cancel (#362).
                 .alert(LobbyContent.startConfirm(model.groupedCars) ?? "", isPresented: $confirmStart) {
                     Button("Start anyway") { startTrip() }
@@ -804,7 +804,7 @@ struct QRCodeSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
-            SheetCloseButton(action: { dismiss() }, onGlass: true).padding(Spacing.m)
+            SheetCloseButton(action: { dismiss() }).buttonSurface(.glass).padding(Spacing.m)
         }
         .presentationDetents([.medium])
     }

@@ -24,34 +24,16 @@ enum IkutButtonRole {
 private struct FilledCapsuleButtonStyle: ButtonStyle {
     var fill: Color
     var foreground: Color
+    /// What Apple's large capsule adds above and below its label, scaled with the text size.
+    @ScaledMetric(relativeTo: .body) private var pad = 14
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .padding(.vertical, pad)
             .foregroundStyle(foreground)
             .background(fill, in: Capsule())
             .contentShape(Capsule())
             .opacity(configuration.isPressed ? 0.7 : 1)
-    }
-}
-
-/// The height of an `ikutButton`: standard 44 (the least a tap target is) for everything in sheets, bars and cards,
-/// and main 50 for the single main action of a full-screen flow. Filled and glass measure the same.
-enum IkutButtonSize {
-    case standard, main
-
-    var base: CGFloat { self == .main ? 50 : SheetButtonSize.hit }
-
-    /// The button's total height at the text size whose scaled base is `scaled` (an `@ScaledMetric` from `base`):
-    /// never under 44, and no more than `SheetButtonSize.maxScale` times the base.
-    func height(scaled: CGFloat) -> CGFloat { SheetButtonSize.capped(scaled, base: base) }
-
-    /// What Apple's capsule styles add around the label at `.regular` (measured on iOS 26 in `design-compare-buttons-5`).
-    static let styleExtra: CGFloat = 14
-
-    /// The label's minimum height that makes the whole button `height`: the style's own padding comes off, except
-    /// for a link and the flat capsule, which add none.
-    static func labelMinHeight(total: CGFloat, addsPadding: Bool) -> CGFloat {
-        max(total - (addsPadding ? styleExtra : 0), 0)
     }
 }
 
@@ -77,9 +59,6 @@ extension View {
 struct IkutButtonLook: Equatable {
     enum Kind: Equatable { case flat, glassProminent, glass, borderedProminent, bordered, borderless }
     var kind: Kind
-    /// The bordered and glass capsules add their own padding around the label; a link and the flat capsule add none.
-    var addsPadding: Bool { switch kind { case .flat, .borderless: false; default: true } }
-
     static func resolve(role: IkutButtonRole, face: IkutButtonFace?, surface: IkutSurface, glassActive: Bool) -> IkutButtonLook {
         switch role {
         case .flat: return IkutButtonLook(kind: .flat)
@@ -93,39 +72,23 @@ struct IkutButtonLook: Equatable {
     }
 }
 
-/// Gives the button its exact height whatever style draws it: the label gets a minimum height scaled with the text
-/// size, and Apple's style is applied to a button inside, so pressed, disabled and the accessibility element stay the system's.
-private struct SizedButtonStyle: PrimitiveButtonStyle {
-    var role: IkutButtonRole
-    var size: IkutButtonSize
-    var look: IkutButtonLook
-    var face: IkutButtonFace?
+/// Accent text with no fill. The label itself is at least `SheetButtonSize.hit` (44) tall and the whole of it is
+/// tappable, so the button's tap area is 44, not just the words.
+private struct LinkButtonStyle: ButtonStyle {
+    var tint: Color
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
-        Sized(configuration: configuration, role: role, size: size, look: look, face: face)
-    }
-
-    private struct Sized: View {
-        var configuration: PrimitiveButtonStyleConfiguration
-        var role: IkutButtonRole
-        var size: IkutButtonSize
-        var look: IkutButtonLook
-        var face: IkutButtonFace?
-        @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
-
-        var body: some View {
-            let total = size.height(scaled: size.base * scale)
-            let minHeight = IkutButtonSize.labelMinHeight(total: total, addsPadding: look.addsPadding)
-            Button(role: configuration.role, action: configuration.trigger) {
-                configuration.label.frame(minHeight: minHeight).contentShape(Rectangle())
-            }
-            .applyStyle(look, role: role, face: face)
-        }
+        configuration.label
+            .foregroundStyle(tint)
+            .frame(minHeight: SheetButtonSize.hit)
+            .contentShape(Rectangle())
+            .opacity(!isEnabled ? 0.4 : configuration.isPressed ? 0.6 : 1)
     }
 }
 
 private extension View {
-    @ViewBuilder func applyStyle(_ look: IkutButtonLook, role: IkutButtonRole, face: IkutButtonFace?) -> some View {
+    @ViewBuilder func applyStyle(_ look: IkutButtonLook, role: IkutButtonRole, face: IkutButtonFace?, tint: Color) -> some View {
         switch look.kind {
         case .flat:
             if case .flat(let own) = role {
@@ -134,40 +97,40 @@ private extension View {
                 buttonStyle(FilledCapsuleButtonStyle(fill: face.fill, foreground: face.foreground))
             }
         case .glassProminent:
-            if #available(iOS 26, *) { buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent) }
+            if #available(iOS 26, *) { buttonStyle(.glassProminent).buttonBorderShape(.capsule).controlSize(.large).tint(tint) }
         case .glass:
-            if #available(iOS 26, *) { buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent) }
-        case .borderedProminent: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-        case .bordered: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
-        case .borderless: buttonStyle(.borderless).buttonBorderShape(.capsule).controlSize(.regular).tint(Color.ikutAccent)
+            if #available(iOS 26, *) { buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.large).tint(tint) }
+        case .borderedProminent: buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large).tint(tint)
+        case .bordered: buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large).tint(tint)
+        case .borderless: buttonStyle(LinkButtonStyle(tint: tint))
         }
     }
 }
 
 private struct IkutButtonModifier: ViewModifier {
     var role: IkutButtonRole
-    var size: IkutButtonSize
     var face: IkutButtonFace?
+    var tint: Color?
     @Environment(\.buttonSurface) private var surface
 
     func body(content: Content) -> some View {
         let look = IkutButtonLook.resolve(role: role, face: face, surface: surface, glassActive: GlassSurface.active)
-        content.buttonStyle(SizedButtonStyle(role: role, size: size, look: look, face: face))
+        content.applyStyle(look, role: role, face: face, tint: tint ?? Color.ikutAccent)
     }
 }
 
 extension View {
-    /// The one button API. Apply to a `Button` (or `ShareLink`) whose label is full width with `.frame(maxWidth: .infinity)`:
-    /// the height comes from `size` (44 standard; `.main` 50 only for the one main action of a full-screen flow), the
-    /// glass or filled look from the surface (`buttonSurface`).
+    /// The one button API. Apply to a `Button` (or `ShareLink`) whose label is full width with `.frame(maxWidth: .infinity)`.
+    /// The height is Apple's own large control size (about 50 pt, growing with the text size); the glass or filled look
+    /// comes from the surface (`buttonSurface`).
     /// `surface`: the flat face a stop card button keeps before iOS 26 in place of Apple's bordered style (the card's
     /// primary and secondary are gray and accent capsules there); a link has none.
-    func ikutButton(_ role: IkutButtonRole, size: IkutButtonSize = .standard, surface: IkutButtonFace? = nil) -> some View {
-        modifier(IkutButtonModifier(role: role, size: size, face: surface))
+    /// `tint`: a colour other than the accent, for a bar that keeps its own (the blue fill, or primary text on a clear button).
+    func ikutButton(_ role: IkutButtonRole, surface: IkutButtonFace? = nil, tint: Color? = nil) -> some View {
+        modifier(IkutButtonModifier(role: role, face: surface, tint: tint))
     }
 }
 
 extension IkutButtonRole {
-    fileprivate var isLink: Bool { if case .link = self { true } else { false } }
     fileprivate var isPrimary: Bool { if case .primary = self { true } else { false } }
 }

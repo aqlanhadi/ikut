@@ -121,7 +121,7 @@ private struct ReportPreviewHost: View {
         Color(.systemGroupedBackground)
             .ignoresSafeArea()
             .overlay(alignment: .bottom) { ReportToastView(model: toast, edge: .bottom).padding(.horizontal, Spacing.l).padding(.bottom, Spacing.xl) }
-            .overlay { Button("Report") { showing = true }.buttonStyle(.borderedProminent) }
+            .overlay { Button { showing = true } label: { Text("Report").padding(.horizontal, Spacing.l) }.ikutButton(.primary) }
             .sheet(isPresented: $showing) {
                 ScrollView { ReportSheet(context: context, toast: toast) { _ in } }
                     .presentationDetents([.large])

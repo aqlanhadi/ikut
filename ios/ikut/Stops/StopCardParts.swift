@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One button in the card's action area, every style `SheetButtonSize.hit` (44) tall and growing with the text size
+/// One button in the card's action area, every style Apple's large size, growing with the text size
 /// (or `height` when the driver needs a huge one). `.primary` is the main action, `.secondary` a gray capsule,
 /// `.positive` the chosen answer, `.ghost` plain text, `.destructive` red text (a destructive button role).
 struct StopActionButton: View {
@@ -10,13 +10,16 @@ struct StopActionButton: View {
     /// A small second line under the title ("Hafiz is 3 min away").
     var subtitle: String?
     var style: Style = .secondary
-    /// Nil: the standard 44 `ikutButton` gives, growing with the text size.
+    /// Nil: the size `ikutButton` gives (the driving screen's big mode passes the button's total height).
     var height: CGFloat?
     var disabled = false
     var id: String
     var action: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// What Apple's large capsule adds around its label (measured: a 50.3 pt button on a 22 pt headline), taken off a
+    /// requested total so `height` is the button's whole height, not the label's minimum with the padding on top.
+    static let largeExtra: CGFloat = 28
 
     var body: some View {
         // At accessibility sizes a long title wraps to two lines and the button grows, not truncates.
@@ -32,9 +35,8 @@ struct StopActionButton: View {
                 }
             }
                 .multilineTextAlignment(.center)
-                .padding(.vertical, large ? Spacing.s : 0)
                 .padding(.horizontal, large ? Spacing.l : 0)
-                .frame(maxWidth: .infinity, minHeight: height)
+                .frame(maxWidth: .infinity, minHeight: height.map { max($0 - Self.largeExtra, 0) })
         }
         .ikutButton(role, surface: face)
         .disabled(disabled)

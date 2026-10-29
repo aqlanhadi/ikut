@@ -105,7 +105,7 @@ frame|width 30, height 30||App/HomeMapContent.swift:134
 frame|width 30, height 30||App/HomeTripRows.swift:49
 frame|minHeight 56||App/HomeTripRows.swift:61
 frame|minHeight 56||App/HomeTripRows.swift:86
-frame|minHeight 44||App/PickedTripSheet.swift:67
+frame|minHeight 44||App/PickedTripSheet.swift:66
 frame|width 88, height 88||App/WelcomeView.swift:33
 padding|28||App/WelcomeView.swift:40
 frame|width 36, height 36||App/WelcomeView.swift:54
@@ -117,24 +117,24 @@ frame|minHeight 50||Auth/NameEntryView.swift:110
 padding|3||Hazards/HazardMapContent.swift:37
 frame|width 0||Hazards/HazardMapContent.swift:43
 opacity|0.3||Hazards/HazardMapContent.swift:80
-frame|minHeight 44||Join/JoinSheet.swift:126
-frame|minHeight 44||Join/JoinSheet.swift:274
-frame|minHeight 54||Join/JoinSheet.swift:330
-color|#8E8E93|8E8E93|Join/JoinSheet.swift:409
-frame|minHeight 46||Join/JoinSheet.swift:420
-frame|minHeight 56||Join/JoinSheet.swift:457
+frame|minHeight 44||Join/JoinSheet.swift:127
+frame|minHeight 44||Join/JoinSheet.swift:275
+frame|minHeight 54||Join/JoinSheet.swift:331
+color|#8E8E93|8E8E93|Join/JoinSheet.swift:410
+frame|minHeight 46||Join/JoinSheet.swift:421
+frame|minHeight 56||Join/JoinSheet.swift:458
 frame|minHeight 54||Lobby/CarRow.swift:22
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:179
-opacity|0.5||Lobby/LobbyMap.swift:267
-opacity|0.2||Lobby/LobbyMap.swift:281
-padding|6||Lobby/LobbyMap.swift:291
-padding|1||Lobby/LobbyMap.swift:291
-opacity|0.88||Lobby/LobbyMap.swift:292
-radius|6||Lobby/LobbyMap.swift:292
-font|12||Lobby/LobbyMap.swift:313
-font|11||Lobby/LobbyMap.swift:315
-font|12||Lobby/LobbyMap.swift:317
-frame|width 8, height 8||Lobby/LobbyMap.swift:319
+opacity|0.5||Lobby/LobbyMap.swift:266
+opacity|0.2||Lobby/LobbyMap.swift:280
+padding|6||Lobby/LobbyMap.swift:290
+padding|1||Lobby/LobbyMap.swift:290
+opacity|0.88||Lobby/LobbyMap.swift:291
+radius|6||Lobby/LobbyMap.swift:291
+font|12||Lobby/LobbyMap.swift:312
+font|11||Lobby/LobbyMap.swift:314
+font|12||Lobby/LobbyMap.swift:316
+frame|width 8, height 8||Lobby/LobbyMap.swift:318
 frame|minHeight 48||Lobby/LobbySheetSections.swift:89
 frame|width 32, height 32||Lobby/LobbySheetSections.swift:195
 frame|minHeight 48||Lobby/LobbySheetSections.swift:204
@@ -164,7 +164,7 @@ frame|minHeight 44||Map/ConvoyPanel.swift:289
 frame|minHeight 50||Map/ConvoyPanel.swift:325
 padding|44||Map/ConvoyPanel.swift:328
 padding|44||Map/ConvoyPanel.swift:333
-frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:395
+frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:396
 opacity|0.3||Map/ConvoyRows.swift:16
 frame|height 4||Map/ConvoyRows.swift:16
 frame|width 12, height 12||Map/ConvoyRows.swift:22
@@ -193,8 +193,8 @@ padding|5||Recap/RecapContent.swift:205
 frame|width 42||Recap/RecapContent.swift:205
 frame|width 2||Recap/RecapContent.swift:209
 frame|minHeight 12||Recap/RecapContent.swift:209
-frame|width 50, height 44||Recap/RecapMapView.swift:78
-frame|width 50, height 44||Recap/RecapMapView.swift:85
+frame|width 50||Recap/RecapMapView.swift:78
+frame|width 50||Recap/RecapMapView.swift:85
 padding|40||Recap/RecapView.swift:31
 padding|80||Recap/RecapView.swift:33
 opacity|0.35||Recap/RecapView.swift:81
@@ -209,11 +209,11 @@ frame|minHeight 46||Stops/StopArrivalCard.swift:372
 frame|width 40, height 40||Stops/StopCard.swift:146
 frame|minHeight 72||Stops/StopCard.swift:155
 frame|minHeight 44||Stops/StopCard.swift:237
-opacity|0.85||Stops/StopCardParts.swift:31
-opacity|0.7||Stops/StopCardParts.swift:68
-padding|5||Stops/StopCardParts.swift:131
-opacity|0.4||Stops/StopCardParts.swift:133
-frame|minHeight 44||Stops/StopCardParts.swift:135
+opacity|0.85||Stops/StopCardParts.swift:34
+opacity|0.7||Stops/StopCardParts.swift:70
+padding|5||Stops/StopCardParts.swift:133
+opacity|0.4||Stops/StopCardParts.swift:135
+frame|minHeight 44||Stops/StopCardParts.swift:137
 frame|width 34, height 34||Stops/StopPillView.swift:71
 frame|minHeight 52||Stops/StopPillView.swift:83
 frame|minHeight 44||Stops/StopPlaces.swift:58
@@ -233,8 +233,8 @@ frame|width 20||Trip/CreateTripView.swift:100
 frame|width 32, height 44||Trip/CreateTripView.swift:123
 frame|minHeight 54||Trip/CreateTripView.swift:131
 font|34||Trip/MapPickView.swift:113
-frame|width 80||Trip/NewTripSheet.swift:100
-frame|minHeight 46||Trip/NewTripSheet.swift:109
+frame|width 80||Trip/NewTripSheet.swift:101
+frame|minHeight 46||Trip/NewTripSheet.swift:110
 frame|width 32, height 32||Trip/PlaceResultRow.swift:67
 frame|minHeight 58||Trip/PlaceResultRow.swift:80
 frame|minHeight 58||Trip/PlaceSearch.swift:261
@@ -248,9 +248,9 @@ color|#7C3AED|7C3AED|Trip/TripService.swift:18
 color|#BE185D|BE185D|Trip/TripService.swift:18
 color|#A16207|A16207|Trip/TripService.swift:18
 opacity|0.25||UI/GlassSurface.swift:86
-frame|minHeight 48||UI/SheetChrome.swift:302
-frame|width 32, height 44||UI/SheetChrome.swift:375
-frame|minHeight 58||UI/Theme.swift:213
+frame|minHeight 48||UI/SheetChrome.swift:257
+frame|width 32, height 44||UI/SheetChrome.swift:318
+frame|minHeight 58||UI/Theme.swift:195
 frame|height 28||UI/TripComponents.swift:105
 font|7||UI/TripComponents.swift:199
 padding|5||UI/TripComponents.swift:209

@@ -10,9 +10,8 @@ struct LocationDeniedView: View {
         } description: {
             Text("ikut needs your location during a trip so the others can see your car. Turn it on in Settings.")
         } actions: {
-            Button("Open Settings", action: onOpenSettings)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+            Button(action: onOpenSettings) { Text("Open Settings").frame(maxWidth: .infinity) }
+                .ikutButton(.primary, tint: .accentColor)
         }
     }
 }
