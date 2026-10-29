@@ -224,11 +224,6 @@ struct JoinSheet: View {
     @ViewBuilder private var nameStep: some View {
         @Bindable var model = model
         Section {
-            Text("Drive together. Arrive together.")
-                .font(.title3).foregroundStyle(.secondary)
-                .lobbyRow(top: Spacing.s)
-        }
-        Section {
             TextField("Your name", text: $model.displayName)
                 .textContentType(.givenName)
                 .textInputAutocapitalization(.words)
@@ -239,7 +234,12 @@ struct JoinSheet: View {
                 .accessibilityIdentifier("nameField")
                 .onSubmit(submitName)
         } header: {
-            Text("Your name")
+            // The line and the caption share the header, so the field stays as high as it was above the keyboard.
+            VStack(alignment: .leading, spacing: Spacing.m) {
+                Text("Drive together. Arrive together.")
+                    .font(.title3).foregroundStyle(.secondary).textCase(nil)
+                Text("Your name")
+            }
         } footer: {
             Text("What the convoy sees in new trips. Joining needs only a name, no account.")
         }
@@ -290,7 +290,7 @@ struct JoinSheet: View {
 
     @ViewBuilder private var codeStep: some View {
         Section {
-            codeBoxes.lobbyRow(top: Spacing.m)
+            codeBoxes.lobbyRow()
             if model.preview == nil { status.lobbyRow(top: Spacing.xs) }
         }
         if let preview = model.preview {

@@ -117,6 +117,8 @@ struct CreateTripView: View {
                     }
                 }
             }
+            // The clear button is 44 pt tall on its own, so the row doesn't add the list's padding to it.
+            .listRowInsets(EdgeInsets(top: 0, leading: Spacing.l, bottom: 0, trailing: Spacing.s))
         }
     }
 

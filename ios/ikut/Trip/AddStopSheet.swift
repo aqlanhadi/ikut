@@ -78,6 +78,8 @@ struct AddStopContent: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+                // The picked place's sections stack tight, so "How long?" is still above the Add bar on the short sheet.
+                .listSectionSpacing(.compact)
                 .contentMargins(.top, Spacing.xs, for: .scrollContent)
                 .contentMargins(.bottom, Spacing.l, for: .scrollContent)
                 .scrollDismissesKeyboard(.interactively)
