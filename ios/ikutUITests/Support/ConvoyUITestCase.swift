@@ -339,10 +339,13 @@ class ConvoyUITestCase: XCTestCase {
     /// bar's Back (Trips) does the same if it can't be reached.
     func closeRecap() {
         let done = app.buttons["Done"]
-        guard done.waitForExistence(timeout: 30) else { print("QA: no Done on the recap"); return }
-        let recap = app.scrollViews["recap"]
+        let recap = app.collectionViews["recap"]
+        // The recap is a lazy list: Done is not in the hierarchy until it is scrolled near.
+        guard recap.waitForExistence(timeout: 30) else { print("QA: no recap"); return }
+        // A recap still loading is only a spinner: wait for its first rows before scrolling.
+        _ = app.staticTexts["Road trip awards"].waitForExistence(timeout: 30) || app.buttons["Share recap"].waitForExistence(timeout: 5)
         var swipes = 0
-        while !done.isHittable, recap.exists, swipes < 6 {
+        while !(done.exists && done.isHittable), recap.exists, swipes < 8 {
             recap.swipeUp()
             swipes += 1
         }

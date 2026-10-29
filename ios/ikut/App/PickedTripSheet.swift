@@ -98,18 +98,15 @@ struct PickedTripHeader: View {
     }
 }
 
-/// What scrolls under the pinned header when the sheet is pulled up: the recap's stat card, awards and
-/// timeline, the same content the end-of-trip screen shows.
+/// What scrolls under the pinned header when the sheet is pulled up: the recap's stat tiles, awards and
+/// timeline as list sections (the host wraps them in an inset-grouped `List`), the same content the end-of-trip screen shows.
 struct PickedTripBody: View {
     @Bindable var picked: PickedTrip
     var onSelect: (RecapTimelineItem) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if !picked.isLeft, let recap = picked.model.recap, let snapshot = picked.model.snapshot {
-                RecapContent(recap: recap, snapshot: snapshot, layout: .sheet, filter: $picked.filter, onSelect: onSelect)
-            }
+        if !picked.isLeft, let recap = picked.model.recap, let snapshot = picked.model.snapshot {
+            RecapContent(recap: recap, snapshot: snapshot, layout: .sheet, filter: $picked.filter, onSelect: onSelect)
         }
-        .buttonSurface(.glass)
     }
 }

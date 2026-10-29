@@ -127,13 +127,11 @@ color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
 frame|width 10, height 10||Map/TripMapView.swift:614
 frame|width 12, height 12||Map/TripMapView.swift:635
 frame|minHeight 56||Map/TripMapView.swift:647
-frame|height 150||Recap/RecapContent.swift:60
-frame|height 30||Recap/RecapContent.swift:64
-frame|width 0.5||Recap/RecapContent.swift:123
-frame|width 40, height 40||Recap/RecapContent.swift:157
-frame|width 42||Recap/RecapContent.swift:205
-frame|width 2||Recap/RecapContent.swift:209
-frame|minHeight 12||Recap/RecapContent.swift:209
+frame|height 150||Recap/RecapContent.swift:65
+frame|height 30||Recap/RecapContent.swift:72
+frame|width 0.5||Recap/RecapContent.swift:146
+frame|width 40, height 40||Recap/RecapContent.swift:179
+frame|width 42||Recap/RecapContent.swift:204
 frame|width 50||Recap/RecapMapView.swift:78
 frame|width 50||Recap/RecapMapView.swift:85
 opacity|0.9||Recap/RecapView.swift:116
