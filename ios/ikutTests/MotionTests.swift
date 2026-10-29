@@ -24,4 +24,21 @@ struct MotionTests {
     @Test func aFollowGlideOfNoTimeIsAStep() {
         #expect(Motion.follow(interval: 0, reduceMotion: false) == nil)
     }
+
+    @Test func theDrivingGlanceMotionsKeepTheirTimingAndHonourReduceMotion() {
+        #expect(Motion.fade == .linear(duration: 0.2))
+        #expect(Motion.pill == .snappy)
+        #expect(Motion.glance(reduceMotion: false) == .easeInOut(duration: 0.8))
+        #expect(Motion.glance(reduceMotion: true) == nil)
+        #expect(Motion.gentle(reduceMotion: false) == .smooth)
+        #expect(Motion.line(reduceMotion: false) == .easeOut)
+        #expect(Motion.gentle(reduceMotion: true) == Motion.reduced)
+        #expect(Motion.line(reduceMotion: true) == Motion.reduced)
+    }
+
+    @Test func dimmedHasThreeSteps() {
+        let amounts = [Dimmed.soft, .faded, .strong].map(\.amount)
+        #expect(amounts == [0.3, 0.7, 0.9])
+        #expect(amounts.allSatisfy { $0 > 0 && $0 < 1 } && amounts == amounts.sorted())
+    }
 }

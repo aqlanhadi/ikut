@@ -104,7 +104,7 @@ struct RouteNoticeBanner: View {
     var body: some View {
         DarkBanner(
             title: notice.text, symbol: notice.waiting ? "antenna.radiowaves.left.and.right.slash" : "arrow.triangle.turn.up.right.diamond.fill",
-            circle: notice.waiting ? .white.opacity(0.7) : .green)
+            circle: notice.waiting ? Color.white.dimmed(.faded) : .green)
             .announces(notice.text)
             .accessibilityIdentifier("route.notice")
     }

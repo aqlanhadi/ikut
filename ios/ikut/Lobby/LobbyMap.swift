@@ -277,7 +277,7 @@ struct LobbyPinView: View {
             .overlay(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 3, bottomTrailingRadius: 14,
                                             topTrailingRadius: 14, style: .continuous).strokeBorder(.white, lineWidth: 2.5))
             .frame(width: side, height: side)
-            .background { if pin.isSelectedCandidate { Circle().fill(Color.ikutAccent.opacity(0.2)).frame(width: side + 16, height: side + 16) } }
+            .background { if pin.isSelectedCandidate { Circle().fill(Color.ikutAccent.dimmed(.soft)).frame(width: side + 16, height: side + 16) } }
             .elevation(.marker)
             .rotationEffect(.degrees(-45))
             .overlay { glyph }
@@ -288,7 +288,7 @@ struct LobbyPinView: View {
                         .foregroundStyle(Color(.label))
                         .lineLimit(1)
                         .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(Color(.systemBackground).opacity(0.88), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .background(Color(.systemBackground).dimmed(.strong), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .fixedSize()
                         .offset(y: 32)
                 }

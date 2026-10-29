@@ -155,7 +155,7 @@ struct RoundGlassIconButton: View {
     @ViewBuilder private var faceView: some View {
         switch face {
         case .symbol(let name): Image(systemName: name).font(glyph)
-        case .text(let text): Text(text).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
+        case .text(let text): Text(text).font(.body.weight(.semibold)).wrapsAtAccessibilitySizes().minimumScaleFactor(0.5)
         }
     }
 
@@ -244,7 +244,7 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
                     line
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
-                        .lineLimit(2)
+                        .wrapsAtAccessibilitySizes(lines: 2)
                         .truncationMode(.middle)
                         .accessibilityIdentifier(subtitleIdentifier ?? "")
                 }

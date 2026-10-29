@@ -11,7 +11,7 @@ struct AlwaysLocationExplainerView: View {
         ScrollView {
             VStack(spacing: Spacing.xl) {
                 illustration
-                    .padding(.top, 32)
+                    .padding(.top, Spacing.hero)
 
                 VStack(spacing: Spacing.m) {
                     Text(LocationAskContent.heading)

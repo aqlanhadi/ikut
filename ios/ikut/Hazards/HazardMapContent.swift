@@ -34,7 +34,7 @@ struct HazardMapContent: View {
                         .lineLimit(1)
                         .fixedSize()
                         .padding(.horizontal, Spacing.s)
-                        .padding(.vertical, 3)
+                        .padding(.vertical, Spacing.xs)
                         .background(.regularMaterial, in: Capsule())
                         .elevation(.marker)
                         // To the left of the circle, as in the mockup: a zero-width box at the circle's
@@ -77,7 +77,7 @@ private struct HazardPing: View {
     /// 0 at the marker's edge, 1 at three times its size and gone.
     private func ring(phase: Double) -> some View {
         Circle()
-            .fill(color.opacity(0.3))
+            .fill(color.dimmed(.soft))
             .overlay(Circle().strokeBorder(color, lineWidth: 2))
             .scaleEffect(1 + 2 * phase)
             .opacity(1 - phase)

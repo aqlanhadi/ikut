@@ -7,6 +7,8 @@ import SwiftUI
 /// Picking a result creates the trip and goes to its lobby. With `changingTripId` it instead
 /// re-points that trip and calls `onDone` with the same id.
 struct CreateTripView: View {
+    /// Where the label starts in a From / To row: the row's margin, the 20 pt icon column and the gap.
+    private static let labelInset = Spacing.l + 20 + Spacing.m
     @Environment(AuthModel.self) private var auth
     @State private var model = CreateTripModel()
     @FocusState private var searchFocused: Bool
@@ -78,7 +80,7 @@ struct CreateTripView: View {
                 Circle()
                     .fill(Color.blue)
                     .frame(width: 12, height: 12)
-                    .background(Circle().fill(Color.blue.opacity(0.25)).padding(-3))
+                    .background(Circle().fill(Color.blue.dimmed(.soft)).padding(-3))
                     .frame(width: 20)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 0) {
@@ -91,7 +93,7 @@ struct CreateTripView: View {
             .ikutRow()
             .accessibilityElement(children: .combine)
 
-            Divider().padding(.leading, 48)
+            Divider().padding(.leading, Self.labelInset)
 
             HStack(spacing: Spacing.m) {
                 Image(systemName: "mappin")

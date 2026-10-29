@@ -354,7 +354,7 @@ struct StopArrivalCard: View {
     private func carRow(_ row: StopArrival.Row) -> some View {
         HStack(spacing: Spacing.m) {
             CarBadge(number: row.car.number, colorHex: row.car.color, size: IconSize.small.base)
-            Text(row.car.name).font(.body).lineLimit(1)
+            Text(row.car.name).font(.body).wrapsAtAccessibilitySizes()
             Spacer(minLength: Spacing.s)
             if row.skipping || row.notSharing {
                 Text(StopArrival.words(row)).font(.subheadline).foregroundStyle(Color.surfaceSecondary)

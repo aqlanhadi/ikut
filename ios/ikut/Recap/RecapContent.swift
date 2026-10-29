@@ -61,7 +61,7 @@ struct RecapContent: View {
                         .overlay(alignment: .bottomTrailing) {
                             Label("Route map", systemImage: "arrow.up.left.and.arrow.down.right")
                                 .font(.footnote.weight(.semibold))
-                                .padding(.horizontal, 11).frame(height: 30)
+                                .padding(.horizontal, Spacing.m).frame(height: 30)
                                 .background(.regularMaterial, in: Capsule())
                                 .padding(Spacing.s)
                         }
@@ -109,7 +109,7 @@ struct RecapContent: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text).font(.title2.bold())
-            .padding(.horizontal, Spacing.xs).padding(.top, 26).padding(.bottom, Spacing.s)
+            .padding(.horizontal, Spacing.xs).padding(.top, Spacing.xl).padding(.bottom, Spacing.s)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -202,7 +202,7 @@ struct RecapContent: View {
                 HStack(alignment: .top, spacing: Spacing.m) {
                     Text(RecapLogic.clock(item.time))
                         .font(.footnote.weight(.semibold)).foregroundStyle(.secondary).monospacedDigit()
-                        .frame(width: 42, alignment: .leading).padding(.top, 5)
+                        .frame(width: 42, alignment: .leading).padding(.top, Spacing.xs)
                     VStack(spacing: Spacing.xs) {
                         RecapEventDot(kind: item.kind, symbol: item.symbol, size: 28)
                         if !isLast {

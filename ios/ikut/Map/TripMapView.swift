@@ -161,12 +161,12 @@ struct TripMapView: View {
                 }
                 .padding(.top, viewButtonsTop)
                 .padding(.trailing, Spacing.m)
-                .animation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion), value: viewButtonsTop)
+                .animation(DrivingGlance.animation(Motion.pill, reduceMotion: reduceMotion), value: viewButtonsTop)
                 // The tall sheet would cut through it: fade it out, and back when the sheet folds.
                 .opacity(DrivingGlance.modeControlOpacity(panelExpanded: panelExpanded))
                 .allowsHitTesting(!panelExpanded)
                 .accessibilityHidden(panelExpanded)
-                .animation(.linear(duration: 0.2), value: panelExpanded)
+                .animation(Motion.fade, value: panelExpanded)
             }
             .toolbar(.hidden, for: .navigationBar)
             .preference(key: TripMapSpecKey.self, value: mapSpec)
@@ -516,7 +516,7 @@ struct TripMapView: View {
             let distance = model.approachDistance(eventId: alert.eventId)
             if let distance, distance <= 0 {
                 let label = model.hazards.markers.first { $0.id == alert.eventId }?.label.lowercased() ?? "hazard"
-                withAnimation(DrivingGlance.animation(.snappy, reduceMotion: reduceMotion)) {
+                withAnimation(DrivingGlance.animation(Motion.pill, reduceMotion: reduceMotion)) {
                     approach = nil
                     passedText = "Passed the \(label)"
                 }
@@ -629,7 +629,7 @@ struct TripMapView: View {
             if bannerSlot.errorHeld {
                 Circle().fill(Color.red).frame(width: 12, height: 12)
                     .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                    .padding(.top, 2).padding(.trailing, 6)
+                    .padding(.top, Spacing.xxs).padding(.trailing, Spacing.xs)
                     .accessibilityHidden(true)
                     .accessibilityIdentifier("trip.pill.errorDot")
             }

@@ -161,7 +161,7 @@ struct JoinSheet: View {
                         if model.isJoining {
                             ProgressView().accessibilityLabel("Joining trip")
                         } else {
-                            Text(joinLabel).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(joinLabel).wrapsAtAccessibilitySizes().minimumScaleFactor(0.7)
                         }
                     }
                     .font(.headline).frame(maxWidth: .infinity)
@@ -327,7 +327,7 @@ struct JoinSheet: View {
                     .font(.ikutDisplay(scaled: codeBoxSize, base: 26, cap: 1.4, weight: .semibold, design: .monospaced))
                     // One letter per box: it can't wrap, so it shrinks a little at the largest sizes.
                     .minimumScaleFactor(0.5)
-                    .lineLimit(1)
+                    .wrapsAtAccessibilitySizes()
                     .ikutRow(fillWidth: true)
                     .surfaceTile(radius: Radius.inner)
                     .overlay {
@@ -377,7 +377,7 @@ struct JoinSheet: View {
                 .font(.footnote).foregroundStyle(.secondary)
                 .padding(.top, Spacing.xs)
         }
-        .animation(.easeOut, value: model.ticketDrive)
+        .animation(Motion.line(reduceMotion: reduceMotion), value: model.ticketDrive)
         .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceTile(radius: Radius.inner)

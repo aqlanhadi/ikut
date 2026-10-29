@@ -599,7 +599,7 @@ struct LobbyView: View {
                     Text(message).font(.footnote).foregroundStyle(.red).padding(.top, Spacing.xl)
                         .lobbyRow()
                 } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, Spacing.hero)
                         .lobbyRow()
                 }
             }

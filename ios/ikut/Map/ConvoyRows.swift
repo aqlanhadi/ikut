@@ -13,7 +13,7 @@ struct ConvoyProgressBar: View {
             let w = proxy.size.width
             ZStack(alignment: .leading) {
                 // systemGray5 vanished on the dark glass; secondary keeps a visible track in both modes.
-                Capsule().fill(Color.secondary.opacity(0.3)).frame(height: 4)
+                Capsule().fill(Color.secondary.dimmed(.soft)).frame(height: 4)
                 Capsule().fill(Color.ikutAccentFill).frame(width: max(4, w * fraction), height: 4)
                 ForEach(Array(hazards.enumerated()), id: \.offset) { _, f in
                     Circle()
@@ -108,7 +108,7 @@ private struct NameLine: View {
 
     var body: some View {
         HStack(spacing: Spacing.xs) {
-            Text(name).lineLimit(1)
+            Text(name).wrapsAtAccessibilitySizes()
             if mine { YouTag(online: online).layoutPriority(1) }
         }
         .font(.body)

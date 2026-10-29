@@ -97,7 +97,7 @@ struct HomeMapContent: MapContent {
                     .foregroundStyle(latest ? .white : Color.ikutAccent)
                     .frame(width: latest ? 30 : 22, height: latest ? 30 : 22)
                     .background(latest ? Color.ikutAccent : Color.white, in: Circle())
-                    .overlay(Circle().stroke(latest ? Color.white : Color.ikutAccent.opacity(0.6), lineWidth: 2))
+                    .overlay(Circle().stroke(latest ? Color.white : Color.ikutAccent.dimmed(.faded), lineWidth: 2))
                     .elevation(.marker)
                     .frame(width: SheetButtonSize.hit, height: SheetButtonSize.hit)
                     .contentShape(Circle())

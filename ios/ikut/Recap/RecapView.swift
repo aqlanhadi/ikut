@@ -28,9 +28,9 @@ struct RecapView: View {
                     RecapContent(recap: recap, snapshot: snapshot, layout: .screen, filter: $filter,
                                  onOpenMap: { showMap = true }, onDone: onDone)
                 } else if let error = model.errorMessage {
-                    Text(error).foregroundStyle(.secondary).padding(.top, 40)
+                    Text(error).foregroundStyle(.secondary).padding(.top, Spacing.hero)
                 } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, Spacing.hero * 2)
                 }
             }
             .padding(.horizontal, Spacing.l)
@@ -78,7 +78,7 @@ struct RecapEventDot: View {
             .foregroundStyle(ink)
             .frame(width: size, height: size)
             .background(fill, in: Circle())
-            .overlay { if selected { Circle().stroke(Color.ikutAccent.opacity(0.35), lineWidth: 4).padding(-4) } }
+            .overlay { if selected { Circle().stroke(Color.ikutAccent.dimmed(.soft), lineWidth: 4).padding(-4) } }
             .accessibilityHidden(true)
     }
 }

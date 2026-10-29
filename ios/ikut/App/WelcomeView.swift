@@ -24,6 +24,9 @@ struct WelcomeView: View {
             detail: "Hazards you report are read aloud to the cars following."),
     ]
 
+    /// The icon's gap from the top and the features' gap from the title: 48 (the hero margin and one more step).
+    private static let introTop = Spacing.hero + Spacing.l
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -37,7 +40,7 @@ struct WelcomeView: View {
                 Text("Welcome to ikut")
                     .font(.largeTitle.bold())
                     .multilineTextAlignment(.center)
-                    .padding(.top, 28)
+                    .padding(.top, Spacing.xl)
                     .accessibilityAddTraits(.isHeader)
                 Text("Drive together. Arrive together.")
                     .font(.body)
@@ -45,7 +48,7 @@ struct WelcomeView: View {
                     .multilineTextAlignment(.center)
                     .padding(.top, Spacing.s)
 
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
                     ForEach(features) { feature in
                         HStack(alignment: .top, spacing: Spacing.l) {
                             Image(systemName: feature.symbol)
@@ -63,10 +66,10 @@ struct WelcomeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 44)
+                .padding(.top, Self.introTop)
             }
-            .padding(.horizontal, 32)
-            .padding(.top, 48)
+            .padding(.horizontal, Spacing.hero)
+            .padding(.top, Self.introTop)
             .padding(.bottom, Spacing.l)
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -86,7 +89,7 @@ struct WelcomeView: View {
                 .ikutButton(.link)
                 .accessibilityIdentifier("welcomeJoin")
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, Spacing.hero)
             .padding(.bottom, Spacing.m)
             .background(Color(.systemBackground))
         }

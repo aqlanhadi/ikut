@@ -11,6 +11,8 @@ import SwiftUI
 /// its own height (`onHeight`) so the detents follow it. The alerts the panel's buttons lead to are
 /// presented from the sheet, since a presented sheet blocks a presentation from the map under it.
 struct ConvoyPanel: View {
+    /// A row's divider starts under its text, past the badge and the gap.
+    private static let dividerInset: CGFloat = 44
     var model: TripMapModel
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -153,7 +155,7 @@ struct ConvoyPanel: View {
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
                         .monospacedDigit()
-                        .lineLimit(2)
+                        .wrapsAtAccessibilitySizes(lines: 2)
                 } else if let departed = model.departedAt {
                     Text("Left \(ConvoyFormat.clock(departed))")
                         .font(.footnote)
@@ -267,7 +269,7 @@ struct ConvoyPanel: View {
                     ForEach(convoy.convoy) { e in
                         Circle().fill(Color.car(hex: e.car.color))
                             .frame(width: 14, height: 14)
-                            .overlay(Circle().strokeBorder(Color(.systemBackground).opacity(0.8), lineWidth: 2))
+                            .overlay(Circle().strokeBorder(Color(.systemBackground).dimmed(.strong), lineWidth: 2))
                     }
                     ForEach(convoy.joining) { e in
                         Circle().fill(Color.white)
@@ -279,7 +281,7 @@ struct ConvoyPanel: View {
                 .fixedSize()
                 text
                     .font(.footnote)
-                    .lineLimit(2)
+                    .wrapsAtAccessibilitySizes(lines: 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.up")
                     .font(.footnote.weight(.bold))
@@ -325,12 +327,12 @@ struct ConvoyPanel: View {
                     .ikutRow(fillWidth: true)
             }
             ForEach(Array(convoy.convoyRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
-                if index > 0 { Divider().padding(.leading, 44) }
+                if index > 0 { Divider().padding(.leading, Self.dividerInset) }
                 ConvoyRowView(row: row, youOnline: model.youOnline)
             }
             // Joining cars follow in the same list; their dashed badges set them apart.
             ForEach(Array(convoy.joiningRows(myCarId: model.myCarId).enumerated()), id: \.element.id) { index, row in
-                if index > 0 || !convoy.convoyRows.isEmpty { Divider().padding(.leading, 44) }
+                if index > 0 || !convoy.convoyRows.isEmpty { Divider().padding(.leading, Self.dividerInset) }
                 JoiningRowView(row: row, mine: row.id == model.myCarId, youOnline: model.youOnline)
             }
         }

@@ -68,9 +68,9 @@ struct PlaceResultRow<Trailing: View>: View {
                     .background(color, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).foregroundStyle(.primary).lineLimit(1)
+                    Text(title).foregroundStyle(.primary).wrapsAtAccessibilitySizes()
                     if !subtitle.isEmpty {
-                        Text(subtitle).font(.footnote).foregroundStyle(inSheet ? Color.surfaceSecondary : Color.secondary).lineLimit(1)
+                        Text(subtitle).font(.footnote).foregroundStyle(inSheet ? Color.surfaceSecondary : Color.secondary).wrapsAtAccessibilitySizes()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

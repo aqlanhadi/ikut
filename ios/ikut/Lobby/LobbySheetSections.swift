@@ -15,13 +15,13 @@ extension LobbyView {
                 .kerning(5)
                 // The code is one token that must stay on one line, so it shrinks rather than wraps.
                 .minimumScaleFactor(0.5)
-                .lineLimit(1)
+                .wrapsAtAccessibilitySizes()
                 .textSelection(.enabled)
                 .accessibilityLabel("Join code \(code.map(String.init).joined(separator: " "))")
             Text("Anyone with the code can join until the trip ends")
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .wrapsAtAccessibilitySizes(lines: 2)
             // Side by side at the usual sizes; stacked at accessibility sizes, where the labels need the width.
             let buttons = dynamicTypeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
@@ -79,7 +79,7 @@ extension LobbyView {
         let content = HStack(spacing: Spacing.s) {
             Text(title)
             Spacer(minLength: Spacing.s)
-            Text(value).foregroundStyle(Color.surfaceSecondary).lineLimit(1)
+            Text(value).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes()
             if tappable {
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
                     .accessibilityHidden(true)

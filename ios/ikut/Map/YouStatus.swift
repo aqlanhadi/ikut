@@ -69,13 +69,14 @@ final class NetworkStatus {
 struct YouTag: View {
     var online: Bool
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         (Text("• ") + Text(YouOnline.text(online: online, differentiateWithoutColor: differentiate))
             .foregroundStyle(online ? Color.ikutPositive : Color.ikutWarning))
             .lineLimit(1)
             .fixedSize()
-            .animation(.smooth, value: online)
+            .animation(Motion.gentle(reduceMotion: reduceMotion), value: online)
             .accessibilityLabel(YouOnline.spoken(online: online))
     }
 }

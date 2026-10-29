@@ -55,7 +55,7 @@ struct RouteEnds: View {
             Text(to)
         }
         .font(.system(size: size, weight: .bold, design: .rounded))
-        .lineLimit(1)
+        .wrapsAtAccessibilitySizes()
         .minimumScaleFactor(0.6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(from.map { "From \($0) to \(to)" } ?? "To \(to)")
@@ -196,7 +196,7 @@ struct Chip: View {
             case .symbol(let name): Image(systemName: name).accessibilityHidden(true)
             case .dot(let color, let pulses):
                 Image(systemName: "circle.fill")
-                    .font(.system(size: 7))
+                    .ikutGlyph(7, cap: 1.3)
                     .foregroundStyle(color ?? tone.text)
                     .symbolEffect(.pulse, options: pulses ? .repeating : .nonRepeating)
                     .accessibilityHidden(true)
@@ -206,7 +206,7 @@ struct Chip: View {
         .font(.footnote.weight(.semibold))
         .foregroundStyle(tone.text)
         .padding(.horizontal, Spacing.s)
-        .padding(.vertical, 5)
+        .padding(.vertical, Spacing.xs)
         .background(background, in: Capsule())
         .accessibilityElement(children: .combine)
     }

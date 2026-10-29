@@ -41,3 +41,33 @@ enum TintFill {
 extension Color {
     func fill(_ amount: TintFill) -> Color { opacity(amount.amount) }
 }
+
+// MARK: - Dimmed
+
+/// How faded a thing is when it is fainter than its neighbours (a muted line on a dark banner, a track, a halo, a
+/// waiting dot): three steps, so nothing invents its own number. Colours of the system's own hierarchy
+/// (`.secondary`, `.tertiary`) are used first; this is for the rest.
+enum Dimmed {
+    /// A track, a halo, a ring behind a marker.
+    case soft
+    /// A muted line or circle on a dark surface, a pressed-looking fill.
+    case faded
+    /// Almost full: a label's backing, a casing, a tile.
+    case strong
+
+    var amount: Double {
+        switch self {
+        case .soft: 0.3
+        case .faded: 0.7
+        case .strong: 0.9
+        }
+    }
+}
+
+extension Color {
+    func dimmed(_ level: Dimmed) -> Color { opacity(level.amount) }
+}
+
+extension View {
+    func dimmed(_ level: Dimmed) -> some View { opacity(level.amount) }
+}
