@@ -7,9 +7,9 @@ enum DesignCeiling {
     static let font = 4
     static let color = 24
     static let opacity = 19
-    static let padding = 31
+    static let padding = 24
     static let radius = 1
-    static let frame = 101
+    static let frame = 98
     /// Views (outside UI/) whose name is written in at most one other place.
     static let viewsUsedOnce = 52
 }
