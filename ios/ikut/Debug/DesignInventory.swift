@@ -134,8 +134,8 @@ frame|width 40, height 40||Recap/RecapContent.swift:179
 frame|width 42||Recap/RecapContent.swift:204
 frame|width 50||Recap/RecapMapView.swift:78
 frame|width 50||Recap/RecapMapView.swift:85
-opacity|0.9||Recap/RecapView.swift:117
-frame|width 16, height 16||Recap/RecapView.swift:123
+opacity|0.9||Recap/RecapView.swift:116
+frame|width 16, height 16||Recap/RecapView.swift:122
 frame|width 40, height 40||Report/ReportSheet.swift:56
 frame|minHeight 72||Report/ReportSheet.swift:64
 frame|minHeight 60||Report/ReportSheet.swift:78
