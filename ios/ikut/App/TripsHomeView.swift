@@ -496,12 +496,14 @@ struct TripsHomeView: View {
             // The header stays put and the rows fade out under it (the system's soft top edge).
             Group {
                 if let picked = model.picked {
-                    ScrollView {
+                    List {
                         PickedTripBody(picked: picked, onSelect: selectItem)
-                            .padding(.horizontal, Spacing.l)
-                            .padding(.bottom, Spacing.l)
                     }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
                     .scrollBounceBehavior(.basedOnSize)
+                    .contentMargins(.bottom, Spacing.l, for: .scrollContent)
+                    .buttonSurface(.glass)
                 } else {
                     pastTrips
                 }

@@ -24,20 +24,21 @@ struct RecapView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let recap = model.recap, let snapshot = model.snapshot {
-                    RecapContent(recap: recap, snapshot: snapshot, layout: .screen, filter: $filter,
-                                 onOpenMap: { showMap = true }, onDone: onDone)
-                } else if let error = model.errorMessage {
-                    Text(error).foregroundStyle(.secondary).padding(.top, Spacing.hero)
-                } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, Self.loadingTop)
+        List {
+            if let recap = model.recap, let snapshot = model.snapshot {
+                RecapContent(recap: recap, snapshot: snapshot, layout: .screen, filter: $filter,
+                             onOpenMap: { showMap = true }, onDone: onDone)
+            } else if let error = model.errorMessage {
+                Section {
+                    Text(error).foregroundStyle(.secondary).padding(.top, Spacing.hero).lobbyRow()
+                }
+            } else {
+                Section {
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, Self.loadingTop).lobbyRow()
                 }
             }
-            .padding(.horizontal, Spacing.l)
-            .padding(.bottom, Spacing.xl)
         }
+        .listStyle(.insetGrouped)
         .background(Color.ikutScreen)
         .navigationTitle(model.recap?.title ?? "")
         .navigationBarTitleDisplayMode(.large)
