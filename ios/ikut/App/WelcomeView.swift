@@ -5,9 +5,6 @@ struct WelcomeView: View {
     var onGetStarted: () -> Void
     var onJoin: () -> Void
 
-    /// The app icon's corner radius, used nowhere else.
-    private static let heroRadius: CGFloat = 20
-
     private struct Feature: Identifiable {
         let symbol: String
         let title: String
@@ -30,11 +27,10 @@ struct WelcomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
-                    .ikutGlyph(42, weight: .semibold, cap: 1.3)
-                    .foregroundStyle(.white)
+                // The official icon (ikut.icon exported with ictool, already masked to the app-icon shape).
+                Image("WelcomeIcon")
+                    .resizable()
                     .frame(width: 88, height: 88)
-                    .background(Color.ikutAccent, in: RoundedRectangle(cornerRadius: Self.heroRadius, style: .continuous))
                     .elevation(.floating)
                     .accessibilityHidden(true)
 
