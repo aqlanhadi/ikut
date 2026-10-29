@@ -577,7 +577,7 @@ struct LobbyView: View {
         Group {
             List {
                 // Each hand-drawn part is one Section with one row (zero insets, clear background); the plain
-                // ones (Cars, Trip) are system rows. Stops, code, options and exit follow in later pieces (D86).
+                // ones (Cars, Trip, Stops) are system rows. Code, options and exit follow in later pieces (D86).
                 Section {
                     statusBanner.lobbyRow()
                     if session.isPaused && !session.isEnded && !session.membershipLost {
@@ -599,7 +599,7 @@ struct LobbyView: View {
                     }
                     Section { codeCard(trip.code).lobbyRow() }
                     tripSection(trip)
-                    Section { stopsRows(trip) }
+                    if showsStops { stopsSection(trip) }
                     Section { optionRows }
                 } else if let message = model.errorMessage {
                     Section {

@@ -147,40 +147,22 @@ extension LobbyView {
         return nil
     }
 
-    /// The meeting point first, the stops numbered as on the map, then (the organizer, before the start) Add a stop and
-    /// Suggest stops, and the route's total. Reorder and swipe to remove work on the rows as before.
-    @ViewBuilder func stopsRows(_ trip: Trip) -> some View {
-        let stops = shownStops
-        let showStops = canEditStops || !stops.isEmpty
-        let texts = LobbyContent.stopTexts(stops, routeLength: routeLength, routeSeconds: trip.routeSeconds ?? routeInfo.travelTime)
-        if showStops {
-            let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
-            layout {
-                Text("Stops").font(.footnote.weight(.semibold)).accessibilityAddTraits(.isHeader)
-                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
-                if planner.isBuilding && canEditStops {
-                    ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
-                        .transition(.opacity)
-                } else if canEditStops, stops.count > 1 {
-                    Text("Hold and drag to reorder").font(.footnote)
-                        .transition(.opacity)
-                }
-            }
-            .animation(Motion.quick(reduceMotion: reduceMotion), value: planner.isBuilding)
-            .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
-            .foregroundStyle(Color.surfaceSecondary)
-            .padding(.horizontal, Spacing.m)
-            .lobbyRow(top: Spacing.m, bottom: Spacing.xs)
+    /// Whether the lobby shows a Stops section at all: the organizer always, a participant once there is a stop.
+    var showsStops: Bool { canEditStops || !shownStops.isEmpty }
 
+    /// The Stops section of the lobby's list: the meeting point first, the stops numbered as on the map, then (the
+    /// organizer, before the start) Add a stop and Suggest stops, and the route's total, all as system rows. Reorder
+    /// (`onMove`) and swipe to remove work on the rows as before.
+    func stopsSection(_ trip: Trip) -> some View {
+        let stops = shownStops
+        let texts = LobbyContent.stopTexts(stops, routeLength: routeLength, routeSeconds: trip.routeSeconds ?? routeInfo.travelTime)
+        return Section {
             if stops.isEmpty {
                 Text("No stops yet. Add one for fuel, food or a place to meet.")
                     .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
-                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.m)
-                    .cardSlice(top: true, bottom: !canEditStops)
-                    .lobbyRow()
             }
             ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
-                stopRow(stop, text: texts[index], index: index, stops: stops, lastOfCard: !isOrganizer && index == stops.count - 1)
+                stopRow(stop, text: texts[index], index: index, stops: stops)
             }
             .onMove(perform: canEditStops ? { planner.move(from: $0, to: $1) } : nil)
             if let failure, failure.place.stopId == nil {
@@ -188,38 +170,44 @@ extension LobbyView {
                     tone: .failure,
                     title: StopNoteText.failureTitle(failure, stopName: nil, destinationName: trip.destination.name),
                     detail: StopNoteText.failureDetail(failure), retry: { planner.retry() })
-                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.s)
-                    .cardSlice()
-                    .lobbyRow()
+                    .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
             }
             if planner.queued && canEditStops {
                 StopNote(tone: .warning, title: StopNoteText.queuedTitle, detail: StopNoteText.queuedDetail)
-                    .padding(.horizontal, Spacing.m).padding(.bottom, Spacing.s)
-                    .cardSlice()
-                    .lobbyRow()
+                    .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
             }
             if canEditStops {
                 stopAction("Add a stop", systemImage: "plus", caption: nil, id: "stops.add") { openAddStop() }
                     .disabled(!StopListLogic.canAdd(among: stops))
-                    .overlay(alignment: .top) { Divider() }
-                    .cardSlice()
-                    .lobbyRow()
                 stopAction(
                     "Suggest stops", systemImage: "sparkles",
                     caption: LobbyContent.suggestCaption(routeSeconds: trip.routeSeconds ?? routeInfo.travelTime), id: "stops.suggest"
                 ) { showSuggestStops = true }
-                    .overlay(alignment: .top) { Divider() }
-                    .cardSlice()
-                    .lobbyRow()
             }
             if isOrganizer {
-                routeTotal(trip, stops: stops)
-                    .padding(.horizontal, Spacing.s)
-                    .padding(.top, Spacing.xs).padding(.bottom, Spacing.s)
-                    .cardSlice(bottom: true)
-                    .lobbyRow()
+                routeTotal(trip, stops: stops, inList: true)
+            }
+        } header: {
+            stopsHeader(stops)
+        }
+    }
+
+    /// "Stops", with the spinner while the route updates or the reorder hint beside it.
+    func stopsHeader(_ stops: [StopDraft]) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs)) : AnyLayout(HStackLayout())
+        return layout {
+            Text("Stops").accessibilityAddTraits(.isHeader)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Spacing.s) }
+            if planner.isBuilding && canEditStops {
+                ProgressView().controlSize(.small).accessibilityLabel("Updating the route")
+                    .transition(.opacity)
+            } else if canEditStops, stops.count > 1 {
+                Text("Hold and drag to reorder").textCase(nil)
+                    .transition(.opacity)
             }
         }
+        .animation(Motion.quick(reduceMotion: reduceMotion), value: planner.isBuilding)
+        .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
     }
 
     func stopAction(_ title: String, systemImage: String, caption: String?, id: String, action: @escaping () -> Void) -> some View {
@@ -227,20 +215,16 @@ extension LobbyView {
             HStack(spacing: Spacing.m) {
                 Image(systemName: systemImage)
                     .ikutGlyph(14, weight: .semibold, cap: 1.3)
-                    .foregroundStyle(Color.ikutAccent)
                     .iconFrame(.regular)
                     .accessibilityHidden(true)
-                Text(title).foregroundStyle(Color.ikutAccent)
+                Text(title)
                 Spacer(minLength: Spacing.s)
                 if let caption {
                     Text(caption).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 }
             }
-            .padding(.horizontal, Spacing.l)
-            .ikutRow()
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(Color.ikutAccent)
         .accessibilityIdentifier(id)
     }
 
@@ -422,18 +406,16 @@ extension LobbyView {
     }
 
     @ViewBuilder
-    func stopRow(_ stop: StopDraft, text: LobbyContent.StopText, index: Int, stops: [StopDraft], lastOfCard: Bool) -> some View {
+    func stopRow(_ stop: StopDraft, text: LobbyContent.StopText, index: Int, stops: [StopDraft]) -> some View {
         let failedHere = failure?.place == .stop(stop.id)
         StopRow(
             stop: stop, text: text, editable: canEditStops, first: index == 0,
             turnBack: canEditStops && !planner.isBuilding ? planner.turnBacks[stop.id] : nil,
-            failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() })
+            failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() }, inList: true)
             .contentShape(Rectangle())
             .onTapGesture { flyTo(stop.id) }
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Shows it on the map")
-            .cardSlice(top: index == 0, bottom: lastOfCard)
-            .lobbyRow()
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if canEditStops {
                     Button(role: .destructive) { removeStop(stop.id) } label: {
@@ -456,13 +438,13 @@ extension LobbyView {
 
     /// "205 km · 2 h 40 + 35 min of stops" (or "Route not ready" while a stop has no road).
     @ViewBuilder
-    func routeTotal(_ trip: Trip, stops: [StopDraft]) -> some View {
+    func routeTotal(_ trip: Trip, stops: [StopDraft], inList: Bool = false) -> some View {
         if failure != nil {
-            RouteTotalLine(content: .notReady)
+            RouteTotalLine(content: .notReady, inList: inList)
         } else if !isOrganizer, case .distanceOnly(let distance) = ownWay.totalState {
-            RouteTotalLine(content: .total(RouteFormat.distance(distance), caption: "No drive time yet"))
+            RouteTotalLine(content: .total(RouteFormat.distance(distance), caption: "No drive time yet"), inList: inList)
         } else if !isOrganizer, case .unknown = ownWay.totalState {
-            RouteTotalLine(content: .pending("Shows once your car shares where it is"))
+            RouteTotalLine(content: .pending("Shows once your car shares where it is"), inList: inList)
         } else if let distance = isOrganizer ? routeInfo.distance : ownWay.distance,
             let seconds = isOrganizer ? routeInfo.travelTime : ownWay.drive?.travelTime
         {
@@ -474,9 +456,9 @@ extension LobbyView {
                 content: .total(
                     StopFormat.total(distance: distance, driveSeconds: seconds, stopMinutes: StopListLogic.plannedMinutes(stops)),
                     caption: caption),
-                dimmed: planner.isBuilding && canEditStops)
+                dimmed: planner.isBuilding && canEditStops, inList: inList)
         } else {
-            RouteTotalLine(content: .loading)
+            RouteTotalLine(content: .loading, inList: inList)
         }
     }
 }
