@@ -5,7 +5,7 @@
 // ceiling, so it never raises one), or edit a single number below by hand. Counts exclude UI/, Debug/, previews and demos.
 enum DesignCeiling {
     static let font = 4
-    static let color = 34
+    static let color = 24
     static let opacity = 19
     static let padding = 31
     static let radius = 1
