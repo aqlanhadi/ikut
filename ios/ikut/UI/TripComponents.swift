@@ -145,36 +145,73 @@ struct StatGrid: View {
     }
 }
 
-/// Capsule status with a pulsing dot: "Gathering", "On the move".
-struct StatusPill: View {
+/// The app's one chip: a capsule with a label, an optional leading symbol or dot, and a tone. The fill is the tone's
+/// colour at `TintFill.chip` (or a material, for a chip over the map); nothing here is a colour literal.
+struct Chip: View {
+    enum Tone: CaseIterable {
+        case accent, positive, warning, neutral
+        /// White text on a dark surface (the floating banners).
+        case onDark
+
+        var text: Color {
+            switch self {
+            case .accent: .ikutAccent
+            case .positive: .ikutPositive
+            case .warning: .ikutWarning
+            case .neutral: .secondary
+            case .onDark: .white
+            }
+        }
+
+        /// The tinted fill: the tone's colour at its `TintFill`.
+        var tint: Color {
+            switch self {
+            case .onDark: Color.white.fill(.onDark)
+            default: text.fill(.chip)
+            }
+        }
+    }
+
+    enum Lead {
+        case none
+        case symbol(String)
+        /// A small filled dot, pulsing when it stands for something live.
+        case dot(Color? = nil, pulses: Bool = true)
+    }
+
+    enum Fill { case tint, material }
+
     var text: String
-    var color: Color
-    var dot: Color
-    var background: AnyShapeStyle = AnyShapeStyle(.regularMaterial)
+    var tone: Tone = .neutral
+    var lead: Lead = .none
+    var fill: Fill = .tint
 
     var body: some View {
-        Label {
+        HStack(spacing: Spacing.tight) {
+            switch lead {
+            case .none: EmptyView()
+            case .symbol(let name): Image(systemName: name).accessibilityHidden(true)
+            case .dot(let color, let pulses):
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 7))
+                    .foregroundStyle(color ?? tone.text)
+                    .symbolEffect(.pulse, options: pulses ? .repeating : .nonRepeating)
+                    .accessibilityHidden(true)
+            }
             Text(text)
-        } icon: {
-            Image(systemName: "circle.fill")
-                .font(.system(size: 7))
-                .foregroundStyle(dot)
-                .symbolEffect(.pulse, options: .repeating)
         }
-        .labelStyle(PillLabelStyle())
         .font(.footnote.weight(.semibold))
-        .foregroundStyle(color)
+        .foregroundStyle(tone.text)
         .padding(.horizontal, Spacing.gap)
         .padding(.vertical, 5)
         .background(background, in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 
-    private struct PillLabelStyle: LabelStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            HStack(spacing: Spacing.tight) {
-                configuration.icon
-                configuration.title
-            }
+    private var background: AnyShapeStyle {
+        switch fill {
+        case .tint: AnyShapeStyle(tone.tint)
+        case .material: AnyShapeStyle(.regularMaterial)
         }
     }
 }
@@ -216,8 +253,9 @@ struct DashedDivider: View {
             .init("Cars", "5"),
         ], background: Color(.secondarySystemBackground), valueSize: 15)
         HStack(spacing: Spacing.gap) {
-            StatusPill(text: "Gathering", color: .ikutWarning, dot: .orange)
-            StatusPill(text: "On the move", color: .ikutPositive, dot: .green)
+            Chip(text: "Gathering", tone: .warning, lead: .dot(.orange), fill: .material)
+            Chip(text: "On the move", tone: .positive, lead: .dot(.green), fill: .material)
+            Chip(text: "Tinted", tone: .accent, lead: .symbol("flag.checkered"))
         }
         HStack(spacing: Spacing.l) {
             Text("Ticket")

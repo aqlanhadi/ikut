@@ -9,6 +9,9 @@ struct HomeHeader: View {
     /// The search bar's height, which the name button is made to match (it grows with the text size).
     @Binding var barHeight: CGFloat
     var onProfile: (String) -> Void
+    @ScaledMetric(relativeTo: .body) private var scaledTile = SheetButtonSize.tile
+    /// The icon tile grows with the text size, up to `SheetButtonSize.maxScale` times.
+    private var tileSide: CGFloat { min(scaledTile, SheetButtonSize.tile * SheetButtonSize.maxScale) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
@@ -25,9 +28,9 @@ struct HomeHeader: View {
             Button(action: onJoin) {
                 HStack(spacing: Spacing.m) {
                     Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
+                        .frame(width: tileSide, height: tileSide)
                         .background(Color(.label).opacity(0.9), in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
                         .accessibilityHidden(true)
                     Text("Join with a code").font(.body.weight(.medium)).foregroundStyle(.primary)

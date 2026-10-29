@@ -8,19 +8,16 @@ struct PickedTripHeader: View {
     var picked: PickedTrip
     var onBack: () -> Void
     var onShowWholeTrip: () -> Void
+    @ScaledMetric(relativeTo: .body) private var buttonSide = SheetButtonSize.inline
+    /// Holds Share's place while the recap loads, so the title doesn't shift when it arrives.
+    private var placeholderSide: CGFloat { SheetButtonSize.capped(buttonSide, base: SheetButtonSize.inline) }
 
     var body: some View {
         let model = picked.model
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Spacing.gap) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Color(.tertiarySystemFill), in: Circle())
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back to trips")
+                RoundGlassIconButton(systemImage: "chevron.left", label: "Back to trips", style: .quiet,
+                                     glyph: .body.weight(.semibold), action: onBack)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(picked.title)
                         .font(.title2.bold()).lineLimit(2).fixedSize(horizontal: false, vertical: true)
@@ -30,15 +27,12 @@ struct PickedTripHeader: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let recap = model.recap {
                     ShareLink(item: RecapContent.shareText(recap)) {
-                        Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .background(Color(.tertiarySystemFill), in: Circle())
-                            .contentShape(Circle())
+                        RoundIconSymbol(systemImage: "square.and.arrow.up", glyph: .callout.weight(.semibold))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Share recap")
                 } else {
-                    Color.clear.frame(width: 44, height: 44)
+                    Color.clear.frame(width: placeholderSide, height: placeholderSide)
                 }
             }
             .padding(.top, Spacing.xxs)
@@ -97,14 +91,8 @@ struct PickedTripHeader: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
-            Button(action: onShowWholeTrip) {
-                Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Show the whole trip")
+            RoundGlassIconButton(systemImage: "xmark", label: "Show the whole trip", style: .bare,
+                                 glyph: .subheadline.weight(.semibold), action: onShowWholeTrip)
         }
         .padding(.leading, Spacing.m).padding(.trailing, Spacing.s).padding(.vertical, Spacing.gap)
         .ikutCard(radius: 18)

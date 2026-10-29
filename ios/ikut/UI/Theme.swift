@@ -199,14 +199,17 @@ struct SheetCloseButton: View {
     }
 }
 
-/// The round "x" on a screen's top corner, on a material so it reads over a map or a scrolling page.
+/// The round "x" on a screen's top corner, on a material so it reads over a map or a scrolling page. It is
+/// `SheetButtonSize.inline` across, scaled with the text size and capped.
 struct MapCloseButton: View {
     var action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var side = SheetButtonSize.inline
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark").font(.subheadline.weight(.bold))
-                .frame(width: 44, height: 44)
+                .frame(width: SheetButtonSize.capped(side, base: SheetButtonSize.inline),
+                       height: SheetButtonSize.capped(side, base: SheetButtonSize.inline))
                 .background(.regularMaterial, in: Circle())
         }
         .tint(.primary)

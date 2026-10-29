@@ -41,7 +41,7 @@ struct HomeMapContent: MapContent {
                 Button { style.onRecapDotTap(item.id) } label: {
                     RecapEventDot(kind: item.kind, symbol: item.symbol, size: selected ? 30 : 22, selected: selected)
                         .overlay(Circle().stroke(.white, lineWidth: 2))
-                        .frame(width: 44, height: 44)
+                        .frame(width: SheetButtonSize.hit, height: SheetButtonSize.hit)
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -99,7 +99,7 @@ struct HomeMapContent: MapContent {
                     .background(latest ? Color.ikutAccent : Color.white, in: Circle())
                     .overlay(Circle().stroke(latest ? Color.white : Color.ikutAccent.opacity(0.6), lineWidth: 2))
                     .elevation(.homeButton)
-                    .frame(width: 44, height: 44)
+                    .frame(width: SheetButtonSize.hit, height: SheetButtonSize.hit)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
