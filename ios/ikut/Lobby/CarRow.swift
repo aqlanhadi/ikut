@@ -19,9 +19,6 @@ struct CarRow: View {
                 .font(.subheadline)
                 .foregroundStyle(text.ready ? Color.ikutPositive : Color.ikutWarning)
         }
-        .ikutRow()
-        .padding(.horizontal, Spacing.l)
-        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("lobby.car.\(number)")
     }
