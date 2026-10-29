@@ -99,7 +99,9 @@ struct StopRow: View {
                         .accessibilityHidden(true)
                 }
             }
-            .modifier(StopRowFrame(inList: inList, editable: editable))
+            .padding(.leading, inList ? 0 : Spacing.l).padding(.trailing, inList ? 0 : (editable ? 6 : Spacing.l))
+            .padding(.vertical, inList ? 0 : Spacing.xs)
+            .frame(minHeight: inList ? nil : RowSize.minimum)
 
             if let turnBack {
                 let text = StopNoteText.turnBack(kind: stop.kind, extraMeters: turnBack)
@@ -134,22 +136,6 @@ struct StopRow: View {
     }
 }
 
-/// The hand-drawn row's padding and minimum height, or nothing in the system list, which sizes the row itself.
-private struct StopRowFrame: ViewModifier {
-    var inList: Bool
-    var editable: Bool
-
-    func body(content: Content) -> some View {
-        if inList {
-            content
-        } else {
-            content
-                .padding(.leading, Spacing.l).padding(.trailing, editable ? 6 : Spacing.l).padding(.vertical, Spacing.xs)
-                .ikutRow()
-        }
-    }
-}
-
 /// The one line under the stops: "205 km · 2 h 40 + 35 min of stops", or why there is none.
 struct RouteTotalLine: View {
     enum Content {
@@ -165,7 +151,7 @@ struct RouteTotalLine: View {
     var inList = false
 
     var body: some View {
-        VStack(spacing: Spacing.xxs) {
+        let lines = VStack(spacing: Spacing.xxs) {
             switch content {
             case .total(let line, let caption):
                 Text(line).font(.system(.headline, design: .rounded)).monospacedDigit().multilineTextAlignment(.center)
@@ -180,24 +166,18 @@ struct RouteTotalLine: View {
                 ProgressView().accessibilityLabel("Getting the route")
             }
         }
-        // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner.
-        .modifier(TotalTile(inList: inList))
+        // Not a tappable row: a tile that keeps one height whether it shows the total or a spinner. In the system
+        // list the row is the tile.
+        Group {
+            if inList {
+                lines.frame(maxWidth: .infinity)
+            } else {
+                lines.ikutRow(fillWidth: true)
+                    .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
+                    .innerTile(radius: Radius.inner)
+            }
+        }
         .opacity(dimmed ? 0.5 : 1)
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct TotalTile: ViewModifier {
-    var inList: Bool
-
-    func body(content: Content) -> some View {
-        if inList {
-            content.frame(maxWidth: .infinity)
-        } else {
-            content
-                .ikutRow(fillWidth: true)
-                .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
-                .innerTile(radius: Radius.inner)
-        }
     }
 }
