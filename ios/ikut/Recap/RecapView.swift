@@ -39,7 +39,6 @@ struct RecapView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .background(Color.ikutScreen)
         .navigationTitle(model.recap?.title ?? "")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {

@@ -434,7 +434,7 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             shot("15-rejoined")
             mark("b.rejoined")
             try waitMark("a.ended", timeout: 240)
-            try waitFor("lobby says Trip ended", timeout: 60) { labelled("label CONTAINS %@", "Trip ended").exists }
+            try waitFor("B sees the trip end (the recap opens)", timeout: 60) { labelled("label CONTAINS %@", "Share recap").exists }
             XCTAssertFalse(app.buttons["lobby.leaveTrip"].exists || app.buttons["lobby.endTrip"].exists, "an ended trip has no options left")
             shot("16-trip-ended")
             mark("b.done")
