@@ -52,6 +52,9 @@ struct RecapLogicTests {
         #expect(r.duration == 7_200)
         #expect(r.peopleCount == 5 && r.carCount == 3)
         #expect(r.subtitle.contains("3 cars") && r.subtitle.contains("5 people"))
+        let stops = r.stats.first { $0.label == "Stops" }
+        #expect(stops?.note == "2 planned stops reached")
+        #expect(r.stats.first { $0.label == "On the road" }?.note == "From Start trip")
     }
 
     @Test func recentOrEventfulTripsStayLive() {
@@ -60,6 +63,7 @@ struct RecapLogicTests {
         // Past 7 days but the cache still has events: live numbers.
         let cached = RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 8 * 86_400))
         #expect(cached.stopCount == 1 && cached.duration == 10_000)
+        #expect(cached.stats.first { $0.label == "On the road" }?.note != "From Start trip")
         // Events empty but the trip ended a day ago: not purged yet.
         s.events = []
         let fresh = RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 86_400))

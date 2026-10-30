@@ -1,9 +1,12 @@
 import FirebaseAuth
 import FirebaseFirestore
 import Foundation
+import UserNotifications
 
-/// Delete from history (D107): an ended trip's entry leaves this phone's Past trips and the person leaves the trip, so
-/// nothing of it stays here. History is on this phone only; the server deletes the trip 90 days after it ended.
+/// Delete from history (D107): an ended trip's entry leaves this phone's Past trips and the person leaves the trip.
+/// Removed here: the entry, the saved recap and the route on Home's map. Firestore's own offline cache is the SDK's
+/// to evict (kept for offline use), and delivered alert notifications for the trip are cleared. History is on this
+/// phone only; the server deletes the trip 90 days after it ended.
 enum HistoryDelete {
     enum Plan: Equatable {
         /// Leave the trip on the server first, then forget it here.
@@ -19,6 +22,7 @@ enum HistoryDelete {
     }
 
     static let couldntLeave = "Couldn’t leave the trip. Check your signal and try again."
+    static let signedOut = "You’re signed out. Close ikut and open it again, then try again."
 
     /// Only an ended trip in Past trips can be deleted; one still running is in Now and has no Delete.
     static func canDelete(_ entry: PastTrips.Entry) -> Bool { entry.endedAt != nil }
@@ -39,6 +43,8 @@ enum HistoryDelete {
                 guard try await leave(entry.id) else { return .kept(couldntLeave) }
             } catch where HomeNow.isGone(error) {
                 // Already out of it: nothing left to leave.
+            } catch is SignedOut {
+                return .kept(signedOut)
             } catch {
                 return .kept(couldntLeave)
             }
@@ -47,17 +53,38 @@ enum HistoryDelete {
         return .removed
     }
 
-    /// Everything this phone keeps for the trip: its entry, its cached recap and its route on Home's map.
+    /// Trips deleted since the app opened. A recap or route load already running when Delete lands must not write the
+    /// trip back (its saves and `PastTrips.record` check this at write time).
+    @MainActor private(set) static var removedIds: Set<String> = []
+
+    /// Everything this phone keeps for the trip: its entry, its cached recap and its route on Home's map, plus
+    /// delivered alerts for it and the "asked" memory if it is for this trip.
+    @MainActor
     static func removeLocalFiles(_ entry: PastTrips.Entry, defaults: UserDefaults = .standard) {
+        removedIds.insert(entry.id)
         PastTrips.remove(tripId: entry.id, defaults: defaults)
         RecapService.removeCache(tripId: entry.id)
         PastTripsMapService.forget(tripId: entry.id)
+        let asked = UserDefaults.standard
+        if asked.string(forKey: askedKey)?.hasPrefix(entry.id + "|") == true { asked.removeObject(forKey: askedKey) }
+        let thread = AlertCenter.threadIdentifier(tripId: entry.id)
+        let center = UNUserNotificationCenter.current()
+        center.getDeliveredNotifications { delivered in
+            let ids = delivered.filter { $0.request.content.threadIdentifier == thread }.map(\.request.identifier)
+            if !ids.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ids) }
+        }
     }
+
+    /// `TripMapView`'s `@AppStorage` key for which asks were answered for a trip.
+    static let askedKey = "ikut.map.askedTrip"
+
+    /// No one is signed in, so the leave can't be asked of the server.
+    struct SignedOut: Error {}
 
     /// The real leave: one delete of this phone's member doc, as the rules allow on an ended trip (D98).
     @MainActor
     static func leaveOnServer(tripId: String) async throws -> Bool {
-        guard let userId = Auth.auth().currentUser?.uid else { return false }
+        guard let userId = Auth.auth().currentUser?.uid else { throw SignedOut() }
         let ref = Firestore.firestore().document(FirestorePaths.member(tripId: tripId, userId: userId))
         return try await ServerWrite.commit { try await ref.delete() }
     }

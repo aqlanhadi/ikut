@@ -614,12 +614,14 @@ struct TripsHomeView: View {
                         .foregroundStyle(Color.surfaceSecondary)
                 } else {
                     ForEach(parts.past) { entry in
+                        let busy = model.deletingIds.contains(entry.id)
                         Button { open(entry) } label: { HomePastRow(entry: entry) }
+                            .opacity(busy ? 0.5 : 1)
                             .swipeActions(edge: .trailing) {
-                                Button("Delete", systemImage: Symbol.delete, role: .destructive) { deleting = entry }
+                                if !busy { Button("Delete", systemImage: Symbol.delete, role: .destructive) { deleting = entry } }
                             }
                             .contextMenu {
-                                Button("Delete from history", systemImage: Symbol.delete, role: .destructive) { deleting = entry }
+                                if !busy { Button("Delete from history", systemImage: Symbol.delete, role: .destructive) { deleting = entry } }
                             }
                     }
                 }
@@ -630,7 +632,9 @@ struct TripsHomeView: View {
         .scrollBounceBehavior(.basedOnSize)
         .confirmAlert(
             "Delete this trip from your history?",
-            message: "It is removed from this phone and you leave the trip. The trip itself is deleted from the server 90 days after it ended.",
+            message: deleting.map(HistoryDelete.plan(for:)) == .removeOnly
+                ? "It is removed from your history on this phone."
+                : "It is removed from your history on this phone and you leave the trip. The trip itself is deleted from the server 90 days after it ended.",
             action: "Delete", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
         ) {
             if let entry = deleting { Task { await model.delete(entry) } }

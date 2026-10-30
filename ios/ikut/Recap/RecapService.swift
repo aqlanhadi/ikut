@@ -145,8 +145,10 @@ final class RecapModel {
     func load(myUserId: String?) async {
         do {
             let fresh = try await fetch(tripId)
+            // Deleted from history while this was loading: show it, but write nothing back.
+            let writes = persist && !HistoryDelete.removedIds.contains(tripId)
             let merged = persist ? RecapLogic.merge(cached: RecapService.cached(tripId: tripId), fresh: fresh) : fresh
-            if persist {
+            if writes {
                 RecapService.save(merged)
                 PastTrips.record(tripId: tripId, name: merged.name, destination: merged.destinationName, endedAt: merged.endedAt,
                                  others: merged.memberNames.isEmpty ? nil : PastTrips.others(from: merged.memberNames, excluding: myUserId))

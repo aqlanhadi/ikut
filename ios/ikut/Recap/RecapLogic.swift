@@ -370,11 +370,16 @@ enum RecapLogic {
         } else {
             arrivedNote = "\(arrivals.count) of \(s.cars.count) arrived"
         }
-        let timeNote = summary?.durationSeconds == nil && [s.createdAt, s.endedAt].allSatisfy { $0 != nil }
-            ? "\(clock(s.createdAt!)) to \(clock(s.endedAt!))" : ""
+        // The summary's duration counts from the first Start trip, so its note says so instead of a clock range.
+        let timeNote = summary?.durationSeconds != nil ? "From Start trip"
+            : [s.createdAt, s.endedAt].allSatisfy { $0 != nil } ? "\(clock(s.createdAt!)) to \(clock(s.endedAt!))" : ""
+        // The summary's stop count is the planned stops the lead car reached, not stop requests.
+        let stopsNote = summary?.stopCount != nil
+            ? (stops == 1 ? "1 planned stop reached" : "\(stops) planned stops reached")
+            : (stops == 1 ? "1 stop requested" : "\(stops) stops requested")
         let spreadTile: RecapStat = spread.map {
             RecapStat(label: "Final spread", value: String(format: "%.1f", $0 / 1000), unit: "km", note: "Front to back at the end")
-        } ?? RecapStat(label: "Stops", value: "\(stops)", unit: "", note: stops == 1 ? "1 stop requested" : "\(stops) stops requested")
+        } ?? RecapStat(label: "Stops", value: "\(stops)", unit: "", note: stopsNote)
         let stats = [
             RecapStat(label: "Distance", value: distance.map { "\(RouteFormat.kilometres($0))" } ?? "–", unit: "km", note: arrivedNote),
             RecapStat(label: "On the road", value: duration.map(ConvoyFormat.duration) ?? "–", unit: "", note: timeNote),

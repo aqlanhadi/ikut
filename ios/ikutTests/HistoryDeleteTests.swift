@@ -96,6 +96,51 @@ struct HistoryDeleteTests {
         #expect(PastTripsMapService.cachedRoutes()[keep.id] != nil)
     }
 
+    @Test func aSecondDeleteWhileOneRunsIsIgnoredAndTheMarkClears() async {
+        let a = entry("a")
+        let model = HomeModel(past: [a])
+        var leaves = 0
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            Task { @MainActor in
+                await model.delete(a, leave: { _ in
+                    leaves += 1
+                    #expect(model.deletingIds == ["a"])
+                    await model.delete(a, leave: { _ in leaves += 1; return true }, removeLocal: { _ in })
+                    return false
+                }, removeLocal: { _ in })
+                done.resume()
+            }
+        }
+        #expect(leaves == 1)
+        #expect(model.deletingIds.isEmpty)
+        #expect(model.past.map(\.id) == ["a"])
+    }
+
+    @Test func aLoadFinishingAfterTheDeleteWritesNothingBack() async {
+        let e = entry()
+        var snap = RecapSnapshot.demo(); snap.tripId = e.id
+        PastTrips.record(tripId: e.id, name: e.name, destination: e.destination, endedAt: e.endedAt)
+        HistoryDelete.removeLocalFiles(e)
+        let model = RecapModel(tripId: e.id, fetch: { _ in snap })
+        await model.load(myUserId: nil)
+        #expect(model.recap != nil)
+        #expect(!PastTrips.all().contains { $0.id == e.id })
+        #expect(RecapService.cached(tripId: e.id) == nil)
+        // A route load already running keeps nothing of it either.
+        let route = PastTripsMapLogic.route(id: e.id, name: e.name, destinationName: "I", destination: snap.destination, encodedRoute: snap.route)
+        PastTripsMapService.remember(route)
+        let kept = await PastTripsMapService.load([e])
+        #expect(kept.isEmpty)
+        #expect(PastTripsMapService.cachedRoutes()[e.id] == nil)
+    }
+
+    @Test func signedOutSaysSoAndKeepsTheEntry() async {
+        let e = entry()
+        let (outcome, _, removed) = await run(e) { _ in throw HistoryDelete.SignedOut() }
+        #expect(outcome == .kept(HistoryDelete.signedOut))
+        #expect(removed.isEmpty)
+    }
+
     @Test func homeDropsTheRowAndItsRouteOnlyOnceDeleted() async {
         let a = entry("a"), b = entry("b")
         let drawn = { (id: String) in PastTripRoute(id: id, name: id, destinationName: "I", destinationLatitude: 4, destinationLongitude: 101, points: []) }

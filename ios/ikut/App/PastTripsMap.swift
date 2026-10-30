@@ -170,8 +170,9 @@ enum PastTripsMapService {
                 result.append(r)
             }
         }
-        // Keep only what Home still lists.
-        if let toSave = routesToKeep(entries, cache: cache, keeping: keeping) { save(toSave) }
-        return result
+        // Keep only what Home still lists, and never a trip deleted from history while this was loading.
+        let removed = HistoryDelete.removedIds
+        if let toSave = routesToKeep(entries.filter { !removed.contains($0.id) }, cache: cache, keeping: keeping) { save(toSave) }
+        return result.filter { !removed.contains($0.id) }
     }
 }
