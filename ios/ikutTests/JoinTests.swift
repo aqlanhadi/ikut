@@ -39,6 +39,8 @@ struct JoinServiceTests {
         #expect(JoinService.message(code: .notFound, serverMessage: "").contains("No trip has that code"))
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip is full (20 people).") == "This trip is full.")
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip already has 10 cars.").contains("cars"))
+        #expect(JoinService.message(code: .resourceExhausted, serverMessage: "Too many tries with that code. Wait 4 minutes and try again.")
+            == "Too many tries. Wait a few minutes and try again.")
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "That car is not part of this trip.").contains("no longer part"))
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "x").contains("6 letters"))
         #expect(JoinService.message(code: .unavailable, serverMessage: "").contains("signal"))

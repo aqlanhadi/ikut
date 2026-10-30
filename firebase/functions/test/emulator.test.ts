@@ -5,6 +5,7 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { endIdleTrips } from "../lib/endIdleTrips.js";
+import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
 import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { previewTripData } from "../lib/previewTrip.js";
@@ -16,8 +17,12 @@ process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 const app = initializeApp({ projectId: PROJECT }, "test");
 const db = getFirestore(app);
 
+// Where a private emulator listens (`IKUT_AUTH_HOST`, `IKUT_FUNCTIONS_HOST`); the defaults are the shared one.
+const AUTH_HOST = process.env.IKUT_AUTH_HOST ?? "127.0.0.1:9099";
+const FUNCTIONS_HOST = process.env.IKUT_FUNCTIONS_HOST ?? "127.0.0.1:5001";
+
 async function newUser(): Promise<{ uid: string; token: string }> {
-  const res = await fetch("http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake", {
+  const res = await fetch(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ returnSecureToken: true }),
@@ -28,7 +33,7 @@ async function newUser(): Promise<{ uid: string; token: string }> {
 
 interface CallResult { status: number; body: any }
 async function callFn(fn: string, data: unknown, token?: string): Promise<CallResult> {
-  const res = await fetch(`http://127.0.0.1:5001/${PROJECT}/asia-southeast1/${fn}`, {
+  const res = await fetch(`http://${FUNCTIONS_HOST}/${PROJECT}/asia-southeast1/${fn}`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({ data }),
@@ -968,5 +973,85 @@ describe("endIdleTrips progress (emulator)", () => {
     await early.update({ lastActivityAt: hoursAgo(30) });
     for (let run = 0; run < 10 && (await early.get()).data()!.status !== "ended"; run++) await endIdleTrips(db, NOW);
     assert.equal((await early.get()).data()!.status, "ended");
+  });
+});
+
+describe("wrong-code limit (emulator)", () => {
+  let n = 0;
+  // A well-formed code that matches no trip.
+  const wrong = () => `ZQ${String(1000 + n++).slice(-4)}`.replace(/[^A-Z0-9]/g, "Q");
+  const join = (code: string, token: string) => call({ code, displayName: "Sam", car: newCar(), tracker: false }, token);
+  const preview = (code: string, token: string) => callFn("previewTrip", { code }, token);
+  const missesOf = async (uid: string) => ((await db.collection(GUESS_LIMITS).doc(uid).get()).data()?.misses ?? []) as number[];
+
+  it("cuts a user off on the 11th wrong code, with a plain message and a retry hint", async () => {
+    const u = await newUser();
+    for (let i = 0; i < 10; i++) {
+      const r = await join(wrong(), u.token);
+      assert.equal(r.body.error.status, "NOT_FOUND", `try ${i + 1}: ${JSON.stringify(r.body)}`);
+    }
+    const r = await join(wrong(), u.token);
+    assert.equal(r.status, 429, JSON.stringify(r.body));
+    assert.equal(r.body.error.status, "RESOURCE_EXHAUSTED");
+    assert.match(r.body.error.message, /^Too many tries with that code\. Wait \d+ minutes? and try again\.$/);
+    assert.equal(r.body.error.details.reason, "too-many-guesses");
+    assert.ok(r.body.error.details.retryAfterSeconds > 0 && r.body.error.details.retryAfterSeconds <= 600);
+    assert.equal((await missesOf(u.uid)).length, 10, "the blocked call is not counted");
+  });
+
+  it("another user is not affected", async () => {
+    const a = await newUser();
+    const b = await newUser();
+    for (let i = 0; i < 10; i++) await join(wrong(), a.token);
+    assert.equal((await join(wrong(), a.token)).body.error.status, "RESOURCE_EXHAUSTED");
+    assert.equal((await join(wrong(), b.token)).body.error.status, "NOT_FOUND");
+  });
+
+  it("a correct code works under the limit, is not counted, and does not clear earlier misses", async () => {
+    const u = await newUser();
+    const { code, tripRef } = await seedTrip();
+    for (let i = 0; i < 9; i++) await join(wrong(), u.token);
+    const ok = await join(code, u.token);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.result.tripId, tripRef.id);
+    const ok2 = await preview(code, u.token);
+    assert.equal(ok2.status, 200, JSON.stringify(ok2.body));
+    assert.equal((await missesOf(u.uid)).length, 9, "hits leave the 9 misses as they were");
+    assert.equal((await join(wrong(), u.token)).body.error.status, "NOT_FOUND"); // the 10th miss
+    assert.equal((await join(code, u.token)).body.error.status, "RESOURCE_EXHAUSTED");
+  });
+
+  it("preview and join share one counter", async () => {
+    const u = await newUser();
+    for (let i = 0; i < 5; i++) assert.equal((await preview(wrong(), u.token)).body.error.status, "NOT_FOUND");
+    for (let i = 0; i < 5; i++) assert.equal((await join(wrong(), u.token)).body.error.status, "NOT_FOUND");
+    assert.equal((await preview(wrong(), u.token)).body.error.status, "RESOURCE_EXHAUSTED");
+    assert.equal((await join(wrong(), u.token)).body.error.status, "RESOURCE_EXHAUSTED");
+  });
+
+  it("a malformed code is refused without counting", async () => {
+    const u = await newUser();
+    const r = await join("abc", u.token);
+    assert.equal(r.body.error.status, "INVALID_ARGUMENT");
+    assert.deepEqual(await missesOf(u.uid), []);
+  });
+
+  it("parallel guesses cannot slip past the limit", async () => {
+    const u = await newUser();
+    const results = await Promise.all(Array.from({ length: 25 }, () => preview(wrong(), u.token)));
+    const statuses = results.map((r) => r.body.error?.status);
+    assert.equal(statuses.filter((s) => s === "NOT_FOUND").length, 10, JSON.stringify(statuses));
+    assert.equal(statuses.filter((s) => s === "RESOURCE_EXHAUSTED").length, 15, JSON.stringify(statuses));
+  });
+
+  it("sweepGuessLimits removes expired counters and keeps current ones", async () => {
+    const old = db.collection(GUESS_LIMITS).doc("sweep-old");
+    const fresh = db.collection(GUESS_LIMITS).doc("sweep-fresh");
+    await old.set({ misses: [Date.now() - 2 * 86_400_000], expiresAt: Timestamp.fromMillis(Date.now() - 86_400_000) });
+    await fresh.set({ misses: [Date.now()], expiresAt: Timestamp.fromMillis(Date.now() + 86_400_000) });
+    const deleted = await sweepGuessLimits(db);
+    assert.ok(deleted >= 1);
+    assert.equal((await old.get()).exists, false);
+    assert.equal((await fresh.get()).exists, true);
   });
 });

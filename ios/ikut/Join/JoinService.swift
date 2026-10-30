@@ -103,6 +103,10 @@ enum JoinService {
         case .notFound:
             return "No trip has that code. Check it with the organiser; the trip may have ended."
         case .resourceExhausted:
+            // The wrong-code limit (functions/src/guessLimit.ts) shares this code with "trip full"; it starts "Too many tries".
+            if serverMessage.localizedCaseInsensitiveContains("too many tries") {
+                return "Too many tries. Wait a few minutes and try again."
+            }
             return serverMessage.localizedCaseInsensitiveContains("cars")
                 ? "This trip already has the most cars it can hold. Join one of the existing cars."
                 : "This trip is full."
