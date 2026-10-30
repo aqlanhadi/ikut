@@ -74,8 +74,6 @@ struct TripMapView: View {
     @State private var inputsWatch = CameraInputsWatch()
     /// The text-size scale for the map's one bottom padding, the minimum resting sheet's line (D101, D114).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
-    /// Home's short sheet at this text size: the folded convoy sheet is never lower (D114).
-    private var homeShort: CGFloat { LobbySheet.homeShort(scaledMedium: mediumHeight) }
     /// The bottom inset the host keeps the map's safe area at, the same on every screen (`LobbySheet.mapPadding`, D109).
     /// What covers the map is put into the camera (`cameraRoom`), not into this.
     private var legalInset: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
@@ -765,16 +763,16 @@ struct TripMapView: View {
 
     /// What the layouts measure now.
     private var measuredHeights: PanelSheet.Heights {
-        sheet.measuredHeights(room: sheetRoom, hasTopBanner: topBanner != nil, minShort: homeShort)
+        sheet.measuredHeights(room: sheetRoom, hasTopBanner: topBanner != nil)
     }
 
     /// What the sheet uses: the measured heights, held while it moves (`PanelSheet.settled`).
-    private var sheetHeights: PanelSheet.Heights { sheet.heights(room: sheetRoom, hasTopBanner: topBanner != nil, minShort: homeShort) }
+    private var sheetHeights: PanelSheet.Heights { sheet.heights(room: sheetRoom, hasTopBanner: topBanner != nil) }
 
     /// Takes the measured heights the sheet may use now; a change at rest (a car joins, the text grows) moves the
     /// sheet with its usual motion.
     private func resettle() {
-        guard let next = sheet.heightsToTake(room: sheetRoom, hasTopBanner: topBanner != nil, minShort: homeShort) else { return }
+        guard let next = sheet.heightsToTake(room: sheetRoom, hasTopBanner: topBanner != nil) else { return }
         if sheet.appliedHeights == nil {
             sheet.take(next)
         } else {

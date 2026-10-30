@@ -31,7 +31,8 @@ enum LobbySheet {
     /// layer gets the same value).
     static func mapPadding(scaledMedium: CGFloat) -> CGFloat { HomeSheet.reach(.list, compact: homeShort(scaledMedium: scaledMedium)) }
 
-    /// Home's short sheet's height at the text size `scaledMedium` stands for; the folded convoy sheet is never lower (D114).
+    /// Home's short sheet's height at the text size `scaledMedium` stands for. At the default size it is the convoy's
+    /// resting folded height (`HomeSheet.compactHeight`, D115), so the logo and Legal sit just above both.
     static func homeShort(scaledMedium: CGFloat) -> CGFloat {
         HomeSheet.compact(scaled: HomeSheet.compactHeight * max(scaledMedium, 0) / compactHeight)
     }

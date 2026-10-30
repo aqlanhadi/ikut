@@ -12,8 +12,9 @@ struct MapPaddingTests {
     func thePaddingIsHomesShortSheetLineAtTheTextSize(scaledMedium: CGFloat) {
         let scale = scaledMedium / LobbySheet.compactHeight
         let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight * scale)
-        #expect(LobbySheet.mapPadding(scaledMedium: scaledMedium) == compact + BottomSheet.detentExtra)
-        #expect(LobbySheet.mapPadding(scaledMedium: scaledMedium) == HomeSheet.reach(.list, compact: compact))
+        // The scale is computed in a different order than the code's, so compare within rounding.
+        #expect(abs(LobbySheet.mapPadding(scaledMedium: scaledMedium) - (compact + BottomSheet.detentExtra)) < 1e-9)
+        #expect(abs(LobbySheet.mapPadding(scaledMedium: scaledMedium) - HomeSheet.reach(.list, compact: compact)) < 1e-9)
     }
 
     @Test func thePaddingAtTheDefaultAndExtremeSizes() {
@@ -137,10 +138,11 @@ struct MapPaddingTests {
         }
     }
 
-    /// Driving at the default text size (D114): the folded sheet is Home's short one (300, never lower: 220 content plus
-    /// the 62 bar is 282, raised to it), a gap under the padding (330), so the room's bottom is negative and the logo shows above it; the unfolded one (about 512)
-    /// is taller, so it is positive and covers the logo. Either way my car sits at the middle of the strip above the sheet.
-    @Test(arguments: [HomeSheet.compactHeight, PanelSheet.unfoldedEstimate + PanelSheet.barEstimate])
+    /// Driving at the default text size (D115): the folded sheet is the convoy's own 282 (220 content plus the 62 bar),
+    /// which is Home's short sheet, a gap under the padding (292), so the room's bottom is slightly negative and the logo
+    /// shows above it; the unfolded one (about 512) is taller, so it is positive and covers the logo. Either way my car
+    /// sits at the middle of the strip above the sheet.
+    @Test(arguments: [PanelSheet.foldedEstimate + PanelSheet.barEstimate, PanelSheet.unfoldedEstimate + PanelSheet.barEstimate])
     func drivingFollowsAboveItsSheetAtTheDefaultPadding(sheet: CGFloat) {
         let padding = LobbySheet.defaultMapPadding
         let room = room(padding: padding, coverBottom: sheet)
