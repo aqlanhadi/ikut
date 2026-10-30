@@ -36,11 +36,11 @@ export async function previewTripData(db: Firestore, tripId: string): Promise<Pr
       color: data.color,
       hasTracker: typeof data.trackerUserId === "string" && data.trackerUserId.length > 0,
       ...(typeof data.number === "number" ? { number: data.number } : {}),
+      // Only a boolean: the join sheet hides the share switch for the lead car (D97).
       isLead: data.isLead === true,
     }))
     // Lead car first, then by name, so the list is stable.
-    .sort((a, b) => Number(b.isLead) - Number(a.isLead) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    .map(({ isLead: _isLead, ...car }) => car);
+    .sort((a, b) => Number(b.isLead) - Number(a.isLead) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   const plannedStops = stopsSnap.docs
     .map((d) => d.data() as PlannedStop)
     .filter((s) => s.skipped !== true && !s.leftAt && !s.leftBy)

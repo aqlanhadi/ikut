@@ -129,6 +129,15 @@ describe("joinTrip (emulator)", () => {
     assert.equal((await tripRef.collection("members").doc(user.uid).get()).data()!.carId, "lead");
   });
 
+  it("someone who already tracks the lead car keeps it and is not told it is taken", async () => {
+    const { code, tripRef } = await seedTrip();
+    await tripRef.collection("cars").doc("lead").update({ trackerUserId: user.uid });
+    const r = await call({ code, displayName: "Sam", car: { existingCarId: "lead" }, tracker: true }, user.token);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.result.trackerTaken, false);
+    assert.equal((await tripRef.collection("cars").doc("lead").get()).data()!.trackerUserId, user.uid);
+  });
+
   it("the organizer can track the lead car again", async () => {
     const { code, tripRef, organizerId } = await seedTrip();
     await tripRef.collection("cars").doc("lead").update({ trackerUserId: FieldValue.delete() });
@@ -325,8 +334,8 @@ describe("previewTrip (emulator)", () => {
       destinationCoordinate: { latitude: 1, longitude: 1 },
       organizerName: "Org",
       cars: [
-        { id: "lead", name: "Lead", color: "blue", hasTracker: true, number: 1 },
-        { id: "second", name: "Alpha", color: "green", hasTracker: false },
+        { id: "lead", name: "Lead", color: "blue", hasTracker: true, number: 1, isLead: true },
+        { id: "second", name: "Alpha", color: "green", hasTracker: false, isLead: false },
       ],
     });
     assert.ok(!JSON.stringify(r.body).includes(organizerId));
@@ -417,7 +426,7 @@ describe("previewTrip (emulator)", () => {
     }
     assert.ok(json.includes(encodePolyline(decodePolyline(r.route!))), "main route present");
     assert.deepEqual(Object.keys(r).sort(), ["cars", "destinationCoordinate", "destinationName", "name", "organizerName", "route", "stops", "tripId"]);
-    assert.deepEqual(r.cars.map((c) => Object.keys(c).sort()), [["color", "hasTracker", "id", "name", "number"], ["color", "hasTracker", "id", "name", "number"]]);
+    assert.deepEqual(r.cars.map((c) => Object.keys(c).sort()), [["color", "hasTracker", "id", "isLead", "name", "number"], ["color", "hasTracker", "id", "isLead", "name", "number"]]);
   });
 
   it("lists the planned stops in order as name, kind and minutes only, without skipped ones", async () => {

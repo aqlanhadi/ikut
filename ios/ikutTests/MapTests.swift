@@ -525,7 +525,8 @@ struct TripMapEmulatorTests {
         let uid = ids.uid
 
         // The second car comes from a second member joining (rules: a member only has their own car), and
-        // writes its own position; then the organizer is back for the session.
+        // writes its own position; then the organizer is back for the session. The positions are written before
+        // the session starts (read on its first load), since writing as the second member needs that sign-in.
         nonisolated(unsafe) let organizerUser = try #require(Auth.auth().currentUser)
         let code = try await Firestore.firestore().document(FirestorePaths.trip(ids.tripId))
             .getDocument(as: Trip.self).code
@@ -539,6 +540,9 @@ struct TripMapEmulatorTests {
         let joined = try await EmulatorTrip.joinAsGuest(
             code: code, name: "Wyna", carName: "Wyna's car", color: "#D9480F", tracker: true)
         try await writer.write(other, tripId: ids.tripId, carId: joined.carId)
+        // As the tracker of its car, the second member moves it from joining to convoy, as a driving car is.
+        try await Firestore.firestore().document("\(FirestorePaths.cars(tripId: ids.tripId))/\(joined.carId)")
+            .updateData(["state": CarState.convoy.rawValue])
         try await Auth.auth().updateCurrentUser(organizerUser)
 
         let session = TripSession(tripId: ids.tripId, userId: uid, tracker: FakeTrackingController())

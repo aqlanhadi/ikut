@@ -272,6 +272,11 @@ describe('cars', () => {
   });
   it('organizer cannot create a car for another member', () => assertFails(mine({}, 'org', 'carS')));
   it('organizer cannot create a second car', () => assertFails(mine({}, 'org', 'ghost')));
+  it('a non-lead car cannot take badge number 1, the lead car\'s', () => assertFails(mine({ number: 1 })));
+  it('the organizer\'s lead car can have badge number 1', async () => {
+    await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), `trips/${T}/cars/carO`)));
+    await assertSucceeds(mine({ isLead: true, number: 1 }, 'org', 'carO'));
+  });
   it('bad state fails', () => assertFails(mine({ state: 'flying' })));
   it('non-string color fails', () => assertFails(mine({ color: 5 })));
   it('car with a badge number succeeds', () => assertSucceeds(mine({ number: 3 })));

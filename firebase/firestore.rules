@@ -339,10 +339,12 @@ service cloud.firestore {
           && (userId == request.auth.uid || isOrganizer(tripId));
       }
 
-      // Cars: a member creates only the car their own member doc names (carId), so a member has at most one
-      // car and cars <= members (<= MAX_MEMBERS, 20); nobody can add ghost cars or fill a trip with cars.
-      // Joiners get their car from joinTrip (admin SDK). A free car is claimed only by joinTrip too; the
-      // tracker/organizer update narrowly; organizer deletes.
+      // Cars: a member creates only the car their own member doc names (carId), so one member makes at most
+      // one car at a time. That keeps cars close to members (<= 20), not exactly: the organizer can delete and
+      // re-create their own member doc to add cars (only hurts their own trip), and a member whose car the
+      // organizer deleted can re-create it. A non-lead car may not take badge number 1 (the lead car's); other
+      // badge numbers can still repeat (known gap, cosmetic). Joiners get their car from joinTrip (admin SDK).
+      // A free car is claimed only by joinTrip too; the tracker/organizer update narrowly; organizer deletes.
       match /cars/{carId} {
         allow read: if isMember(tripId);
 
@@ -356,6 +358,7 @@ service cloud.firestore {
           && validCarFields(request.resource.data)
           && request.resource.data.isLead is bool
           && (request.resource.data.isLead == false || isOrganizer(tripId))
+          && (request.resource.data.isLead == true || optionalOf(request.resource.data, 'number') != 1)
           && (optionalOf(request.resource.data, 'trackerUserId') == null
               || request.resource.data.trackerUserId == request.auth.uid);
 

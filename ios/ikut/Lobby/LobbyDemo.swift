@@ -467,7 +467,7 @@ enum DemoScreens {
         // Joining in Home's sheet (D58): the name and the location ask first for someone new (H1, H2), the code (empty, found, found with the drive from here, not found), then which
         // car (nothing picked, someone else's car, my own car). The sheet is the same height on all of them.
         case "join-h1-name", "join-h2-location", "join-h3-empty", "join-h3-found", "join-h3-found-drive", "join-h3-not-found", "join-h3-too-many-tries",
-             "join-h3-looking", "join-h3-no-signal", "join-h4-joining", "join-h4-car", "join-h4-copilot", "join-h4-own":
+             "join-h3-looking", "join-h3-no-signal", "join-h4-joining", "join-h4-car", "join-h4-copilot", "join-h4-lead", "join-h4-own":
             return home(name)
         case "lobby-own-merges": return trip(OwnWayDemo.lobby(.merges))
         case "lobby-own-main": return trip(OwnWayDemo.lobby(.onMain))

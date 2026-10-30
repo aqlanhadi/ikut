@@ -14,6 +14,8 @@ enum JoinDemo {
         /// The lookup, or the join, never answers: the spinner stays.
         var lookupHangs = false
         var joinHangs = false
+        /// The organiser has left: the lead car has no one sharing it.
+        var leadUntracked = false
 
         func preview(code: String) async throws -> TripPreview {
             if lookupHangs { try await Task.sleep(for: .seconds(86_400)) }
@@ -22,7 +24,7 @@ enum JoinDemo {
                 tripId: "demo", name: "Balik kampung raya", destinationName: "Ipoh",
                 destinationCoordinate: withCoordinate ? PreviewCoordinate(latitude: 4.5975, longitude: 101.09) : nil,
                 cars: [
-                    PreviewCar(id: "c1", name: "Aqlan’s Myvi", color: "#2563EB", hasTracker: true, number: 1),
+                    PreviewCar(id: "c1", name: "Aqlan’s Myvi", color: "#2563EB", hasTracker: !leadUntracked, number: 1, isLead: true),
                     PreviewCar(id: "c2", name: "Wyna’s X70", color: "#D9480F", hasTracker: true, number: 2),
                 ],
                 stops: withStops
@@ -57,7 +59,7 @@ enum JoinDemo {
     }
 
     /// Home with the join steps over its map, for the launch states `join-h1-name`, `join-h2-location`, `join-h3-empty`, `join-h3-found`, `join-h3-found-drive`,
-    /// `join-h3-not-found`, `join-h3-too-many-tries`, `join-h4-car`, `join-h4-copilot` and `join-h4-own` (D58). The found states look the trip up
+    /// `join-h3-not-found`, `join-h3-too-many-tries`, `join-h4-car`, `join-h4-copilot`, `join-h4-lead` (the lead car picked, the organiser gone) and `join-h4-own` (D58). The found states look the trip up
     /// from the fixed-data API a moment after they open, as the real one does.
     static func home(_ state: String) -> TripsHomeView? {
         guard state.hasPrefix("join-h") || state == "join-location-off" else { return nil }
@@ -70,7 +72,8 @@ enum JoinDemo {
         let model = JoinModel(
             displayName: "Nurul", initialCode: code,
             api: API(withStops: true, withCoordinate: true, withRoute: true, failure: failure,
-                     lookupHangs: state == "join-h3-looking", joinHangs: state == "join-h4-joining"),
+                     lookupHangs: state == "join-h3-looking", joinHangs: state == "join-h4-joining",
+                     leadUntracked: state == "join-h4-lead"),
             driveFromHere: { _ in drive })
         if state == "join-h1-name" { model.displayName = "" }
         // H1 and H2 come first for a person with no name and no answer to iOS yet; the other states are for someone with both.
@@ -82,7 +85,8 @@ enum JoinDemo {
             Task { @MainActor in
                 for _ in 0..<100 where model.preview == nil { try? await Task.sleep(for: .milliseconds(50)) }
                 switch state {
-                case "join-h4-copilot": if let car = model.cars.first { model.select(car) }
+                case "join-h4-lead": if let car = model.cars.first { model.select(car) }
+                case "join-h4-copilot": if let car = model.cars.last { model.select(car) }
                 case "join-h4-own", "join-location-off": model.selectNewCar()
                 case "join-h4-joining":
                     if let car = model.cars.first { model.select(car) }

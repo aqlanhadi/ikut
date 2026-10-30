@@ -153,10 +153,10 @@ enum JoinSteps {
 
     /// What the car step shows about sharing once a car is picked, always pinned above Join (never in the scrolling list):
     /// nothing before a pick, a switch for someone else's car, a line for my own.
-    enum Sharing: Equatable { case none, switchRow, ownCar }
+    enum Sharing: Equatable { case none, switchRow, ownCar, leadCar }
 
     static func sharing(selectedCar: PreviewCar?, ownCar: Bool) -> Sharing {
-        if selectedCar != nil { return .switchRow }
+        if let car = selectedCar { return car.isLead ? .leadCar : .switchRow }
         return ownCar ? .ownCar : .none
     }
 
