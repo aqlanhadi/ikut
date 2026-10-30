@@ -524,12 +524,22 @@ struct TripMapEmulatorTests {
         let ids = try await EmulatorTrip.make(name: "Map", route: Fixtures.longRoute)
         let uid = ids.uid
 
-        let db = Firestore.firestore()
-        let second = Car(
-            id: nil, name: "Wyna's car", color: "#D9480F", trackerUserId: uid, isLead: false, route: nil,
-            mergeOffset: nil, state: .convoy, number: 2)
-        let secondRef = db.collection(FirestorePaths.cars(tripId: ids.tripId)).document()
-        try secondRef.setData(from: second)
+        // The second car comes from a second member joining (rules: a member only has their own car), and
+        // writes its own position; then the organizer is back for the session.
+        nonisolated(unsafe) let organizerUser = try #require(Auth.auth().currentUser)
+        let code = try await Firestore.firestore().document(FirestorePaths.trip(ids.tripId))
+            .getDocument(as: Trip.self).code
+        var builder = PositionBuilder(mainRoute: RouteLine(Polyline.decode(Fixtures.longRoute.polyline)), carRoute: nil)
+        let writer = FirestorePositionWriter()
+        let first = builder.build(
+            from: LocationFix(latitude: 38.5, longitude: -120.2, speed: 20, course: 90, timestamp: Date()), battery: nil)
+        let other = builder.build(
+            from: LocationFix(latitude: 40.7, longitude: -120.95, speed: 22, course: 90, timestamp: Date()), battery: nil)
+        try await writer.write(first, tripId: ids.tripId, carId: ids.carId)
+        let joined = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Wyna", carName: "Wyna's car", color: "#D9480F", tracker: true)
+        try await writer.write(other, tripId: ids.tripId, carId: joined.carId)
+        try await Auth.auth().updateCurrentUser(organizerUser)
 
         let session = TripSession(tripId: ids.tripId, userId: uid, tracker: FakeTrackingController())
         session.start()
@@ -540,21 +550,12 @@ struct TripMapEmulatorTests {
             session.stop()
         }
 
-        var builder = PositionBuilder(mainRoute: RouteLine(Polyline.decode(Fixtures.longRoute.polyline)), carRoute: nil)
-        let writer = FirestorePositionWriter()
-        let first = builder.build(
-            from: LocationFix(latitude: 38.5, longitude: -120.2, speed: 20, course: 90, timestamp: Date()), battery: nil)
-        let other = builder.build(
-            from: LocationFix(latitude: 40.7, longitude: -120.95, speed: 22, course: 90, timestamp: Date()), battery: nil)
-        try await writer.write(first, tripId: ids.tripId, carId: ids.carId)
-        try await writer.write(other, tripId: ids.tripId, carId: secondRef.documentID)
-
         await waitUntil(.seconds(10)) {
             model.sync()
             return model.markers.count == 2
         }
         #expect(model.markers.count == 2)
-        #expect(Set(model.markers.map(\.id)) == [ids.carId, secondRef.documentID])
+        #expect(Set(model.markers.map(\.id)) == [ids.carId, joined.carId])
         #expect(Set(model.markers.compactMap(\.number)) == [1, 2])
         #expect(model.markers.first(where: { $0.id == ids.carId })?.heading == 90)
     }
