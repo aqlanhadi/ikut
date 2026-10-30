@@ -188,7 +188,9 @@ service cloud.firestore {
         && d.createdAt is timestamp
         && d.createdAt > request.time - duration.value(5, 'm')
         && d.createdAt < request.time + duration.value(5, 'm')
-        && (optionalOf(d, 'expiresAt') == null
+        // Every kind but a status event carries an expiresAt, so it always ends and is swept (D95): none at all
+        // would keep a hazard's location for ever. The app has always sent one (its category's default).
+        && ((d.category == 'status' && optionalOf(d, 'expiresAt') == null)
             || (d.expiresAt is timestamp && d.expiresAt > d.createdAt && d.expiresAt <= expiryLimit()))
         && (optionalOf(d, 'message') == null || isString(d.message, 0, 280))
         // A stop request closes itself: it must carry an expiresAt at most 30 minutes (and the
@@ -227,11 +229,12 @@ service cloud.firestore {
       let lead = isLeadOrOrganizer(tripId);
       let expiryOnly = keys.hasOnly(['expiresAt']);
       return
-        // The author of any other kind of event sets or clears expiresAt (resolving a hazard).
+        // The author of any other kind of event moves expiresAt (resolving a hazard). Never removed, except on a
+        // status event, which has none: an event without one would never expire.
         (mine
           && prev.category != 'stopRequest'
           && expiryOnly
-          && (optionalOf(next, 'expiresAt') == null
+          && ((optionalOf(next, 'expiresAt') == null && prev.category == 'status')
               || (next.expiresAt is timestamp && next.expiresAt <= expiryLimit())))
         // The author closes their own stop request: cancelled it, or the convoy has stopped.
         || (mine && open && closeKeys && closesStop(next, ['cancelled', 'stopped']))

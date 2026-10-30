@@ -66,8 +66,15 @@ const position = (over = {}) => ({
 });
 const event = (over = {}) => ({
   type: 'pothole', category: 'hazard', severity: 'high', location: pt, heading: 10,
-  routeOffset: 5, authorId: 'mem', carId: 'carA', createdAt: ts(), ...over,
+  routeOffset: 5, authorId: 'mem', carId: 'carA', createdAt: ts(), expiresAt: ts(-45 * 60000), ...over,
 });
+// An event with no expiresAt at all (a status event has none).
+const eventNoExpiry = (over = {}) => {
+  const e = event(over);
+  delete e.expiresAt;
+  return e;
+};
+const farFuture = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
 
 async function seed({ ended = false } = {}) {
   await env.clearFirestore();
@@ -347,7 +354,16 @@ describe('events', () => {
     await seed({ ended: true });
     await assertFails(setDoc(ev('mem'), event()));
   });
-  it('author can clear expiresAt', () => assertSucceeds(updateDoc(ev('mem', 'ev1'), { expiresAt: null })));
+  it('author can end a hazard now by moving expiresAt to now', () => assertSucceeds(updateDoc(ev('mem', 'ev1'), { expiresAt: ts() })));
+  // D95: an event with no expiresAt never expires and is never swept.
+  it('author cannot clear expiresAt to null', () => assertFails(updateDoc(ev('mem', 'ev1'), { expiresAt: null })));
+  it('author cannot delete expiresAt', () => assertFails(updateDoc(ev('mem', 'ev1'), { expiresAt: deleteField() })));
+  it('a hazard without expiresAt cannot be created', () => assertFails(setDoc(ev('mem'), eventNoExpiry())));
+  it('a condition or message without expiresAt cannot be created', async () => {
+    await assertFails(setDoc(ev('mem'), eventNoExpiry({ category: 'condition' })));
+    await assertFails(setDoc(ev('mem'), eventNoExpiry({ category: 'message', severity: 'low' })));
+  });
+  it('a status event needs no expiresAt', () => assertSucceeds(setDoc(ev('mem'), eventNoExpiry({ category: 'status', type: 'arrived' }))));
   it('author cannot change other fields', () => assertFails(updateDoc(ev('mem', 'ev1'), { message: 'edit' })));
   it('non-author cannot update expiresAt', () => assertFails(updateDoc(ev('other', 'ev1'), { expiresAt: null })));
   it('seed event authored by mem', async () => {
@@ -440,10 +456,29 @@ describe('stop requests', () => {
       assertFails(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-36 * MIN) }))));
     it('a stop request that lasts 34 minutes (clock slack) passes', () =>
       assertSucceeds(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-34 * MIN) }))));
-    it('a hazard still needs no expiresAt', () => assertSucceeds(setDoc(evRef('mem', 'new'), event())));
+    it('a hazard needs an expiresAt too', () => assertFails(setDoc(evRef('mem', 'new'), eventNoExpiry())));
     it('a place cannot be supplied', () =>
       assertFails(setDoc(evRef('mem', 'new'), stop({ place: { name: 'R&R', coordinate: pt, routeOffset: 1, pinnedBy: 'mem' } }))));
     it('a status cannot be supplied', () => assertFails(setDoc(evRef('mem', 'new'), stop({ status: 'closed' }))));
+  });
+
+  // D95: a close sets expiresAt, which must not be far out (a stop held open, its location kept for ever).
+  describe('a close cannot keep the stop open', () => {
+    it('the asker cancelling with a year 9999 expiresAt is denied', () =>
+      assertFails(updateDoc(evRef('mem'), closed('cancelled', 'mem', { expiresAt: farFuture }))));
+    it('the organizer closing as stopped with a year 9999 expiresAt is denied', () =>
+      assertFails(updateDoc(evRef('org'), closed('stopped', 'org', { expiresAt: farFuture }))));
+    it('the lead car closing as stopped with a year 9999 expiresAt is denied', () =>
+      assertFails(updateDoc(evRef('lead'), closed('stopped', 'lead', { expiresAt: farFuture }))));
+    it('the normal closes still pass', async () => {
+      await assertSucceeds(updateDoc(evRef('mem'), closed('cancelled', 'mem')));
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/events/stop2`), stop());
+        await setDoc(doc(c.firestore(), `trips/${T}/events/stop3`), stop());
+      });
+      await assertSucceeds(updateDoc(evRef('org', 'stop3'), closed('stopped', 'org')));
+      await assertSucceeds(updateDoc(evRef('lead', 'stop2'), closed('stopped', 'lead')));
+    });
   });
 
   describe('OK votes', () => {
