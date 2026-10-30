@@ -12,6 +12,9 @@ const COLOR_MAX = 20;
 /** What a wrong code and an ended trip both say. */
 export const NO_ACTIVE_TRIP = "No active trip with that code";
 
+/** What a person the organiser removed hears when they try the code again (D104); a new code from the organiser lets them back in. */
+export const REMOVED_FROM_TRIP = "You were removed from this trip. Ask the organiser for a new code.";
+
 export type CarChoice =
   | { kind: "existing"; carId: string }
   | { kind: "new"; name: string; color: string };
@@ -114,6 +117,10 @@ export async function joinTripTransaction(
     const trip = tripSnap.data() as Trip | undefined;
     if (!tripSnap.exists || !trip || trip.status !== "active") {
       throw new HttpsError("not-found", NO_ACTIVE_TRIP);
+    }
+    // D104: a removed person is refused before anything is written. Someone who only left has no such doc.
+    if ((await tx.get(tripRef.collection("removed").doc(uid))).exists) {
+      throw new HttpsError("permission-denied", REMOVED_FROM_TRIP);
     }
     const memberSnap = await tx.get(memberRef);
     const existing = memberSnap.exists ? (memberSnap.data() as Member) : null;

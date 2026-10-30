@@ -17,6 +17,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/trips/$(tripId)/members/$(userId);
     }
 
+    function removedPath(tripId, userId) {
+      return /databases/$(database)/documents/trips/$(tripId)/removed/$(userId);
+    }
+
     function carPath(tripId, carId) {
       return /databases/$(database)/documents/trips/$(tripId)/cars/$(carId);
     }
@@ -334,9 +338,29 @@ service cloud.firestore {
 
         // A member may leave at any time, an ended trip too (D98): leaving ends their read access to the trip's cars and
         // positions during the 7 days before the purge. Removing someone else stays with the organizer of an active trip.
+        // The organizer's removal of someone else must leave the removed/{userId} record in the same batch (D104), so a
+        // removed person cannot rejoin with the old code; leaving, one's own delete, records nothing.
         allow delete: if isMember(tripId)
           && (userId == request.auth.uid
-              || (tripActive(tripId) && isOrganizer(tripId)));
+              || (tripActive(tripId) && isOrganizer(tripId) && existsAfter(removedPath(tripId, userId))));
+      }
+
+      // Who the organizer removed (D104): joinTrip (admin SDK) refuses them until the organizer makes a new code, which
+      // clears the list. A client may only create a doc, as the organizer of an active trip, for someone else, in the
+      // batch that deletes that person's member doc. It never reads, updates or deletes one: a member must not learn who
+      // was removed, and the organizer cannot undo a removal by hand (the new code is the only way back).
+      match /removed/{userId} {
+        allow read, update, delete: if false;
+        allow create: if isOrganizer(tripId)
+          && tripActive(tripId)
+          && userId != request.auth.uid
+          && exists(memberPath(tripId, userId))
+          && !existsAfter(memberPath(tripId, userId))
+          && request.resource.data.keys().hasOnly(['userId', 'removedAt', 'removedBy'])
+          && request.resource.data.keys().hasAll(['userId', 'removedAt', 'removedBy'])
+          && request.resource.data.userId == userId
+          && request.resource.data.removedBy == request.auth.uid
+          && request.resource.data.removedAt == request.time;
       }
 
       // Cars: a member creates only the car their own member doc names (carId), so one member makes at most

@@ -5,6 +5,7 @@ initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 10 });
 
 export { joinTrip } from "./joinTripCall.js";
+export { rotateTripCode } from "./rotateTripCall.js";
 export { createTrip } from "./createTripCall.js";
 export { previewTrip } from "./previewTrip.js";
 export { endIdleTripsJob } from "./endIdleTrips.js";
