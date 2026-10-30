@@ -40,6 +40,21 @@ struct TripServiceTests {
         #expect(TripService.defaultTripName(destination: "Ipoh") == "Trip to Ipoh")
     }
 
+    @Test func aLongPlaceNameCannotMakeTheDefaultNameTooLong() {
+        let long = String(repeating: "Taman Perindustrian ", count: 20)
+        let name = TripService.defaultTripName(destination: long)
+        #expect(name.count == TripService.nameMaxLength)
+        #expect(name.hasPrefix("Trip to Taman") && name.hasSuffix("…"))
+        let fits = String(repeating: "x", count: TripService.nameMaxLength - 8)
+        #expect(TripService.defaultTripName(destination: fits) == "Trip to " + fits)
+    }
+
+    @Test func tripNameLimit() {
+        #expect(TripService.nameProblem(String(repeating: "a", count: 60)) == nil)
+        #expect(TripService.nameProblem(String(repeating: "a", count: 61)) == "Use 1 to 60 characters.")
+
+    }
+
     @Test func tripDocumentMatchesRules() {
         let trip = TripService.makeTrip(
             name: "Raya", code: "ABC234", organizerId: "uid1", destination: Fixtures.kotaBharu, route: Fixtures.longRoute)

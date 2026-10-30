@@ -163,7 +163,6 @@ function cutOwnStart(points: LatLng[]): LatLng[] {
   return rest < ROUTE_LEAD_CUT_METERS ? [] : out;
 }
 
-/** The main route as a precision-5 polyline of at most `maxPoints` points, widening the tolerance until it fits; "" when unreadable. */
 /**
  * Most points `simplify` ever sees (D98). Douglas-Peucker is quadratic on a crafted zigzag, and a route string can be
  * up to 200,000 characters (about 100,000 points); a longer line is thinned evenly first. A real route at 50 characters
@@ -172,15 +171,15 @@ function cutOwnStart(points: LatLng[]): LatLng[] {
  */
 export const MAX_SIMPLIFY_POINTS = 1_500;
 
-/** Every k-th point (always keeping the last) so at most `max` remain. */
+/** At most `max` points spread evenly by index, always including the first and the last. */
 export function thin(points: LatLng[], max: number): LatLng[] {
-  if (points.length <= max) return points;
-  const step = Math.ceil(points.length / max);
-  const out = points.filter((_, i) => i % step === 0);
-  if (out[out.length - 1] !== points[points.length - 1]) out.push(points[points.length - 1]);
-  return out;
+  const n = points.length;
+  if (n <= max || max < 2) return n <= max ? points : points.slice(0, max);
+  const step = (n - 1) / (max - 1);
+  return Array.from({ length: max }, (_, i) => points[i === max - 1 ? n - 1 : Math.round(i * step)]);
 }
 
+/** The main route as a precision-5 polyline of at most `maxPoints` points, widening the tolerance until it fits; "" when unreadable. */
 export function simplifiedRoute(
   encoded: unknown,
   opts: { toleranceMeters?: number; maxPoints?: number; meet?: { routeOffset: number; coordinate?: LatLng } } = {},

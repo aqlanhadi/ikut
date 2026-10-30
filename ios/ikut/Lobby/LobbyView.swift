@@ -502,6 +502,7 @@ struct LobbyView: View {
         Button("Save") {
             let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty, let id = model.trip?.id else { return }
+            if let problem = TripService.nameProblem(name) { actionError = problem; return }
             run { try await TripService.rename(tripId: id, to: name) }
         }
     }

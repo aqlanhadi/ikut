@@ -160,7 +160,8 @@ async function clearFields(db: Firestore, col: FirebaseFirestore.CollectionRefer
 /**
  * Clears each car's own `route` and `mergeOffset` (a route often starts at the member's home) and each member's
  * `pushToken`. The car and member docs stay: the recap reads the car's name, colour, number and lead flag, and each
- * member's name and car. The trip's main route stays too (the recap draws it; it starts at the meeting point).
+ * member's name and car. The trip's main route is kept as it is: it begins where the organizer started, and the recap
+ * draws it; only members can read it (owner decision #606).
  */
 export async function purgeMemberPrivates(db: Firestore, tripRef: FirebaseFirestore.DocumentReference): Promise<{ cars: number; tokens: number }> {
   const cars = await clearFields(db, tripRef.collection("cars"), CAR_PRIVATE_FIELDS);

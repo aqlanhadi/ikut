@@ -263,6 +263,7 @@ describe('members', () => {
   it('the organizer cannot remove another member from an ended trip, only leave themselves', async () => {
     await seed({ ended: true });
     await assertFails(deleteDoc(doc(db('org'), `trips/${T}/members/mem`)));
+    await assertFails(deleteDoc(doc(db('mem'), `trips/${T}/members/other`)));
     await assertSucceeds(deleteDoc(doc(db('org'), `trips/${T}/members/org`)));
   });
   it('a stranger cannot delete a member doc of an ended trip', async () => {

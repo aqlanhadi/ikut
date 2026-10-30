@@ -104,6 +104,10 @@ final class NewTripFlow {
         isCreating = true
         createError = nil
         defer { isCreating = false }
+        if let problem = TripService.nameProblem(name.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            createError = problem
+            return nil
+        }
         do {
             return try await creator(Self.tripName(typed: name, destination: ready.place.name), ready.place, ready.route)
         } catch {

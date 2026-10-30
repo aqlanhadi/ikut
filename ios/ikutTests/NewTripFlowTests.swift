@@ -112,6 +112,16 @@ struct NewTripFlowTests {
         #expect(NewTripFlow.tripName(typed: "  Balik kampung raya ", destination: "Ipoh") == "Balik kampung raya")
     }
 
+    @Test func aTooLongNameIsNotWrittenAndSaysSo() async {
+        let (flow, counter) = makeFlow()
+        await flow.pick(ipoh)
+        flow.name = String(repeating: "a", count: 61)
+        let id = await flow.create { name, place, route in counter.created.append((name, place, route)); return "x" }
+        #expect(id == nil)
+        #expect(counter.created.isEmpty)
+        #expect(flow.createError == "Use 1 to 60 characters.")
+    }
+
     @Test func pickingAgainStartsWithAnEmptyName() async {
         let (flow, _) = makeFlow()
         await flow.pick(ipoh)

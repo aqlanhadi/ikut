@@ -223,13 +223,18 @@ describe("simplifiedRoute on a crafted route (D98)", () => {
       assert.ok(out.length >= 2 && out.length <= 400, `${out.length} points`);
     });
   }
-  it("thins evenly, keeping the first and last point, and leaves a short line alone", () => {
-    const pts = zigzag(10_000);
-    const t = thin(pts, MAX_SIMPLIFY_POINTS);
-    assert.ok(t.length <= MAX_SIMPLIFY_POINTS + 1);
-    assert.equal(t[0], pts[0]);
-    assert.equal(t[t.length - 1], pts[pts.length - 1]);
-    assert.equal(thin(pts.slice(0, 100), MAX_SIMPLIFY_POINTS).length, 100);
+  it("thins to at most max points, keeping the first and last, for lengths around the cap", () => {
+    const max = MAX_SIMPLIFY_POINTS;
+    for (const n of [max, max + 1, 1_501, 2 * max, 2 * max + 1, 100_000]) {
+      const pts = zigzag(n);
+      const t = thin(pts, max);
+      assert.ok(t.length <= max, `${n}: ${t.length}`);
+      assert.equal(t[0], pts[0]);
+      assert.equal(t[t.length - 1], pts[n - 1]);
+    }
+    // A line one over the cap loses almost nothing: it does not halve.
+    assert.ok(thin(zigzag(1_501), max).length >= 1_499);
+    assert.equal(thin(zigzag(100), max).length, 100);
   });
 });
 
