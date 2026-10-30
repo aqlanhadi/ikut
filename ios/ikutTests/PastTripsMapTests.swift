@@ -225,7 +225,7 @@ struct PastTripsCacheTests {
     @Test func aLeftTripPickedRestsAtTheCollapsedStop() {
         #expect(HomeSheet.mode(flow: nil, leftTripPicked: true) == .leftTrip)
         #expect(HomeSheet.mode(flow: nil) == .list)
-        // The same short sheet as the list (D116: 282 at the default size, no longer 0.62 of it).
+        // The same short sheet as the list (D116: 239 at the default size, no longer 0.62 of it).
         #expect(HomeSheet.height(.leftTrip, compact: 300) == 300)
         #expect(HomeSheet.height(.leftTrip, compact: HomeSheet.compactHeight) == SheetStops.collapsed(scale: 1))
     }

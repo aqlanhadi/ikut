@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The app's one set of sheet stops (D116), in points at the default text size on an 874 pt screen. Every sheet that
 /// rests at a short or medium height reads it, so the heights agree from screen to screen:
-/// - collapsed (282): Home's list and a picked trip or a trip you left, and the driving folded sheet at rest;
+/// - collapsed (239): Home's list and a picked trip or a trip you left, and the driving folded sheet at rest;
 /// - mid (470): the lobby's medium sheet, Home's New trip, and the driving unfolded sheet (never taller);
 /// - tall: iOS's own full height (`.large`).
 /// Outside the stops on purpose: the keyboard steps (Where to?, joining, the name step), the stop card (its content's
