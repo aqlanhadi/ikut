@@ -70,6 +70,15 @@ struct LobbyMapTests {
         #expect(first && !second)
     }
 
+    @Test func cancellingAnAskReturnsToIdle() {
+        for kind in [ExitFlow.Kind.leave, .end, .newCode] {
+            var exit = ExitFlow()
+            exit.ask(kind)
+            exit.cancel(kind)
+            #expect(exit.phase == .idle && exit.asking == nil && !exit.busy)
+        }
+    }
+
     @Test func aFailedWriteReturnsTheRowToNormalWithTheError() {
         var exit = ExitFlow()
         exit.ask(.end)

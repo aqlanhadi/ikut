@@ -21,13 +21,26 @@ struct TripExitMenu: View {
 }
 
 extension View {
+    /// The one shape of a confirmation: an alert whose title is the question, one sentence of message, a red button
+    /// named for the action, and Cancel. Every ask-before-doing dialog goes through here so they cannot drift.
+    func confirmAlert(
+        _ title: LocalizedStringKey, message: LocalizedStringKey, action: LocalizedStringKey,
+        destructive: Bool = true, isPresented: Binding<Bool>, perform: @escaping () -> Void
+    ) -> some View {
+        alert(title, isPresented: isPresented) {
+            Button(action, role: destructive ? .destructive : nil, action: perform)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(message)
+        }
+    }
+
     /// The confirmation behind the lobby's New code row (D104), asked inside the sheet like Leave and End.
     func tripNewCodeDialog(isPresented: Binding<Bool>, make: @escaping () -> Void) -> some View {
-        confirmationDialog("Make a new code?", isPresented: isPresented, titleVisibility: .visible) {
-            Button("Make a new code", action: make)
-        } message: {
-            Text("The old code stops working. People already in the trip stay in. Share the new code with anyone still to join.")
-        }
+        confirmAlert(
+            "Make a new code?",
+            message: "The old code stops working. People already in the trip stay in. Share the new code with anyone still to join.",
+            action: "Make a new code", destructive: false, isPresented: isPresented, perform: make)
     }
 
     /// The two confirmations behind `TripExitMenu`; each screen passes what leaving and ending do there.
@@ -35,15 +48,11 @@ extension View {
         confirmLeave: Binding<Bool>, confirmEnd: Binding<Bool>,
         leave: @escaping () -> Void, end: @escaping () -> Void
     ) -> some View {
-        confirmationDialog("Leave this trip?", isPresented: confirmLeave, titleVisibility: .visible) {
-            Button("Leave trip", role: .destructive, action: leave)
-        } message: {
-            Text("Your phone stops sharing its location.")
-        }
-        .confirmationDialog("End the trip for everyone?", isPresented: confirmEnd, titleVisibility: .visible) {
-            Button("End trip", role: .destructive, action: end)
-        } message: {
-            Text("Everyone stops sharing their location. This can’t be undone.")
-        }
+        confirmAlert(
+            "Leave this trip?", message: "Your phone stops sharing its location.", action: "Leave trip",
+            isPresented: confirmLeave, perform: leave)
+        .confirmAlert(
+            "End the trip for everyone?", message: "Everyone stops sharing their location. This can’t be undone.",
+            action: "End trip", isPresented: confirmEnd, perform: end)
     }
 }

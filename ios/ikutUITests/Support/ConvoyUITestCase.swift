@@ -323,9 +323,9 @@ class ConvoyUITestCase: XCTestCase {
             }
             let label = app.clearOfDrivingBar(end) ? "End trip" : "Leave trip"
             (label == "End trip" ? end : leave).tap()
-            let confirm = app.buttons.matching(NSPredicate(format: "label == %@", label))
-            _ = confirm.element(boundBy: 1).waitForExistence(timeout: 10)
-            confirm.element(boundBy: confirm.count - 1).tap()
+            let confirm = app.alerts.buttons[label]
+            _ = confirm.waitForExistence(timeout: 10)
+            confirm.tap()
             if label == "End trip" { closeRecap() }
         } else if back.exists {
             // Tracking starts as the lobby opens, and the Always explainer comes up once a moment later, with the
