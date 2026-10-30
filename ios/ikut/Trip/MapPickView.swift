@@ -122,7 +122,7 @@ struct MapPickView: View {
                     .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
                     .background(.regularMaterial, in: Capsule())
                     .offset(y: -52)
-                    .accessibilityIdentifier("mapPick.label")
+                    .accessibilityIdentifier(AXID.Trip.mapPickLabel)
             }
             .allowsHitTesting(false)
     }

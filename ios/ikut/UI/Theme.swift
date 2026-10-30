@@ -153,7 +153,7 @@ struct SheetHeader: View {
             Spacer(minLength: 0)
             SheetCloseButton(action: onClose)
                 .offset(closeOffset)
-                .accessibilityIdentifier(closeIdentifier ?? "sheet.close")
+                .accessibilityIdentifier(closeIdentifier ?? AXID.Sheet.close)
         }
     }
 }

@@ -40,7 +40,7 @@ struct NameEntryView: View {
                 .ikutRow()
                 .ikutCard()
                 .accessibilityLabel("Your name")
-                .accessibilityIdentifier("nameField")
+                .accessibilityIdentifier(AXID.Name.field)
                 .onSubmit(submit)
         }
     }
@@ -63,7 +63,7 @@ struct NameEntryView: View {
                 if let errorMessage {
                     InlineNote(errorMessage, tone: .alert)
                         .padding(.top, Spacing.s)
-                        .accessibilityIdentifier("nameError")
+                        .accessibilityIdentifier(AXID.Name.error)
                 }
 
                 Spacer(minLength: 16)

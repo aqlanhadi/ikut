@@ -209,7 +209,7 @@ struct LobbyMapLayer: View {
                 RoundGlassIconButton(systemImage: "arrow.up.left.and.arrow.down.right", label: "Show the whole trip") { command = command.asking(.wholeTrip) }
                 .padding(.trailing, Spacing.m)
                 .padding(.top, stage.space.safeTop + Spacing.xs)
-                .accessibilityIdentifier("lobby.wholeTrip")
+                .accessibilityIdentifier(AXID.Lobby.wholeTrip)
             }
             .preference(key: TripMapSpecKey.self, value: TripMapSpec(
                 input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),

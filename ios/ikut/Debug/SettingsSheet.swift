@@ -33,7 +33,7 @@ struct SettingsSheet: View {
                     Section {
                         Button(action: onRename) { LabeledContent("Your name", value: name) }
                             .foregroundStyle(.primary)
-                            .accessibilityIdentifier("settingsName")
+                            .accessibilityIdentifier(AXID.Debug.settingsName)
                     } header: {
                         Text("Name")
                     } footer: {
@@ -41,7 +41,7 @@ struct SettingsSheet: View {
                     }
                     Section("Developer") {
                         NavigationLink("Design language", value: Page.design)
-                            .accessibilityIdentifier("settingsDesign")
+                            .accessibilityIdentifier(AXID.Debug.settingsDesign)
                     }
                 }
                 .listStyle(.insetGrouped)

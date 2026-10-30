@@ -168,19 +168,19 @@ struct SuggestStopsSheet: View {
 
     private func note(_ text: String) -> some View {
         Text(text).font(.body).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityIdentifier("suggest.note")
+            .accessibilityIdentifier(AXID.Suggest.note)
     }
 
     private var stepper: some View {
         HStack(spacing: Spacing.m) {
-            Text(SuggestStopsModel.stepperText(model.after)).font(.body).accessibilityIdentifier("suggest.after")
+            Text(SuggestStopsModel.stepperText(model.after)).font(.body).accessibilityIdentifier(AXID.Suggest.after)
             Spacer(minLength: Spacing.s)
             Button { model.step(-1) } label: { Image(systemName: "minus").inlineRoundLabel() }
                 .disabled(!SuggestAfter.canStep(model.after, by: -1))
-                .accessibilityLabel("Earlier").accessibilityIdentifier("suggest.earlier")
+                .accessibilityLabel("Earlier").accessibilityIdentifier(AXID.Suggest.earlier)
             Button { model.step(1) } label: { Image(systemName: "plus").inlineRoundLabel() }
                 .disabled(!SuggestAfter.canStep(model.after, by: 1))
-                .accessibilityLabel("Later").accessibilityIdentifier("suggest.later")
+                .accessibilityLabel("Later").accessibilityIdentifier(AXID.Suggest.later)
         }
         .buttonStyle(.bordered).buttonBorderShape(.circle).tint(Color.ikutAccent)
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.s)
@@ -207,7 +207,7 @@ struct SuggestStopsSheet: View {
                 } label: { Text("Add").frame(maxWidth: .infinity) }
                     .ikutButton(.primary)
                     .disabled(added || !canAdd())
-                    .accessibilityIdentifier("suggest.add")
+                    .accessibilityIdentifier(AXID.Suggest.add)
             }
             .padding(.top, Spacing.xs)
         }

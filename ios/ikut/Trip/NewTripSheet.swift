@@ -22,7 +22,7 @@ struct WhereToSheet: View {
                 if let message = model.errorMessage {
                     Section {
                         InlineNote(message, tone: .alert)
-                            .accessibilityIdentifier("createTripError")
+                            .accessibilityIdentifier(AXID.Trip.createError)
                             .lobbyRow(top: Spacing.m)
                     }
                 }
@@ -50,7 +50,7 @@ struct WhereToSheet: View {
                         .focused($searchFocused)
                         .disabled(model.isWorking)
                         .accessibilityLabel("Destination")
-                        .accessibilityIdentifier("destinationField")
+                        .accessibilityIdentifier(AXID.Trip.destinationField)
                         .onChange(of: model.query) { model.queryChanged() }
                         .onSubmit { model.submit() }
                 }
@@ -97,7 +97,7 @@ struct NewTripSheet: View {
                 backButton
             } trailing: {
                 RoundGlassIconButton(systemImage: "xmark", label: "Close", action: onClose)
-                    .accessibilityIdentifier("sheet.close").disabled(flow.isCreating)
+                    .accessibilityIdentifier(AXID.Sheet.close).disabled(flow.isCreating)
             }
             .padding(.top, Spacing.xs)
             .padding(.horizontal, Spacing.l)
@@ -112,13 +112,13 @@ struct NewTripSheet: View {
                             .submitLabel(.done)
                             .disabled(flow.isCreating)
                             .accessibilityLabel("Trip name")
-                            .accessibilityIdentifier("newTripNameField")
+                            .accessibilityIdentifier(AXID.Trip.newTripNameField)
                     }
                 }
                 if let message = flow.createError {
                     Section {
                         InlineNote(message, tone: .alert)
-                            .accessibilityIdentifier("createTripError")
+                            .accessibilityIdentifier(AXID.Trip.createError)
                             .lobbyRow()
                     }
                 }

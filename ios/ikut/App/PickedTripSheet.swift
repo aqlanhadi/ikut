@@ -45,7 +45,7 @@ struct PickedTripHeader: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.s)
                 .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("picked.left")
+                .accessibilityIdentifier(AXID.Home.pickedLeft)
             } else if model.recap != nil {
                 if let item = picked.selectedItem {
                     selectedCard(item)

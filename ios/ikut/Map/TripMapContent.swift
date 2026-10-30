@@ -157,7 +157,7 @@ struct TripMapContent: MapContent {
         ForEach(input.hazards) { hazard in
             Annotation(hazard.label, coordinate: hazard.coordinate, anchor: .center) {
                 HazardMapContent(marker: hazard, pinging: hazard.id == style.pingingEventId)
-                    .accessibilityIdentifier("hazard.marker")
+                    .accessibilityIdentifier(AXID.Map.hazardMarker)
             }
             .annotationTitles(.hidden)
         }

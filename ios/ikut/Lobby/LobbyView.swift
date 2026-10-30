@@ -161,7 +161,7 @@ struct LobbyView: View {
                 // On a surface that hides the rows scrolling under the bar: a blurred material under the glass capsule.
                 .background(.regularMaterial, in: Capsule())
                 .glassSurface(.pill)
-                .accessibilityIdentifier("lobbyWaiting")
+                .accessibilityIdentifier(AXID.Lobby.waiting)
                 .sheetActionBar(lift: barLift)
                 .transition(.opacity)
         case .startTrip, .showMap:
@@ -174,7 +174,7 @@ struct LobbyView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                        .accessibilityIdentifier("lobby.waitingForCars")
+                        .accessibilityIdentifier(AXID.Lobby.waitingForCars)
                 }
                 Button {
                     if bar == .startTrip {
@@ -497,7 +497,7 @@ struct LobbyView: View {
     @ViewBuilder var renameActions: some View {
         TextField("Trip name", text: $renameText)
             .textInputAutocapitalization(.words)
-            .accessibilityIdentifier("renameTripField")
+            .accessibilityIdentifier(AXID.Trip.renameTripField)
         Button("Cancel", role: .cancel) {}
         Button("Save") {
             let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -632,15 +632,15 @@ struct LobbyView: View {
             tracking: isSample ? sampleSharing : session.isTracking, paused: session.isPaused, started: isStarted, ended: ended)
         return SheetTopRow(
             title: trip.map { LobbyContent.headerTitle(tripName: $0.name, started: isStarted, ended: ended) } ?? "",
-            subtitle: LobbyContent.subtitleWords(subtitle, sharing: sharing), subtitleIdentifier: "lobby.subtitle",
+            subtitle: LobbyContent.subtitleWords(subtitle, sharing: sharing), subtitleIdentifier: AXID.Lobby.subtitle,
             styledSubtitle: sharing ? sharingSubtitle(subtitle) : nil
         ) {
             RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: backToTrips)
-                .accessibilityIdentifier("lobby.back")
+                .accessibilityIdentifier(AXID.Lobby.back)
         } trailing: {
             if let trip {
                 RoundGlassShareLink(item: LobbyLogic.shareText(code: trip.code))
-                    .accessibilityIdentifier("lobby.share")
+                    .accessibilityIdentifier(AXID.Lobby.share)
             }
         }
         .padding(.horizontal, Spacing.l)

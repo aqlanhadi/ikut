@@ -35,14 +35,14 @@ struct JoinSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetTopRow(title: stepper.title, subtitle: stepper.indicator, subtitleIdentifier: "joinStep") {
+            SheetTopRow(title: stepper.title, subtitle: stepper.indicator, subtitleIdentifier: AXID.Join.step) {
                 if stepper.canGoBack {
                     RoundGlassIconButton(systemImage: "chevron.left", label: "Back", action: back)
-                        .accessibilityIdentifier("joinBack").disabled(model.isJoining)
+                        .accessibilityIdentifier(AXID.Join.back).disabled(model.isJoining)
                 }
             } trailing: {
                 RoundGlassIconButton(systemImage: "xmark", label: "Close", action: onClose)
-                    .accessibilityIdentifier("sheet.close").disabled(model.isJoining)
+                    .accessibilityIdentifier(AXID.Sheet.close).disabled(model.isJoining)
             }
             .padding(.top, Spacing.xs)
             .padding(.horizontal, Spacing.l)
@@ -123,7 +123,7 @@ struct JoinSheet: View {
             }
             .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(!stepper.canContinue || isWorking)
-            .accessibilityIdentifier("joinNameContinue")
+            .accessibilityIdentifier(AXID.Join.nameContinue)
             .sheetActionBar(sides: false)
             .padding(.bottom, PanelSheet.sideGap)
         case .location:
@@ -135,13 +135,13 @@ struct JoinSheet: View {
             }
             .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(isWorking)
-            .accessibilityIdentifier("joinLocationContinue")
+            .accessibilityIdentifier(AXID.Join.locationContinue)
             .sheetActionBar(sides: false)
             Button("Not now") { goNext() }
                 .font(.body.weight(.semibold))
                 .ikutRow(fillWidth: true)
                 .disabled(isWorking)
-                .accessibilityIdentifier("joinLocationSkip")
+                .accessibilityIdentifier(AXID.Join.locationSkip)
                 .padding(.bottom, PanelSheet.sideGap)
         case .code:
             if stepper.canContinue {
@@ -149,7 +149,7 @@ struct JoinSheet: View {
                     Text("Continue").font(.headline).frame(maxWidth: .infinity)
                 }
                 .ikutButton(.primary, tint: .ikutAccentFill)
-                .accessibilityIdentifier("joinContinue")
+                .accessibilityIdentifier(AXID.Join.continueStep)
                 .sheetActionBar(sides: false)
                 .padding(.bottom, PanelSheet.sideGap)
             }
@@ -157,7 +157,7 @@ struct JoinSheet: View {
             if let taken = model.trackerTakenResult {
                 Button { onJoined(taken.tripId, model.tracks) } label: { Text("Continue").font(.headline).frame(maxWidth: .infinity) }
                     .ikutButton(.primary, tint: .ikutAccentFill)
-                    .accessibilityIdentifier("joinContinue")
+                    .accessibilityIdentifier(AXID.Join.continueStep)
                     .sheetActionBar(sides: false)
                     .padding(.bottom, PanelSheet.sideGap)
             } else {
@@ -168,7 +168,7 @@ struct JoinSheet: View {
                             .font(.footnote.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("joinLocationOff")
+                    .accessibilityIdentifier(AXID.Join.locationOff)
                 }
                 if JoinSteps.sharing(selectedCar: model.selectedCar, ownCar: model.selection == .newCar) != .none { sharingRow }
                 Button(action: join) {
@@ -183,7 +183,7 @@ struct JoinSheet: View {
                 }
                 .ikutButton(.primary, tint: .ikutAccentFill)
                 .disabled(!stepper.canContinue || auth.userID == nil)
-                .accessibilityIdentifier("joinConfirm")
+                .accessibilityIdentifier(AXID.Join.confirm)
                 .sheetActionBar(sides: false)
                 .padding(.bottom, PanelSheet.sideGap)
             }
@@ -231,7 +231,7 @@ struct JoinSheet: View {
                 .focused($nameFocused)
                 .disabled(isWorking)
                 .accessibilityLabel("Your name")
-                .accessibilityIdentifier("nameField")
+                .accessibilityIdentifier(AXID.Name.field)
                 .onSubmit(submitName)
         } header: {
             // The line and the caption share the header, so the field stays as high as it was above the keyboard.
@@ -247,7 +247,7 @@ struct JoinSheet: View {
             Section {
                 InlineNote(nameError, tone: .alert, inset: 0)
                     .lobbyRow()
-                    .accessibilityIdentifier("nameError")
+                    .accessibilityIdentifier(AXID.Name.error)
             }
         }
     }
@@ -312,7 +312,7 @@ struct JoinSheet: View {
                         Text("Scan QR code")
                     }
                 }
-                .accessibilityIdentifier("joinScan")
+                .accessibilityIdentifier(AXID.Join.scan)
             }
         }
     }
@@ -330,7 +330,7 @@ struct JoinSheet: View {
         } else if let message = model.errorMessage {
             VStack(alignment: .leading, spacing: Spacing.s) {
                 InlineNote(message, tone: .alert, inset: 0)
-                    .accessibilityIdentifier("joinError")
+                    .accessibilityIdentifier(AXID.Join.error)
                 if JoinService.isCompleteCode(model.code) {
                     Button("Try again") { model.retryPreview() }
                         .font(.subheadline.weight(.semibold))
@@ -379,7 +379,7 @@ struct JoinSheet: View {
             .focused($codeFocused)
             .disabled(model.isJoining)
             .accessibilityLabel("Trip code")
-            .accessibilityIdentifier("joinCodeField")
+            .accessibilityIdentifier(AXID.Join.codeField)
             .accessibilityValue(codeText)
             .onChange(of: codeText) {
                 model.codeChanged(codeText)
@@ -409,7 +409,7 @@ struct JoinSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, Spacing.xs)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("joinTripCard")
+        .accessibilityIdentifier(AXID.Join.tripCard)
     }
 
     // MARK: H4 Car
@@ -441,7 +441,7 @@ struct JoinSheet: View {
                     .textInputAutocapitalization(.words)
                     .disabled(model.isJoining)
                     .accessibilityLabel("Car name")
-                    .accessibilityIdentifier("joinCarNameField")
+                    .accessibilityIdentifier(AXID.Join.carNameField)
                     .onChange(of: model.newCarName) { model.newCarNameDidEdit() }
             }
         }
@@ -450,7 +450,7 @@ struct JoinSheet: View {
             Section {
                 if let message = model.errorMessage {
                     InlineNote(message, tone: .alert, inset: 0)
-                        .accessibilityIdentifier("joinError")
+                        .accessibilityIdentifier(AXID.Join.error)
                 }
                 if model.trackerTakenResult != nil {
                     InlineNote(
@@ -497,7 +497,7 @@ struct JoinSheet: View {
                 .font(.footnote).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, Spacing.s)
-                .accessibilityIdentifier("joinShareNote")
+                .accessibilityIdentifier(AXID.Join.shareNote)
         case .switchRow:
             Toggle(isOn: $model.tracker) {
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -510,7 +510,7 @@ struct JoinSheet: View {
             }
             .tint(Color(.systemGreen))
             .disabled(model.isJoining)
-            .accessibilityIdentifier("joinShare")
+            .accessibilityIdentifier(AXID.Join.share)
             .padding(.top, Spacing.s)
         }
     }

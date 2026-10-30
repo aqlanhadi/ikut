@@ -153,7 +153,7 @@ struct TripsHomeView: View {
             if cameraTour {
                 Chip(text: tourCaption, tone: .neutral, fill: .material)
                     .padding(.top, 70)
-                    .accessibilityIdentifier("cameraTour.caption")
+                    .accessibilityIdentifier(AXID.Map.cameraTourCaption)
                     .allowsHitTesting(false)
             }
         }

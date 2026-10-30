@@ -80,13 +80,13 @@ struct GlanceErrorBanner: View {
                 RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
             }
             .accessibilityLabel("Close")
-            .accessibilityIdentifier("map.error.close")
+            .accessibilityIdentifier(AXID.Map.errorClose)
         }
         .padding(.leading, Spacing.l).padding(.trailing, Spacing.xs).padding(.vertical, Spacing.xs)
         .background(Color.criticalFill, in: Capsule())
         .elevation(.floating)
         .announces(message)
-        .accessibilityIdentifier("map.error")
+        .accessibilityIdentifier(AXID.Map.error)
     }
 }
 

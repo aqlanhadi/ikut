@@ -158,7 +158,7 @@ struct StopCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(reason.label)
-                    .accessibilityIdentifier("stop.reason.\(reason.type.rawValue)")
+                    .accessibilityIdentifier(AXID.Stop.reason(reason.type.rawValue))
                 }
             }
         } actions: {}
@@ -175,16 +175,16 @@ struct StopCard: View {
                 Text(message).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
             }
             StopActionButton(
-                title: "Tell the convoy", style: .primary, height: big ? 72 : nil, disabled: !ask.canSend, id: "stop.send"
+                title: "Tell the convoy", style: .primary, height: big ? 72 : nil, disabled: !ask.canSend, id: AXID.Stop.send
             ) { send() }
             StopActionButton(
                 title: StopLogic.cleanedMessage(ask.message) == nil ? "Add a message" : "Change the message",
-                style: big ? .ghost : .secondary, height: big ? 44 : nil, id: "stop.addMessage"
+                style: big ? .ghost : .secondary, height: big ? 44 : nil, id: AXID.Stop.addMessage
             ) {
                 model.screen = StopCardGate.needsPassengerCheck(driving: driving, session: model.session)
                     ? .passengerCheck : .message
             }
-            StopActionButton(title: "Back", style: .ghost, id: "stop.back") { ask.clearReason() }
+            StopActionButton(title: "Back", style: .ghost, id: AXID.Stop.back) { ask.clearReason() }
         }
     }
 
@@ -213,13 +213,13 @@ struct StopCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("stop.passengerCheck")
+            .accessibilityIdentifier(AXID.Stop.passengerCheck)
         } actions: {
-            StopActionButton(title: "I’m a passenger", style: .primary, height: big ? 72 : nil, id: "stop.passenger") {
+            StopActionButton(title: "I’m a passenger", style: .primary, height: big ? 72 : nil, id: AXID.Stop.passenger) {
                 model.session.confirmPassenger()
                 model.screen = .message
             }
-            StopActionButton(title: "I’m driving", style: .secondary, height: big ? 56 : nil, id: "stop.driving") {
+            StopActionButton(title: "I’m driving", style: .secondary, height: big ? 56 : nil, id: AXID.Stop.driving) {
                 model.session.confirmDriving()
                 model.backHome()
             }
@@ -236,18 +236,18 @@ struct StopCard: View {
                 .padding(Spacing.m)
                 .ikutRow(fillWidth: true, alignment: .leading)
                 .ikutSurface(.quaternary, radius: Radius.inner)
-                .accessibilityIdentifier("stop.messageField")
+                .accessibilityIdentifier(AXID.Stop.messageField)
             Text("\(ask.message.count) of \(StopLogic.maxMessageLength)")
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .accessibilityHidden(true)
         } actions: {
-            StopActionButton(title: "Done", style: .primary, id: "stop.messageDone") {
+            StopActionButton(title: "Done", style: .primary, id: AXID.Stop.messageDone) {
                 messageFocused = false
                 model.backHome()
             }
             if !ask.message.isEmpty {
-                StopActionButton(title: "No message", style: .ghost, id: "stop.messageClear") {
+                StopActionButton(title: "No message", style: .ghost, id: AXID.Stop.messageClear) {
                     ask.message = ""
                     messageFocused = false
                     model.backHome()
@@ -292,14 +292,14 @@ struct StopCard: View {
         let ok = StopActionButton(
             title: needsOK ? "OK" : "You said OK", style: needsOK ? .primary : .positive,
             height: sideBySide ? shared : height,
-            id: "stop.ok\(suffix)"
+            id: AXID.Stop.ok(suffix)
         ) {
             if needsOK { actions.ok(state.eventId) }
         }
         let stopped = StopActionButton(
             title: "We’ve stopped", style: needsOK ? .secondary : .primary,
             height: sideBySide ? shared : stopHeight,
-            id: "stop.stopped\(suffix)"
+            id: AXID.Stop.stopped(suffix)
         ) { actions.close(state.eventId, .stopped) }
         if sideBySide {
             // Side by side, equal width and the taller of the two heights; stacked at accessibility text sizes.
@@ -310,7 +310,7 @@ struct StopCard: View {
         }
         if state.isAuthor {
             StopActionButton(
-                title: "Cancel request", style: .secondary, height: secondaryHeight, id: "stop.cancel\(suffix)"
+                title: "Cancel request", style: .secondary, height: secondaryHeight, id: AXID.Stop.cancel(suffix)
             ) { actions.close(state.eventId, .cancelled) }
         }
     }
@@ -344,7 +344,7 @@ struct StopCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceTile()
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("stop.request\(suffix)")
+        .accessibilityIdentifier(AXID.Stop.request(suffix))
     }
 }
 

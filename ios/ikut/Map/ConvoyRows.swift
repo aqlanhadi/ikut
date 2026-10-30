@@ -79,7 +79,7 @@ struct ConvoyRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.hasArrived {
                 Chip(text: row.trailingPrimary, tone: .positive, lead: .symbol("checkmark"))
-                    .accessibilityIdentifier("convoy.row.arrived")
+                    .accessibilityIdentifier(AXID.Convoy.rowArrived)
             } else {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(row.trailingPrimary)
@@ -96,7 +96,7 @@ struct ConvoyRowView: View {
         .padding(.horizontal, Spacing.xs)
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("convoy.row.\(row.number.map(String.init) ?? row.id)")
+        .accessibilityIdentifier(AXID.Convoy.row(row.number.map(String.init) ?? row.id))
     }
 }
 
@@ -139,7 +139,7 @@ struct JoiningRowView: View {
         .padding(.horizontal, Spacing.xs)
         .opacity(row.isStale ? Color.staleRowOpacity : 1)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("joining.row.\(row.number.map(String.init) ?? row.id)")
+        .accessibilityIdentifier(AXID.Convoy.joiningRow(row.number.map(String.init) ?? row.id))
     }
 }
 

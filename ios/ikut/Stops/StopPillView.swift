@@ -13,9 +13,9 @@ struct StopPillView: View {
             case .question(let eventId, let symbol, let title, let detail):
                 question(eventId: eventId, symbol: symbol, title: title, detail: detail)
             case .confirm(let symbol, let title, let detail):
-                slim(symbol: symbol, title: title, detail: detail, id: "stop.pill.confirm")
+                slim(symbol: symbol, title: title, detail: detail, id: AXID.Stop.pillConfirm)
             case .asked(let title, let detail):
-                slim(symbol: "checkmark", title: title, detail: detail, id: "stop.pill.asked")
+                slim(symbol: "checkmark", title: title, detail: detail, id: AXID.Stop.pillAsked)
             }
         }
         .elevation(.floating)
@@ -45,7 +45,7 @@ struct StopPillView: View {
                 Spacer(minLength: 0)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("stop.pill.text")
+            .accessibilityIdentifier(AXID.Stop.pillText)
             Button { onButton(eventId) } label: {
                 Text("OK")
                     .font(.title3.weight(.bold))
@@ -55,12 +55,12 @@ struct StopPillView: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("stop.pill.button")
+            .accessibilityIdentifier(AXID.Stop.pillButton)
         }
         .padding(Spacing.m)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Self.questionRadius, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("stop.pill")
+        .accessibilityIdentifier(AXID.Stop.pill)
     }
 
     private func slim(symbol: String, title: String, detail: String, id: String) -> some View {

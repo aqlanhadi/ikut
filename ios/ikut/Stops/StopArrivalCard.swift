@@ -79,7 +79,7 @@ struct StopArrivalCard: View {
                 skipActions(stop, skippers: skippers)
                 skipAllActions(stop, tally: tally)
             }
-            .accessibilityIdentifier("stop.arrival")
+            .accessibilityIdentifier(AXID.Stop.arrival)
             .onAppear {
                 if startConfirming { confirming = true }
                 if startConfirmingSkipAll { confirmingSkipAll = true }
@@ -108,7 +108,7 @@ struct StopArrivalCard: View {
             .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
             .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("stop.arrival.leavingAt")
+            .accessibilityIdentifier(AXID.Stop.arrivalLeavingAt)
         }
     }
 
@@ -125,7 +125,7 @@ struct StopArrivalCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.xs)
             .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("stop.arrival.skipping")
+            .accessibilityIdentifier(AXID.Stop.arrivalSkipping)
         }
     }
 
@@ -141,18 +141,18 @@ struct StopArrivalCard: View {
             VStack(spacing: Spacing.xs) {
                 if skipQueued {
                     Text("Sends when you have signal")
-                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skip.queued")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.skipQueued)
                 } else if couldNotSkip {
                     Text("That didn’t go through. Try again.")
-                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skip.retry")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.skipRetry)
                 }
                 if mineSkipping {
-                    StopActionButton(title: "We’ll stop after all", style: .secondary, id: "stop.skip.undo") {
+                    StopActionButton(title: "We’ll stop after all", style: .secondary, id: AXID.Stop.skipUndo) {
                         sendSkip(stop, skipping: false)
                     }
                     .disabled(skipping)
                 } else {
-                    StopActionButton(title: stop.isMeeting ? "We’ll meet you along the way" : "We’ll skip this stop", style: .secondary, id: "stop.skip") {
+                    StopActionButton(title: stop.isMeeting ? "We’ll meet you along the way" : "We’ll skip this stop", style: .secondary, id: AXID.Stop.skip) {
                         sendSkip(stop, skipping: true)
                     }
                     .disabled(skipping)
@@ -169,25 +169,25 @@ struct StopArrivalCard: View {
             VStack(spacing: Spacing.xs) {
                 if skipAllQueued {
                     Text("Sends when you have signal")
-                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skipAll.queued")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.skipAllQueued)
                 } else if couldNotSkipAll {
                     Text("That didn’t go through. Try again.")
-                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.skipAll.retry")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.skipAllRetry)
                 }
                 if confirmingSkipAll {
                     Text(StopSkipAll.confirmSentence(stop: stop))
                         .font(.subheadline).multilineTextAlignment(.center).frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("stop.skipAll.confirm.text")
-                    StopActionButton(title: "Skip this stop", style: .destructive, id: "stop.skipAll.confirm") {
+                        .accessibilityIdentifier(AXID.Stop.skipAllConfirmText)
+                    StopActionButton(title: "Skip this stop", style: .destructive, id: AXID.Stop.skipAllConfirm) {
                         sendSkipAll(stop)
                     }
                     .disabled(skippingAll)
-                    StopActionButton(title: "Not now", style: .ghost, id: "stop.skipAll.cancel") {
+                    StopActionButton(title: "Not now", style: .ghost, id: AXID.Stop.skipAllCancel) {
                         confirmingSkipAll = false
                     }
                 } else {
                     VStack(spacing: Spacing.xs) {
-                        StopActionButton(title: "Skip this stop", style: .destructive, id: "stop.skipAll") {
+                        StopActionButton(title: "Skip this stop", style: .destructive, id: AXID.Stop.skipAll) {
                             couldNotSkipAll = false
                             confirmingSkipAll = true
                         }
@@ -199,7 +199,7 @@ struct StopArrivalCard: View {
         } else if !isOrganizer, StopSkipAll.isSkippable(stop: stop, tripStarted: model.tripStarted, carReached: reached) {
             Text(StopSkipAll.passengerLine(organizerName: organizerName, cars: model.cars))
                 .font(.footnote).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity).accessibilityIdentifier("stop.skipAll.others")
+                .frame(maxWidth: .infinity).accessibilityIdentifier(AXID.Stop.skipAllOthers)
         }
     }
 
@@ -249,22 +249,22 @@ struct StopArrivalCard: View {
                 if queued {
                     Text("No signal. Leave goes through when you’re back online.")
                         .font(.footnote).foregroundStyle(Color.surfaceSecondary).multilineTextAlignment(.center)
-                        .accessibilityIdentifier("stop.leave.queued")
+                        .accessibilityIdentifier(AXID.Stop.leaveQueued)
                 } else if couldNotLeave {
                     Text("That didn’t go through. Try Leave again.")
-                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier("stop.leave.retry")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.leaveRetry)
                 }
                 if confirming {
                     Text(StopLeave.confirmSentence(stop: stop, waiting: waiting))
                         .font(.subheadline).multilineTextAlignment(.center).frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("stop.leave.confirm.text")
-                    StopActionButton(title: "Leave", style: .primary, id: "stop.leave.confirm") { send(stop) }
+                        .accessibilityIdentifier(AXID.Stop.leaveConfirmText)
+                    StopActionButton(title: "Leave", style: .primary, id: AXID.Stop.leaveConfirm) { send(stop) }
                         .disabled(leaving)
-                    StopActionButton(title: "Not yet, we’ll wait", style: .ghost, id: "stop.leave.cancel") {
+                    StopActionButton(title: "Not yet, we’ll wait", style: .ghost, id: AXID.Stop.leaveCancel) {
                         confirming = false
                     }
                 } else {
-                    StopActionButton(title: "Leave", subtitle: waiting, style: .primary, id: "stop.leave") {
+                    StopActionButton(title: "Leave", subtitle: waiting, style: .primary, id: AXID.Stop.leave) {
                         couldNotLeave = false
                         confirming = true
                     }
@@ -275,7 +275,7 @@ struct StopArrivalCard: View {
                 .foregroundStyle(Color.surfaceSecondary)
                 .barActionLabel(font: .subheadline)
                 .background(Color(.tertiarySystemFill), in: Capsule())
-                .accessibilityIdentifier("stop.leave.waiting")
+                .accessibilityIdentifier(AXID.Stop.leaveWaiting)
         }
     }
 
@@ -306,7 +306,7 @@ struct StopArrivalCard: View {
         switch status {
         case .here:
             Chip(text: "You’re here", tone: .positive)
-                .accessibilityIdentifier("stop.arrival.you")
+                .accessibilityIdentifier(AXID.Stop.arrivalYou)
         case .away(let distance, let seconds):
             let inConvoy = model.convoy.convoy.contains { $0.id == model.myCarId }
             let place = StopArrival.place(of: stopId, in: model.stops)
@@ -324,7 +324,7 @@ struct StopArrivalCard: View {
             .accessibilityElement(children: .combine)
         case .passed:
             Chip(text: "You drove past", tone: .neutral)
-                .accessibilityIdentifier("stop.arrival.you")
+                .accessibilityIdentifier(AXID.Stop.arrivalYou)
         case .unknown, .lastSeenHere:
             EmptyView()
         }
@@ -348,7 +348,7 @@ struct StopArrivalCard: View {
         .padding(.horizontal, Spacing.xs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(tally.title)
-        .accessibilityIdentifier("stop.arrival.count")
+        .accessibilityIdentifier(AXID.Stop.arrivalCount)
     }
 
     private func carRow(_ row: StopArrival.Row) -> some View {

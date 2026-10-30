@@ -57,11 +57,11 @@ struct StopPlaceRows: View {
                     }
                     .ikutRow(fillWidth: true, alignment: .leading)
                     .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("stop.place.\(place.id)")
+                    .accessibilityIdentifier(AXID.Stop.place(place.id))
                 }
                 Text("© OpenStreetMap contributors")
                     .font(.footnote).foregroundStyle(Color.surfaceSecondary)
-                    .accessibilityIdentifier("stop.places.credit")
+                    .accessibilityIdentifier(AXID.Stop.placesCredit)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

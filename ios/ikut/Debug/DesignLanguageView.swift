@@ -13,7 +13,7 @@ struct DesignLanguageView: View {
             DesignSharedSection()
             DesignOneOffsSection()
         }
-        .accessibilityIdentifier("designLanguage")
+        .accessibilityIdentifier(AXID.Debug.designLanguage)
     }
 }
 
@@ -24,12 +24,12 @@ private struct DesignOneOffsSection: View {
         let literals = DesignInventory.literals
         Section {
             NavigationLink(value: DesignDrill.views) { Text(InventoryGroups.totals(DesignInventory.views)) }
-                .accessibilityIdentifier("designDrill.views")
+                .accessibilityIdentifier(AXID.Debug.designDrillViews)
             ForEach(InventoryCategory.allCases, id: \.self) { category in
                 NavigationLink(value: DesignDrill.literals(category)) {
                     Text(InventoryGroups.totals(literals, in: category))
                 }
-                .accessibilityIdentifier("designDrill.\(category.rawValue)")
+                .accessibilityIdentifier(AXID.Debug.designDrill(category.rawValue))
             }
         } header: {
             Text("One-offs")
