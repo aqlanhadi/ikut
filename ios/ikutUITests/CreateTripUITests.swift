@@ -98,20 +98,16 @@ final class CreateTripUITests: ConvoyUITestCase {
         XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row with the convoy sheet pulled up")
         let endTitle = app.staticTexts["End the trip for everyone?"]
         XCTAssertTrue(endTitle.waitForExistence(timeout: 10), "End trip didn't ask to confirm")
-        let cancel = app.buttons["Cancel"]
-        // On iOS 26 the dialog is a popover with no Cancel: a tap outside it closes it.
-        let outside = app.descendants(matching: .any)["PopoverDismissRegion"].firstMatch
-        if cancel.exists { cancel.tap() } else if outside.exists { outside.tap() } else {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
-        }
+        app.alerts.buttons["Cancel"].tap()
         XCTAssertTrue(waitForGone(endTitle, timeout: 5), "The End trip confirmation stayed up after Cancel")
         XCTAssertTrue(app.pulledUpSheet.waitForExistence(timeout: 10), "After Cancel the sheet isn't pulled up")
 
         // End trip again and confirm: the recap opens.
         XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "No End trip row the second time")
         XCTAssertTrue(endTitle.waitForExistence(timeout: 10), "End trip didn't ask to confirm the second time")
-        let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "End trip"))
-        confirm.element(boundBy: confirm.count - 1).tap()
+        let confirm = app.alerts.buttons["End trip"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "The End trip alert has no End trip button")
+        confirm.tap()
         XCTAssertTrue(app.buttons["Share recap"].waitForExistence(timeout: 30), "Ending the trip didn't open the recap")
 
         // The navigation bar's Back on the recap (D92; Done is what `returnHomeFromAnOpenTrip` taps in the relaunch

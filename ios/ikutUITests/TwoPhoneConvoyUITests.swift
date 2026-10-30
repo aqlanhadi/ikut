@@ -145,12 +145,11 @@ class TwoPhoneConvoyBase: ConvoyUITestCase {
         XCTAssertTrue(app.tapPulledUpRow("lobby.endTrip"), "no End trip row with the convoy sheet pulled up")
     }
 
-    /// Taps the destructive button of a confirmation dialog (it repeats the menu item's title).
+    /// Taps the destructive button of a confirmation dialog (an alert; it repeats the menu item's title).
     func confirm(_ title: String) {
-        let buttons = app.buttons.matching(NSPredicate(format: "label == %@", title))
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline, buttons.count == 0 { Thread.sleep(forTimeInterval: 0.2) }
-        buttons.element(boundBy: buttons.count - 1).tap()
+        let button = app.alerts.buttons[title]
+        _ = button.waitForExistence(timeout: 5)
+        button.tap()
     }
 }
 
