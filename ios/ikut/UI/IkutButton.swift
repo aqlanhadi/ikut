@@ -115,7 +115,7 @@ private struct IkutButtonModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let look = IkutButtonLook.resolve(role: role, face: face, surface: surface, glassActive: GlassSurface.active)
-        content.applyStyle(look, role: role, face: face, tint: tint ?? Color.ikutAccent)
+        content.applyStyle(look, role: role, face: face, tint: tint ?? role.defaultTint)
     }
 }
 
@@ -132,5 +132,8 @@ extension View {
 }
 
 extension IkutButtonRole {
+    /// Primary fills with `ikutAccentFill`, so its white label holds 4.5:1 in both modes; the roles whose label is
+    /// the tint (secondary, link) use `accentText` (D79).
+    fileprivate var defaultTint: Color { isPrimary ? .ikutAccentFill : .accentText }
     fileprivate var isPrimary: Bool { if case .primary = self { true } else { false } }
 }

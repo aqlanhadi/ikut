@@ -305,7 +305,7 @@ struct AddStopContent: View {
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(selected ? Color.white : Color.primary)
                 .ikutRow(fillWidth: true)
-                .background(selected ? AnyShapeStyle(Color.ikutAccent) : AnyShapeStyle(Color.primary.fill(.wash)), in: Capsule())
+                .background(selected ? AnyShapeStyle(Color.ikutAccentFill) : AnyShapeStyle(Color.primary.fill(.wash)), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])

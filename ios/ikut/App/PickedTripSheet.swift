@@ -62,7 +62,7 @@ struct PickedTripHeader: View {
                     .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.s)
                 Button("Try again") { Task { await model.retry(myUserId: Auth.auth().currentUser?.uid) } }
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.ikutAccent)
+                    .foregroundStyle(Color.accentText)
                     .ikutRow(fillWidth: true)
                     .background(Color(.tertiarySystemFill), in: Capsule())
                     .contentShape(Capsule())

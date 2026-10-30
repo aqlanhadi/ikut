@@ -73,7 +73,7 @@ struct YouTag: View {
 
     var body: some View {
         (Text("• ") + Text(YouOnline.text(online: online, differentiateWithoutColor: differentiate))
-            .foregroundStyle(online ? Color.ikutPositive : Color.ikutWarning))
+            .foregroundStyle(online ? Color.positiveText : Color.ikutWarning))
             .lineLimit(1)
             .fixedSize()
             .animation(Motion.gentle(reduceMotion: reduceMotion), value: online)

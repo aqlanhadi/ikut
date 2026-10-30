@@ -156,10 +156,11 @@ struct Chip: View {
         /// White text on a dark surface (the floating banners).
         case onDark
 
+        /// The words: the tone's text token, which holds 4.5:1 on the chip's own tint (D79).
         var text: Color {
             switch self {
-            case .accent: .ikutAccent
-            case .positive: .ikutPositive
+            case .accent: .accentText
+            case .positive: .positiveText
             case .warning: .ikutWarning
             case .neutral: .secondary
             case .onDark: .white
@@ -170,6 +171,8 @@ struct Chip: View {
         var tint: Color {
             switch self {
             case .onDark: Color.white.fill(.tint)
+            case .accent: Color.ikutAccent.fill(.tint)
+            case .positive: Color.ikutPositive.fill(.tint)
             default: text.fill(.tint)
             }
         }

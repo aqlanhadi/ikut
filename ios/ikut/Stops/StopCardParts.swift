@@ -58,15 +58,15 @@ struct StopActionButton: View {
         switch style {
         case .primary: .white
         case .secondary: .primary
-        case .positive: Color.ikutPositive
-        case .ghost: Color.ikutAccent
+        case .positive: Color.positiveText
+        case .ghost: Color.accentText
         case .destructive: .red
         }
     }
 
     private var background: Color {
         switch style {
-        case .primary: Color.ikutAccent
+        case .primary: Color.ikutAccentFill
         case .secondary: Color(.systemGray5).dimmed(.faded)
         case .positive: Color.green.fill(.tint)
         case .ghost, .destructive: .clear
@@ -149,7 +149,7 @@ struct StopVoterRow: View {
 
     static func status(_ row: StopRequestState.Row) -> (text: String, color: Color) {
         switch row.status {
-        case .ok: ("OK", Color.ikutPositive)
+        case .ok: ("OK", Color.positiveText)
         case .waiting: ("Waiting", Color.surfaceSecondary)
         }
     }

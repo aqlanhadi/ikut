@@ -70,7 +70,7 @@ struct DesignDrillView: View {
                     Text(view.name).font(.body.monospaced())
                     Text("\(view.kind) in \(view.file)").font(.footnote).foregroundStyle(.secondary)
                     Text(InventoryGroups.usage(view)).font(.footnote)
-                        .foregroundStyle(view.uses <= 1 ? Color.ikutWarning : Color.ikutPositive)
+                        .foregroundStyle(view.uses <= 1 ? Color.ikutWarning : Color.positiveText)
                 }
             }
         } header: {

@@ -172,7 +172,7 @@ struct ConvoyPanel: View {
                     .minimumScaleFactor(ConvoyEndName.minimumScale)
                     .fixedSize(horizontal: false, vertical: true)
                 if let arrive, !mineArrived {
-                    Text("Arrive \(Text(arrive).foregroundStyle(Color.ikutPositive).fontWeight(.semibold))")
+                    Text("Arrive \(Text(arrive).foregroundStyle(Color.positiveText).fontWeight(.semibold))")
                         .font(.footnote)
                         .foregroundStyle(Color.surfaceSecondary)
                         .monospacedDigit()

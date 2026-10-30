@@ -275,7 +275,7 @@ extension LobbyView {
                 }
             }
         }
-        .foregroundStyle(Color.ikutAccent)
+        .foregroundStyle(Color.accentText)
         .accessibilityIdentifier(id)
     }
 

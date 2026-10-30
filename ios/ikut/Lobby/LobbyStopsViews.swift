@@ -47,7 +47,7 @@ struct StopNote: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.ikutAccent)
+                .foregroundStyle(Color.accentText)
                 .padding(.top, Spacing.xs)
                 .accessibilityIdentifier(AXID.Stops.retry)
             }
