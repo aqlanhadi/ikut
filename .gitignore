@@ -40,3 +40,8 @@ qa/battery/
 
 # Built by tools/osm/publish.mjs at hosting deploy
 firebase/hosting/
+
+# Internal, kept out of the public repo (see .claude/publish-public.mjs)
+.claude/
+CLAUDE.md
+design/
