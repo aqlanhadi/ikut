@@ -404,10 +404,10 @@ struct TripMapView: View {
             if cause == .none, !reduceMotion, let step, let camera = next.camera {
                 let points = (stage.seenView.map { CameraPace.travel(from: $0, to: view) } ?? 1) * Double(mapWidth)
                 // Too small to see (parked, or under 1.5 pt): nothing to move, or placed without a glide (D71).
-                if step > 0, points >= MarkerGlide.placeUnder {
-                    stage.glide(to: camera, duration: step)
-                } else if points > 0.05 {
-                    stage.place(next)
+                switch FollowStep.decide(points: points, step: step) {
+                case .glide: stage.glide(to: camera, duration: step)
+                case .place: stage.place(next)
+                case .ignore: break
                 }
                 return
             }

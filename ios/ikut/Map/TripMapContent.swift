@@ -185,18 +185,26 @@ struct MarkerGlide: ViewModifier {
     var place: Int
     var point: ((MapCoordinate) -> CGPoint?)?
     /// My own car (the one the camera follows) keeps the small threshold; the others' steps are worth less.
-    var isMine = true
+    var isMine: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var offset = CGSize.zero
     @State private var slide: Slide?
 
+    init(coordinate: MapCoordinate, duration: TimeInterval, place: Int, point: ((MapCoordinate) -> CGPoint?)?, isMine: Bool) {
+        self.coordinate = coordinate
+        self.duration = duration
+        self.place = place
+        self.point = point
+        self.isMine = isMine
+    }
+
     /// A step shorter than this, in points, is placed: a standing car, or one far out at Fit zoom.
-    static let placeUnder: CGFloat = 1.5
+    nonisolated static let placeUnder: CGFloat = 1.5
     /// Another car's step shorter than this, in points, is placed (D71): its write comes every 5 s, so a few points
     /// is a crawl nobody sees, and its slide costs a layout of the marker on every frame.
-    static let placeUnderOther: CGFloat = 6
+    nonisolated static let placeUnderOther: CGFloat = 6
     /// A scale change bigger than this share places the slides.
-    static let scaleTolerance = 0.1
+    nonisolated static let scaleTolerance = 0.1
 
     struct Slide: Equatable {
         var from: CGSize
@@ -210,12 +218,12 @@ struct MarkerGlide: ViewModifier {
         }
     }
 
-    static func scaleMoved(from: Double, to: Double) -> Bool {
+    nonisolated static func scaleMoved(from: Double, to: Double) -> Bool {
         guard from > 0, to > 0 else { return false }
         return abs(to / from - 1) > scaleTolerance
     }
 
-    static func worthGliding(_ from: CGSize, isMine: Bool = true) -> Bool {
+    nonisolated static func worthGliding(_ from: CGSize, isMine: Bool) -> Bool {
         (from.width * from.width + from.height * from.height).squareRoot() >= (isMine ? placeUnder : placeUnderOther)
     }
 
@@ -253,12 +261,18 @@ struct MarkerGlide: ViewModifier {
     private func start(from old: MapCoordinate, to new: MapCoordinate) {
         let now = Date()
         let left = slide?.remaining(at: now) ?? .zero
-        guard !reduceMotion, duration > 0, let a = point?(old), let b = point?(new) else { stop(); return }
-        let from = CGSize(width: a.x - b.x + left.width, height: a.y - b.y + left.height)
-        guard Self.worthGliding(from) else { stop(); return }
+        guard let from = slideStart(old: point?(old), new: point?(new), left: left, reduceMotion: reduceMotion) else { stop(); return }
         jump(to: from)
         withAnimation(Motion.follow(interval: duration, reduceMotion: false)) { offset = .zero }
         slide = Slide(from: from, start: now, duration: duration)
+    }
+
+    /// Where the marker's view starts its slide, in points from the car's new place; nil to place it (Reduce Motion, no
+    /// glide asked for, the map not ready, or a step under the threshold for this car, `worthGliding`).
+    func slideStart(old: CGPoint?, new: CGPoint?, left: CGSize, reduceMotion: Bool) -> CGSize? {
+        guard !reduceMotion, duration > 0, let a = old, let b = new else { return nil }
+        let from = CGSize(width: a.x - b.x + left.width, height: a.y - b.y + left.height)
+        return Self.worthGliding(from, isMine: isMine) ? from : nil
     }
 
     private func stop() {

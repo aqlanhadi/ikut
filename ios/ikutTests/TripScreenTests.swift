@@ -7,6 +7,21 @@ import Testing
 /// The trip screen's modes over its one map (D53): what switches them, which layer draws, where the camera goes and
 /// the one sheet's sizes.
 struct TripScreenTests {
+    // MARK: Slides placed per zoom (D71)
+
+    @MainActor @Test func aZoomPlacesTheCarsSlidesTwiceNoMatterHowManyReadings() {
+        let model = TripScreenModel()
+        model.noteScale(0.01)
+        let before = model.placeSlides
+        var scale = 0.01
+        for _ in 0..<40 {
+            scale *= 1.08
+            model.noteScale(scale)
+        }
+        model.noteSettled(scale)
+        #expect(model.placeSlides - before == 2)
+    }
+
     // MARK: Recap popped (D92)
 
     @Test func poppingTheRecapWithATripOpenClosesTheTrip() {
