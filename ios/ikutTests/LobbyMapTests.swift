@@ -38,12 +38,107 @@ struct LobbyMapTests {
         #expect(TripSheet(size: .lobby(tall: false)).presented)
     }
 
-    @MainActor @Test(arguments: [TripSheetCover.changeDestination, .suggestStops, .renaming, .alwaysExplainer,
-                                 .confirmLeave, .confirmEnd])
+    @MainActor @Test(arguments: [TripSheetCover.changeDestination, .alwaysExplainer])
     func eachPushedOrPresentedThingCoversTheSheet(cover: TripSheetCover) {
         let sheet = TripSheet(size: .lobby(tall: false))
         sheet.cover([cover], among: TripSheetCover.trip)
         #expect(!sheet.presented)
+    }
+
+    /// D110: Leave, End and Rename present from inside the lobby's sheet, as in driving: the sheet never leaves for them.
+    @MainActor @Test(arguments: [TripSheetCover.renaming, .confirmLeave, .confirmEnd])
+    func theLobbysOwnAsksKeepTheSheetUp(cover: TripSheetCover) {
+        let sheet = TripSheet(size: .lobby(tall: false))
+        sheet.cover([cover], among: TripSheetCover.trip)
+        #expect(sheet.presented)
+        // With a real cover alongside, it still steps aside.
+        sheet.cover([cover, .alwaysExplainer], among: TripSheetCover.trip)
+        #expect(!sheet.presented)
+    }
+
+    // MARK: The exit row (D110)
+
+    @Test func leaveAsksThenWorksThenExitsOnce() {
+        var exit = ExitFlow()
+        #expect(exit.phase == .idle && !exit.busy)
+        exit.ask(.leave)
+        #expect(exit.asking == .leave && !exit.busy)
+        exit.confirm(.leave)
+        #expect(exit.working == .leave && exit.busy && exit.asking == nil)
+        let first = exit.land()
+        let second = exit.land()
+        #expect(first && !second)
+    }
+
+    @Test func aFailedWriteReturnsTheRowToNormalWithTheError() {
+        var exit = ExitFlow()
+        exit.ask(.end)
+        exit.confirm(.end)
+        exit.fail("Can’t reach the server.")
+        #expect(exit.phase == .idle && !exit.busy)
+        #expect(exit.error == "Can’t reach the server.")
+        // A later try starts clean, and a write that lands after a failure doesn't exit.
+        let late = exit.land()
+        #expect(!late)
+        exit.confirm(.end)
+        #expect(exit.error == nil && exit.working == .end)
+    }
+
+    @Test func cancellingTheAskOrConfirmingTwiceChangesNothingElse() {
+        var exit = ExitFlow()
+        exit.ask(.leave)
+        exit.cancel(.leave)
+        #expect(exit.phase == .idle)
+        exit.confirm(.leave)
+        // The dialog closing after its button was tapped cancels nothing; a second confirm doesn't switch kind.
+        exit.cancel(.leave)
+        exit.confirm(.end)
+        #expect(exit.working == .leave)
+    }
+
+    @Test func endingHoldsItsProgressUntilTheRecapTakesTheScreen() {
+        var exit = ExitFlow()
+        exit.confirm(.end)
+        let exits = exit.land()
+        #expect(!exits && exit.progress == .end && exit.busy)
+    }
+
+    @Test func backIsOffWhileAWriteIsOutOrLanded() {
+        var exit = ExitFlow()
+        #expect(exit.canGoBack)
+        exit.ask(.leave)
+        #expect(exit.canGoBack)
+        exit.confirm(.leave)
+        #expect(!exit.canGoBack)
+        exit.fail("x")
+        #expect(exit.canGoBack)
+    }
+
+    @MainActor @Test func aLandedLeaveExitsOnce() async {
+        let runner = ExitRunner()
+        var exits = 0
+        let problem = await runner.run(.leave, write: {}, exit: { exits += 1 })
+        #expect(problem == nil && exits == 1)
+        // A second try after it landed writes nothing and exits nothing.
+        var writes = 0
+        await runner.run(.leave, write: { writes += 1 }, exit: { exits += 1 })
+        #expect(writes == 0 && exits == 1)
+    }
+
+    @MainActor @Test func aFailedLeaveNeverExitsAndReturnsToIdle() async {
+        struct Down: LocalizedError { var errorDescription: String? { "Can’t reach the server." } }
+        let runner = ExitRunner()
+        var exits = 0
+        let problem = await runner.run(.leave, write: { throw Down() }, exit: { exits += 1 })
+        #expect(problem == "Can’t reach the server." && exits == 0)
+        #expect(runner.flow.phase == .idle && runner.flow.error == "Can’t reach the server.")
+    }
+
+    @MainActor @Test func aWriteLandingAfterTheScreenWentExitsNothing() async {
+        let runner = ExitRunner()
+        var exits = 0
+        await runner.run(.leave, write: { runner.live = false }, exit: { exits += 1 })
+        #expect(exits == 0)
     }
 
     @MainActor @Test func aPoppedLobbyTakesItsSheetWithIt() {

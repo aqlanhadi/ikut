@@ -41,8 +41,8 @@ struct LobbyView: View {
     @State var renaming = false
     @State var renameText = ""
     @State var showChangeDestination = false
-    @State var confirmLeave = false
-    @State var confirmEnd = false
+    /// Leave trip and End trip: asked, working, done (`ExitFlow`); the asks present from inside the sheet.
+    @State var exit = ExitRunner()
     @State var isWorking = false
     @State var actionError: String?
     /// Start trip with a car not sharing yet asks first (#362).
@@ -123,6 +123,17 @@ struct LobbyView: View {
         if let ownWay { _ownWay = State(initialValue: ownWay) }
     }
     #endif
+
+    var confirmLeave: Bool {
+        get { exit.flow.asking == .leave }
+        nonmutating set { if newValue { exit.flow.ask(.leave) } else { exit.flow.cancel(.leave) } }
+    }
+    var confirmEnd: Bool {
+        get { exit.flow.asking == .end }
+        nonmutating set { if newValue { exit.flow.ask(.end) } else { exit.flow.cancel(.end) } }
+    }
+    /// A row's write is out: the others rest (the working row says so itself).
+    var busy: Bool { isWorking || exit.flow.busy }
 
     var isOrganizer: Bool { isSample ? sampleOrganizer : session.isOrganizer }
 
@@ -274,7 +285,6 @@ struct LobbyView: View {
     var covers: Set<TripSheetCover> {
         var covers = Set<TripSheetCover>()
         if showChangeDestination { covers.insert(.changeDestination) }
-        if showSuggestStops { covers.insert(.suggestStops) }
         if renaming { covers.insert(.renaming) }
         if session.alwaysExplainerShowing { covers.insert(.alwaysExplainer) }
         if confirmLeave { covers.insert(.confirmLeave) }
@@ -326,7 +336,6 @@ struct LobbyView: View {
 
     var body: some View {
         let sheetsUp = stage.sheet.up
-        let inLobby = stage.mode == .lobby
         return ZStack {
             switch TripScreenLogic.layer(in: stage.mode) {
             case .home:
@@ -380,17 +389,6 @@ struct LobbyView: View {
             syncPlanner()
         }
         .onChange(of: model.stops) { _, _ in syncPlanner() }
-        .sheet(isPresented: Binding(
-            get: { BottomSheet.presents(wanted: showSuggestStops, sheetUp: sheetsUp) }, set: { showSuggestStops = $0 })) {
-            SuggestStopsSheet(
-                model: SuggestStopsModel(
-                    line: routeInfo.coordinates.count > 1 ? RouteLine(routeInfo.coordinates) : nil,
-                    routeSeconds: routeInfo.travelTime,
-                    existing: SuggestStopsModel.existingOffsets(planner.items)),
-                summary: suggestSummary,
-                canAdd: { StopListLogic.canAdd(among: planner.items) },
-                onAdd: { addStop($0) })
-        }
         .onChange(of: model.members, initial: true) { _, _ in recordPastTrip() }
         .onChange(of: joinTownsKey, initial: true) { _, _ in askJoinTowns() }
         .task(id: model.trip?.route) {
@@ -413,20 +411,14 @@ struct LobbyView: View {
                 meetingPoint: TripSessionLogic.meetingPoint(in: model.stops), routeSeconds: trip.routeSeconds,
                 phone: { granted ? try? await RouteBuilder.currentLocation() : nil })
         }
-        // In the lobby's mode its asks present here, once its sheet has stepped aside; driving, the pulled-up sheet
-        // presents them itself (`pulledUpSections`).
-        .alert("Trip name", isPresented: Binding(
-            get: { inLobby && BottomSheet.presents(wanted: renaming, sheetUp: sheetsUp) }, set: { renaming = $0 })) {
-            renameActions
-        }
         .onAppear {
             onScreen = true
+            exit.live = true
             stage.tripLayer(of: session, onScreen: true)
             if sampleTall { setExpanded(true) }
             #if DEBUG
-            // Asked a moment after the screen is up, as a tap does: the sheet is on screen first, steps aside for the ask
-            // (`covers`), and the alert presents once it is gone. Set at appear, the sheet's own presentation and its
-            // cover race and UIKit drops the alert.
+            // Asked a moment after the screen is up, as a tap does: the sheet is on screen first and the ask presents from
+            // inside it. Set at appear, the sheet's own presentation races the ask and UIKit drops it.
             if let ask = demoAsk {
                 Task {
                     try? await Task.sleep(for: .seconds(1.5))
@@ -434,6 +426,8 @@ struct LobbyView: View {
                     case "start": confirmStart = true
                     case "leave": confirmLeave = true
                     case "end": confirmEnd = true
+                    case "leave-working": exit.flow.confirm(.leave)
+                    case "end-working": exit.flow.confirm(.end)
                     case "rename": renameText = "Balik kampung raya"; renaming = true
                     case "qr": showQR = true
                     case "action-error": actionError = "Can’t reach the server. Check your signal and try again."
@@ -450,6 +444,7 @@ struct LobbyView: View {
         // screen's model closes the trip (`TripScreenModel.exit`).
         .onDisappear {
             onScreen = false
+            exit.live = false
             stage.tripLayer(of: session, onScreen: false)
             updateListening()
         }
@@ -464,14 +459,19 @@ struct LobbyView: View {
             // Declining is fine: the background activity session keeps tracking alive on When In Use.
             AlwaysLocationExplainerView(permission: location) { _ in session.alwaysExplainerShowing = false }
         }
-        .tripExitDialogs(
-            confirmLeave: Binding(get: { inLobby && BottomSheet.presents(wanted: confirmLeave, sheetUp: sheetsUp) }, set: { confirmLeave = $0 }),
-            confirmEnd: Binding(get: { inLobby && BottomSheet.presents(wanted: confirmEnd, sheetUp: sheetsUp) }, set: { confirmEnd = $0 }),
-            leave: leaveTrip, end: endTrip)
+    }
+
+    /// Leaving and ending keep the sheet up with the row working, and only a write that landed moves on (`ExitFlow`).
+    func exitTrip(_ kind: ExitFlow.Kind, _ write: @escaping () async throws -> Void) {
+        guard exit.flow.canStart else { return }
+        actionError = nil
+        Task {
+            if let problem = await exit.run(kind, write: write, exit: onExit) { actionError = problem }
+        }
     }
 
     func leaveTrip() {
-        run {
+        exitTrip(.leave) {
             try await session.leave()
             // Past trips from now on, marked as left: a relaunch (even offline) never reopens it, and Home shows its
             // route without reading the trip or its recap, which are members-only.
@@ -482,16 +482,17 @@ struct LobbyView: View {
                     id: model.tripId, name: trip.name, destinationName: trip.destination.name,
                     destination: trip.destination.coordinate.coordinate, encodedRoute: trip.route))
             }
-            onExit()
         }
     }
 
     /// Back to trips: the trip keeps going without this screen. Its session stops as the screen's model closes the
     /// trip (`TripScreenModel.exit`), before Home takes the map, rather than whenever the view is released.
     func backToTrips() {
+        guard exit.flow.canGoBack else { return }
+        exit.live = false
         onExit()
     }
-    func endTrip() { run { try await session.endTrip() } }
+    func endTrip() { exitTrip(.end) { try await session.endTrip() } }
 
     /// Rename's field and buttons, in the lobby's alert and the pulled-up sheet's.
     @ViewBuilder var renameActions: some View {
@@ -554,18 +555,38 @@ struct LobbyView: View {
                         addStop(draft)
                         closeAddStop()
                     })
+                    .transition(.opacity)
             } else {
                 lobbyContent
+                    .transition(.opacity)
             }
         }
+        // Add a stop crossfades with the lobby in the sheet's motion, as Home's flows do.
+        .animation(Motion.sheet(reduceMotion: reduceMotion), value: adding != nil)
         .environment(\.inPanelSheet, true)
         .buttonSurface(.glass)
         .padding(.top, LobbySheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.safeAreaInsets.bottom }) { sheetSafeBottom = $0 }
+        // The sheet's own asks nest on it, as the QR code and driving's do: it never steps aside for them (D110).
         .sheet(isPresented: $showQR) {
             if let code = model.trip?.code { QRCodeSheet(code: code) }
         }
+        .sheet(isPresented: $showSuggestStops) {
+            SuggestStopsSheet(
+                model: SuggestStopsModel(
+                    line: routeInfo.coordinates.count > 1 ? RouteLine(routeInfo.coordinates) : nil,
+                    routeSeconds: routeInfo.travelTime,
+                    existing: SuggestStopsModel.existingOffsets(planner.items)),
+                summary: suggestSummary,
+                canAdd: { StopListLogic.canAdd(among: planner.items) },
+                onAdd: { addStop($0) })
+        }
+        .tripExitDialogs(
+            confirmLeave: Binding(get: { confirmLeave }, set: { confirmLeave = $0 }),
+            confirmEnd: Binding(get: { confirmEnd }, set: { confirmEnd = $0 }),
+            leave: leaveTrip, end: endTrip)
+        .alert("Trip name", isPresented: $renaming) { renameActions }
         .presentationDetents(TripScreenLogic.Sheet.lobby(compact: compact).detents, selection: Binding(
             get: { LobbySheet.detent(expanded: expanded, compact: compact) },
             set: { setExpanded(LobbySheet.isExpanded($0)) }))
@@ -637,6 +658,7 @@ struct LobbyView: View {
             styledSubtitle: sharing ? sharingSubtitle(subtitle) : nil
         ) {
             RoundGlassIconButton(systemImage: Symbol.backTrailing, label: "Back to trips", action: backToTrips)
+                .disabled(!exit.flow.canGoBack)
                 .accessibilityIdentifier(AXID.Lobby.back)
         } trailing: {
             if let trip {

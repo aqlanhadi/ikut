@@ -309,6 +309,7 @@
 		F6017A198D489282BE790269 /* HomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5BF62FE297FAF566E38721 /* HomeHeader.swift */; };
 		F6B53E2E7B17959EE85F9245 /* PanelHeaderDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */; };
 		F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519810884A2F43AD0A1C337 /* HomeView.swift */; };
+		F8DCE64D30FFB9AFB86B1E15 /* ExitFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C70CCB41C196ECA0F0858DF /* ExitFlow.swift */; };
 		F8E045C650D5F0F83C461892 /* PlaceResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF960678563AF80F4392D216 /* PlaceResultRow.swift */; };
 		FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52C0A56BCBBB39D114D5E659 /* Motion.swift */; };
 		FB51D1A672EE0EFBD53B0034 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */; };
@@ -542,6 +543,7 @@
 		9A59B3CC045531B01304008A /* BannerSlot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerSlot.swift; sourceTree = "<group>"; };
 		9B6D9175AAE37F8644EE69B0 /* AuthEmulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthEmulatorTests.swift; sourceTree = "<group>"; };
 		9B8ECEB1452E465155C7324B /* TripSessionLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSessionLogic.swift; sourceTree = "<group>"; };
+		9C70CCB41C196ECA0F0858DF /* ExitFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExitFlow.swift; sourceTree = "<group>"; };
 		9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestPlacesTests.swift; sourceTree = "<group>"; };
 		9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelHeaderDemo.swift; sourceTree = "<group>"; };
 		9EB7D8F7B36CE100D1B0BECC /* Symbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Symbol.swift; sourceTree = "<group>"; };
@@ -707,6 +709,7 @@
 			isa = PBXGroup;
 			children = (
 				1252A60E6727550F035DB2EA /* CarRow.swift */,
+				9C70CCB41C196ECA0F0858DF /* ExitFlow.swift */,
 				69F3CF9A6AAD541D8024D3F1 /* JoinTowns.swift */,
 				E803C8C9331D07C56F506F44 /* LobbyContent.swift */,
 				A934C926EBC010FFC24A37C0 /* LobbyDemo.swift */,
@@ -1448,6 +1451,7 @@
 				91048901E8ADA438604E985C /* DrivingGlance.swift in Sources */,
 				56AD3DB484BF8EFED6033D2E /* ETARefresh.swift in Sources */,
 				3238E7CD833C608EF250940E /* EventService.swift in Sources */,
+				F8DCE64D30FFB9AFB86B1E15 /* ExitFlow.swift in Sources */,
 				E54047B79F4DBB4FED8D948F /* FirestoreDecoding.swift in Sources */,
 				7FE167439E0BC891B60FF3AD /* FirestorePaths.swift in Sources */,
 				1B5E51CBAB488831512B471C /* FollowGlide.swift in Sources */,

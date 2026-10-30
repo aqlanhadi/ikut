@@ -240,9 +240,8 @@ struct PanelSheetTests {
         #expect(presented([]))
         #expect(!presented([.tripEnded]))
         #expect(!presented([.alwaysExplainer]))
-        // What the pulled-up lobby puts over the whole screen (Change destination, Suggest stops) takes it too.
+        // What the pulled-up lobby puts over the whole screen (Change destination) takes it too.
         #expect(!presented([.changeDestination]))
-        #expect(!presented([.suggestStops]))
     }
 
     @Test func theLobbysAlwaysSheetWaitsForTheConvoySheetToGo() {
