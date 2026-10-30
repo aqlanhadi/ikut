@@ -20,6 +20,13 @@ enum LobbySheet {
     /// Legal ride above it and stay put when the sheet is pulled up.
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
+    /// The one bottom padding the lobby's map and the driving map both publish (D101): the screen's bottom edge to the top
+    /// of the medium sheet, so MapKit's logo and Legal ride 10 pt above that line in both. It is the same before, during
+    /// and after Start trip (MapKit refits at once to a changed safe area, which cut the paced flight into one frame)
+    /// and never follows the driving sheet; what covers the map beyond it goes into the camera (`MapCameraRoom`), where
+    /// it animates. `scaledMedium` is the medium height at the text size (an already capped one stays as it is).
+    static func mapPadding(scaledMedium: CGFloat) -> CGFloat { legalInset(compact: compact(scaled: scaledMedium)) }
+
     /// What the lobby's sheet covers of the map for its camera (D63 C4): the medium sheet (the camera fits the trip above
     /// it, inside the map's bottom safe area); the tall one covers the map on purpose and moves nothing, so it is not a
     /// parameter. The round button under the status bar is at the top.
@@ -215,7 +222,7 @@ struct LobbyMapLayer: View {
                 input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),
                 style: TripMapStyle(onCandidateTap: onCandidateTap),
                 // The logo and Legal ride above the medium sheet from the first frame, and stay when it is pulled up.
-                bottomPadding: LobbySheet.legalInset(compact: sheetCompact),
+                bottomPadding: LobbySheet.mapPadding(scaledMedium: sheetCompact),
                 hidesControls: true))
     }
 

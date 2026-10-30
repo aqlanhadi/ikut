@@ -74,9 +74,9 @@ struct TripMapView: View {
     @State private var inputsWatch = CameraInputsWatch()
     /// The lobby sheet's medium height at this text size: the map's one bottom padding is the lobby's (D101).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
-    /// The bottom inset the map keeps as safe area, the same as the lobby's and constant (`DrivingGlance.mapPadding`).
+    /// The bottom inset the map keeps as safe area, the same as the lobby's and constant (`LobbySheet.mapPadding`).
     /// What covers the map is put into the camera (`cameraRoom`), not into this.
-    private var legalInset: CGFloat { DrivingGlance.mapPadding(mode: .driving, scaledMedium: mediumHeight) }
+    private var legalInset: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
     /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
     @State private var latitudePerPointPerMeter = 0.0
     /// The top cover (banner stack, from the map's top edge) the camera was last aimed with: where my car sits in the visible strip
@@ -312,7 +312,10 @@ struct TripMapView: View {
         let fullHeight = mapFullHeight
         guard fullHeight > 0, reading.distance > 0, reading.pitch == 0 else { return }
         let measured = latitudePerPointPerMeter
-        latitudePerPointPerMeter = reading.latitudeDelta / Double(fullHeight) / reading.distance
+        guard let scale = MapCameraRoom.latitudePerPointPerMeter(
+            latitudeDelta: reading.latitudeDelta, mapHeight: fullHeight, padding: legalInset, distance: reading.distance)
+        else { return }
+        latitudePerPointPerMeter = scale
         if measured == 0 { move(to: model.cameraTarget, animated: true, reaim: true) }
     }
 

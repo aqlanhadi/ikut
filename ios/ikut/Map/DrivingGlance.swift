@@ -3,16 +3,6 @@ import SwiftUI
 /// The small rules that keep the driving map readable at a glance (D34 piece 2a): where the Apple logo and
 /// Legal link sit, what fades or moves, how long information stays, and what stays until it is dealt with.
 enum DrivingGlance {
-    /// The map's one bottom safe area for the lobby and for driving (D101): from the screen's bottom edge to the top of
-    /// the lobby's medium sheet, so MapKit's logo and Legal ride 10 pt above that line in both. It is the same value
-    /// before, during and after Start trip: MapKit refits at once to a changed safe area, which cut the paced flight
-    /// from the lobby's whole-route view to my car into one frame. It never follows the driving sheet as it measures
-    /// or folds; what covers the map beyond it goes into the camera (`MapCameraRoom`), where it animates.
-    /// `scaledMedium` is the lobby sheet's medium height at the current text size.
-    static func mapPadding(mode: TripScreenMode, scaledMedium: CGFloat) -> CGFloat {
-        LobbySheet.legalInset(compact: LobbySheet.compact(scaled: scaledMedium))
-    }
-
     /// Follow / Fit fades out while the sheet is tall (the sheet would cut through it) and returns when folded.
     static func modeControlOpacity(panelExpanded: Bool) -> Double { panelExpanded ? 0 : 1 }
 
