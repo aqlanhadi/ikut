@@ -66,8 +66,15 @@ const position = (over = {}) => ({
 });
 const event = (over = {}) => ({
   type: 'pothole', category: 'hazard', severity: 'high', location: pt, heading: 10,
-  routeOffset: 5, authorId: 'mem', carId: 'carA', createdAt: ts(), ...over,
+  routeOffset: 5, authorId: 'mem', carId: 'carA', createdAt: ts(), expiresAt: ts(-45 * 60000), ...over,
 });
+// An event with no expiresAt at all (a status event has none).
+const eventNoExpiry = (over = {}) => {
+  const e = event(over);
+  delete e.expiresAt;
+  return e;
+};
+const farFuture = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
 
 async function seed({ ended = false } = {}) {
   await env.clearFirestore();
@@ -164,6 +171,49 @@ describe('trip startedAt is write-once', () => {
     await seed();
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc({ startedAt: ts(5000) })));
     await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { startedAt: serverTimestamp() }));
+  });
+});
+
+describe('D95: trip and event timestamps are server time or capped', () => {
+  beforeEach(() => seed());
+  const far = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
+  const createWith = async (extra) => {
+    const f = db('att');
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/d95'), tripDoc({ organizerId: 'att', createdAt: serverTimestamp(), ...extra }));
+    b.set(doc(f, 'trips/d95/members/att'), memberDoc({ role: 'organizer', displayName: 'A', carId: 'c' }));
+    return b.commit();
+  };
+  it('create with lastActivityAt in year 9999 fails', () => assertFails(createWith({ lastActivityAt: far })));
+  it('create with a client lastActivityAt of now fails, server time passes', async () => {
+    await assertFails(createWith({ lastActivityAt: ts() }));
+    await assertSucceeds(createWith({ lastActivityAt: serverTimestamp() }));
+  });
+  it('create with a client startedAt fails (even server time: Start Trip is its own write)', async () => {
+    await assertFails(createWith({ startedAt: ts(86400000) }));
+    await assertFails(createWith({ startedAt: serverTimestamp() }));
+  });
+  it('organizer cannot push lastActivityAt to year 9999 or a client time', async () => {
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: far }));
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: ts() }));
+  });
+  it('organizer bumps lastActivityAt with server time', () =>
+    assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: serverTimestamp() })));
+  it('an old bad lastActivityAt left untouched does not block other edits', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc({ lastActivityAt: far })));
+    await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'Renamed' }));
+  });
+  const ev = (id = 'new') => doc(db('mem'), `trips/${T}/events/${id}`);
+  it('hazard create with expiresAt a year away fails; the app\'s own 45 and 60 minutes pass', async () => {
+    await assertFails(setDoc(ev(), event({ expiresAt: Timestamp.fromMillis(Date.now() + 365 * 86400000) })));
+    await assertFails(setDoc(ev(), event({ expiresAt: Timestamp.fromMillis(Date.now() + 3 * 3600000) })));
+    await assertSucceeds(setDoc(ev(), event({ expiresAt: Timestamp.fromMillis(Date.now() + 45 * 60000) })));
+    await assertSucceeds(setDoc(ev('c2'), event({ category: 'condition', expiresAt: Timestamp.fromMillis(Date.now() + 60 * 60000) })));
+  });
+  it('author cannot move a hazard expiresAt to year 9999 or a day out; now passes', async () => {
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/events/ev1`), { expiresAt: far }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/events/ev1`), { expiresAt: Timestamp.fromMillis(Date.now() + 86400000) }));
+    await assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/events/ev1`), { expiresAt: ts() }));
   });
 });
 
@@ -304,7 +354,16 @@ describe('events', () => {
     await seed({ ended: true });
     await assertFails(setDoc(ev('mem'), event()));
   });
-  it('author can clear expiresAt', () => assertSucceeds(updateDoc(ev('mem', 'ev1'), { expiresAt: null })));
+  it('author can end a hazard now by moving expiresAt to now', () => assertSucceeds(updateDoc(ev('mem', 'ev1'), { expiresAt: ts() })));
+  // D95: an event with no expiresAt never expires and is never swept.
+  it('author cannot clear expiresAt to null', () => assertFails(updateDoc(ev('mem', 'ev1'), { expiresAt: null })));
+  it('author cannot delete expiresAt', () => assertFails(updateDoc(ev('mem', 'ev1'), { expiresAt: deleteField() })));
+  it('a hazard without expiresAt cannot be created', () => assertFails(setDoc(ev('mem'), eventNoExpiry())));
+  it('a condition or message without expiresAt cannot be created', async () => {
+    await assertFails(setDoc(ev('mem'), eventNoExpiry({ category: 'condition' })));
+    await assertFails(setDoc(ev('mem'), eventNoExpiry({ category: 'message', severity: 'low' })));
+  });
+  it('a status event needs no expiresAt', () => assertSucceeds(setDoc(ev('mem'), eventNoExpiry({ category: 'status', type: 'arrived' }))));
   it('author cannot change other fields', () => assertFails(updateDoc(ev('mem', 'ev1'), { message: 'edit' })));
   it('non-author cannot update expiresAt', () => assertFails(updateDoc(ev('other', 'ev1'), { expiresAt: null })));
   it('seed event authored by mem', async () => {
@@ -397,10 +456,29 @@ describe('stop requests', () => {
       assertFails(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-36 * MIN) }))));
     it('a stop request that lasts 34 minutes (clock slack) passes', () =>
       assertSucceeds(setDoc(evRef('mem', 'new'), stop({ expiresAt: ts(-34 * MIN) }))));
-    it('a hazard still needs no expiresAt', () => assertSucceeds(setDoc(evRef('mem', 'new'), event())));
+    it('a hazard needs an expiresAt too', () => assertFails(setDoc(evRef('mem', 'new'), eventNoExpiry())));
     it('a place cannot be supplied', () =>
       assertFails(setDoc(evRef('mem', 'new'), stop({ place: { name: 'R&R', coordinate: pt, routeOffset: 1, pinnedBy: 'mem' } }))));
     it('a status cannot be supplied', () => assertFails(setDoc(evRef('mem', 'new'), stop({ status: 'closed' }))));
+  });
+
+  // D95: a close sets expiresAt, which must not be far out (a stop held open, its location kept for ever).
+  describe('a close cannot keep the stop open', () => {
+    it('the asker cancelling with a year 9999 expiresAt is denied', () =>
+      assertFails(updateDoc(evRef('mem'), closed('cancelled', 'mem', { expiresAt: farFuture }))));
+    it('the organizer closing as stopped with a year 9999 expiresAt is denied', () =>
+      assertFails(updateDoc(evRef('org'), closed('stopped', 'org', { expiresAt: farFuture }))));
+    it('the lead car closing as stopped with a year 9999 expiresAt is denied', () =>
+      assertFails(updateDoc(evRef('lead'), closed('stopped', 'lead', { expiresAt: farFuture }))));
+    it('the normal closes still pass', async () => {
+      await assertSucceeds(updateDoc(evRef('mem'), closed('cancelled', 'mem')));
+      await env.withSecurityRulesDisabled(async (c) => {
+        await setDoc(doc(c.firestore(), `trips/${T}/events/stop2`), stop());
+        await setDoc(doc(c.firestore(), `trips/${T}/events/stop3`), stop());
+      });
+      await assertSucceeds(updateDoc(evRef('org', 'stop3'), closed('stopped', 'org')));
+      await assertSucceeds(updateDoc(evRef('lead', 'stop2'), closed('stopped', 'lead')));
+    });
   });
 
   describe('OK votes', () => {
