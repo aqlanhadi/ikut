@@ -16,18 +16,25 @@ enum LobbySheet {
         min(max(scaled, compactHeight), compactHeight * 1.4)
     }
 
-    /// The map's bottom safe area: from the screen's bottom edge to the top of the medium sheet, so MapKit's logo and
-    /// Legal ride above it and stay put when the sheet is pulled up.
+    /// From the screen's bottom edge to the top of the medium sheet (what the lobby's camera keeps clear; the map's
+    /// padding is lower, `mapPadding`).
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
-    /// The one bottom padding of the map on every screen (D101, D109): the screen's bottom edge to the top of the lobby's
-    /// medium sheet, so MapKit's logo and Legal ride 10 pt above that line on Home, in the lobby and while driving. The
-    /// host (`TripScreenHost`) applies it; no layer sets its own. It is the same before, during and after Start trip,
-    /// Leave, Back to trips and End (MapKit refits at once to a changed safe area, which cut the paced flight into one
-    /// frame) and a function of the text size alone, never of the mode or the sheet; what covers the map beyond it goes
-    /// into the camera (`MapCameraRoom`, `HomeSheet.createInsets`), where it animates. `scaledMedium` is the medium height
-    /// at the text size (an already capped one stays as it is).
-    static func mapPadding(scaledMedium: CGFloat) -> CGFloat { legalInset(compact: compact(scaled: scaledMedium)) }
+    /// The one bottom padding of the map on every screen (D101, D109, D114): the screen's bottom edge to the top of the
+    /// lowest sheet that ever rests there, Home's short list sheet, so MapKit's logo and Legal ride 10 pt above that line
+    /// everywhere and any taller sheet (Where to?, New trip, joining, the lobby's, one pulled up) simply covers them, as in
+    /// Apple Maps. The host (`TripScreenHost`) applies it; no layer sets its own. It is the same before, during and after
+    /// Start trip, Leave, Back to trips and End (MapKit refits at once to a changed safe area, which cut the paced flight
+    /// into one frame) and a function of the text size alone, never of the mode or the sheet; what covers the map beyond
+    /// it goes into the camera (`MapCameraRoom`, `HomeSheet.createInsets`), where it animates. `scaledMedium` is this
+    /// screen's `@ScaledMetric` of `compactHeight` (the text-size scale; the lobby's own cap is not applied, so every
+    /// layer gets the same value).
+    static func mapPadding(scaledMedium: CGFloat) -> CGFloat { HomeSheet.reach(.list, compact: homeShort(scaledMedium: scaledMedium)) }
+
+    /// Home's short sheet's height at the text size `scaledMedium` stands for; the folded convoy sheet is never lower (D114).
+    static func homeShort(scaledMedium: CGFloat) -> CGFloat {
+        HomeSheet.compact(scaled: HomeSheet.compactHeight * max(scaledMedium, 0) / compactHeight)
+    }
     /// `mapPadding` at the default text size.
     static let defaultMapPadding = mapPadding(scaledMedium: compactHeight)
 
@@ -141,7 +148,7 @@ enum LobbyMapLogic {
     }
 
     /// The fraction of the frame kept clear at the bottom: what the lobby's sheet (`cover`) covers beyond the map's one
-    /// bottom padding. Zero when the cover is the padding itself (the medium sheet at the same text size).
+    /// bottom padding. Positive for the lobby's medium sheet, which is taller than the padding (the minimum sheet).
     static func bottomFraction(mapHeight: CGFloat, safeTop: CGFloat, cover: CGFloat, bottomPadding: CGFloat) -> Double {
         Double((cover - bottomPadding) / viewport(mapHeight: mapHeight, safeTop: safeTop, bottomPadding: bottomPadding))
     }
@@ -205,6 +212,8 @@ struct LobbyMapLayer: View {
     var ownRoute: [CLLocationCoordinate2D] = []
     var ownColorHex: String = "#0A7CFF"
     var sheetCompact: CGFloat
+    /// The text-size scale for the map's one bottom padding (`LobbySheet.mapPadding`), uncapped, as every other layer reads it.
+    @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
     /// A tap on a candidate R&R's pin (its id).
     var onCandidateTap: (String) -> Void = { _ in }
     @Binding var command: LobbyMapCommand
@@ -254,7 +263,7 @@ struct LobbyMapLayer: View {
         // The one cover, written first so a fit made in the sheet's transaction reads the lobby's own (D63 C4).
         stage.cover(LobbySheet.cover(compact: sheetCompact), from: .lobby)
         let cover = stage.space.cover(in: .lobby) ?? LobbySheet.cover(compact: sheetCompact)
-        let padding = LobbySheet.mapPadding(scaledMedium: sheetCompact)
+        let padding = LobbySheet.mapPadding(scaledMedium: mediumHeight)
         let height = stage.space.frame.height, safeTop = stage.space.safeTop
         guard let region = LobbyMapLogic.region(
             for: target, route: route, pins: pins,

@@ -42,7 +42,7 @@ struct TripsHomeView: View {
     /// The short sheet's height, the same for the list and a picked trip so a pick never resizes it. Follows the
     /// text size and nothing else.
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
-    /// The lobby's medium height at the text size, for the map's one constant bottom padding (the host's, D109).
+    /// The text-size scale for the map's one constant bottom padding (the host's, D109, D114).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
     var mapPadding: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

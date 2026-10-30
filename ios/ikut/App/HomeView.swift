@@ -9,7 +9,7 @@ struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(LocationPermission.self) private var location
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The list's short sheet and the lobby's medium one at the text size: the list's reach and the map's one padding.
+    /// The list's short sheet and the text-size scale (the lobby's medium height) at the text size: the list's reach and the map's one padding (the short sheet's line, D114).
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
 

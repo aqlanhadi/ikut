@@ -594,7 +594,7 @@ final class TripScreenModel {
 struct TripScreenHost<Content: View>: View {
     @State private var stage: TripScreenModel
     private let content: Content
-    /// The lobby's medium height at the text size: all the map's one bottom padding depends on (D109).
+    /// The text-size scale: all the map's one bottom padding depends on (D109, D114).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
 
     init(mode: TripScreenMode = .lobby, makeTrip: (@MainActor (String) -> OpenTrip)? = nil,

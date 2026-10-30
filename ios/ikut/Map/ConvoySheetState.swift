@@ -47,14 +47,14 @@ struct ConvoySheetState: Equatable {
 
     /// What the layouts measure now. `room`: the map's height under the pills and banners (nil before the map is
     /// measured); `hasTopBanner`: the banner on top of the panel is there.
-    func measuredHeights(room: CGFloat?, hasTopBanner: Bool) -> PanelSheet.Heights {
+    func measuredHeights(room: CGFloat?, hasTopBanner: Bool, minShort: CGFloat = HomeSheet.compactHeight) -> PanelSheet.Heights {
         PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, bar: barContent,
-                           top: hasTopBanner ? topContent : 0, room: room)
+                           top: hasTopBanner ? topContent : 0, room: room, minShort: minShort)
     }
 
     /// What the sheet uses: the measured heights, held while it moves (`PanelSheet.settled`).
-    func heights(room: CGFloat?, hasTopBanner: Bool) -> PanelSheet.Heights {
-        appliedHeights ?? measuredHeights(room: room, hasTopBanner: hasTopBanner)
+    func heights(room: CGFloat?, hasTopBanner: Bool, minShort: CGFloat = HomeSheet.compactHeight) -> PanelSheet.Heights {
+        appliedHeights ?? measuredHeights(room: room, hasTopBanner: hasTopBanner, minShort: minShort)
     }
 
     /// The text size changed: every layout is measured again.
@@ -65,8 +65,8 @@ struct ConvoySheetState: Equatable {
     }
 
     /// The measured heights the sheet may take now, or nil when they are the ones in use already.
-    func heightsToTake(room: CGFloat?, hasTopBanner: Bool) -> PanelSheet.Heights? {
-        let next = PanelSheet.settled(appliedHeights, measured: measuredHeights(room: room, hasTopBanner: hasTopBanner),
+    func heightsToTake(room: CGFloat?, hasTopBanner: Bool, minShort: CGFloat = HomeSheet.compactHeight) -> PanelSheet.Heights? {
+        let next = PanelSheet.settled(appliedHeights, measured: measuredHeights(room: room, hasTopBanner: hasTopBanner, minShort: minShort),
                                       moving: moving)
         return next == appliedHeights ? nil : next
     }

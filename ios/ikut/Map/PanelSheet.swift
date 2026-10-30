@@ -68,13 +68,17 @@ enum PanelSheet {
     /// area, so adding it again (as Home's formula does for its own header) left about 34 pt of empty space.
     /// When the content is taller than the cap, the list scrolls under the bar and the bar stays in view.
     /// `top`: what sits above the panel at every height (the "no longer in this trip" banner), measured.
-    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, top: CGFloat = 0, room: CGFloat?) -> Heights {
+    /// `minShort` (D114): the folded sheet is never lower than Home's short sheet at this text size
+    /// (`LobbySheet.homeShort`), so the resting sheet is the same height on Home and while driving and the map's one
+    /// padding puts the logo and Legal above both; a folded list taller than that covers them. Still capped at `room`.
+    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, top: CGFloat = 0, room: CGFloat?,
+                        minShort: CGFloat = HomeSheet.compactHeight) -> Heights {
         let cap = max(room ?? .greatestFiniteMagnitude, minimumHeight)
         let barHeight = bar ?? barEstimate
         func fit(_ content: CGFloat?, _ estimate: CGFloat, bar: CGFloat = 0) -> CGFloat {
             min((content ?? estimate) + top + bar, cap).rounded()
         }
-        let short = fit(folded, foldedEstimate, bar: barHeight)
+        let short = min(max(fit(folded, foldedEstimate, bar: barHeight), minShort), cap).rounded()
         let tall = max(short, fit(unfolded, unfoldedEstimate, bar: barHeight))
         let full = room == nil ? tall + continuationEstimate : cap.rounded()
         return Heights(short: short, tall: tall, full: full)
