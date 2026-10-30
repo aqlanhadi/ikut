@@ -659,7 +659,7 @@ struct OneMapTests {
         // What the picked trip and the create steps aim with: the cover less the one padding, as fractions of the frame.
         let area = Double(874 - padding)
         #expect(TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, reach: reach, padding: padding)
-            == (Double(110 / (874 - padding)), Double(max(cover.bottom, reach) - padding) / area))
+            == (Double((LobbyMapLogic.typicalBar + TripsHomeView.markerRoom) / (874 - padding)), Double(max(cover.bottom, reach) - padding) / area))
         #expect(HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact, padding: padding).bottom
             == Double(max(HomeSheet.reach(.list, compact: compact), cover.bottom + HomeSheet.createMargin) - padding) / area)
         #expect(cover.top == 0)

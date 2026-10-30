@@ -237,6 +237,7 @@
 		AE72CCADED8DA399C9756E21 /* OurSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E829D83EBFA088CE302217 /* OurSide.swift */; };
 		AF04B2967E2DDA9303ECB310 /* RouteTimeoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */; };
 		AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01043B5C41A66BD353B61377 /* SuggestStopsSheet.swift */; };
+		AFDC7F89119C98D63362C915 /* RouteFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F972FD505779E98F561F7AA8 /* RouteFitTests.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
 		B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */; };
 		B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */; };
@@ -652,6 +653,7 @@
 		F56D59AA9467F430D986EC9F /* HomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSheet.swift; sourceTree = "<group>"; };
 		F849A1145EA5F7AF5598EF32 /* TripMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapContent.swift; sourceTree = "<group>"; };
 		F96D7D95AD4B85B47A729BFE /* DrivingGlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivingGlanceTests.swift; sourceTree = "<group>"; };
+		F972FD505779E98F561F7AA8 /* RouteFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteFitTests.swift; sourceTree = "<group>"; };
 		F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModel.swift; sourceTree = "<group>"; };
 		FBFE7C740DA188C9EC84A837 /* TrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingService.swift; sourceTree = "<group>"; };
 		FC037B2B119969C5EA87597F /* DesignInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignInventoryTests.swift; sourceTree = "<group>"; };
@@ -1114,6 +1116,7 @@
 				F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */,
 				9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */,
 				E8A4EAA8AF4570F7C844776A /* ResultFramesTests.swift */,
+				F972FD505779E98F561F7AA8 /* RouteFitTests.swift */,
 				3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */,
 				1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */,
 				6AD721BB540FF08D991143F7 /* RouteTimeoutTests.swift */,
@@ -1705,6 +1708,7 @@
 				E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */,
 				A068D03A44E44AD4E4982A1B /* RequestPlacesTests.swift in Sources */,
 				011158B3DE43983630440367 /* ResultFramesTests.swift in Sources */,
+				AFDC7F89119C98D63362C915 /* RouteFitTests.swift in Sources */,
 				E27EEADBA7C729DAEB92D7E5 /* RouteGeometryTests.swift in Sources */,
 				1940A6D8FC37BFF48FFF1F6C /* RouteRebuildTests.swift in Sources */,
 				AF04B2967E2DDA9303ECB310 /* RouteTimeoutTests.swift in Sources */,

@@ -101,15 +101,15 @@ frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
 color|#737378|737378|Join/JoinSheet.swift:390
-color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:217
-opacity|0.5||Lobby/LobbyMap.swift:307
-padding|6||Lobby/LobbyMap.swift:331
-padding|1||Lobby/LobbyMap.swift:331
-radius|6||Lobby/LobbyMap.swift:332
-font|12||Lobby/LobbyMap.swift:353
-font|11||Lobby/LobbyMap.swift:355
-font|12||Lobby/LobbyMap.swift:357
-frame|width 8, height 8||Lobby/LobbyMap.swift:359
+color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:223
+opacity|0.5||Lobby/LobbyMap.swift:316
+padding|6||Lobby/LobbyMap.swift:340
+padding|1||Lobby/LobbyMap.swift:340
+radius|6||Lobby/LobbyMap.swift:341
+font|12||Lobby/LobbyMap.swift:362
+font|11||Lobby/LobbyMap.swift:364
+font|12||Lobby/LobbyMap.swift:366
+frame|width 8, height 8||Lobby/LobbyMap.swift:368
 frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#CC450D|CC450D|Lobby/LobbyView.swift:70
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:815
@@ -156,7 +156,7 @@ color|#7C3AED|7C3AED|Trip/TripService.swift:19
 color|#BE185D|BE185D|Trip/TripService.swift:19
 color|#A16207|A16207|Trip/TripService.swift:19
 opacity|0.25||UI/GlassSurface.swift:86
-frame|minHeight 58||UI/Theme.swift:198
+frame|minHeight 58||UI/Theme.swift:206
 frame|height 28||UI/TripComponents.swift:108
 frame|width 2||UI/TripComponents.swift:233
 """

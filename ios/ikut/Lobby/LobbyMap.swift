@@ -147,7 +147,7 @@ enum LobbyMapLogic {
     /// under it, and room for the destination flag, which stands about `flagRoom` above its coordinate, so the flag
     /// lands clear of both. Before the map is measured a typical status bar and phone height stand in.
     static func topFraction(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat = 0) -> Double {
-        let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
+        let bar = bar(safeTop: safeTop) + buttonBand
         return Double((bar + flagRoom) / viewport(mapHeight: mapHeight, safeTop: safeTop, bottomPadding: bottomPadding))
     }
 
@@ -159,29 +159,35 @@ enum LobbyMapLogic {
 
     /// The part of the map MapKit fits a region inside (the map less the bottom padding), so the fractions are of it.
     private static func viewport(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat) -> CGFloat {
-        let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
+        let bar = bar(safeTop: safeTop) + buttonBand
         let measured = mapHeight - bottomPadding
         return measured > 2 * (bar + flagRoom) ? measured : 874 - bottomPadding
     }
 
     /// The status bar before it is measured.
     static let typicalBar: CGFloat = 62
+    /// The status bar height every camera keeps clear: the measured top safe area, a typical one before it is measured.
+    static func bar(safeTop: CGFloat) -> CGFloat { safeTop > 0 ? safeTop : typicalBar }
     /// Under the status bar: the gap above the round map button, the button (56 pt) and a margin below it.
-    static let buttonBand: CGFloat = Spacing.xs + 56 + Spacing.s
+    static let buttonBand: CGFloat = CornerButton.top + 56 + Spacing.xs
     /// The destination flag: its pin and name above the coordinate, with a margin.
     static let flagRoom: CGFloat = 50
+    /// Kept clear above the sheet for what hangs below the southern end of the route: the position dot's lower half and the
+    /// name under a stop's pin, so the route's start is not cut by the sheet's edge (D118).
+    static let startRoom: CGFloat = 24
     /// Degrees of latitude shown when the camera flies to one stop.
     static let stopSpan = 0.12
 
     /// Where the camera goes for `target`: a close view of the stop (nil for a stop that isn't there any more), or the
     /// whole route with its pins, in the part of the map above the sheet. Nil when there is nothing to show yet.
     static func region(for target: LobbyMapTarget, route: [CLLocationCoordinate2D], pins: [LobbyPin],
-                       bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion? {
+                       bottomObscured: Double, topObscured: Double,
+                       aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion? {
         switch target {
         case .stop(let id):
             guard let pin = pins.first(where: { $0.id == id }) else { return nil }
             return PickedTripLogic.focus(on: pin.coordinate, span: stopSpan,
-                                         bottomObscured: bottomObscured, topObscured: topObscured)
+                                         bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
         case .wholeTrip:
             let points = route + pins.filter { $0.kind != .join }.map(\.coordinate)
             guard let first = points.first else { return nil }
@@ -189,7 +195,7 @@ enum LobbyMapLogic {
             let line = PastTripRoute(
                 id: "lobby", name: "", destinationName: "", destinationLatitude: end.latitude,
                 destinationLongitude: end.longitude, points: points.map { [$0.latitude, $0.longitude] })
-            return PastTripsMapLogic.region(fitting: [line], bottomObscured: bottomObscured, topObscured: topObscured)
+            return PastTripsMapLogic.region(fitting: [line], bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
         }
     }
 
@@ -233,7 +239,7 @@ struct LobbyMapLayer: View {
             .ignoresSafeArea()
             // The one map's height and status bar (D63 C4): known before the lobby comes on screen, so its first fit is
             // already right; a later change (rotation, a call bar) refits as the layer's own measuring did.
-            .onChange(of: stage.space.frame.height) { _, _ in refitIfOurs(animated: false) }
+            .onChange(of: stage.space.screenHeight) { _, _ in refitIfOurs(animated: false) }
             .onChange(of: stage.space.safeTop) { _, _ in refitIfOurs(animated: false) }
             .onChange(of: LobbySheet.cover(compact: sheetCompact), initial: true) { _, cover in stage.cover(cover, from: .lobby) }
             .onChange(of: route.count, initial: true) { _, _ in refitIfOurs(animated: LobbyMapLogic.fitAnimates(fitted: fitted, mapHasCamera: stage.hasCamera)) }
@@ -248,8 +254,10 @@ struct LobbyMapLayer: View {
             }
             .overlay(alignment: .topTrailing) {
                 RoundGlassIconButton(systemImage: Symbol.wholeTrip, label: "Show the whole trip") { command = command.asking(.wholeTrip) }
-                .padding(.trailing, Spacing.m)
-                .padding(.top, stage.space.safeTop + Spacing.xs)
+                // The overlay already sits inside the top safe area (the status bar), so `top` is measured from it: adding
+                // `safeTop` again put the button a whole status bar too low, off the corner (D118).
+                .padding(.trailing, CornerButton.edge)
+                .padding(.top, CornerButton.top)
                 .accessibilityIdentifier(AXID.Lobby.wholeTrip)
             }
             .preference(key: TripMapSpecKey.self, value: TripMapSpec(
@@ -268,11 +276,12 @@ struct LobbyMapLayer: View {
         stage.cover(LobbySheet.cover(compact: sheetCompact), from: .lobby)
         let cover = stage.space.cover(in: .lobby) ?? LobbySheet.cover(compact: sheetCompact)
         let padding = LobbySheet.mapPadding(scaledMedium: mediumHeight, screenHeight: SheetStops.screenHeight)
-        let height = stage.space.frame.height, safeTop = stage.space.safeTop
+        let height = stage.space.screenHeight, safeTop = stage.space.safeTop
         guard let region = LobbyMapLogic.region(
             for: target, route: route, pins: pins,
-            bottomObscured: LobbyMapLogic.bottomFraction(mapHeight: height, safeTop: safeTop, cover: cover.bottom, bottomPadding: padding),
-            topObscured: LobbyMapLogic.topFraction(mapHeight: height, safeTop: safeTop, bottomPadding: padding)) else { return }
+            bottomObscured: LobbyMapLogic.bottomFraction(mapHeight: height, safeTop: safeTop, cover: cover.bottom + LobbyMapLogic.startRoom, bottomPadding: padding),
+            topObscured: LobbyMapLogic.topFraction(mapHeight: height, safeTop: safeTop, bottomPadding: padding),
+            aspect: MapFit.aspect(width: stage.space.screenWidth, height: height > 0 ? height : SheetStops.referenceScreen, padding: padding)) else { return }
         onStop = target != .wholeTrip
         fitted = true
         let position = MapCameraPosition.region(region)
@@ -283,7 +292,7 @@ struct LobbyMapLayer: View {
         } else if CameraPace.decide(flyingTo: stage.flight.destination, seen: nil, to: CameraView(region: region)) == .hold {
             // A refit for the map's measured height while flying back from driving: land on it rather than cut the
             // flight short.
-            stage.flight.hold { [stage, reduceMotion] in stage.nudge(to: position, reduceMotion: reduceMotion) }
+            stage.hold(nudgeTo: position, reduceMotion: reduceMotion)
         } else {
             stage.place(position)
         }

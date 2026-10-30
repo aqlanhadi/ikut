@@ -137,7 +137,8 @@ enum JoinSteps {
 
     /// The camera for a found code: the whole route above the sheet when there is one, else the destination, like the
     /// pin at the top of Where to?'s list.
-    static func region(for preview: TripPreview?, bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion? {
+    static func region(for preview: TripPreview?, bottomObscured: Double, topObscured: Double,
+                       aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion? {
         guard let preview else { return nil }
         let line = route(preview)
         if let end = preview.destinationCoordinate, line.count > 1 {
@@ -145,10 +146,10 @@ enum JoinSteps {
                 id: preview.tripId, name: preview.name, destinationName: preview.destinationName,
                 destinationLatitude: end.latitude, destinationLongitude: end.longitude,
                 points: line.map { [$0.latitude, $0.longitude] })
-            if let region = PickedTripLogic.fit(fitted, bottomObscured: bottomObscured, topObscured: topObscured) { return region }
+            if let region = PickedTripLogic.fit(fitted, bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect) { return region }
         }
         guard let end = preview.destinationCoordinate else { return nil }
-        return PickedTripLogic.focus(on: end.coordinate, span: 0.2, bottomObscured: bottomObscured, topObscured: topObscured)
+        return PickedTripLogic.focus(on: end.coordinate, span: 0.2, bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
     }
 
     /// What the car step shows about sharing once a car is picked, always pinned above Join (never in the scrolling list):

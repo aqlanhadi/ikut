@@ -163,14 +163,14 @@ struct NewTripSheet: View {
 extension NewTripFlow {
     /// The map region for this step: the whole route above the sheet on New trip, else the pin at the top of the
     /// list. Nil when there is nothing to show.
-    func region(bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion? {
+    func region(bottomObscured: Double, topObscured: Double, aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion? {
         if let ready {
             let route = PastTripsMapLogic.route(id: "new-trip", name: ready.place.name, destinationName: ready.place.name,
                                                 destination: ready.place.coordinate, encodedRoute: ready.route.polyline)
-            return PickedTripLogic.fit(route, bottomObscured: bottomObscured, topObscured: topObscured)
+            return PickedTripLogic.fit(route, bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
         }
         guard let target = focusTarget else { return nil }
-        return PickedTripLogic.focus(on: target.coordinate, span: 0.2, bottomObscured: bottomObscured, topObscured: topObscured)
+        return PickedTripLogic.focus(on: target.coordinate, span: 0.2, bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
     }
 
     /// Changes whenever the camera should move: the step, or the pin at the top of the list.

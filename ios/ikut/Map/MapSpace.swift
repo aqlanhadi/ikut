@@ -49,6 +49,13 @@ final class MapSpace {
     /// From the map's measured top down to the screen's bottom edge, under the home indicator (main's
     /// `mapMaxY - mapFrame.minY`): driving's camera frame. 0 before the layers are measured.
     var fullHeight: CGFloat { layer.bottomEdge > 0 ? layer.bottomEdge - frame.minY : 0 }
+    /// The screen's height, which is the height of the map MapKit fits a region inside once the one bottom padding is taken
+    /// off (D118): the map ignores the safe area, so its framed part runs from the screen's top edge, under the status
+    /// bar, to the padding. Not `frame.height` (the safe area's frame, 778 on an iPhone 17, which left every camera's
+    /// fractions of the wrong height). 0 before the layers are measured.
+    var screenHeight: CGFloat { layer.bottomEdge }
+    /// The screen's width, the map's too.
+    var screenWidth: CGFloat { frame.maxX }
     /// A layer's own height (the driving layer's `size.height` on main).
     var layerHeight: CGFloat { layer.height }
 
