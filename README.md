@@ -8,7 +8,6 @@ An iOS app that keeps a group of cars traveling together in sync: a live convoy 
 | --- | --- |
 | `ios/` | SwiftUI app (iOS 17+), bundle ID `dev.aqlan.ikut` |
 | `firebase/` | Firestore rules and indexes, Cloud Functions, emulator config (project `ikut-b1083`, asia-southeast1) |
-| `design/` | Screen designs from the design canvas (`.dc.html` source files) |
 | `qa/` | Simulated convoy drives, live demos and the battery watch ([`qa/README.md`](qa/README.md)) |
 | `tools/` | Helpers for working on tasks: start and finish a task, status, test summaries, emulators (`CLAUDE.md`, *Tools*); `tools/design-inventory.mjs` rewrites `ios/ikut/Debug/DesignInventory.swift` (the one-offs in Settings > Design, behind the name button): rerun it after a merge to refresh, `--check` says if it is stale, `--lower` lowers the ratchet ceilings (ad hoc literals, and the D78 token counts in `Debug/DesignTokenCeiling.swift`) after a piece that removes some |
 
