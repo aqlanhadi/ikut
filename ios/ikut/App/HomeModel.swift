@@ -100,6 +100,30 @@ final class HomeModel {
 
     func reloadPast(defaults: UserDefaults = .standard) { past = PastTrips.all(defaults: defaults) }
 
+    /// The words of a Delete that didn't go through (an alert on Home); nil when there's nothing to say.
+    var deleteProblem: String?
+    /// Trips whose Delete is running (the leave can take about 11 s): their rows dim and a second Delete is ignored.
+    private(set) var deletingIds: Set<String> = []
+
+    /// Delete from history (`HistoryDelete`): leaves the trip if needed, then drops the entry, its cached recap and its
+    /// route from the map. Nothing is dropped when the leave didn't land. `leave` and `removeLocal` are for tests.
+    func delete(_ entry: PastTrips.Entry,
+                leave: (String) async throws -> Bool = { try await HistoryDelete.leaveOnServer(tripId: $0) },
+                removeLocal: (PastTrips.Entry) -> Void = { HistoryDelete.removeLocalFiles($0) }) async {
+        guard deletingIds.insert(entry.id).inserted else { return }
+        defer { deletingIds.remove(entry.id) }
+        let outcome = await HistoryDelete.run(entry, leave: leave, removeLocal: removeLocal)
+        switch outcome {
+        case .removed:
+            deleteProblem = nil
+            past.removeAll { $0.id == entry.id }
+            routes.removeAll { $0.id == entry.id }
+            if picked?.entry.id == entry.id { picked = nil }
+        case .kept(let words):
+            deleteProblem = words
+        }
+    }
+
     /// Reads each trip in Now once. A trip that ended while this phone wasn't in it, or that this phone left or was
     /// removed from, is remembered as past and moves to Past trips; the others get their status line and whether they
     /// started.

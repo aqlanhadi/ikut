@@ -152,7 +152,7 @@ enum HomePickedDemo {
         let thin = PastTripsMapLogic.route(id: entry.id, name: entry.name, destinationName: snapshot.destinationName,
                                            destination: snapshot.destination, encodedRoute: snapshot.route)
         let past = [entry] + older
-        if name == "rename" || name == "rename-error" || name.hasPrefix("settings") {
+        if name == "rename" || name == "rename-error" || name.hasPrefix("settings") || name.hasPrefix("delete-") {
             var home = TripsHomeView(demo: past, routes: [thin])
             home.demoAlert = name
             return home

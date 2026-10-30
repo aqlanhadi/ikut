@@ -40,6 +40,71 @@ struct RecapLogicTests {
             positions: positions, events: events)
     }
 
+    private let summary = TripSummary(distanceMeters: 99_000, durationSeconds: 7_200, peopleCount: 5, carCount: 3, stopCount: 2,
+                                      roadReportCount: 4, summarisedAt: nil)
+
+    @Test func purgedTripReadsTheSummary() {
+        var s = snapshot(ended: 10_000)
+        s.summary = summary
+        let r = RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 8 * 86_400))
+        #expect(r.stopCount == 2 && r.roadReportCount == 4)
+        #expect(r.routeDistance == 99_000)
+        #expect(r.duration == 7_200)
+        #expect(r.peopleCount == 5 && r.carCount == 3)
+        #expect(r.subtitle.contains("3 cars") && r.subtitle.contains("5 people"))
+        let stops = r.stats.first { $0.label == "Stops" }
+        #expect(stops?.note == "2 planned stops reached")
+        #expect(r.stats.first { $0.label == "On the road" }?.note == "From Start trip")
+    }
+
+    @Test func recentOrEventfulTripsStayLive() {
+        var s = snapshot(events: [event("e1", .stopFuel, car: "c1", user: "u1", at: 5)], ended: 10_000)
+        s.summary = summary
+        // Past 7 days but the cache still has events: live numbers.
+        let cached = RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 8 * 86_400))
+        #expect(cached.stopCount == 1 && cached.duration == 10_000)
+        #expect(cached.stats.first { $0.label == "On the road" }?.note != "From Start trip")
+        // Events empty but the trip ended a day ago: not purged yet.
+        s.events = []
+        let fresh = RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 86_400))
+        #expect(fresh.stopCount == 0 && fresh.duration == 10_000 && fresh.peopleCount == 3)
+        // Purged, but no summary: zero as before.
+        s.summary = nil
+        #expect(RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 8 * 86_400)).stopCount == 0)
+    }
+
+    @Test func aSummaryWithMissingNumbersFallsBackPerNumber() {
+        var s = snapshot(ended: 10_000)
+        s.summary = TripSummary(distanceMeters: nil, durationSeconds: nil, peopleCount: nil, carCount: nil, stopCount: 1,
+                                roadReportCount: nil, summarisedAt: nil)
+        let r = RecapLogic.recap(s, now: t0.addingTimeInterval(10_000 + 8 * 86_400))
+        #expect(r.stopCount == 1 && r.peopleCount == 3 && r.carCount == 2 && r.duration == 10_000)
+    }
+
+    @Test func mergeKeepsTheCachedSummaryWhenFreshHasNone() {
+        var cached = snapshot()
+        cached.summary = summary
+        #expect(RecapLogic.merge(cached: cached, fresh: snapshot()).summary == summary)
+    }
+
+    @Test @MainActor func aTripGoneFromTheServerOpensFromTheCacheOrSaysSo() async {
+        let gone: @MainActor (String) async throws -> RecapSnapshot = { _ in throw RecapService.NotStored() }
+        let none = RecapModel(tripId: "nothing-cached-\(UUID().uuidString)", fetch: gone, persist: false)
+        await none.load(myUserId: nil)
+        #expect(none.isNotStored && none.recap == nil)
+        #expect(none.errorMessage == RecapModel.notStored)
+        let id = "cached-\(UUID().uuidString)"
+        var snap = snapshot(); snap.tripId = id
+        RecapService.save(snap)
+        defer { RecapService.removeCache(tripId: id) }
+        let kept = RecapModel(tripId: id, fetch: gone)
+        await kept.load(myUserId: nil)
+        #expect(kept.recap != nil && kept.errorMessage == nil && !kept.isNotStored)
+        let offline = RecapModel(tripId: "x-\(UUID().uuidString)", fetch: { _ in throw NSError(domain: NSURLErrorDomain, code: -1009) }, persist: false)
+        await offline.load(myUserId: nil)
+        #expect(!offline.isNotStored && offline.errorMessage == RecapModel.couldntLoad)
+    }
+
     private func pos(_ car: String, near: Bool, offset: Double?, at minutes: Double) -> RecapPosition {
         RecapPosition(carId: car, latitude: near ? dest.latitude + 0.001 : 4.0, longitude: dest.longitude,
                       convoyOffset: offset, updatedAt: t0.addingTimeInterval(minutes * 60))
