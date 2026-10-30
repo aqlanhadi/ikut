@@ -167,6 +167,49 @@ describe('trip startedAt is write-once', () => {
   });
 });
 
+describe('D95: trip and event timestamps are server time or capped', () => {
+  beforeEach(() => seed());
+  const far = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
+  const createWith = async (extra) => {
+    const f = db('att');
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/d95'), tripDoc({ organizerId: 'att', createdAt: serverTimestamp(), ...extra }));
+    b.set(doc(f, 'trips/d95/members/att'), memberDoc({ role: 'organizer', displayName: 'A', carId: 'c' }));
+    return b.commit();
+  };
+  it('create with lastActivityAt in year 9999 fails', () => assertFails(createWith({ lastActivityAt: far })));
+  it('create with a client lastActivityAt of now fails, server time passes', async () => {
+    await assertFails(createWith({ lastActivityAt: ts() }));
+    await assertSucceeds(createWith({ lastActivityAt: serverTimestamp() }));
+  });
+  it('create with a client startedAt fails (even server time: Start Trip is its own write)', async () => {
+    await assertFails(createWith({ startedAt: ts(86400000) }));
+    await assertFails(createWith({ startedAt: serverTimestamp() }));
+  });
+  it('organizer cannot push lastActivityAt to year 9999 or a client time', async () => {
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: far }));
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: ts() }));
+  });
+  it('organizer bumps lastActivityAt with server time', () =>
+    assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: serverTimestamp() })));
+  it('an old bad lastActivityAt left untouched does not block other edits', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}`), tripDoc({ lastActivityAt: far })));
+    await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'Renamed' }));
+  });
+  const ev = (id = 'new') => doc(db('mem'), `trips/${T}/events/${id}`);
+  it('hazard create with expiresAt a year away fails; the app\'s own 45 and 60 minutes pass', async () => {
+    await assertFails(setDoc(ev(), event({ expiresAt: Timestamp.fromMillis(Date.now() + 365 * 86400000) })));
+    await assertFails(setDoc(ev(), event({ expiresAt: Timestamp.fromMillis(Date.now() + 3 * 3600000) })));
+    await assertSucceeds(setDoc(ev(), event({ expiresAt: Timestamp.fromMillis(Date.now() + 45 * 60000) })));
+    await assertSucceeds(setDoc(ev('c2'), event({ category: 'condition', expiresAt: Timestamp.fromMillis(Date.now() + 60 * 60000) })));
+  });
+  it('author cannot move a hazard expiresAt to year 9999 or a day out; now passes', async () => {
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/events/ev1`), { expiresAt: far }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/events/ev1`), { expiresAt: Timestamp.fromMillis(Date.now() + 86400000) }));
+    await assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/events/ev1`), { expiresAt: ts() }));
+  });
+});
+
 describe('members', () => {
   beforeEach(() => seed());
   it('user cannot create member doc for someone else\'s trip', () =>

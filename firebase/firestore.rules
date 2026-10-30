@@ -55,6 +55,13 @@ service cloud.firestore {
       return isOrganizer(tripId) || isLeadTracker(tripId);
     }
 
+    // The furthest an event's expiresAt may be set (D95). The app's longest lifetime is an hour (conditions), written
+    // from a createdAt up to 5 minutes ahead of the server: 65 minutes at most, plus 5 for slack. Without a cap an
+    // author could set year 9999, which keeps a hazard (and its location) from ever being swept.
+    function expiryLimit() {
+      return request.time + duration.value(70, 'm');
+    }
+
     // Optional field: absent or null counts as unset.
     function optionalOf(data, key) {
       return data.get(key, null);
@@ -182,7 +189,7 @@ service cloud.firestore {
         && d.createdAt > request.time - duration.value(5, 'm')
         && d.createdAt < request.time + duration.value(5, 'm')
         && (optionalOf(d, 'expiresAt') == null
-            || (d.expiresAt is timestamp && d.expiresAt > d.createdAt))
+            || (d.expiresAt is timestamp && d.expiresAt > d.createdAt && d.expiresAt <= expiryLimit()))
         && (optionalOf(d, 'message') == null || isString(d.message, 0, 280))
         // A stop request closes itself: it must carry an expiresAt at most 30 minutes (and the
         // 5 minute clock slack) after it was asked.
@@ -205,7 +212,8 @@ service cloud.firestore {
       return d.status == 'closed'
         && d.closedReason in reasons
         && d.closedBy == request.auth.uid
-        && d.expiresAt is timestamp;
+        && d.expiresAt is timestamp
+        && d.expiresAt <= expiryLimit();
     }
 
     // An event update. Changed keys, the lead/organizer check and "is the stop open" are worked out once
@@ -223,7 +231,8 @@ service cloud.firestore {
         (mine
           && prev.category != 'stopRequest'
           && expiryOnly
-          && (optionalOf(next, 'expiresAt') == null || next.expiresAt is timestamp))
+          && (optionalOf(next, 'expiresAt') == null
+              || (next.expiresAt is timestamp && next.expiresAt <= expiryLimit())))
         // The author closes their own stop request: cancelled it, or the convoy has stopped.
         || (mine && open && closeKeys && closesStop(next, ['cancelled', 'stopped']))
         // Lead car or organizer closes a stop request: the convoy has stopped.
@@ -257,8 +266,11 @@ service cloud.firestore {
         && request.resource.data.code.matches('^[A-Z0-9]{6}$')
         && request.resource.data.createdAt == request.time
         && optionalOf(request.resource.data, 'endedAt') == null
+        // Server time only (D95): a client value (year 9999) would keep the trip from ever idle-ending, and a made-up
+        // startedAt would forge when the trip began.
         && (optionalOf(request.resource.data, 'lastActivityAt') == null
-            || request.resource.data.lastActivityAt is timestamp);
+            || request.resource.data.lastActivityAt == request.time)
+        && optionalOf(request.resource.data, 'startedAt') == null;
 
       allow update: if isSignedIn()
         && resource.data.organizerId == request.auth.uid
@@ -279,8 +291,9 @@ service cloud.firestore {
                 && request.resource.data.endedAt == request.time))
         && (request.resource.data.status == 'ended'
             || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['endedAt']))
-        && (optionalOf(request.resource.data, 'lastActivityAt') == null
-            || request.resource.data.lastActivityAt is timestamp);
+        // Changing lastActivityAt means setting it to server time (D95); an untouched value stays as it is.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastActivityAt'])
+            || optionalOf(request.resource.data, 'lastActivityAt') == request.time);
 
       // Only the organizer records when the trip first started (Start Trip); once, server time only.
       allow update: if isMember(tripId)
