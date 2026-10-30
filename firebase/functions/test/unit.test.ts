@@ -4,7 +4,7 @@ import { isIdle } from "../src/idle.ts";
 import { Timestamp } from "firebase-admin/firestore";
 import { compareKeys, cursorFromState, cursorToState, runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, TRIP_RETENTION_MS, eventExpiryCutoff, shouldDeleteTrip, shouldPurgeTripData } from "../src/retention.ts";
-import { routeDistanceMeters, summaryDurationSeconds } from "../src/summary.ts";
+import { routeDistanceMeters, summaryDurationSeconds } from "../src/summaryMath.ts";
 import { MAX_SIMPLIFY_POINTS, decodePolyline, encodePolyline, routeFrom, simplifiedRoute, thin } from "../src/previewRoute.ts";
 import { DAY_MS, recentMisses, tooManyTries, waitMs } from "../src/guessLimit.ts";
 import { CODE_ALPHABET, CODE_LENGTH, generateCode, parseCreateInput } from "../src/createTrip.ts";
@@ -557,6 +557,13 @@ describe("summaryDurationSeconds", () => {
   it("counts from the first Start Trip when there was one, else from creation", () => {
     assert.equal(summaryDurationSeconds({ createdAt: t(0), startedAt: t(1000), endedAt: t(4600) }), 3600);
     assert.equal(summaryDurationSeconds({ createdAt: t(0), endedAt: t(4600) }), 4600);
+  });
+  it("a trip ended for being idle ends at its last sign of life; a recent one is not cut", () => {
+    const idle = 12 * 3600 * 1000;
+    const trip = { createdAt: t(0), startedAt: t(100), endedAt: t(100 + 20 * 3600) };
+    assert.equal(summaryDurationSeconds(trip, (100 + 2 * 3600) * 1000, idle), 2 * 3600);
+    assert.equal(summaryDurationSeconds(trip, (100 + 10 * 3600) * 1000, idle), 20 * 3600);
+    assert.equal(summaryDurationSeconds(trip, null, idle), 20 * 3600);
   });
   it("is null when the end is not after the start, or there is no end", () => {
     assert.equal(summaryDurationSeconds({ createdAt: t(10), endedAt: t(10) }), null);

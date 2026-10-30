@@ -13,7 +13,12 @@ export const FULL_BUDGET_MS = 300_000;
 export const FULL_PAGE_SIZE = 20;
 /** Failed trips remembered for the next run. */
 export const FULL_MAX_RETRY = 100;
-/** Trips ended in the last 7 days checked for a missing summary per run. */
+/**
+ * Trips ended in the last 7 days checked for a missing summary per run. Scale: the backfill re-reads up to this many
+ * recently ended trips every day, and past about 500 ended per week a missing summary might never be filled; 100 deletes
+ * a day also caps the 90-day rule once more than 100 trips end a day. Fine at today's scale; then raise these
+ * (and give the job more than one run a day).
+ */
 export const BACKFILL_MAX = 500;
 /** Own cursor, apart from the 7-day purge's `jobState/purgeTripData`. */
 export const FULL_PURGE_STATE = "purgeTripsFull";
@@ -48,6 +53,17 @@ async function deleteTripCompletely(db: Firestore, ref: FirebaseFirestore.Docume
 }
 
 /**
+ * A trip doc that is already gone but may have left its subtree (a `recursiveDelete` that failed on a child still
+ * deletes the root): delete what is under it, its limit counters and any claim naming it. Throws if a step does.
+ */
+async function cleanUpGoneTrip(db: Firestore, ref: FirebaseFirestore.DocumentReference): Promise<void> {
+  const claims = await db.collection("codes").where("tripId", "==", ref.id).get();
+  for (const c of claims.docs) await c.ref.delete();
+  for (const col of TRIP_KEYED_LIMITS) await db.collection(col).doc(ref.id).delete();
+  await db.recursiveDelete(ref);
+}
+
+/**
  * Step A: an ended trip within the 7-day window that has no summary (it ended before the trigger was live, or the
  * trigger failed) gets one now, while its events and stops are still there. Older ones are not summarised: their
  * events are gone, so the counts would be wrong; they are simply deleted at 90 days.
@@ -70,8 +86,9 @@ export async function backfillSummaries(db: Firestore, now: Date): Promise<numbe
 /**
  * Step B: deletes trips ended more than TRIP_RETENTION_MS ago, oldest first from a cursor in `jobState/purgeTripsFull`,
  * at most `maxTrips` and `budgetMs` a run. A trip whose delete threw is retried first next run. An active trip is never
- * touched (the query is `status == ended`); an ended trip without `endedAt` is not returned by the query, and one that
- * is returned without it is logged and skipped.
+ * touched (the query is `status == ended`). An ended trip without `endedAt` is never returned by the `endedAt <` query,
+ * so it is never deleted (neither the rules nor endIdleTrips can produce one). A retried id whose trip doc is already
+ * gone still gets its subtree, claim and limit docs cleaned, and leaves the retry list only once that succeeded.
  */
 export async function purgeOldTrips(db: Firestore, now: Date = new Date(), opts: FullPurgeOptions = {}): Promise<FullPurgeResult> {
   const clock = opts.clock ?? Date.now;
@@ -90,10 +107,6 @@ export async function purgeOldTrips(db: Firestore, now: Date = new Date(), opts:
   let retryFull = false;
 
   const tryDelete = async (ref: FirebaseFirestore.DocumentReference, trip: Trip): Promise<void> => {
-    if (trip.status === "ended" && !trip.endedAt) {
-      logger.warn("purgeTripsFull: ended trip without endedAt skipped", { tripId: ref.id });
-      return;
-    }
     if (!shouldDeleteTrip(trip, now)) return;
     await deleteTripCompletely(db, ref, trip);
     result.deleted++;
@@ -105,6 +118,7 @@ export async function purgeOldTrips(db: Firestore, now: Date = new Date(), opts:
     try {
       const snap = await ref.get();
       if (snap.exists) await tryDelete(ref, snap.data() as Trip);
+      else await cleanUpGoneTrip(db, ref);
     } catch (err) {
       stillFailing.push(id);
       result.failed++;

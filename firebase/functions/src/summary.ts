@@ -1,80 +1,9 @@
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { IDLE_MS } from "./idle.js";
 import type { Trip, TripSummary } from "./model.js";
-
-/** Same sphere as ios/ikut/Route/RouteGeometry.swift `RouteLine.earthRadius`. */
-const EARTH_RADIUS = 6_371_008.8;
-
-/**
- * Strict polyline decode (precision 5), like ios/ikut/Model/Polyline.swift `decode`: a truncated or malformed string
- * gives `null` (Swift: an empty list), never a partial route, so the two sides agree on what has a distance.
- */
-export function decodeStrict(encoded: string): { lat: number; lng: number }[] | null {
-  const out: { lat: number; lng: number }[] = [];
-  let i = 0;
-  let lat = 0;
-  let lng = 0;
-  const next = (): number | null => {
-    let result = 0;
-    let shift = 0;
-    while (i < encoded.length) {
-      const b = encoded.charCodeAt(i++) - 63;
-      // 5 bits a character; past 30 bits the 32-bit math below would overflow, and no real coordinate step needs it.
-      if (b < 0 || shift >= 30) return null;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-      if (b < 0x20) return result & 1 ? ~(result >> 1) : result >> 1;
-    }
-    return null;
-  };
-  while (i < encoded.length) {
-    const dLat = next();
-    const dLng = next();
-    if (dLat === null || dLng === null) return null;
-    lat += dLat;
-    lng += dLng;
-    out.push({ lat: lat / 1e5, lng: lng / 1e5 });
-  }
-  return out;
-}
-
-function wrapLongitude(d: number): number {
-  if (d > 180) return d - 360;
-  if (d < -180) return d + 360;
-  return d;
-}
-
-/** Great-circle meters; mirrors `RouteLine.haversine`. */
-function haversine(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const lat1 = (a.lat * Math.PI) / 180;
-  const lat2 = (b.lat * Math.PI) / 180;
-  const dLat = lat2 - lat1;
-  const dLon = (wrapLongitude(b.lng - a.lng) * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-/** Mirrors `RecapLogic.routeDistance`: meters along the route, `null` for fewer than two points or a malformed string. */
-export function routeDistanceMeters(encoded: string): number | null {
-  const pts = decodeStrict(encoded);
-  if (!pts || pts.length < 2) return null;
-  let sum = 0;
-  for (let i = 0; i < pts.length - 1; i++) sum += haversine(pts[i]!, pts[i + 1]!);
-  return sum;
-}
-
-/**
- * Seconds the trip was underway: `startedAt` (the first Start Trip) to `endedAt`, or `createdAt` when it never
- * started. Like `RecapLogic.duration`, `null` unless the end is after the start. (The live recap counts from
- * `createdAt`, which for a trip planned the day before includes the waiting.)
- */
-export function summaryDurationSeconds(trip: Pick<Trip, "createdAt" | "startedAt" | "endedAt">): number | null {
-  const start = trip.startedAt ?? trip.createdAt;
-  if (!start || !trip.endedAt) return null;
-  const seconds = (trip.endedAt.toMillis() - start.toMillis()) / 1000;
-  return seconds > 0 ? seconds : null;
-}
+import { routeDistanceMeters, summaryDurationSeconds } from "./summaryMath.js";
 
 /**
  * The small summary kept after the trip's data is gone (D107): counts and two numbers, no names, no coordinates, no
@@ -84,16 +13,23 @@ export function summaryDurationSeconds(trip: Pick<Trip, "createdAt" | "startedAt
  * them); a report already swept after it expired is not counted.
  */
 export async function buildTripSummary(db: Firestore, tripRef: FirebaseFirestore.DocumentReference, trip: Trip): Promise<Omit<TripSummary, "summarisedAt">> {
-  const [members, cars, stops, hazards, conditions] = await Promise.all([
+  const newest = async (col: string, field: string): Promise<number> => {
+    const r = await tripRef.collection(col).orderBy(field, "desc").limit(1).get();
+    return r.empty ? 0 : (r.docs[0]!.get(field) as { toMillis(): number }).toMillis();
+  };
+  const [members, cars, stops, hazards, conditions, lastPosition, lastEvent] = await Promise.all([
     tripRef.collection("members").count().get(),
     tripRef.collection("cars").count().get(),
     tripRef.collection("stops").get(),
     tripRef.collection("events").where("category", "==", "hazard").count().get(),
     tripRef.collection("events").where("category", "==", "condition").count().get(),
+    newest("positions", "updatedAt"),
+    newest("events", "createdAt"),
   ]);
+  const lastActivity = Math.max(lastPosition, lastEvent, trip.lastActivityAt?.toMillis() ?? 0, trip.startedAt?.toMillis() ?? 0);
   return {
     distanceMeters: routeDistanceMeters(trip.route ?? ""),
-    durationSeconds: summaryDurationSeconds(trip),
+    durationSeconds: summaryDurationSeconds(trip, lastActivity > 0 ? lastActivity : null, IDLE_MS),
     peopleCount: members.data().count,
     carCount: cars.data().count,
     stopCount: stops.docs.filter((d) => d.get("arrivedAt") != null).length,
