@@ -251,6 +251,8 @@ enum LobbyContent {
         var canEditStops: Bool
         var canPause: Bool
         var canLeave: Bool
+        /// "Hand over and leave", the organizer's Leave trip (D106): needs another member.
+        var canHandOver: Bool
         var canEnd: Bool
         /// A participant has their own way in (D26) under the header.
         var ownWay: Bool
@@ -263,7 +265,7 @@ enum LobbyContent {
     /// Keep screen on is everyone's, so the options are always there; Leave or End only when this person can.
     static func pulledUp(_ rows: Rows) -> [PulledUpSection] {
         var sections: [PulledUpSection] = [.journey, .code, .trip, .options]
-        if rows.canEnd || rows.canLeave { sections.append(.exit) }
+        if rows.canEnd || rows.canLeave || rows.canHandOver { sections.append(.exit) }
         return sections
     }
 
@@ -284,7 +286,9 @@ enum LobbyContent {
     }
 
     /// `trackingOrPaused`: this phone is broadcasting (or paused while it was).
-    static func rows(isOrganizer: Bool, started: Bool, ended: Bool, isLiveMember: Bool, trackingOrPaused: Bool) -> Rows {
+    static func rows(
+        isOrganizer: Bool, started: Bool, ended: Bool, isLiveMember: Bool, trackingOrPaused: Bool, otherMembers: Int = 0
+    ) -> Rows {
         let canEdit = isOrganizer && isLiveMember
         return Rows(
             canRename: canEdit,
@@ -292,6 +296,7 @@ enum LobbyContent {
             canEditStops: canEdit && !started,
             canPause: trackingOrPaused && isLiveMember,
             canLeave: LobbyLogic.canLeaveTrip(isOrganizer: isOrganizer, started: started, isLiveMember: isLiveMember),
+            canHandOver: !ended && LobbyLogic.canHandOver(isOrganizer: isOrganizer, isLiveMember: isLiveMember, candidates: otherMembers),
             canEnd: isOrganizer && !ended,
             ownWay: !isOrganizer)
     }

@@ -96,9 +96,9 @@ struct LobbyTests {
         #expect(LobbyLogic.bottomBar(isOrganizer: false, isMember: false, started: true, organizerName: "Aqlan") == Bar.none)
     }
 
-    @Test func theOrganizerCanOnlyEndBeforeTheStart() {
+    @Test func theOrganizerOfALiveTripNeverJustLeaves() {
         #expect(!LobbyLogic.canLeaveTrip(isOrganizer: true, started: false, isLiveMember: true))
-        #expect(LobbyLogic.canLeaveTrip(isOrganizer: true, started: true, isLiveMember: true))
+        #expect(!LobbyLogic.canLeaveTrip(isOrganizer: true, started: true, isLiveMember: true))
         #expect(LobbyLogic.canLeaveTrip(isOrganizer: false, started: false, isLiveMember: true))
         #expect(LobbyLogic.canLeaveTrip(isOrganizer: false, started: true, isLiveMember: true))
         #expect(!LobbyLogic.canLeaveTrip(isOrganizer: false, started: true, isLiveMember: false))

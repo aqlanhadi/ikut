@@ -121,15 +121,15 @@ struct TripPullUpTests {
     // MARK: Who gets which sections
 
     private func rows(organizer: Bool, sharing: Bool = true, live: Bool = true) -> LobbyContent.Rows {
-        LobbyContent.rows(isOrganizer: organizer, started: true, ended: false, isLiveMember: live, trackingOrPaused: sharing)
+        LobbyContent.rows(isOrganizer: organizer, started: true, ended: false, isLiveMember: live, trackingOrPaused: sharing, otherMembers: 2)
     }
 
     @Test func theOrganiserAndAParticipantPullUpTheSameSectionsTheirRowsDecideTheRest() {
         #expect(LobbyContent.pulledUp(rows(organizer: true)) == [.journey, .code, .trip, .options, .exit])
         #expect(LobbyContent.pulledUp(rows(organizer: false)) == [.journey, .code, .trip, .options, .exit])
-        // Inside them the lobby's rows decide: the organiser ends and changes the destination, a participant leaves.
+        // Inside them the lobby's rows decide: the organiser ends, hands over and changes the destination, a participant leaves.
         let organiser = rows(organizer: true)
-        #expect(organiser.canEnd && organiser.canLeave && organiser.canChangeDestination && organiser.canPause)
+        #expect(organiser.canEnd && organiser.canHandOver && !organiser.canLeave && organiser.canChangeDestination && organiser.canPause)
         let participant = rows(organizer: false, sharing: false)
         #expect(!participant.canEnd && participant.canLeave && !participant.canChangeDestination && !participant.canPause)
     }

@@ -43,6 +43,14 @@ extension View {
             action: "Make a new code", destructive: false, isPresented: isPresented, perform: make)
     }
 
+    /// The organiser's hand-over (D106), asked after they picked who: the person is named in the title and the sentence.
+    func tripHandOverDialog(name: String, isPresented: Binding<Bool>, hand: @escaping () -> Void) -> some View {
+        confirmAlert(
+            "Make \(name) the organiser?",
+            message: "You’ll leave the trip, and \(name) can start it, end it and make a new code.",
+            action: "Hand over and leave", isPresented: isPresented, perform: hand)
+    }
+
     /// The two confirmations behind `TripExitMenu`; each screen passes what leaving and ending do there.
     func tripExitDialogs(
         confirmLeave: Binding<Bool>, confirmEnd: Binding<Bool>,

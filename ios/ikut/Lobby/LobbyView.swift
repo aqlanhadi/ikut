@@ -132,6 +132,10 @@ struct LobbyView: View {
         get { exit.flow.asking == .end }
         nonmutating set { if newValue { exit.flow.ask(.end) } else { exit.flow.cancel(.end) } }
     }
+    var confirmHandOver: Bool {
+        get { exit.flow.asking == .handOver }
+        nonmutating set { if !newValue { exit.flow.cancel(.handOver) } }
+    }
     var confirmNewCode: Bool {
         get { exit.flow.asking == .newCode }
         nonmutating set { if newValue { exit.flow.ask(.newCode) } else { exit.flow.cancel(.newCode) } }
@@ -263,10 +267,16 @@ struct LobbyView: View {
     var rows: LobbyContent.Rows {
         LobbyContent.rows(
             isOrganizer: isOrganizer, started: isStarted, ended: session.isEnded, isLiveMember: canLeave,
-            trackingOrPaused: session.isTracking || session.isPaused || sampleSharing)
+            trackingOrPaused: session.isTracking || session.isPaused || sampleSharing, otherMembers: handOverCandidates.count)
+    }
+    /// The members the organizer could hand the trip to (D106): everyone but them.
+    var handOverCandidates: [LobbyLogic.HandOverCandidate] {
+        LobbyLogic.handOverCandidates(
+            members: model.members, cars: model.cars, me: isSample ? (model.trip?.organizerId ?? "") : session.userId)
     }
     /// The Leave trip row: not the organizer before the start (they can only End it).
     var canLeaveTrip: Bool { rows.canLeave }
+    var canHandOver: Bool { rows.canHandOver }
     var canEnd: Bool { rows.canEnd }
     /// Rename and change destination: the organizer, before the trip ends.
     var canEdit: Bool { rows.canRename }
@@ -369,6 +379,7 @@ struct LobbyView: View {
             updateListening()
             // The asks inside the pulled-up sheet went with it (a fold, a stop request, a hazard): none comes back by
             // itself at the next pull-up.
+            if !(pulledUp || stage.mode == .lobby) { exit.flow.cancel(.handOver); exit.flow.stopPicking() }
             let asks = LobbySheet.pulledUpAsks(
                 .init(confirmLeave: confirmLeave, confirmEnd: confirmEnd, confirmNewCode: confirmNewCode, renaming: renaming, showQR: showQR),
                 continuationShown: pulledUp || stage.mode == .lobby)
@@ -434,6 +445,10 @@ struct LobbyView: View {
                     case "end": confirmEnd = true
                     case "leave-working": exit.flow.confirm(.leave)
                     case "end-working": exit.flow.confirm(.end)
+                    case "handover-pick": exit.flow.startPicking()
+                    case "handover-ask": exit.flow.startPicking(); exit.flow.choose(id: "u2", name: "Wyna")
+                    case "handover-working":
+                        exit.flow.startPicking(); exit.flow.choose(id: "u2", name: "Wyna"); exit.flow.confirm(.handOver)
                     case "new-code": confirmNewCode = true
                     case "new-code-working": exit.flow.confirm(.newCode)
                     case "rename": renameText = "Balik kampung raya"; renaming = true
@@ -478,18 +493,19 @@ struct LobbyView: View {
         }
     }
 
-    func leaveTrip() {
-        exitTrip(.leave) {
-            try await session.leave()
-            // Past trips from now on, marked as left: a relaunch (even offline) never reopens it, and Home shows its
-            // route without reading the trip or its recap, which are members-only.
-            if let trip = model.trip {
-                PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name,
-                                 endedAt: Date(), left: true)
-                PastTripsMapService.remember(PastTripsMapLogic.route(
-                    id: model.tripId, name: trip.name, destinationName: trip.destination.name,
-                    destination: trip.destination.coordinate.coordinate, encodedRoute: trip.route))
-            }
+    func leaveTrip() { exitTrip(.leave) { try await leaveTripWrites() } }
+
+    /// Leaving as a member: the session's leave, then the trip in Past trips, marked as left.
+    func leaveTripWrites() async throws {
+        try await session.leave()
+        // Past trips from now on, marked as left: a relaunch (even offline) never reopens it, and Home shows its
+        // route without reading the trip or its recap, which are members-only.
+        if let trip = model.trip {
+            PastTrips.record(tripId: model.tripId, name: trip.name, destination: trip.destination.name,
+                             endedAt: Date(), left: true)
+            PastTripsMapService.remember(PastTripsMapLogic.route(
+                id: model.tripId, name: trip.name, destinationName: trip.destination.name,
+                destination: trip.destination.coordinate.coordinate, encodedRoute: trip.route))
         }
     }
 
@@ -501,6 +517,17 @@ struct LobbyView: View {
         onExit()
     }
     func endTrip() { exitTrip(.end) { try await session.endTrip() } }
+    /// The organiser's Hand over and leave (D106): the hand-over, then leave as any member does; a failure on either
+    /// step returns the row with plain words, and a hand-over that landed with the leave failing keeps them in the trip.
+    func handOverAndLeave() {
+        guard let target = exit.flow.target else { return }
+        exitTrip(.handOver) {
+            try await TripService.handOverAndLeave(
+                to: target.name,
+                handOver: { try await TripService.handOver(tripId: model.tripId, to: target.id) },
+                leave: { try await leaveTripWrites() })
+        }
+    }
     /// The organiser's New code (D104): the same working row as Leave and End; the trip's listener brings the new code to the screen.
     func makeNewCode() { exitTrip(.newCode) { _ = try await TripService.newCode(tripId: model.tripId) } }
 
@@ -597,6 +624,9 @@ struct LobbyView: View {
             confirmEnd: Binding(get: { confirmEnd }, set: { confirmEnd = $0 }),
             leave: leaveTrip, end: endTrip)
         .tripNewCodeDialog(isPresented: Binding(get: { confirmNewCode }, set: { confirmNewCode = $0 }), make: makeNewCode)
+        .tripHandOverDialog(
+            name: exit.flow.target?.name ?? "", isPresented: Binding(get: { confirmHandOver }, set: { confirmHandOver = $0 }),
+            hand: handOverAndLeave)
         .alert("Trip name", isPresented: $renaming) { renameActions }
         .presentationDetents(TripScreenLogic.Sheet.lobby(compact: compact).detents, selection: Binding(
             get: { LobbySheet.detent(expanded: expanded, compact: compact) },

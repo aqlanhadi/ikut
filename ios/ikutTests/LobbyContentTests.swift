@@ -129,15 +129,16 @@ struct LobbyContentTests {
     @Test func theOrganiserEditsBeforeTheStartAndAParticipantOnlyReads() {
         let organiser = LobbyContent.rows(isOrganizer: true, started: false, ended: false, isLiveMember: true, trackingOrPaused: true)
         #expect(organiser == .init(canRename: true, canChangeDestination: true, canEditStops: true, canPause: true,
-                                   canLeave: false, canEnd: true, ownWay: false))
+                                   canLeave: false, canHandOver: false, canEnd: true, ownWay: false))
         let participant = LobbyContent.rows(isOrganizer: false, started: false, ended: false, isLiveMember: true, trackingOrPaused: false)
         #expect(participant == .init(canRename: false, canChangeDestination: false, canEditStops: false, canPause: false,
-                                     canLeave: true, canEnd: false, ownWay: true))
+                                     canLeave: true, canHandOver: false, canEnd: false, ownWay: true))
     }
 
-    @Test func afterTheStartTheStopsAreFixedAndTheOrganiserCanLeave() {
-        let started = LobbyContent.rows(isOrganizer: true, started: true, ended: false, isLiveMember: true, trackingOrPaused: false)
-        #expect(!started.canEditStops && started.canChangeDestination && started.canLeave && started.canEnd)
+    @Test func afterTheStartTheStopsAreFixedAndTheOrganiserHandsOverInsteadOfLeaving() {
+        let started = LobbyContent.rows(
+            isOrganizer: true, started: true, ended: false, isLiveMember: true, trackingOrPaused: false, otherMembers: 2)
+        #expect(!started.canEditStops && started.canChangeDestination && !started.canLeave && started.canHandOver && started.canEnd)
         let ended = LobbyContent.rows(isOrganizer: true, started: true, ended: true, isLiveMember: false, trackingOrPaused: true)
         #expect(!ended.canEnd && !ended.canLeave && !ended.canPause && !ended.canRename)
     }
