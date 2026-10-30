@@ -68,7 +68,7 @@ struct WhereToSheet: View {
     }
 
     /// Cancel: a glass capsule on the sheet (iOS 26), plain accent text otherwise.
-    @ViewBuilder private func glassCapsule(_ title: String, action: @escaping () -> Void) -> some View {
+    @ViewBuilder private func glassCapsule(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
             Button(action: action) { Text(title) }
                 .ikutButton(.secondary, tint: .primary)

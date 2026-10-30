@@ -264,7 +264,7 @@ struct StopArrivalCard: View {
                         confirming = false
                     }
                 } else {
-                    StopActionButton(title: "Leave", subtitle: waiting, style: .primary, id: AXID.Stop.leave) {
+                    StopActionButton(title: "Leave", subtitle: waiting.map { .verbatim($0) }, style: .primary, id: AXID.Stop.leave) {
                         couldNotLeave = false
                         confirming = true
                     }

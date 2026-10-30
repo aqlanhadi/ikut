@@ -28,7 +28,7 @@ struct ButtonSizesDemo: View {
                     row("recapSheet.done") { Button {} label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link) }
                     ForEach(["primary", "secondary", "positive", "ghost", "destructive"], id: \.self) { name in
                         row("stopCard.\(name)") {
-                            StopActionButton(title: name.capitalized, style: Self.style(name), id: AXID.Debug.sizes(name), action: {})
+                            StopActionButton(title: .verbatim(name.capitalized), style: Self.style(name), id: AXID.Debug.sizes(name), action: {})
                         }
                     }
                 }
