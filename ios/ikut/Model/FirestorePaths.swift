@@ -4,6 +4,9 @@ enum FirestorePaths {
 
     static func trip(_ tripId: String) -> String { "trips/\(tripId)" }
 
+    /// A trip's code claim (D103): created in the same batch as the trip; clients never read or change it.
+    static func code(_ code: String) -> String { "codes/\(code)" }
+
     static func cars(tripId: String) -> String { "\(trip(tripId))/cars" }
     static func car(tripId: String, carId: String) -> String { "\(cars(tripId: tripId))/\(carId)" }
 

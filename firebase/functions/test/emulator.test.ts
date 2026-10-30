@@ -692,6 +692,44 @@ describe("purgeTripData (emulator)", () => {
     assert.equal((await purgeTripData(db, NOW)).carsCleared, 0);
   });
 
+  const claim = (code: string, tripId: string) => db.collection("codes").doc(code).set({ tripId, organizerId: "org-" + code, createdAt: at(24 * 9) });
+
+  it("D103: deletes the code claim of a trip ended 8 days ago, so the code is free, and leaves the trip doc", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    const code = (await ref.get()).data()!.code as string;
+    await claim(code, ref.id);
+    const result = await purgeTripData(db, NOW);
+    assert.equal(result.failed, 0);
+    assert.equal(result.codesCleared, 1);
+    assert.equal((await db.collection("codes").doc(code).get()).exists, false);
+    assert.equal((await ref.get()).exists, true);
+    assert.equal((await purgeTripData(db, NOW)).codesCleared, 0);
+  });
+
+  it("D103: keeps the code claim of a trip ended 2 days ago and of an active trip", async () => {
+    const recent = await seedRetentionTrip({ status: "ended", endedH: 24 * 2 });
+    const active = await seedRetentionTrip({ status: "active" });
+    const codes = [(await recent.get()).data()!.code as string, (await active.get()).data()!.code as string];
+    await claim(codes[0], recent.id);
+    await claim(codes[1], active.id);
+    await purgeTripData(db, NOW);
+    for (const c of codes) assert.equal((await db.collection("codes").doc(c).get()).exists, true);
+  });
+
+  it("D103: an old trip with no claim purges fine, and a claim held by another trip with the same code is not deleted", async () => {
+    const old = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    const code = (await old.get()).data()!.code as string;
+    const result = await purgeTripData(db, NOW);
+    assert.equal(result.failed, 0);
+    assert.equal(result.codesCleared, 0);
+    const old2 = await seedRetentionTrip({ status: "ended", endedH: 24 * 9 });
+    await old2.update({ code });
+    await claim(code, "some-live-trip");
+    await resetJobState("purgeTripData");
+    await purgeTripData(db, NOW);
+    assert.equal((await db.collection("codes").doc(code).get()).exists, true);
+  });
+
   it("keeps cars' routes and push tokens on a trip ended 2 days ago", async () => {
     const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 2 });
     await addCarsAndMembers(ref);
@@ -1107,6 +1145,20 @@ describe("wrong-code limit (emulator)", () => {
     const r = await preview(a.code, u.token);
     assert.equal(r.body.error.status, "FAILED_PRECONDITION", JSON.stringify(r.body));
     assert.equal((await missesOf(u.uid)).length, 1);
+  });
+
+  it("D103: preview and join work for a trip with a code claim and for an older trip without one", async () => {
+    const u = await newUser();
+    for (const withClaim of [true, false]) {
+      const t = await seedTrip();
+      if (withClaim) await db.collection("codes").doc(t.code).set({ tripId: t.tripRef.id, organizerId: t.organizerId, createdAt: FieldValue.serverTimestamp() });
+      const p = await preview(t.code, u.token);
+      assert.equal(p.status, 200, JSON.stringify(p.body));
+      const j = await join(t.code, u.token);
+      assert.equal(j.status, 200, JSON.stringify(j.body));
+      assert.equal(j.body.result.tripId, t.tripRef.id);
+    }
+    assert.deepEqual(await missesOf(u.uid), []);
   });
 
   it("a malformed code is refused without counting", async () => {

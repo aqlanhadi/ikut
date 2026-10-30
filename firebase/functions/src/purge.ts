@@ -8,6 +8,7 @@ import {
   deleteEventsWithVotesOf,
   deleteInBatches,
   eventExpiryCutoff,
+  purgeCodeClaim,
   purgeMemberPrivates,
   purgeStopTraces,
   shouldPurgeTripData,
@@ -36,15 +37,16 @@ export interface PurgeOptions {
   clock?: () => number;
 }
 
-type PurgeCounts = { positions: number; events: number; votes: number; stops: number; answers: number; cars: number; tokens: number };
+type PurgeCounts = { positions: number; events: number; votes: number; stops: number; answers: number; cars: number; tokens: number; codes: number };
 
-/** Deletes one ended trip's positions, events (with votes) and stop traces, and clears cars' own routes and members' push tokens. Throws if any step does. */
-async function purgeOneTrip(db: Firestore, ref: FirebaseFirestore.DocumentReference): Promise<PurgeCounts> {
+/** Deletes one ended trip's positions, events (with votes) and stop traces, clears cars' own routes and members' push tokens, and deletes the trip's code claim. Throws if any step does. */
+async function purgeOneTrip(db: Firestore, ref: FirebaseFirestore.DocumentReference, trip: Trip): Promise<PurgeCounts> {
   const positions = await deleteInBatches(db, ref.collection("positions"));
   const events = await deleteEventsWithVotes(db, await ref.collection("events").listDocuments());
   const traces = await purgeStopTraces(db, ref);
   const privates = await purgeMemberPrivates(db, ref);
-  return { positions, events: events.events, votes: events.votes, stops: traces.stops, answers: traces.answers, cars: privates.cars, tokens: privates.tokens };
+  const codes = await purgeCodeClaim(db, ref, trip);
+  return { codes, positions, events: events.events, votes: events.votes, stops: traces.stops, answers: traces.answers, cars: privates.cars, tokens: privates.tokens };
 }
 
 function addCounts(result: PurgeResult, c: PurgeCounts): void {
@@ -55,8 +57,9 @@ function addCounts(result: PurgeResult, c: PurgeCounts): void {
   result.answers += c.answers;
   result.carsCleared += c.cars;
   result.tokensCleared += c.tokens;
+  result.codesCleared += c.codes;
   // Purged trips are not read again, but a retried one can be empty: count only those that had something to delete.
-  if (c.positions + c.events + c.votes + c.stops + c.answers + c.cars + c.tokens > 0) result.trips++;
+  if (c.positions + c.events + c.votes + c.stops + c.answers + c.cars + c.tokens + c.codes > 0) result.trips++;
 }
 
 /**
@@ -83,7 +86,7 @@ export async function purgeEndedTrips(db: Firestore, now: Date, result: PurgeRes
     try {
       const snap = await ref.get();
       if (snap.exists && shouldPurgeTripData(snap.data() as Trip, now)) {
-        addCounts(result, await purgeOneTrip(db, ref));
+        addCounts(result, await purgeOneTrip(db, ref, snap.data() as Trip));
       }
     } catch (err) {
       stillFailing.push(id);
@@ -97,7 +100,7 @@ export async function purgeEndedTrips(db: Firestore, now: Date, result: PurgeRes
     list: tripsList(base, "endedAt"),
     handle: async ({ item }) => {
       if (!shouldPurgeTripData(item.data() as Trip, now)) return;
-      addCounts(result, await purgeOneTrip(db, item.ref));
+      addCounts(result, await purgeOneTrip(db, item.ref, item.data() as Trip));
     },
     cursor: cursorFromState(state, PURGE_STATE, endedBefore),
     maxItems: opts.maxTrips ?? MAX_TRIPS_PER_RUN,
@@ -139,7 +142,7 @@ export async function sweepExpiredEvents(db: Firestore, now: Date, result: Purge
 }
 
 export function emptyPurgeResult(): PurgeResult {
-  return { trips: 0, failed: 0, examined: 0, more: false, stopsCleared: 0, carsCleared: 0, tokensCleared: 0, answers: 0, votes: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
+  return { trips: 0, failed: 0, examined: 0, more: false, stopsCleared: 0, carsCleared: 0, tokensCleared: 0, codesCleared: 0, answers: 0, votes: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
 }
 
 /**

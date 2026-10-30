@@ -109,6 +109,8 @@ try {
       destination: { name: 'Ipoh', coordinate: new GeoPoint(destination.latitude, destination.longitude) },
       routeSeconds: 1834.5, status: 'active', createdAt: serverTimestamp(),
     });
+    // The code claim (D103): needs the rules with codes/{code} deployed first.
+    batch.set(doc(org.db, `codes/${code}`), { tripId: tripRef.id, organizerId: org.uid, createdAt: serverTimestamp() });
     // makeOrganizerMember (:58-60)
     batch.set(doc(org.db, `trips/${tripRef.id}/members/${org.uid}`), { displayName: 'Smoke Org', carId: carRef.id, role: 'organizer' });
     await batch.commit();

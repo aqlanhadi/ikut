@@ -21,6 +21,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/trips/$(tripId)/cars/$(carId);
     }
 
+    function codePath(code) {
+      return /databases/$(database)/documents/codes/$(code);
+    }
+
     // Current trip data (before this write).
     function trip(tripId) {
       return get(tripPath(tripId)).data;
@@ -267,6 +271,24 @@ service cloud.firestore {
 
     // ---------- rules ----------
 
+    // Code claims (D103): one doc per trip code, made in the batch that creates the trip. A create only succeeds while
+    // no doc has that id, so a second trip cannot take a code that is in use. Clients never read (a doc names a trip
+    // id), update or delete one: only the purge job (admin) removes it, 7 days after its trip ended.
+    match /codes/{code} {
+      allow read, update, delete: if false;
+
+      allow create: if isSignedIn()
+        && code.matches('^[A-Z0-9]{6}$')
+        && request.resource.data.keys().hasOnly(['tripId', 'organizerId', 'createdAt'])
+        && request.resource.data.keys().hasAll(['tripId', 'organizerId', 'createdAt'])
+        && isString(request.resource.data.tripId, 1, 128)
+        && request.resource.data.organizerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && !exists(tripPath(request.resource.data.tripId))
+        && getAfter(tripPath(request.resource.data.tripId)).data.code == code
+        && getAfter(tripPath(request.resource.data.tripId)).data.organizerId == request.auth.uid;
+    }
+
     // Trips: members read; organizer creates and updates; nobody deletes.
     match /trips/{tripId} {
       allow get: if isMember(tripId);
@@ -277,6 +299,12 @@ service cloud.firestore {
         && request.resource.data.organizerId == request.auth.uid
         && request.resource.data.status == 'active'
         && request.resource.data.code.matches('^[A-Z0-9]{6}$')
+        // The code is claimed in the same batch (D103): codes/{code} is created, for this trip and this organizer. A
+        // code doc can only be created while none exists, so two trips never hold the same code (older trips have no
+        // code doc and keep working; their codes can still be copied until they end).
+        && existsAfter(codePath(request.resource.data.code))
+        && getAfter(codePath(request.resource.data.code)).data.tripId == tripId
+        && getAfter(codePath(request.resource.data.code)).data.organizerId == request.auth.uid
         && request.resource.data.createdAt == request.time
         && optionalOf(request.resource.data, 'endedAt') == null
         // Server time only (D95): a client value (year 9999) would keep the trip from ever idle-ending, and a made-up

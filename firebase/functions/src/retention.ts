@@ -39,6 +39,8 @@ export interface PurgeResult {
   carsCleared: number;
   /** Member docs of ended trips that had a pushToken cleared (the member doc stays for the recap). */
   tokensCleared: number;
+  /** Code claims (codes/{code}) of ended trips deleted, so the code can be used again (D103). */
+  codesCleared: number;
   /** Skip answers (stops/{s}/answers/{carId}: user id and time) deleted from ended trips. */
   answers: number;
   /** Stop votes (events/{e}/votes/{carId}: user id and time) deleted with their events. */
@@ -167,4 +169,18 @@ export async function purgeMemberPrivates(db: Firestore, tripRef: FirebaseFirest
   const cars = await clearFields(db, tripRef.collection("cars"), CAR_PRIVATE_FIELDS);
   const tokens = await clearFields(db, tripRef.collection("members"), MEMBER_PRIVATE_FIELDS);
   return { cars, tokens };
+}
+
+/**
+ * Deletes the trip's code claim (codes/{code}, D103) once the trip is past retention. Only a claim that names this
+ * trip is removed: a claim is created with the trip, so a doc for the same code under another trip id (an older trip
+ * made before claims existed, then a later trip with the same code) is never touched. Returns 1 if it deleted one.
+ */
+export async function purgeCodeClaim(db: Firestore, tripRef: FirebaseFirestore.DocumentReference, trip: Pick<Trip, "code">): Promise<number> {
+  if (typeof trip.code !== "string" || !/^[A-Z0-9]{6}$/.test(trip.code)) return 0;
+  const claim = db.collection("codes").doc(trip.code);
+  const snap = await claim.get();
+  if (!snap.exists || snap.get("tripId") !== tripRef.id) return 0;
+  await claim.delete();
+  return 1;
 }

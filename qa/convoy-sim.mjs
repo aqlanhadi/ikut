@@ -230,6 +230,8 @@ class Phone {
       destination: { name: TRIP.destination.name, coordinate: new GeoPoint(TRIP.destination.latitude, TRIP.destination.longitude) },
       status: 'active', createdAt: serverTimestamp(),
     });
+    // The code is claimed in the same batch (D103): codes/{code} for this trip and organizer.
+    batch.set(doc(this.db, `codes/${code}`), { tripId: this.tripId, organizerId: this.uid, createdAt: serverTimestamp() });
     batch.set(doc(this.db, `trips/${this.tripId}/members/${this.uid}`), { displayName: this.spec.displayName, carId: carRef.id, role: 'organizer' });
     await batch.commit();
     // The car goes in a second write: rules only let existing members create cars (see TripService).
