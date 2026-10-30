@@ -76,11 +76,24 @@ const eventNoExpiry = (over = {}) => {
 };
 const farFuture = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
 
+// A new trip the way the app creates it (D103): the trip and its code claim in one batch. `claim: false` leaves the claim
+// out; `claimOver` changes what the claim says; `members` adds the organizer's member doc.
+const NEW_CODE = 'NEW234';
+function tripBatch(uid, { id = 't2', trip = {}, claim = true, claimOver = {}, code = NEW_CODE, extra } = {}) {
+  const f = db(uid);
+  const b = writeBatch(f);
+  b.set(doc(f, `trips/${id}`), tripDoc({ organizerId: uid, code, createdAt: serverTimestamp(), ...trip }));
+  if (claim) b.set(doc(f, `codes/${code}`), { tripId: id, organizerId: uid, createdAt: serverTimestamp(), ...claimOver });
+  if (extra) extra(b, f);
+  return b.commit();
+}
+
 async function seed({ ended = false } = {}) {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const f = ctx.firestore();
     await setDoc(doc(f, `trips/${T}`), tripDoc({ status: ended ? 'ended' : 'active' }));
+    await setDoc(doc(f, 'codes/ABC123'), { tripId: T, organizerId: 'org', createdAt: Timestamp.now() });
     await setDoc(doc(f, `trips/${T}/members/org`), memberDoc({ displayName: 'Org', carId: 'carO', role: 'organizer' }));
     await setDoc(doc(f, `trips/${T}/members/mem`), memberDoc());
     await setDoc(doc(f, `trips/${T}/members/other`), memberDoc({ displayName: 'Oth', carId: 'carB' }));
@@ -109,28 +122,26 @@ describe('reads', () => {
 
 describe('trips', () => {
   beforeEach(() => seed());
-  it('organizer creates trip + own member doc in one batch', async () => {
-    const f = db('newOrg');
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', createdAt: serverTimestamp() }));
-    b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N' }));
-    await assertSucceeds(b.commit());
-  });
+  it('organizer creates trip + own member doc + code claim in one batch', () =>
+    assertSucceeds(tripBatch('newOrg', {
+      extra: (b, f) => b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N' })),
+    })));
   it('create with wrong organizerId fails', () =>
-    assertFails(setDoc(doc(db('x'), 'trips/t2'), tripDoc({ organizerId: 'y', createdAt: serverTimestamp() }))));
+    assertFails(tripBatch('x', { trip: { organizerId: 'y' }, claimOver: { organizerId: 'y' } })));
   it('create with bad code fails', () =>
-    assertFails(setDoc(doc(db('x'), 'trips/t2'), tripDoc({ organizerId: 'x', code: 'abc123', createdAt: serverTimestamp() }))));
-  it('create with status ended fails', () =>
-    assertFails(setDoc(doc(db('x'), 'trips/t2'), tripDoc({ organizerId: 'x', status: 'ended', createdAt: serverTimestamp() }))));
-  it('create with missing field fails', () => {
-    const d = tripDoc({ organizerId: 'x', createdAt: serverTimestamp() });
+    assertFails(tripBatch('x', { code: 'abc123' })));
+  it('create with status ended fails', () => assertFails(tripBatch('x', { trip: { status: 'ended' } })));
+  it('create with missing field fails', async () => {
+    const f = db('x');
+    const d = tripDoc({ organizerId: 'x', code: NEW_CODE, createdAt: serverTimestamp() });
     delete d.route;
-    return assertFails(setDoc(doc(db('x'), 'trips/t2'), d));
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/t2'), d);
+    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't2', organizerId: 'x', createdAt: serverTimestamp() });
+    await assertFails(b.commit());
   });
-  it('create with client createdAt fails', () =>
-    assertFails(setDoc(doc(db('x'), 'trips/t2'), tripDoc({ organizerId: 'x' }))));
-  it('unauthenticated create fails', () =>
-    assertFails(setDoc(doc(db(null), 'trips/t2'), tripDoc({ createdAt: serverTimestamp() }))));
+  it('create with client createdAt fails', () => assertFails(tripBatch('x', { trip: { createdAt: Timestamp.now() } })));
+  it('unauthenticated create fails', () => assertFails(tripBatch(null, { trip: { organizerId: 'x' } })));
   it('organizer can rename', () => assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'New' })));
   it('organizer can end trip with endedAt = request.time', () =>
     assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() })));
@@ -179,13 +190,10 @@ describe('trip startedAt is write-once', () => {
 describe('D95: trip and event timestamps are server time or capped', () => {
   beforeEach(() => seed());
   const far = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
-  const createWith = async (extra) => {
-    const f = db('att');
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/d95'), tripDoc({ organizerId: 'att', createdAt: serverTimestamp(), ...extra }));
-    b.set(doc(f, 'trips/d95/members/att'), memberDoc({ role: 'organizer', displayName: 'A', carId: 'c' }));
-    return b.commit();
-  };
+  const createWith = (extra) => tripBatch('att', {
+    id: 'd95', trip: extra,
+    extra: (b, f) => b.set(doc(f, 'trips/d95/members/att'), memberDoc({ role: 'organizer', displayName: 'A', carId: 'c' })),
+  });
   it('create with lastActivityAt in year 9999 fails', () => assertFails(createWith({ lastActivityAt: far })));
   it('create with a client lastActivityAt of now fails, server time passes', async () => {
     await assertFails(createWith({ lastActivityAt: ts() }));
@@ -232,11 +240,9 @@ describe('members', () => {
   it('member cannot set pushToken (D98: every member can read member docs; push tokens will live in an owner-only doc)', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { pushToken: 'tok' })));
   it('organizer cannot create their member doc with a pushToken', () => {
-    const f = db('newOrg');
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', createdAt: serverTimestamp() }));
-    b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N', pushToken: 'tok' }));
-    return assertFails(b.commit());
+    return assertFails(tripBatch('newOrg', {
+      extra: (b, f) => b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N', pushToken: 'tok' })),
+    }));
   });
   it('member cannot change own carId', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { carId: 'carB' })));
@@ -453,7 +459,7 @@ describe('review: impersonation and escalation', () => {
   it('cannot post an event as another user', () =>
     assertFails(setDoc(doc(db('mem'), `trips/${T}/events/e9`), event({ authorId: 'other', carId: 'carB' }))));
   it('cannot create a trip on someone else\'s behalf', () =>
-    assertFails(setDoc(doc(db('x'), 'trips/t9'), tripDoc({ organizerId: 'org' }))));
+    assertFails(tripBatch('x', { id: 't9', trip: { organizerId: 'org' }, claimOver: { organizerId: 'org' } })));
   it('member cannot list all trips', () =>
     assertFails(getDocs(collection(db('mem'), 'trips'))));
   it('a member of another trip cannot read this trip\'s events', async () => {
@@ -1197,10 +1203,7 @@ describe('guessLimits (server only)', () => {
 
 describe('D98: size caps', () => {
   beforeEach(() => seed());
-  const tripCreate = (over, destination) => {
-    const f = db('newOrg');
-    return setDoc(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', createdAt: serverTimestamp(), ...(destination ? { destination } : {}), ...over }));
-  };
+  const tripCreate = (over, destination) => tripBatch('newOrg', { trip: { ...(destination ? { destination } : {}), ...over } });
   const big = (n) => 'x'.repeat(n);
   it('a trip with ordinary text and a long real route is created', () =>
     assertSucceeds(tripCreate({ name: big(200), route: big(200000) }, { name: big(300), coordinate: pt })));
@@ -1224,4 +1227,62 @@ describe('D98: size caps', () => {
   });
   it('an event message over 280 characters is refused', () =>
     assertFails(setDoc(doc(db('mem'), `trips/${T}/events/e2`), event({ message: big(281) }))));
+});
+
+describe('D103: trip codes are unique among trips', () => {
+  beforeEach(() => seed());
+  const claimOnly = (uid, code, data) => setDoc(doc(db(uid), `codes/${code}`), data);
+
+  it('a normal create (trip and claim in one batch) passes', () => assertSucceeds(tripBatch('newOrg')));
+  it('a trip created with a code another trip holds is refused', () => assertFails(tripBatch('newOrg', { code: 'ABC123' })));
+  it('a trip created with a code still held by an ended trip is refused (the claim stays until the purge)', async () => {
+    await seed({ ended: true });
+    await assertFails(tripBatch('newOrg', { code: 'ABC123' }));
+  });
+  it('a trip created without claiming its code is refused', () => assertFails(tripBatch('newOrg', { claim: false })));
+  it('a claim naming another trip id is refused', () => assertFails(tripBatch('newOrg', { claimOver: { tripId: 'other' } })));
+  it('a claim naming another organizer is refused', () => assertFails(tripBatch('newOrg', { claimOver: { organizerId: 'org' } })));
+  it('a claim with a client createdAt, or an extra field, is refused', async () => {
+    await assertFails(tripBatch('newOrg', { claimOver: { createdAt: Timestamp.now() } }));
+    await assertFails(tripBatch('newOrg', { claimOver: { admin: true } }));
+  });
+  it('a claim whose code differs from the trip code is refused', async () => {
+    const f = db('newOrg');
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', code: 'AAA222', createdAt: serverTimestamp() }));
+    b.set(doc(f, 'codes/BBB333'), { tripId: 't2', organizerId: 'newOrg', createdAt: serverTimestamp() });
+    await assertFails(b.commit());
+  });
+  it('a claim on its own, with no trip created, is refused', () =>
+    assertFails(claimOnly('newOrg', 'LONE22', { tripId: 'nothing', organizerId: 'newOrg', createdAt: serverTimestamp() })));
+  it('a claim pointing at a trip that already exists is refused (claims are made only with a new trip)', () =>
+    assertFails(claimOnly('org', 'OLD222', { tripId: T, organizerId: 'org', createdAt: serverTimestamp() })));
+  it('a claim for a code of the wrong shape is refused', () =>
+    assertFails(tripBatch('newOrg', { code: 'abc12' })));
+  it('a trip cannot be created pointing at a claim made for another trip', async () => {
+    // Someone else holds codes/NEW234 for trip tA; a new trip tB with that code has no claim of its own.
+    await tripBatch('alice', { id: 'tA' });
+    await assertFails(tripBatch('bob', { id: 'tB', claim: false }));
+    await assertFails(tripBatch('bob', { id: 'tB' }));
+  });
+  it('two creates racing for one code: the second is refused', async () => {
+    await assertSucceeds(tripBatch('alice', { id: 'tA' }));
+    await assertFails(tripBatch('bob', { id: 'tB' }));
+  });
+  it('a client cannot read, overwrite, update or delete a code doc', async () => {
+    await assertFails(getDoc(doc(db('org'), 'codes/ABC123')));
+    await assertFails(getDoc(doc(db('stranger'), 'codes/ABC123')));
+    await assertFails(setDoc(doc(db('org'), 'codes/ABC123'), { tripId: 'tX', organizerId: 'org', createdAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db('org'), 'codes/ABC123'), { tripId: 'tX' }));
+    await assertFails(deleteDoc(doc(db('org'), 'codes/ABC123')));
+    await assertFails(deleteDoc(doc(db('stranger'), 'codes/ABC123')));
+    await assertFails(getDocs(collection(db('org'), 'codes')));
+  });
+  it('an older trip with no code doc keeps working: members read it and the organizer renames and ends it', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1'), tripDoc({ organizerId: 'org', code: 'OLD111' })));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1/members/org'), memberDoc({ role: 'organizer', carId: 'carO' })));
+    await assertSucceeds(getDoc(doc(db('org'), 'trips/old1')));
+    await assertSucceeds(updateDoc(doc(db('org'), 'trips/old1'), { name: 'Renamed' }));
+    await assertSucceeds(updateDoc(doc(db('org'), 'trips/old1'), { status: 'ended', endedAt: serverTimestamp() }));
+  });
 });
