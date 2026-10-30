@@ -27,6 +27,52 @@ struct TripServiceTests {
         #expect(codes.count > 9_990)
     }
 
+    private struct Collision: Error {}
+    private struct Down: Error {}
+
+    @Test func claimingCodeRetriesWithAFreshCodeOnACollision() async throws {
+        var codes = ["AAAAAA", "BBBBBB", "CCCCCC"].makeIterator()
+        var tried: [String] = []
+        let accepted = try await TripService.claimingCode(nextCode: { codes.next()! }, collision: { $0 is Collision }) { code in
+            tried.append(code)
+            if tried.count <= 2 { throw Collision() }
+        }
+        #expect(accepted == "CCCCCC")
+        #expect(tried == ["AAAAAA", "BBBBBB", "CCCCCC"])
+    }
+
+    @Test func claimingCodeGivesUpAfterTheBoundWithAPlainMessage() async {
+        var tries = 0
+        do {
+            _ = try await TripService.claimingCode(collision: { $0 is Collision }) { _ in tries += 1; throw Collision() }
+            Issue.record("should have thrown")
+        } catch {
+            #expect(error is TripService.CodeUnavailable)
+            #expect(error.localizedDescription == "Couldn’t set up your trip just now. Please try again.")
+        }
+        #expect(tries == TripService.codeAttempts)
+        #expect(TripService.codeAttempts == 5)
+    }
+
+    @Test func claimingCodeDoesNotRetryOtherErrors() async {
+        var tries = 0
+        do {
+            _ = try await TripService.claimingCode(collision: { $0 is Collision }) { _ in tries += 1; throw Down() }
+            Issue.record("should have thrown")
+        } catch {
+            #expect(error is Down)
+        }
+        #expect(tries == 1)
+    }
+
+    @Test func onlyPermissionDeniedCountsAsACollision() {
+        let denied = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.permissionDenied.rawValue)
+        let unavailable = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.unavailable.rawValue)
+        #expect(TripService.isCodeCollision(denied))
+        #expect(!TripService.isCodeCollision(unavailable))
+        #expect(!TripService.isCodeCollision(ServerWrite.Offline()))
+    }
+
     @Test func distanceFormatting() {
         #expect(RouteFormat.distance(205_400) == "205 km")
         #expect(RouteFormat.distance(205_600) == "206 km")

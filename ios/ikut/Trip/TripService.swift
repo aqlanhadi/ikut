@@ -79,7 +79,47 @@ enum TripService {
     /// Longer than `ServerWrite.defaultTimeout`: the first write also opens the connection.
     static let createTimeout: Duration = .seconds(15)
 
-    /// Creates the trip and the organizer's member doc in one batch, then the organizer's car.
+    /// How many codes `createTrip` tries before giving up (D103).
+    static let codeAttempts = 5
+
+    /// Raised when every code tried was turned away.
+    struct CodeUnavailable: LocalizedError {
+        var errorDescription: String? { "Couldn’t set up your trip just now. Please try again." }
+    }
+
+    /// The rules turn a trip away when its code is already claimed, and say only "permission denied" (a client can't
+    /// read the claims). That is the one error a fresh code can fix, so it is the one retried.
+    static func isCodeCollision(_ error: Error) -> Bool {
+        let ns = error as NSError
+        return ns.domain == FirestoreErrorDomain && ns.code == FirestoreErrorCode.permissionDenied.rawValue
+    }
+
+    /// Runs `attempt` with a fresh code until one is accepted, at most `attempts` times; returns the accepted code.
+    /// Only a collision (`isCodeCollision`) moves on to the next code; any other error, and an offline write, goes
+    /// straight to the caller. After the last collision it throws `CodeUnavailable`.
+    static func claimingCode(
+        isolation: isolated (any Actor)? = #isolation,
+        attempts: Int = codeAttempts,
+        nextCode: () -> String = { generateCode() },
+        collision: (Error) -> Bool = { isCodeCollision($0) },
+        _ attempt: (String) async throws -> Void
+    ) async throws -> String {
+        for _ in 0..<attempts {
+            let code = nextCode()
+            do {
+                try await attempt(code)
+                return code
+            } catch where collision(error) {
+                continue
+            }
+        }
+        throw CodeUnavailable()
+    }
+
+    /// Creates the trip, its code claim and the organizer's member doc in one batch, then the organizer's car.
+    ///
+    /// The claim (`codes/{code}`) is what keeps two trips from sharing a code: the rules only accept it while no one
+    /// holds the code. On a collision the whole batch is refused and the next try uses a new code.
     ///
     /// The car goes in a second write because the rules only let existing members create cars,
     /// and `exists()` can't see documents from the same batch.
@@ -96,21 +136,27 @@ enum TripService {
         let tripRef = db.collection(FirestorePaths.trips).document()
         let carRef = db.collection(FirestorePaths.cars(tripId: tripRef.documentID)).document()
 
-        let trip = makeTrip(
-            name: name, code: generateCode(), organizerId: organizer.id,
-            destination: destination, route: route)
+        let tripId = tripRef.documentID
         let member = makeOrganizerMember(organizer: organizer, carId: carRef.documentID)
         let car = makeOrganizerCar(
             organizer: organizer, name: carName ?? Self.carName(for: organizer.displayName),
             color: carColor ?? palette[0])
 
-        nonisolated(unsafe) let batch = db.batch()
-        try batch.setData(from: trip, forDocument: tripRef)
-        try batch.setData(
-            from: member, forDocument: db.document(FirestorePaths.member(tripId: tripRef.documentID, userId: organizer.id)))
-        // A trip the server hasn't seen can't be joined, so a queued create is a failure here.
-        guard try await ServerWrite.commit(within: createTimeout, { try await batch.commit() }) else {
-            throw ServerWrite.Offline()
+        _ = try await claimingCode { code in
+            let trip = makeTrip(
+                name: name, code: code, organizerId: organizer.id,
+                destination: destination, route: route)
+            nonisolated(unsafe) let batch = db.batch()
+            try batch.setData(from: trip, forDocument: tripRef)
+            batch.setData(
+                ["tripId": tripId, "organizerId": organizer.id, "createdAt": FieldValue.serverTimestamp()],
+                forDocument: db.document(FirestorePaths.code(code)))
+            try batch.setData(
+                from: member, forDocument: db.document(FirestorePaths.member(tripId: tripId, userId: organizer.id)))
+            // A trip the server hasn't seen can't be joined, so a queued create is a failure here.
+            guard try await ServerWrite.commit(within: createTimeout, { try await batch.commit() }) else {
+                throw ServerWrite.Offline()
+            }
         }
 
         // Encode first: `setData(from:)` has no async overload, so awaiting it wouldn't wait for the server.

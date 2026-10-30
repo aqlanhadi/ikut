@@ -1239,6 +1239,10 @@ describe('D103: trip codes are unique among trips', () => {
     await seed({ ended: true });
     await assertFails(tripBatch('newOrg', { code: 'ABC123' }));
   });
+  it('known gap: a code held only by an older trip (made before claims, no code doc) can still be taken by a new trip', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1'), tripDoc({ organizerId: 'org', code: 'OLD111' })));
+    await assertSucceeds(tripBatch('newOrg', { code: 'OLD111' }));
+  });
   it('a trip created without claiming its code is refused', () => assertFails(tripBatch('newOrg', { claim: false })));
   it('a claim naming another trip id is refused', () => assertFails(tripBatch('newOrg', { claimOver: { tripId: 'other' } })));
   it('a claim naming another organizer is refused', () => assertFails(tripBatch('newOrg', { claimOver: { organizerId: 'org' } })));
