@@ -229,8 +229,15 @@ describe('members', () => {
     assertFails(setDoc(doc(db('org'), `trips/${T}/members/stranger`), memberDoc())));
   it('member can update displayName', () =>
     assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy' })));
-  it('member can set pushToken', () =>
-    assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { pushToken: 'tok' })));
+  it('member cannot set pushToken (D98: every member can read member docs; push tokens will live in an owner-only doc)', () =>
+    assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { pushToken: 'tok' })));
+  it('organizer cannot create their member doc with a pushToken', () => {
+    const f = db('newOrg');
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', createdAt: serverTimestamp() }));
+    b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N', pushToken: 'tok' }));
+    return assertFails(b.commit());
+  });
   it('member cannot change own carId', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { carId: 'carB' })));
   it('member cannot change carId alongside allowed fields', () =>
@@ -246,6 +253,22 @@ describe('members', () => {
   it('cannot update another member', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/other`), { displayName: 'Hax' })));
   it('member can leave', () => assertSucceeds(deleteDoc(doc(db('mem'), `trips/${T}/members/mem`))));
+  it('member can leave an ended trip, and then cannot read its cars or positions', async () => {
+    await seed({ ended: true });
+    await assertSucceeds(getDoc(doc(db('mem'), `trips/${T}/cars/carA`)));
+    await assertSucceeds(deleteDoc(doc(db('mem'), `trips/${T}/members/mem`)));
+    await assertFails(getDoc(doc(db('mem'), `trips/${T}/cars/carA`)));
+    await assertFails(getDoc(doc(db('mem'), `trips/${T}/positions/carA`)));
+  });
+  it('the organizer cannot remove another member from an ended trip, only leave themselves', async () => {
+    await seed({ ended: true });
+    await assertFails(deleteDoc(doc(db('org'), `trips/${T}/members/mem`)));
+    await assertSucceeds(deleteDoc(doc(db('org'), `trips/${T}/members/org`)));
+  });
+  it('a stranger cannot delete a member doc of an ended trip', async () => {
+    await seed({ ended: true });
+    await assertFails(deleteDoc(doc(db('stranger'), `trips/${T}/members/mem`)));
+  });
   it('organizer can remove a member', () => assertSucceeds(deleteDoc(doc(db('org'), `trips/${T}/members/mem`))));
   it('member cannot remove another member', () => assertFails(deleteDoc(doc(db('mem'), `trips/${T}/members/other`))));
 });
@@ -1169,4 +1192,35 @@ describe('guessLimits (server only)', () => {
     await assertFails(getDoc(doc(db(null), 'guessLimits/mem')));
     await assertFails(deleteDoc(doc(db(null), 'guessLimits/mem')));
   });
+});
+
+describe('D98: size caps', () => {
+  beforeEach(() => seed());
+  const tripCreate = (over, destination) => {
+    const f = db('newOrg');
+    return setDoc(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', createdAt: serverTimestamp(), ...(destination ? { destination } : {}), ...over }));
+  };
+  const big = (n) => 'x'.repeat(n);
+  it('a trip with ordinary text and a long real route is created', () =>
+    assertSucceeds(tripCreate({ name: big(200), route: big(200000) }, { name: big(300), coordinate: pt })));
+  it('a trip name over 200 characters is refused', () => assertFails(tripCreate({ name: big(201) })));
+  it('a destination name over 300 characters is refused', () => assertFails(tripCreate({}, { name: big(301), coordinate: pt })));
+  it('a trip route over 200,000 characters is refused', () => assertFails(tripCreate({ route: big(200001) })));
+  it('the organizer cannot grow the route or name of the trip past the caps', async () => {
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { route: big(200001) }));
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { name: big(201) }));
+    await assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { route: big(200000) }));
+  });
+  it('a car name over 100 or colour over 32 characters is refused', async () => {
+    await assertFails(setDoc(doc(db('solo'), `trips/${T}/cars/carS`), carDoc({ name: big(101) })));
+    await assertFails(setDoc(doc(db('solo'), `trips/${T}/cars/carS`), carDoc({ color: big(33) })));
+    await assertSucceeds(setDoc(doc(db('solo'), `trips/${T}/cars/carS`), carDoc({ name: big(100), color: big(32) })));
+  });
+  it('a car route over 200,000 characters is refused on create and on the tracker\'s update', async () => {
+    await assertFails(setDoc(doc(db('solo'), `trips/${T}/cars/carS`), carDoc({ route: big(200001) })));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/cars/carA`), { route: big(200001) }));
+    await assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/cars/carA`), { route: big(200000) }));
+  });
+  it('an event message over 280 characters is refused', () =>
+    assertFails(setDoc(doc(db('mem'), `trips/${T}/events/e2`), event({ message: big(281) }))));
 });

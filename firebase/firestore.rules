@@ -76,13 +76,23 @@ service cloud.firestore {
       return v is number;
     }
 
+    // Size caps (D98). Every one is well above anything the app writes; they only stop a member filling a document
+    // with junk that every member then downloads. Measured: the app's polyline encoding is about 50 characters per km
+    // (osrm-main: 65 km, 915 points, 3,091 characters), so 200,000 characters is about 4,000 km at full detail, far
+    // beyond a day's drive; Firestore's own document limit (1 MiB) is the next wall. previewTrip also thins what it
+    // decodes (previewRoute.ts), so even a route at the cap costs milliseconds.
+    function routeOk(v) {
+      return v is string && v.size() <= 200000;
+    }
+
     function validTripShape(d) {
       return d.keys().hasOnly(['name', 'code', 'organizerId', 'route', 'destination',
                                'status', 'createdAt', 'lastActivityAt', 'endedAt', 'startedAt',
                                'routeSeconds', 'stopCount'])
         && d.keys().hasAll(['name', 'code', 'organizerId', 'route', 'destination', 'status', 'createdAt'])
-        && d.name is string
-        && d.route is string
+        && isString(d.name, 0, 200)
+        && isString(d.organizerId, 1, 128)
+        && routeOk(d.route)
         && (optionalOf(d, 'routeSeconds') == null || (d.routeSeconds is number && d.routeSeconds >= 0))
         && (optionalOf(d, 'stopCount') == null || (d.stopCount is int && d.stopCount >= 0 && d.stopCount <= 20))
         && validDestination(d.destination);
@@ -92,15 +102,15 @@ service cloud.firestore {
       return v is map
         && v.keys().hasOnly(['name', 'coordinate'])
         && v.keys().hasAll(['name', 'coordinate'])
-        && v.name is string
+        && isString(v.name, 0, 300)
         && v.coordinate is latlng;
     }
 
     function validCarFields(d) {
-      return d.name is string
-        && d.color is string
+      return isString(d.name, 0, 100)
+        && isString(d.color, 0, 32)
         && d.state in ['joining', 'convoy']
-        && (optionalOf(d, 'route') == null || d.route is string)
+        && (optionalOf(d, 'route') == null || routeOk(d.route))
         && (optionalOf(d, 'mergeOffset') == null || d.mergeOffset is number)
         && (optionalOf(d, 'number') == null
             || (d.number is int && d.number >= 1 && d.number <= 99));
@@ -183,8 +193,8 @@ service cloud.firestore {
         && d.location is latlng
         && d.heading is number
         && d.routeOffset is number
-        && d.authorId is string
-        && d.carId is string
+        && isString(d.authorId, 1, 128)
+        && isString(d.carId, 1, 128)
         && d.createdAt is timestamp
         && d.createdAt > request.time - duration.value(5, 'm')
         && d.createdAt < request.time + duration.value(5, 'm')
@@ -316,27 +326,25 @@ service cloud.firestore {
           && userId == request.auth.uid
           && getAfter(tripPath(tripId)).data.organizerId == request.auth.uid
           && getAfter(tripPath(tripId)).data.status == 'active'
-          && request.resource.data.keys().hasOnly(['displayName', 'carId', 'role', 'pushToken'])
+          && request.resource.data.keys().hasOnly(['displayName', 'carId', 'role'])
           && request.resource.data.keys().hasAll(['displayName', 'carId', 'role'])
           && request.resource.data.role == 'organizer'
           && isString(request.resource.data.displayName, 1, 30)
-          && request.resource.data.carId is string
-          && (optionalOf(request.resource.data, 'pushToken') == null
-              || request.resource.data.pushToken is string);
+          && isString(request.resource.data.carId, 1, 128);
 
         // carId is never changed by a client; only joinTrip (admin SDK) moves a member between cars.
         allow update: if isMember(tripId)
           && userId == request.auth.uid
           && tripActive(tripId)
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['displayName', 'pushToken'])
-          && isString(request.resource.data.displayName, 1, 30)
-          && (optionalOf(request.resource.data, 'pushToken') == null
-              || request.resource.data.pushToken is string);
+               .hasOnly(['displayName'])
+          && isString(request.resource.data.displayName, 1, 30);
 
+        // A member may leave at any time, an ended trip too (D98): leaving ends their read access to the trip's cars and
+        // positions during the 7 days before the purge. Removing someone else stays with the organizer of an active trip.
         allow delete: if isMember(tripId)
-          && tripActive(tripId)
-          && (userId == request.auth.uid || isOrganizer(tripId));
+          && (userId == request.auth.uid
+              || (tripActive(tripId) && isOrganizer(tripId)));
       }
 
       // Cars: a member creates only the car their own member doc names (carId), so one member makes at most

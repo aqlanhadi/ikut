@@ -4,7 +4,7 @@ import { isIdle } from "../src/idle.ts";
 import { Timestamp } from "firebase-admin/firestore";
 import { compareKeys, cursorFromState, cursorToState, runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
-import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
+import { MAX_SIMPLIFY_POINTS, decodePolyline, encodePolyline, routeFrom, simplifiedRoute, thin } from "../src/previewRoute.ts";
 import { DAY_MS, recentMisses, tooManyTries, waitMs } from "../src/guessLimit.ts";
 import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
@@ -206,6 +206,30 @@ describe("simplifiedRoute", () => {
   });
   it("gives an empty line for nothing readable", () => {
     for (const bad of ["", undefined, 5, "?"]) assert.equal(simplifiedRoute(bad), "");
+  });
+});
+
+describe("simplifiedRoute on a crafted route (D98)", () => {
+  // A zigzag swinging up to 0.2 degrees (22 km) every point: the worst shape for Douglas-Peucker, which on 20,000
+  // points took 26 s before the points were thinned.
+  const zigzag = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ latitude: 3 + (i % 2 ? 1 : -1) * i * 1e-5, longitude: 101 + i * 1e-4 }));
+  for (const n of [5_000, 20_000, 100_000]) {
+    it(`answers a ${n}-point zigzag within half a second, with at most 400 points`, () => {
+      const encoded = encodePolyline(zigzag(n));
+      const t = Date.now();
+      const out = decodePolyline(simplifiedRoute(encoded));
+      assert.ok(Date.now() - t < 500, `${Date.now() - t} ms`);
+      assert.ok(out.length >= 2 && out.length <= 400, `${out.length} points`);
+    });
+  }
+  it("thins evenly, keeping the first and last point, and leaves a short line alone", () => {
+    const pts = zigzag(10_000);
+    const t = thin(pts, MAX_SIMPLIFY_POINTS);
+    assert.ok(t.length <= MAX_SIMPLIFY_POINTS + 1);
+    assert.equal(t[0], pts[0]);
+    assert.equal(t[t.length - 1], pts[pts.length - 1]);
+    assert.equal(thin(pts.slice(0, 100), MAX_SIMPLIFY_POINTS).length, 100);
   });
 });
 

@@ -663,6 +663,43 @@ describe("purgeTripData (emulator)", () => {
     assert.equal((await ref.get()).data()!.status, "ended");
   });
 
+  async function addCarsAndMembers(ref: FirebaseFirestore.DocumentReference) {
+    await ref.collection("cars").doc("lead").set({ name: "Lead", color: "blue", isLead: true, state: "convoy", number: 1, trackerUserId: "org", route: "_p~iF~ps|U", mergeOffset: 1200 });
+    await ref.collection("cars").doc("plain").set({ name: "Plain", color: "green", isLead: false, state: "convoy", number: 2 });
+    await ref.collection("members").doc("org").set({ displayName: "Aqlan", carId: "lead", role: "organizer", pushToken: "PUSH-1" });
+    await ref.collection("members").doc("m1").set({ displayName: "Siti", carId: "plain", role: "member" });
+  }
+
+  it("clears each car's own route and mergeOffset and each member's pushToken on a trip ended 8 days ago, keeping the docs the recap reads", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 8 });
+    await ref.update({ route: "MAIN-ROUTE" });
+    await addCarsAndMembers(ref);
+    const result = await purgeTripData(db, NOW);
+    assert.equal(result.failed, 0);
+    assert.equal(result.carsCleared, 1);
+    assert.equal(result.tokensCleared, 1);
+    const lead = (await ref.collection("cars").doc("lead").get()).data()!;
+    assert.equal("route" in lead, false);
+    assert.equal("mergeOffset" in lead, false);
+    assert.deepEqual([lead.name, lead.color, lead.isLead, lead.number], ["Lead", "blue", true, 1]);
+    assert.equal((await ref.collection("cars").doc("plain").get()).data()!.name, "Plain");
+    const org = (await ref.collection("members").doc("org").get()).data()!;
+    assert.equal("pushToken" in org, false);
+    assert.deepEqual([org.displayName, org.carId, org.role], ["Aqlan", "lead", "organizer"]);
+    assert.equal((await ref.collection("members").doc("m1").get()).data()!.displayName, "Siti");
+    // The trip's main route stays for the recap.
+    assert.equal((await ref.get()).data()!.route, "MAIN-ROUTE");
+    assert.equal((await purgeTripData(db, NOW)).carsCleared, 0);
+  });
+
+  it("keeps cars' routes and push tokens on a trip ended 2 days ago", async () => {
+    const ref = await seedRetentionTrip({ status: "ended", endedH: 24 * 2 });
+    await addCarsAndMembers(ref);
+    await purgeTripData(db, NOW);
+    assert.equal((await ref.collection("cars").doc("lead").get()).data()!.route, "_p~iF~ps|U");
+    assert.equal((await ref.collection("members").doc("org").get()).data()!.pushToken, "PUSH-1");
+  });
+
   it("deletes an active trip's event that expired 2 hours ago", async () => {
     const ref = await seedRetentionTrip({ status: "active" });
     await addEvent(ref, "expired", at(2));

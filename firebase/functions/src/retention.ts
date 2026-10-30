@@ -35,6 +35,10 @@ export interface PurgeResult {
   trips: number;
   /** Planned stops of ended trips that had arrivedAt, leftAt or leftBy cleared. */
   stopsCleared: number;
+  /** Cars of ended trips that had their own route and mergeOffset cleared (the car doc stays for the recap). */
+  carsCleared: number;
+  /** Member docs of ended trips that had a pushToken cleared (the member doc stays for the recap). */
+  tokensCleared: number;
   /** Skip answers (stops/{s}/answers/{carId}: user id and time) deleted from ended trips. */
   answers: number;
   /** Stop votes (events/{e}/votes/{carId}: user id and time) deleted with their events. */
@@ -129,4 +133,37 @@ export async function purgeStopTraces(db: Firestore, tripRef: FirebaseFirestore.
   let answers = 0;
   for (const d of stops.docs) answers += await deleteInBatches(db, d.ref.collection("answers"));
   return { stops: cleared, answers };
+}
+
+/** The car fields that hold where a member's own drive began (often their home); cleared with the positions. */
+export const CAR_PRIVATE_FIELDS = ["route", "mergeOffset"] as const;
+/** The member field that identifies a phone for push; cleared with the positions. */
+export const MEMBER_PRIVATE_FIELDS = ["pushToken"] as const;
+
+/** Deletes `fields` from every doc of `col` that has any of them, in batches; returns how many docs were written. */
+async function clearFields(db: Firestore, col: FirebaseFirestore.CollectionReference, fields: readonly string[]): Promise<number> {
+  const snap = await col.get();
+  let cleared = 0;
+  let batch = db.batch();
+  let pending = 0;
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (!fields.some((f) => f in data)) continue;
+    batch.update(d.ref, Object.fromEntries(fields.map((f) => [f, FieldValue.delete()])));
+    cleared++;
+    if (++pending === BATCH_SIZE) { await batch.commit(); batch = db.batch(); pending = 0; }
+  }
+  if (pending > 0) await batch.commit();
+  return cleared;
+}
+
+/**
+ * Clears each car's own `route` and `mergeOffset` (a route often starts at the member's home) and each member's
+ * `pushToken`. The car and member docs stay: the recap reads the car's name, colour, number and lead flag, and each
+ * member's name and car. The trip's main route stays too (the recap draws it; it starts at the meeting point).
+ */
+export async function purgeMemberPrivates(db: Firestore, tripRef: FirebaseFirestore.DocumentReference): Promise<{ cars: number; tokens: number }> {
+  const cars = await clearFields(db, tripRef.collection("cars"), CAR_PRIVATE_FIELDS);
+  const tokens = await clearFields(db, tripRef.collection("members"), MEMBER_PRIVATE_FIELDS);
+  return { cars, tokens };
 }
