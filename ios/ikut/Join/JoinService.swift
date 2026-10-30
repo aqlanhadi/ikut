@@ -131,13 +131,17 @@ enum JoinService {
 
     /// "Too many wrong codes. Wait 4 minutes and try again."; hours when long; past 12 hours it is the daily cap.
     static func tooManyGuesses(retryAfterSeconds seconds: Int) -> String {
-        let minutes = max(1, Int((Double(seconds) / 60).rounded(.up)))
         if seconds > 12 * 3600 { return "Too many wrong codes. Try again tomorrow." }
-        let wait: String
-        if minutes <= 1 { wait = "a minute" }
-        else if minutes < 90 { wait = "\(minutes) minutes" }
-        else { let h = Int((Double(minutes) / 60).rounded(.up)); wait = h == 1 ? "an hour" : "\(h) hours" }
-        return "Too many wrong codes. Wait \(wait) and try again."
+        return "Too many wrong codes. Wait \(waitPhrase(seconds: seconds)) and try again."
+    }
+
+    /// "a minute", "4 minutes", "an hour", "3 hours": the wait a limit message names (also used by creating a trip).
+    static func waitPhrase(seconds: Int) -> String {
+        let minutes = max(1, Int((Double(seconds) / 60).rounded(.up)))
+        if minutes <= 1 { return "a minute" }
+        if minutes < 90 { return "\(minutes) minutes" }
+        let h = Int((Double(minutes) / 60).rounded(.up))
+        return h == 1 ? "an hour" : "\(h) hours"
     }
 
     static func map(_ error: Error) -> JoinError {

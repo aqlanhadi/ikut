@@ -19,12 +19,6 @@ export function loadRoutes() {
   return { mainCoords: toLine(main.coordinates), car4Coords: toLine(car4.coordinates) };
 }
 
-/** A trip code: 6 characters from TripService.codeAlphabet (no 0, 1, I, L, O). */
-export function generateCode() {
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
-}
-
 export const GPX_EPOCH = '2026-10-18T09:00:00Z';
 export const DURATION = 900; // seconds of drive
 export const FIX_HZ = 1;

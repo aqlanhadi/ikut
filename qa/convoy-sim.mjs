@@ -50,7 +50,7 @@ import { httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
-import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, generateCode, loadRoutes, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, loadRoutes, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
 import { ON_ROUTE_TOLERANCE, distinctValues, rebuildRoute, staleReads, syntheticTrack, townDetour } from './lib/rebuild.mjs';
 import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referenceId, relativeDistance, spokenStopRequest, togetherPairs } from './lib/farahead.mjs';
 import { tally as stopTally } from './lib/stoparrival.mjs';
@@ -219,25 +219,22 @@ class Phone {
     this.tripId = tripId;
   }
 
-  // ---- TripService.createTrip (ios/ikut/Trip/TripService.swift)
-  async createTrip(code) {
-    const tripRef = doc(collection(this.db, 'trips'));
-    this.tripId = tripRef.id;
-    const carRef = doc(collection(this.db, `trips/${this.tripId}/cars`));
-    const batch = writeBatch(this.db);
-    batch.set(tripRef, {
-      name: TRIP.name, code, organizerId: this.uid, route: tripPolyline,
-      destination: { name: TRIP.destination.name, coordinate: new GeoPoint(TRIP.destination.latitude, TRIP.destination.longitude) },
-      status: 'active', createdAt: serverTimestamp(),
-    });
-    // The code is claimed in the same batch (D103): codes/{code} for this trip and organizer.
-    batch.set(doc(this.db, `codes/${code}`), { tripId: this.tripId, organizerId: this.uid, createdAt: serverTimestamp() });
-    batch.set(doc(this.db, `trips/${this.tripId}/members/${this.uid}`), { displayName: this.spec.displayName, carId: carRef.id, role: 'organizer' });
-    await batch.commit();
+  // ---- TripService.createTrip (ios/ikut/Trip/TripService.swift, D108): the createTrip callable picks the code and writes
+  // the trip, the organizer's member doc and the code claim; returns the code.
+  async createTrip() {
+    const carId = doc(collection(this.db, 'trips')).id; // a fresh id; the car is made under the new trip below
+    const res = (await httpsCallable(this.fns, 'createTrip')({
+      name: TRIP.name, route: tripPolyline,
+      destination: { name: TRIP.destination.name, latitude: TRIP.destination.latitude, longitude: TRIP.destination.longitude },
+      organizerName: this.spec.displayName, carId,
+    })).data;
+    this.tripId = res.tripId;
+    const carRef = doc(this.db, `trips/${this.tripId}/cars/${carId}`);
     // The car goes in a second write: rules only let existing members create cars (see TripService).
     await setDoc(carRef, { name: this.spec.name, color: this.spec.color, trackerUserId: this.uid, isLead: true, state: 'convoy', number: 1 });
     this.carId = carRef.id;
     this.state = 'convoy';
+    return res.code;
   }
 
   // ---- JoinService.join (ios/ikut/Join/JoinService.swift): callable joinTrip, new car, tracker true
@@ -561,14 +558,12 @@ function segmentIndexAtOffset(route, offset) {
   return lo;
 }
 
-// TripService.codeAlphabet: A-Z and 2-9 without O, I, L.
 // ---------------------------------------------------------------- main
 
 async function main() {
   const specs = CARS.filter((c) => c.kind !== 'app');
   const phones = new Map(specs.map((s) => [s.key, new Phone(s)]));
   const organizer = phones.get('car1');
-  const code = generateCode();
 
   const slowed = dropGap && speedAt(dropGap.from) < opts.speed ? ` (${speedAt(dropGap.from)}x during car 2's signal drop)` : '';
   console.log(`ikut convoy simulator, project ${PROJECT_ID}, emulators on ${opts.host}, speed ${opts.speed}x${slowed}, about ${Math.round(wallAt(RUN) / 60)} min`);
@@ -576,7 +571,7 @@ async function main() {
 
   // ---- setup
   await organizer.connect();
-  await organizer.createTrip(code);
+  const code = await organizer.createTrip();
   for (const spec of specs.slice(1)) {
     const p = phones.get(spec.key);
     await p.connect();

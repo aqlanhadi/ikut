@@ -20,7 +20,6 @@ import {
 } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { endsWithResult } from './lib/shell.mjs';
-import { generateCode } from './lib/scenario.mjs';
 import { Polyline, destinationPoint, haversine } from './lib/route.mjs';
 
 const emulators = process.argv.includes('--emulators');
@@ -73,8 +72,8 @@ async function mustBeDenied(label, fn) {
   }
 }
 
-const code = generateCode();
-console.log(`${emulators ? 'EMULATORS, ' : ''}project ${config.projectId}, trip code ${code}`);
+let code = null; // picked by the server (createTrip)
+console.log(`${emulators ? 'EMULATORS, ' : ''}project ${config.projectId}`);
 
 // A 30 km line going north from the organiser's start, a point every km; the meeting point is the 8th (8 km in), so
 // the preview's route starts there, not at the organiser's start.
@@ -88,6 +87,7 @@ const destination = points[30];
 let org;
 let guest;
 let tripRef = null;
+let carRef = null;
 let tripMade = false;
 let started = false;
 let ended = false;
@@ -98,25 +98,36 @@ try {
   org = await client('smoke-organizer');
   check(Boolean(org.uid), 'organizer signed in anonymously');
 
-  // TripService.createTrip (ios/ikut/Trip/TripService.swift:72-107, makeTrip :43-56): the trip with routeSeconds and
-  // the organizer's member in one batch, then the car.
-  tripRef = doc(collection(org.db, 'trips'));
-  const carRef = doc(collection(org.db, `trips/${tripRef.id}/cars`));
-  await step('Create trip (name, code, route, routeSeconds, member) as the app writes it', async () => {
-    const batch = writeBatch(org.db);
-    batch.set(tripRef, {
-      name: 'Trip to Ipoh', code, organizerId: org.uid, route,
+  // TripService.createTrip (ios/ikut/Trip/TripService.swift, D108): the createTrip callable picks the code and writes the
+  // trip (with routeSeconds), the organizer's member and the code claim; the app then writes the car with the id it sent.
+  // Clients may no longer create a trip or a claim themselves (needs the functions deployed before the rules).
+  const carId = doc(collection(org.db, 'trips')).id;
+  await mustBeDenied('a client create of a trip is refused (the server makes trips)', () =>
+    setDoc(doc(collection(org.db, 'trips')), {
+      name: 'Probe', code: 'PROBE2', organizerId: org.uid, route,
       destination: { name: 'Ipoh', coordinate: new GeoPoint(destination.latitude, destination.longitude) },
-      routeSeconds: 1834.5, status: 'active', createdAt: serverTimestamp(),
-    });
-    // The code claim (D103): needs the rules with codes/{code} deployed first.
-    batch.set(doc(org.db, `codes/${code}`), { tripId: tripRef.id, organizerId: org.uid, createdAt: serverTimestamp() });
-    // makeOrganizerMember (:58-60)
-    batch.set(doc(org.db, `trips/${tripRef.id}/members/${org.uid}`), { displayName: 'Smoke Org', carId: carRef.id, role: 'organizer' });
-    await batch.commit();
+      status: 'active', createdAt: serverTimestamp(),
+    }));
+  await mustBeDenied('a client create of a code claim is refused', () =>
+    setDoc(doc(org.db, 'codes/PROBE3'), { tripId: 'x', organizerId: org.uid, createdAt: serverTimestamp() }));
+  await step('Create trip through the createTrip callable (returns only the trip id and the code)', async () => {
+    const res = (await httpsCallable(org.fns, 'createTrip')({
+      name: 'Trip to Ipoh', route, routeSeconds: 1834.5,
+      destination: { name: 'Ipoh', latitude: destination.latitude, longitude: destination.longitude },
+      organizerName: 'Smoke Org', carId,
+    })).data;
+    check(Object.keys(res).sort().join() === 'code,tripId', 'createTrip returns only tripId and code', Object.keys(res).join());
+    check(/^[A-HJKMNP-Z2-9]{6}$/.test(res.code), 'the code is 6 characters of the app alphabet', res.code);
+    tripRef = doc(org.db, `trips/${res.tripId}`);
+    code = res.code;
     tripMade = true;
-    return tripRef.id;
+    return res.tripId;
   });
+  carRef = doc(org.db, `trips/${tripRef.id}/cars/${carId}`);
+  const made = (await getDoc(tripRef)).data();
+  check(made?.code === code && made?.organizerId === org.uid && made?.routeSeconds === 1834.5 && made?.status === 'active',
+    'the trip holds the code, the organizer, routeSeconds and is active', `${made?.code} ${made?.routeSeconds}`);
+  console.log(`trip code ${code}`);
   // makeOrganizerCar (:62-66), written second because the rules need the member first (:101-105)
   await step('Create the organizer car (lead, convoy, number 1)', () =>
     setDoc(carRef, { name: "Smoke Org's car", color: '#2563EB', trackerUserId: org.uid, isLead: true, state: 'convoy', number: 1 }));
