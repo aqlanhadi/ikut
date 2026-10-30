@@ -97,7 +97,7 @@ struct StopMessageTile: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: "text.bubble.fill")
+            Image(systemName: Symbol.message)
                 .font(.body)
                 .foregroundStyle(Color.surfaceSecondary)
                 .accessibilityHidden(true)
@@ -164,9 +164,9 @@ struct StopVoterRow: View {
         StopActionButton(title: "You said OK", style: .positive, id: "y") {}
         StopActionButton(title: "Back", style: .ghost, id: "g") {}
         HStack(spacing: Spacing.m) {
-            StopReasonIcon(symbol: "fuelpump.fill")
-            StopReasonIcon(symbol: "fork.knife", size: 40)
-            StopReasonIcon(symbol: "toilet.fill", size: 34)
+            StopReasonIcon(symbol: Symbol.fuel)
+            StopReasonIcon(symbol: Symbol.food, size: 40)
+            StopReasonIcon(symbol: Symbol.toilet, size: 34)
         }
         StopMessageTile(text: "Low on fuel, next R&R please")
     }

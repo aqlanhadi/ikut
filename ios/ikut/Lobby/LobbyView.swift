@@ -635,7 +635,7 @@ struct LobbyView: View {
             subtitle: LobbyContent.subtitleWords(subtitle, sharing: sharing), subtitleIdentifier: AXID.Lobby.subtitle,
             styledSubtitle: sharing ? sharingSubtitle(subtitle) : nil
         ) {
-            RoundGlassIconButton(systemImage: "chevron.backward", label: "Back to trips", action: backToTrips)
+            RoundGlassIconButton(systemImage: Symbol.backTrailing, label: "Back to trips", action: backToTrips)
                 .accessibilityIdentifier(AXID.Lobby.back)
         } trailing: {
             if let trip {
@@ -649,7 +649,7 @@ struct LobbyView: View {
 
     /// "➤ Sharing · To Ipoh · code K7M 2QX": the arrow and Sharing in the positive green (#394).
     func sharingSubtitle(_ rest: String?) -> Text {
-        let lead = Text("\(Image(systemName: "location.fill")) \(LobbyContent.sharingWord)")
+        let lead = Text("\(Image(systemName: Symbol.location)) \(LobbyContent.sharingWord)")
             .foregroundStyle(Color.ikutPositive).fontWeight(.semibold)
         guard let rest else { return lead }
         return lead + Text(" · \(rest)")

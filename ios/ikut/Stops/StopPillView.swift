@@ -15,7 +15,7 @@ struct StopPillView: View {
             case .confirm(let symbol, let title, let detail):
                 slim(symbol: symbol, title: title, detail: detail, id: AXID.Stop.pillConfirm)
             case .asked(let title, let detail):
-                slim(symbol: "checkmark", title: title, detail: detail, id: AXID.Stop.pillAsked)
+                slim(symbol: Symbol.tick, title: title, detail: detail, id: AXID.Stop.pillAsked)
             }
         }
         .elevation(.floating)

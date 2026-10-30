@@ -12,19 +12,19 @@ struct ButtonSizesDemo: View {
             VStack(alignment: .leading, spacing: Spacing.l) {
                 block("Plain screen (filled)", surface: .plain) {
                     row("welcome.getStarted") { Button {} label: { Text("Get started").frame(maxWidth: .infinity) }.ikutButton(.primary) }
-                    row("welcome.join") { Button {} label: { Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity) }.ikutButton(.link) }
+                    row("welcome.join") { Button {} label: { Label("Join with a code", systemImage: Symbol.qrCode).frame(maxWidth: .infinity) }.ikutButton(.link) }
                     row("mapPick.use") { Button {} label: { Text("Use this place").frame(maxWidth: .infinity) }.ikutButton(.primary) }
-                    row("recapPage.share") { Button {} label: { Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }.ikutButton(.primary) }
+                    row("recapPage.share") { Button {} label: { Label("Share recap", systemImage: Symbol.share).frame(maxWidth: .infinity) }.ikutButton(.primary) }
                     row("recapPage.done") { Button {} label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link) }
                     row("secondary") { Button {} label: { Text("Secondary").frame(maxWidth: .infinity) }.ikutButton(.secondary) }
                 }
                 block("Glass sheet", surface: .glass) {
-                    row("lobby.copy") { Button {} label: { Label("Copy", systemImage: "doc.on.doc").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity) }.ikutButton(.link) }
-                    row("lobby.qr") { Button {} label: { Label("QR code", systemImage: "qrcode").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity) }.ikutButton(.link) }
+                    row("lobby.copy") { Button {} label: { Label("Copy", systemImage: Symbol.copy).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity) }.ikutButton(.link) }
+                    row("lobby.qr") { Button {} label: { Label("QR code", systemImage: Symbol.qrCode).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity) }.ikutButton(.link) }
                     row("addStop.add") { Button {} label: { Text("Add Petronas Gopeng").font(.headline).frame(maxWidth: .infinity) }.ikutButton(.primary) }
                     row("suggest.notNow") { Button {} label: { Text("Not now").frame(maxWidth: .infinity) }.ikutButton(.secondary) }
                     row("suggest.add") { Button {} label: { Text("Add").frame(maxWidth: .infinity) }.ikutButton(.primary) }
-                    row("recapSheet.share") { Button {} label: { Label("Share recap", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }.ikutButton(.primary) }
+                    row("recapSheet.share") { Button {} label: { Label("Share recap", systemImage: Symbol.share).frame(maxWidth: .infinity) }.ikutButton(.primary) }
                     row("recapSheet.done") { Button {} label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link) }
                     ForEach(["primary", "secondary", "positive", "ghost", "destructive"], id: \.self) { name in
                         row("stopCard.\(name)") {
@@ -33,17 +33,17 @@ struct ButtonSizesDemo: View {
                     }
                 }
                 block("Round buttons on glass", surface: .glass) {
-                    row("round.back") { RoundGlassIconButton(systemImage: "chevron.left", label: "Back") {} }
-                    row("round.close") { RoundGlassIconButton(systemImage: "xmark", label: "Close") {} }
+                    row("round.back") { RoundGlassIconButton(systemImage: Symbol.back, label: "Back") {} }
+                    row("round.close") { RoundGlassIconButton(systemImage: Symbol.close, label: "Close") {} }
                     row("round.share") { RoundGlassShareLink(item: "ikut") }
                     row("round.initial") { RoundGlassIconButton(text: "A", label: "Name") {} }
                     row("round.homeName") { RoundGlassIconButton(text: "A", label: "Name", size: 50, exact: true) {} }
                     row("round.sheetClose") { SheetCloseButton {} }
-                    row("round.backQuiet") { RoundGlassIconButton(systemImage: "chevron.left", label: "Back", style: .quiet) {} }
-                    row("round.bare") { RoundGlassIconButton(systemImage: "xmark", label: "Close", style: .bare) {} }
-                    row("round.symbol") { RoundIconSymbol(systemImage: "square.and.arrow.up") }
+                    row("round.backQuiet") { RoundGlassIconButton(systemImage: Symbol.back, label: "Back", style: .quiet) {} }
+                    row("round.bare") { RoundGlassIconButton(systemImage: Symbol.close, label: "Close", style: .bare) {} }
+                    row("round.symbol") { RoundIconSymbol(systemImage: Symbol.share) }
                     row("bar.primary") { Button {} label: { Text("Create trip").font(.headline).frame(maxWidth: .infinity) }.ikutButton(.primary, tint: .ikutAccentFill) }
-                    row("bar.secondary") { Button {} label: { Label("Pit stop", systemImage: "mappin").font(.headline).frame(maxWidth: .infinity) }.ikutButton(.secondary, tint: .primary) }
+                    row("bar.secondary") { Button {} label: { Label("Pit stop", systemImage: Symbol.pin).font(.headline).frame(maxWidth: .infinity) }.ikutButton(.secondary, tint: .primary) }
                     row("cancel") { Button {} label: { Text("Cancel") }.ikutButton(.secondary, tint: .primary) }
                     row("backToTrips") { Button {} label: { Text("Back to trips").frame(maxWidth: .infinity) }.ikutButton(.secondary) }
                 }
@@ -51,8 +51,8 @@ struct ButtonSizesDemo: View {
                     row("round.sheetClosePlain") { SheetCloseButton {} }
                     row("round.mapClose") { MapCloseButton {} }
                     row("location.main") { Button {} label: { Text("Open Settings").frame(maxWidth: .infinity) }.ikutButton(.primary) }
-                    row("recap.prev") { Button {} label: { Image(systemName: "chevron.left").frame(width: 50) }.ikutButton(.secondary) }
-                    row("recap.next") { Button {} label: { Image(systemName: "chevron.right").frame(width: 50) }.ikutButton(.secondary) }
+                    row("recap.prev") { Button {} label: { Image(systemName: Symbol.back).frame(width: 50) }.ikutButton(.secondary) }
+                    row("recap.next") { Button {} label: { Image(systemName: Symbol.forward).frame(width: 50) }.ikutButton(.secondary) }
                 }
             }
             .padding(Spacing.l)

@@ -6,7 +6,7 @@ struct LocationDeniedView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Location is off", systemImage: "location.slash.fill")
+            Label("Location is off", systemImage: Symbol.locationOff)
         } description: {
             Text("ikut needs your location during a trip so the others can see your car. Turn it on in Settings.")
         } actions: {

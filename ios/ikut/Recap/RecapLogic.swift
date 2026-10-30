@@ -265,7 +265,7 @@ enum RecapLogic {
             let from = originName.map { " from \($0)" } ?? ""
             items.append(.init(
                 id: "start", kind: .trip, time: start, title: "Trip started",
-                detail: "\(s.cars.count) \(s.cars.count == 1 ? "car" : "cars") set off\(from)", symbol: "flag.fill",
+                detail: "\(s.cars.count) \(s.cars.count == 1 ? "car" : "cars") set off\(from)", symbol: Symbol.flag,
                 latitude: route.first?.latitude, longitude: route.first?.longitude))
         }
         for e in s.events {
@@ -277,7 +277,7 @@ enum RecapLogic {
                 items.append(.init(
                     id: e.id, kind: .hazard, time: time, title: "\(label) reported",
                     detail: [who, e.message].compactMap { $0 }.joined(separator: " · "),
-                    symbol: e.category == .hazard ? "exclamationmark.triangle.fill" : "cloud.rain.fill",
+                    symbol: e.category == .hazard ? Symbol.warning : Symbol.rain,
                     latitude: e.latitude, longitude: e.longitude, pinTitle: "Road report"))
             case .stopRequest:
                 items.append(.init(
@@ -289,11 +289,11 @@ enum RecapLogic {
             case .status:
                 items.append(.init(
                     id: e.id, kind: .car, time: time, title: "\(carName(e.carId, in: s)): \(label.lowercased())",
-                    detail: who, symbol: "car.fill", latitude: e.latitude, longitude: e.longitude))
+                    detail: who, symbol: Symbol.car, latitude: e.latitude, longitude: e.longitude))
             case .message:
                 items.append(.init(
                     id: e.id, kind: .car, time: time, title: "\(who) said",
-                    detail: e.message ?? label, symbol: "text.bubble.fill", latitude: e.latitude, longitude: e.longitude))
+                    detail: e.message ?? label, symbol: Symbol.message, latitude: e.latitude, longitude: e.longitude))
             }
         }
         if let first = arrivals.first, let last = arrivals.last {
@@ -302,11 +302,11 @@ enum RecapLogic {
                 : "\(carName(first.carId, in: s)) at the destination"
             items.append(.init(
                 id: "arrived", kind: .trip, time: first.time, title: "Arrived in \(s.destinationName)",
-                detail: detail, symbol: "mappin.circle.fill",
+                detail: detail, symbol: Symbol.pinCircle,
                 latitude: s.destinationLatitude, longitude: s.destinationLongitude))
         }
         if let end = s.endedAt {
-            items.append(.init(id: "end", kind: .trip, time: end, title: "Trip ended", detail: "Location sharing stopped", symbol: "flag.checkered", latitude: nil, longitude: nil))
+            items.append(.init(id: "end", kind: .trip, time: end, title: "Trip ended", detail: "Location sharing stopped", symbol: Symbol.finish, latitude: nil, longitude: nil))
         }
         return items.enumerated()
             .sorted { $0.element.time == $1.element.time ? $0.offset < $1.offset : $0.element.time < $1.element.time }

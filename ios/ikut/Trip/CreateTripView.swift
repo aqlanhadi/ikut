@@ -92,7 +92,7 @@ struct CreateTripView: View {
             .accessibilityElement(children: .combine)
 
             HStack(spacing: Spacing.m) {
-                Image(systemName: "mappin")
+                Image(systemName: Symbol.pin)
                     .ikutGlyph(17, weight: .bold, cap: 1.15)
                     .foregroundStyle(.red)
                     .frame(width: 20)

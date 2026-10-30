@@ -16,7 +16,7 @@ struct PickedTripHeader: View {
         let model = picked.model
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Spacing.s) {
-                RoundGlassIconButton(systemImage: "chevron.left", label: "Back to trips", style: .quiet, action: onBack)
+                RoundGlassIconButton(systemImage: Symbol.back, label: "Back to trips", style: .quiet, action: onBack)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(picked.title)
                         .font(.title2.bold()).wrapsAtAccessibilitySizes(lines: 2).fixedSize(horizontal: false, vertical: true)
@@ -26,7 +26,7 @@ struct PickedTripHeader: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let recap = model.recap {
                     ShareLink(item: RecapContent.shareText(recap)) {
-                        RoundIconSymbol(systemImage: "square.and.arrow.up", glyph: .callout.weight(.semibold))
+                        RoundIconSymbol(systemImage: Symbol.share, glyph: .callout.weight(.semibold))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Share recap")
@@ -90,7 +90,7 @@ struct PickedTripHeader: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
-            RoundGlassIconButton(systemImage: "xmark", label: "Show the whole trip", style: .bare, action: onShowWholeTrip)
+            RoundGlassIconButton(systemImage: Symbol.close, label: "Show the whole trip", style: .bare, action: onShowWholeTrip)
         }
         .padding(.leading, Spacing.m).padding(.trailing, Spacing.s).padding(.vertical, Spacing.s)
         .ikutCard(radius: 18)

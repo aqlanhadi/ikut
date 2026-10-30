@@ -122,7 +122,7 @@ struct DesignSharedSection: View {
             SheetHeader(title: "Report", subtitle: "The cars behind you get an alert.") {}
             "InlineNote (hint, alert)".code
             InlineNote("Everyone in the trip sees this name.")
-            InlineNote("Couldn’t reach the server.", systemImage: "exclamationmark.triangle.fill", tone: .alert)
+            InlineNote("Couldn’t reach the server.", systemImage: Symbol.warning, tone: .alert)
             "EmptyRow, RowDivider".code
             VStack(spacing: 0) { EmptyRow("No cars yet"); RowDivider(); EmptyRow("Nothing else") }.ikutCard()
             "StatCaption, Chip, DashedDivider".code
@@ -140,18 +140,18 @@ struct DesignSharedSection: View {
         group("Icons and round buttons") {
             "IconTile".code
             HStack(spacing: Spacing.s) {
-                IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
-                IconTile(symbol: "steeringwheel", color: .ikutAccent, size: .small)
-                IconTile(symbol: "fuelpump.fill", color: .orange, size: .regular, radius: Radius.icon)
+                IconTile(symbol: Symbol.pin, color: .red, size: .small, font: .footnote.weight(.bold))
+                IconTile(symbol: Symbol.steering, color: .ikutAccent, size: .small)
+                IconTile(symbol: Symbol.fuel, color: .orange, size: .regular, radius: Radius.icon)
             }
             "CarBadge".code
             HStack(spacing: Spacing.s) {
                 CarBadge(number: 1, colorHex: "#2563EB"); CarBadge(number: 2, colorHex: "#D9480F")
-                CarBadge(symbol: "plus", colorHex: "#8E8E93")
+                CarBadge(symbol: Symbol.add, colorHex: "#8E8E93")
             }
             "RoundGlassIconButton".code
             HStack(spacing: Spacing.s) {
-                RoundGlassIconButton(systemImage: "location.fill", label: "Centre") {}
+                RoundGlassIconButton(systemImage: Symbol.location, label: "Centre") {}
                 RoundGlassIconButton(text: "A", label: "Your name") {}
             }
             "SheetCloseButton, MapCloseButton".code

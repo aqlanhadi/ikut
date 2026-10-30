@@ -14,7 +14,7 @@ struct PausedBanner: View {
     var body: some View {
         VStack(spacing: Spacing.s) {
             HStack(spacing: Spacing.m) {
-                Image(systemName: "pause.circle.fill")
+                Image(systemName: Symbol.paused)
                     .font(.title3)
                     .foregroundStyle(Color.ikutWarning)
                     .accessibilityHidden(true)

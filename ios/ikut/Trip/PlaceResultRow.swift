@@ -50,7 +50,7 @@ struct PlaceResultRow<Trailing: View>: View {
     init(suggestion: SearchSuggestion, disabled: Bool = false, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
         title = HighlightedText.attributed(suggestion.shownTitle, suggestion.shownHighlights)
         subtitle = suggestion.shownSubtitle
-        (symbol, color) = suggestion.isQuery ? ("magnifyingglass", .gray) : ("mappin", .orange)
+        (symbol, color) = suggestion.isQuery ? (Symbol.search, .gray) : ("mappin", .orange)
         label = [suggestion.shownTitle, suggestion.shownSubtitle].filter { !$0.isEmpty }.joined(separator: ", ")
         self.disabled = disabled
         self.action = action
@@ -93,13 +93,13 @@ struct PlaceKind {
         case nil:
             (symbol, color) = ("building.2.fill", .red)
         case .publicTransport?, .airport?:
-            (symbol, color) = ("tram.fill", .indigo)
+            (symbol, color) = (Symbol.transit, .indigo)
         case .park?, .nationalPark?, .beach?, .campground?:
             (symbol, color) = ("leaf.fill", .green)
         case .gasStation?, .evCharger?:
-            (symbol, color) = ("fuelpump.fill", .orange)
+            (symbol, color) = (Symbol.fuel, .orange)
         case .restaurant?, .cafe?, .bakery?, .foodMarket?:
-            (symbol, color) = ("fork.knife", .orange)
+            (symbol, color) = (Symbol.food, .orange)
         case .hotel?:
             (symbol, color) = ("bed.double.fill", .purple)
         default:

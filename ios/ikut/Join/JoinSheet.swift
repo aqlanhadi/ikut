@@ -37,11 +37,11 @@ struct JoinSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTopRow(title: stepper.title, subtitle: stepper.indicator, subtitleIdentifier: AXID.Join.step) {
                 if stepper.canGoBack {
-                    RoundGlassIconButton(systemImage: "chevron.left", label: "Back", action: back)
+                    RoundGlassIconButton(systemImage: Symbol.back, label: "Back", action: back)
                         .accessibilityIdentifier(AXID.Join.back).disabled(model.isJoining)
                 }
             } trailing: {
-                RoundGlassIconButton(systemImage: "xmark", label: "Close", action: onClose)
+                RoundGlassIconButton(systemImage: Symbol.close, label: "Close", action: onClose)
                     .accessibilityIdentifier(AXID.Sheet.close).disabled(model.isJoining)
             }
             .padding(.top, Spacing.xs)
@@ -308,7 +308,7 @@ struct JoinSheet: View {
                     showScanner = true
                 } label: {
                     HStack(spacing: Spacing.m) {
-                        Image(systemName: "qrcode.viewfinder").accessibilityHidden(true)
+                        Image(systemName: Symbol.scanCode).accessibilityHidden(true)
                         Text("Scan QR code")
                     }
                 }
@@ -390,7 +390,7 @@ struct JoinSheet: View {
     /// The found trip: name, "Code found", where to and who is in, the meeting point and stops, and what the map shows.
     private func tripCard(_ preview: TripPreview) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Chip(text: "Code found", tone: .positive, lead: .symbol("checkmark"))
+            Chip(text: "Code found", tone: .positive, lead: .symbol(Symbol.tick))
             Text(preview.name)
                 .font(.title3.weight(.semibold))
                 .padding(.top, Spacing.xs)
@@ -426,7 +426,7 @@ struct JoinSheet: View {
                 ) { model.select(car) }
             }
             carRow(
-                name: "My own car", badge: CarBadge(symbol: "plus", colorHex: "#8E8E93", size: IconSize.small.base),
+                name: "My own car", badge: CarBadge(symbol: Symbol.add, colorHex: "#8E8E93", size: IconSize.small.base),
                 detail: "Shares this car’s location", selected: model.selection == .newCar
             ) { model.selectNewCar() }
         } header: {
@@ -455,7 +455,7 @@ struct JoinSheet: View {
                 if model.trackerTakenResult != nil {
                     InlineNote(
                         "You’re in. Someone else is already sharing that car’s location, so your phone won’t.",
-                        systemImage: "info.circle", inset: 0)
+                        systemImage: Symbol.info, inset: 0)
                 }
             }
             .lobbyRow()
@@ -475,7 +475,7 @@ struct JoinSheet: View {
                 }
                 Spacer(minLength: Spacing.s)
                 if selected {
-                    Image(systemName: "checkmark").font(.body.weight(.semibold)).foregroundStyle(Color.ikutAccent)
+                    Image(systemName: Symbol.tick).font(.body.weight(.semibold)).foregroundStyle(Color.ikutAccent)
                         .accessibilityHidden(true)
                 }
             }
@@ -493,7 +493,7 @@ struct JoinSheet: View {
         case .none:
             EmptyView()
         case .ownCar:
-            Label("Your phone shares this car’s location, even with the screen off.", systemImage: "location.fill")
+            Label("Your phone shares this car’s location, even with the screen off.", systemImage: Symbol.location)
                 .font(.footnote).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, Spacing.s)

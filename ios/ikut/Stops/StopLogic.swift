@@ -233,10 +233,10 @@ enum StopLogic {
     /// The icon of the reason, for the button, the pill and the card.
     static func reasonSymbol(_ type: EventType) -> String {
         switch type {
-        case .stopFuel: "fuelpump.fill"
-        case .stopFood: "fork.knife"
-        case .stopToilet: "toilet.fill"
-        default: "cup.and.saucer.fill"
+        case .stopFuel: Symbol.fuel
+        case .stopFood: Symbol.food
+        case .stopToilet: Symbol.toilet
+        default: Symbol.rest
         }
     }
 
@@ -255,7 +255,7 @@ enum StopLogic {
     }
 
     static func buttonContent(for board: StopBoard) -> ButtonContent {
-        let plain = "mappin.and.ellipse"
+        let plain = Symbol.pinAndRing
         let requests = board.requests
         guard !requests.isEmpty else {
             return ButtonContent(label: "Pit stop", symbol: plain, badge: 0, accessibilityLabel: "Pit stop")

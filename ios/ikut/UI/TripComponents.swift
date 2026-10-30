@@ -47,7 +47,7 @@ struct RouteEnds: View {
         HStack(spacing: Spacing.s) {
             if let from {
                 Text(from)
-                Image(systemName: "arrow.right")
+                Image(systemName: Symbol.next)
                     .font(.system(size: size * 0.55, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -195,7 +195,7 @@ struct Chip: View {
             case .none: EmptyView()
             case .symbol(let name): Image(systemName: name).accessibilityHidden(true)
             case .dot(let color, let pulses):
-                Image(systemName: "circle.fill")
+                Image(systemName: Symbol.dot)
                     .ikutGlyph(7, cap: 1.3)
                     .foregroundStyle(color ?? tone.text)
                     .symbolEffect(.pulse, options: pulses ? .repeating : .nonRepeating)
@@ -258,7 +258,7 @@ struct DashedDivider: View {
         HStack(spacing: Spacing.s) {
             Chip(text: "Gathering", tone: .warning, lead: .dot(.orange), fill: .material)
             Chip(text: "On the move", tone: .positive, lead: .dot(.green), fill: .material)
-            Chip(text: "Tinted", tone: .accent, lead: .symbol("flag.checkered"))
+            Chip(text: "Tinted", tone: .accent, lead: .symbol(Symbol.finish))
         }
         HStack(spacing: Spacing.l) {
             Text("Ticket")

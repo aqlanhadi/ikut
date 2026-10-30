@@ -10,10 +10,10 @@ struct TripExitMenu: View {
 
     var body: some View {
         if canEnd {
-            Button("End trip", systemImage: "flag.checkered", role: .destructive) { confirmEnd = true }
+            Button("End trip", systemImage: Symbol.finish, role: .destructive) { confirmEnd = true }
         }
         if canLeave {
-            Button("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+            Button("Leave trip", systemImage: Symbol.leaveTrip, role: .destructive) {
                 confirmLeave = true
             }
         }

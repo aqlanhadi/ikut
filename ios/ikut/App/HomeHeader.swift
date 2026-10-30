@@ -27,7 +27,7 @@ struct HomeHeader: View {
 
             Button(action: onJoin) {
                 HStack(spacing: Spacing.m) {
-                    Image(systemName: "qrcode.viewfinder")
+                    Image(systemName: Symbol.scanCode)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(width: tileSide, height: tileSide)

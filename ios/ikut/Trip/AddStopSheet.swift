@@ -6,12 +6,12 @@ import SwiftUI
 extension PlannedStopKind {
     var symbol: String {
         switch self {
-        case .meet: "flag.fill"
-        case .fuel: "fuelpump.fill"
-        case .food: "fork.knife"
-        case .rest: "cup.and.saucer.fill"
-        case .toilet: "toilet.fill"
-        case .sight: "mountain.2.fill"
+        case .meet: Symbol.flag
+        case .fuel: Symbol.fuel
+        case .food: Symbol.food
+        case .rest: Symbol.rest
+        case .toilet: Symbol.toilet
+        case .sight: Symbol.sight
         }
     }
 
@@ -94,7 +94,7 @@ struct AddStopContent: View {
         .buttonSurface(.glass)
         .sheetTopBar {
             SheetTopRow(title: "Add a stop", subtitle: nil) {
-                RoundGlassIconButton(systemImage: "chevron.backward", label: model.picked == nil ? "Back to the trip" : "Back to the list") {
+                RoundGlassIconButton(systemImage: Symbol.backTrailing, label: model.picked == nil ? "Back to the trip" : "Back to the list") {
                     searchFocused = false
                     if !model.back() { onBack() }
                 }
@@ -171,7 +171,7 @@ struct AddStopContent: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if selected {
-                    Image(systemName: "checkmark").font(.body.weight(.bold)).foregroundStyle(Color.ikutAccent).accessibilityHidden(true)
+                    Image(systemName: Symbol.tick).font(.body.weight(.bold)).foregroundStyle(Color.ikutAccent).accessibilityHidden(true)
                 }
             }
             .opacity(taken ? 0.45 : 1)
@@ -191,10 +191,10 @@ struct AddStopContent: View {
             Text(StopFormat.length(minutes: model.stay)).font(.body.weight(.semibold)).monospacedDigit()
                 .accessibilityIdentifier(AXID.AddStop.stay)
             HStack(spacing: Spacing.xs) {
-                Button { model.step(-1) } label: { Image(systemName: "minus").inlineRoundLabel() }
+                Button { model.step(-1) } label: { Image(systemName: Symbol.remove).inlineRoundLabel() }
                     .disabled(!AddStopLogic.canStep(model.stay, by: -1))
                     .accessibilityLabel("Shorter").accessibilityIdentifier(AXID.AddStop.shorter)
-                Button { model.step(1) } label: { Image(systemName: "plus").inlineRoundLabel() }
+                Button { model.step(1) } label: { Image(systemName: Symbol.add).inlineRoundLabel() }
                     .disabled(!AddStopLogic.canStep(model.stay, by: 1))
                     .accessibilityLabel("Longer").accessibilityIdentifier(AXID.AddStop.longer)
             }
@@ -228,7 +228,7 @@ struct AddStopContent: View {
     @ViewBuilder private func details(_ place: DestinationResult) -> some View {
         Section {
             HStack(spacing: Spacing.m) {
-                IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
+                IconTile(symbol: Symbol.pin, color: .red, size: .small, font: .footnote.weight(.bold))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(place.name).font(.body)
                     Text(placeLine(place)).font(.footnote).foregroundStyle(.secondary)

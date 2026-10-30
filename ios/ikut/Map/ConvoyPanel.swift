@@ -283,7 +283,7 @@ struct ConvoyPanel: View {
                     .font(.footnote)
                     .wrapsAtAccessibilitySizes(lines: 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.up")
+                Image(systemName: Symbol.expandUp)
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(Color.surfaceSecondary)
             }
@@ -340,7 +340,7 @@ struct ConvoyPanel: View {
     }
 
     private func separation(_ text: String) -> some View {
-        Label(text, systemImage: "exclamationmark.triangle.fill")
+        Label(text, systemImage: Symbol.warning)
             .font(.footnote.weight(.semibold))
             .foregroundStyle(Color.ikutWarning)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -371,7 +371,7 @@ struct ConvoyActionBar: View {
             ? AnyLayout(VStackLayout(spacing: Spacing.s)) : AnyLayout(HStackLayout(spacing: Spacing.s))
         return layout {
             Button(action: onReport) {
-                Label("Report", systemImage: "exclamationmark.triangle")
+                Label("Report", systemImage: Symbol.warningOutline)
                     .font(.headline).frame(maxWidth: .infinity)
             }
             .ikutButton(.primary, tint: .ikutAccentFill)

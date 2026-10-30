@@ -11,9 +11,9 @@ struct MapModeControl: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            button(.follow, symbol: "location.fill", label: "Follow my car")
+            button(.follow, symbol: Symbol.location, label: "Follow my car")
             Divider().padding(.horizontal, Spacing.s)
-            button(.fit, symbol: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", label: "Fit whole convoy")
+            button(.fit, symbol: Symbol.fitConvoy, label: "Fit whole convoy")
         }
         .frame(width: side)
         .glassSurface(.control)
@@ -41,7 +41,7 @@ struct ReadAloudButton: View {
 
     var body: some View {
         Button { isOn.toggle() } label: {
-            Image(systemName: isOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+            Image(systemName: isOn ? Symbol.soundOn : Symbol.soundOff)
                 .ikutGlyph(17, weight: .semibold)
                 .foregroundStyle(isOn ? Color.surfaceAccent : Color.primary)
                 .frame(width: side, height: side)

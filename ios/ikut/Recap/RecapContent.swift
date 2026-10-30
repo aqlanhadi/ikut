@@ -65,7 +65,7 @@ struct RecapContent: View {
                         .frame(height: 150)
                         .overlay(alignment: .bottomTrailing) {
                             HStack(spacing: Spacing.xs) {
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                Image(systemName: Symbol.wholeTrip)
                                 Text("Route map")
                             }
                             .font(.footnote.weight(.semibold))
@@ -108,7 +108,7 @@ struct RecapContent: View {
             Section {
                 ForEach(recap.notes, id: \.self) { note in
                     HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
-                        Image(systemName: "info.circle")
+                        Image(systemName: Symbol.info)
                         Text(note)
                     }
                     .font(.footnote).foregroundStyle(.secondary)
@@ -122,7 +122,7 @@ struct RecapContent: View {
             VStack(spacing: Spacing.xs) {
                 ShareLink(item: Self.shareText(recap)) {
                     HStack(spacing: Spacing.xs) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: Symbol.share)
                         Text("Share recap")
                     }
                     .frame(maxWidth: .infinity)
@@ -164,15 +164,15 @@ struct RecapContent: View {
     }
 
     private static let awardStyle: [RecapAward.Kind: (symbol: String, tint: Color)] = [
-        .lead: ("bolt.fill", .recapLead),
-        .firstIn: ("flag.checkered", .recapFirstIn),
-        .reporter: ("eye.fill", .recapReporter),
-        .stopCaller: ("fuelpump.fill", .recapStopCaller),
-        .sweeper: ("shield.fill", .recapSweeper),
+        .lead: (Symbol.awardLead, .recapLead),
+        .firstIn: (Symbol.finish, .recapFirstIn),
+        .reporter: (Symbol.awardReporter, .recapReporter),
+        .stopCaller: (Symbol.fuel, .recapStopCaller),
+        .sweeper: (Symbol.awardSweeper, .recapSweeper),
     ]
 
     private func award(of a: RecapAward, _ s: RecapSnapshot) -> some View {
-        let style = Self.awardStyle[a.kind] ?? ("star.fill", .ikutAccent)
+        let style = Self.awardStyle[a.kind] ?? (Symbol.awardDefault, .ikutAccent)
         let car = s.cars.first { $0.id == a.carId }
         return HStack(spacing: Spacing.m) {
             Image(systemName: style.symbol).ikutGlyph(18, weight: .semibold, cap: 1.4).foregroundStyle(.white)
