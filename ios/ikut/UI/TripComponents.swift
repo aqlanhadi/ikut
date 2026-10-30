@@ -30,7 +30,8 @@ struct StatCaption: View {
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Text(text.uppercased())
+        Text(text)
+            .textCase(.uppercase)
             .font(.caption.weight(.semibold))
             .kerning(0.6)
             .foregroundStyle(.secondary)
