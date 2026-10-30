@@ -33,4 +33,23 @@ struct Trip: Codable, Sendable, Equatable, Identifiable {
     /// When a member first tapped Start Trip (server time); nil until the trip is underway.
     var startedAt: Date?
     var endedAt: Date?
+    /// Written by the server when the trip ends (D107) and kept until the trip is deleted 90 days after it ended;
+    /// nil on trips that ended before it existed. Never written by the app.
+    var summary: TripSummary?
+}
+
+/// What is left of a trip once its events and positions are gone (`trips/{id}.summary`): no names, no places. A number
+/// the server could not work out is nil, and any nil leaves the rest readable.
+struct TripSummary: Codable, Sendable, Equatable {
+    /// Meters along the planned main route.
+    var distanceMeters: Double?
+    /// Seconds from the first Start Trip (from creation if it never started) to the end.
+    var durationSeconds: Double?
+    var peopleCount: Int?
+    var carCount: Int?
+    /// Planned stops the lead car reached.
+    var stopCount: Int?
+    /// Hazard and condition reports still stored when the trip ended.
+    var roadReportCount: Int?
+    var summarisedAt: Date?
 }

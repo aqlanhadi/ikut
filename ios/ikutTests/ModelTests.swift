@@ -20,6 +20,20 @@ struct ModelTests {
         #expect(try roundTrip(trip) == trip)
     }
 
+    @Test func tripReadsAServerSummaryAndToleratesNullsAndAbsence() throws {
+        var data = try encoder.encode(Trip(
+            id: "doc", name: "Balik", code: "ABC234", organizerId: "u1", route: "_p~iF~ps|U",
+            destination: Destination(name: "Ipoh", coordinate: point), status: .ended, createdAt: date, endedAt: date))
+        #expect(try firestoreDecode(Trip.self, from: data).summary == nil)
+        data["summary"] = ["distanceMeters": 175_813.3, "durationSeconds": NSNull(), "peopleCount": 3, "carCount": 2,
+                           "stopCount": 2, "roadReportCount": 0, "summarisedAt": Timestamp(date: date)] as [String: Any]
+        let summary = try #require(try firestoreDecode(Trip.self, from: data).summary)
+        #expect(summary.distanceMeters == 175_813.3)
+        #expect(summary.durationSeconds == nil)
+        #expect(summary.peopleCount == 3 && summary.carCount == 2 && summary.stopCount == 2 && summary.roadReportCount == 0)
+        #expect(summary.summarisedAt != nil)
+    }
+
     @Test func carRoundTrips() throws {
         let full = Car(id: "doc", name: "Car 1", color: "#FF0000", trackerUserId: "u1", isLead: true,
                        route: "abc", mergeOffset: 1200, state: .convoy)
