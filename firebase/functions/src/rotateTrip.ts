@@ -72,6 +72,11 @@ async function checkOrganizer(db: Firestore, uid: string, tripId: string): Promi
   if (trip.status !== "active") throw new HttpsError("failed-precondition", TRIP_ENDED);
 }
 
+/** A trip id the callable accepts: not a path, not "." or "..", not a reserved "__x__" id (Firestore refuses those with a 500). */
+export function isValidTripId(id: unknown): id is string {
+  return typeof id === "string" && id.length >= 1 && id.length <= 128 && !id.includes("/") && !/^\.{1,2}$/.test(id) && !/^__.*__$/.test(id);
+}
+
 export async function rotateCodeForUser(db: Firestore, uid: string, tripId: string, opts: RotateOpts = {}): Promise<{ code: string }> {
   await checkOrganizer(db, uid, tripId);
   const now = opts.now ?? Date.now();

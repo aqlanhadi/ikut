@@ -12,8 +12,8 @@ import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
 import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { ROTATE_LIMITS } from "../lib/createLimit.js";
-import { joinTripTransaction, parseJoinInput, REMOVED_FROM_TRIP } from "../lib/joinTrip.js";
-import { ROTATE_PRODUCTION_LIMITS, rotateCodeForUser } from "../lib/rotateTrip.js";
+import { findActiveTripId, joinTripTransaction, parseJoinInput, REMOVED_FROM_TRIP } from "../lib/joinTrip.js";
+import { ROTATE_PRODUCTION_LIMITS, isValidTripId, rotateCodeForUser } from "../lib/rotateTrip.js";
 import { previewTripData } from "../lib/previewTrip.js";
 import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
 
@@ -1475,5 +1475,47 @@ describe("removed members and new codes (emulator, D104)", () => {
     await rotateCodeForUser(db, t.organizer, t.tripId, { limits: ROTATE_PRODUCTION_LIMITS });
     await assert.rejects(rotateCodeForUser(db, t.organizer, t.tripId, { random: always(taken), maxTries: 1, limits: ROTATE_PRODUCTION_LIMITS }));
     assert.equal(((await doc.get()).data()!.creates as number[]).length, 1, "only the call that changed something stays counted");
+  });
+
+  it("a join that found the trip by the old code, and lands after a new code was made, is turned away like an unknown code", async () => {
+    const t = await trip();
+    const gone = (await newUser()).uid;
+    await remove(t.tripId, t.organizer, gone);
+    const id = await findActiveTripId(db, t.code);
+    await rotateCodeForUser(db, t.organizer, t.tripId);
+    const carsBefore = (await db.collection("trips").doc(t.tripId).collection("cars").get()).size;
+    await rejected(join(gone, id, t.code), "not-found");
+    assert.equal((await memberRef(t.tripId, gone).get()).exists, false);
+    assert.equal((await db.collection("trips").doc(t.tripId).collection("cars").get()).size, carsBefore);
+  });
+
+  it("previewTrip gives a removed person only the removed words, and nothing for an old code after a new one", async () => {
+    const t = await trip(1);
+    const [gone] = t.people as [string];
+    await remove(t.tripId, t.organizer, gone);
+    await assert.rejects(previewTripData(db, t.tripId, { uid: gone, code: t.code }), (e: any) =>
+      e.code === "permission-denied" && e.message === REMOVED_FROM_TRIP && e.details?.reason === "removed");
+    // Someone else still sees the preview, and the join says the same as the preview, with the reason the app reads.
+    assert.equal((await previewTripData(db, t.tripId, { uid: "someone", code: t.code })).tripId, t.tripId);
+    await assert.rejects(join(gone, t.tripId, t.code), (e: any) => e.details?.reason === "removed");
+    const r = await rotateCodeForUser(db, t.organizer, t.tripId);
+    await rejected(previewTripData(db, t.tripId, { uid: "someone", code: t.code }), "not-found");
+    assert.equal((await previewTripData(db, t.tripId, { uid: gone, code: r.code })).tripId, t.tripId);
+  });
+
+  it("refuses trip ids Firestore reserves", () => {
+    for (const bad of [".", "..", "__x__", "__name__", "a/b", "", 3, undefined]) assert.equal(isValidTripId(bad), false, String(bad));
+    assert.equal(isValidTripId("Abc123xyz"), true);
+  });
+
+  it("the sweep deletes an expired new-code counter and keeps one that has not expired", async () => {
+    const old = db.collection(ROTATE_LIMITS).doc("old-" + Math.random());
+    const fresh = db.collection(ROTATE_LIMITS).doc("fresh-" + Math.random());
+    const now = Date.now();
+    await old.set({ creates: [now - 2 * 24 * 3600_000], expiresAt: Timestamp.fromMillis(now - 3600_000) });
+    await fresh.set({ creates: [now], expiresAt: Timestamp.fromMillis(now + 3600_000) });
+    await sweepCreateLimits(db, new Date(now), 1000, ROTATE_LIMITS);
+    assert.equal((await old.get()).exists, false);
+    assert.equal((await fresh.get()).exists, true);
   });
 });

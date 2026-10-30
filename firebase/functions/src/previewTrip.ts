@@ -1,6 +1,6 @@
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { NO_ACTIVE_TRIP, appCheckOptions, findActiveTripId, isRecord, normalizeCode } from "./joinTrip.js";
+import { NO_ACTIVE_TRIP, appCheckOptions, findActiveTripId, isRecord, normalizeCode, removedError } from "./joinTrip.js";
 import { countingMisses } from "./guessLimit.js";
 import { simplifiedRoute } from "./previewRoute.js";
 import type { Car, Member, PlannedStop, PreviewCar, PreviewStop, PreviewTripResult, Trip } from "./model.js";
@@ -17,17 +17,24 @@ import type { Car, Member, PlannedStop, PreviewCar, PreviewStop, PreviewTripResu
  * Never sent: any member's own start, own route (`cars/*.route`), position, join point, phone/push token, display name
  * or user id (the organiser id, tracker uids and member ids stay on the server), stop notes or skip details.
  */
-export async function previewTripData(db: Firestore, tripId: string): Promise<PreviewTripResult> {
+export async function previewTripData(
+  db: Firestore, tripId: string, caller?: { uid: string; code: string },
+): Promise<PreviewTripResult> {
   const tripRef = db.collection("trips").doc(tripId);
-  const [tripSnap, carsSnap, stopsSnap] = await Promise.all([
+  const [tripSnap, carsSnap, stopsSnap, removedSnap] = await Promise.all([
     tripRef.get(),
     tripRef.collection("cars").get(),
     tripRef.collection("stops").get(),
+    caller ? tripRef.collection("removed").doc(caller.uid).get() : undefined,
   ]);
   const trip = tripSnap.data() as Trip | undefined;
   if (!tripSnap.exists || !trip || trip.status !== "active") {
     throw new HttpsError("not-found", NO_ACTIVE_TRIP);
   }
+  // D104: the trip was found by this code outside this read; a code changed since is an unknown code (as in joinTrip).
+  if (caller && trip.code !== caller.code) throw new HttpsError("not-found", NO_ACTIVE_TRIP);
+  // D104: someone the organiser removed gets no trip data, only the removed words (as joinTrip), until a new code.
+  if (removedSnap?.exists) throw removedError();
   const cars: PreviewCar[] = carsSnap.docs
     .map((d) => ({ id: d.id, data: d.data() as Car }))
     .map(({ id, data }) => ({
@@ -99,5 +106,5 @@ export const previewTrip = onCall(appCheckOptions, async (request): Promise<Prev
   const code = normalizeCode(request.data.code);
   const db = getFirestore();
   const tripId = await countingMisses(db, uid, () => findActiveTripId(db, code));
-  return previewTripData(db, tripId);
+  return previewTripData(db, tripId, { uid, code });
 });

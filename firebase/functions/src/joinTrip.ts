@@ -12,6 +12,11 @@ const COLOR_MAX = 20;
 /** What a wrong code and an ended trip both say. */
 export const NO_ACTIVE_TRIP = "No active trip with that code";
 
+/** The answer for a person the organiser removed, from joinTrip and previewTrip: `details.reason` is what the app reads. */
+export function removedError(): HttpsError {
+  return new HttpsError("permission-denied", REMOVED_FROM_TRIP, { reason: "removed" });
+}
+
 /** What a person the organiser removed hears when they try the code again (D104); a new code from the organiser lets them back in. */
 export const REMOVED_FROM_TRIP = "You were removed from this trip. Ask the organiser for a new code.";
 
@@ -118,9 +123,12 @@ export async function joinTripTransaction(
     if (!tripSnap.exists || !trip || trip.status !== "active") {
       throw new HttpsError("not-found", NO_ACTIVE_TRIP);
     }
+    // The trip was found by this code outside the transaction. A new code made since (D104, which also clears the removed
+    // list) must not leave the old code working for a retry that lands in between: same answer as an unknown code.
+    if (trip.code !== input.code) throw new HttpsError("not-found", NO_ACTIVE_TRIP);
     // D104: a removed person is refused before anything is written. Someone who only left has no such doc.
     if ((await tx.get(tripRef.collection("removed").doc(uid))).exists) {
-      throw new HttpsError("permission-denied", REMOVED_FROM_TRIP);
+      throw removedError();
     }
     const memberSnap = await tx.get(memberRef);
     const existing = memberSnap.exists ? (memberSnap.data() as Member) : null;
