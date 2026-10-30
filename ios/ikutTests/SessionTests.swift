@@ -783,7 +783,7 @@ struct SessionEmulatorTests {
 
         // A second user joins as the tracker of a new car.
         let (uid2, joinedCar) = try await EmulatorTrip.joinAsGuest(
-            code: code, name: "Siti", carName: "Siti's car", color: "#D9480F", tracker: true, viaAuthModel: true)
+            code: code, name: "Siti", carName: "Siti's car", color: "#CC450D", tracker: true, viaAuthModel: true)
         let tracker2 = FakeTrackingController()
         let session2 = TripSession(tripId: s.tripId, userId: uid2, tracker: tracker2)
         session2.start()
@@ -815,7 +815,7 @@ struct SessionEmulatorTests {
 
         // A second member joins another car and listens to the trip.
         try await EmulatorTrip.joinAsGuest(
-            code: code, name: "Siti", carName: "Siti's car", color: "#D9480F", tracker: false, viaAuthModel: true)
+            code: code, name: "Siti", carName: "Siti's car", color: "#CC450D", tracker: false, viaAuthModel: true)
         nonisolated(unsafe) let otherUser = try #require(Auth.auth().currentUser)
         // The tracker pauses.
         try await Auth.auth().updateCurrentUser(trackerUser)

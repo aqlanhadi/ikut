@@ -172,7 +172,7 @@ extension RecapSnapshot {
             route: Polyline.encode(main), createdAt: start, endedAt: now,
             cars: [
                 .init(id: "c1", name: "Aqlan’s Myvi", color: "#2563EB", number: 1, isLead: true),
-                .init(id: "c2", name: "Wyna’s Axia", color: "#D9480F", number: 2, isLead: false),
+                .init(id: "c2", name: "Wyna’s Axia", color: "#CC450D", number: 2, isLead: false),
                 .init(id: "c3", name: "Hafiz’s Saga", color: "#0F766E", number: 3, isLead: false),
                 .init(id: "c4", name: "Daniel’s City", color: "#7C3AED", number: 4, isLead: false),
             ],

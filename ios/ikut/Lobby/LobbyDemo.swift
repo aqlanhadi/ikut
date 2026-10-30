@@ -98,7 +98,7 @@ enum LobbyStopsDemo {
             planner.showForDemo(items: items)
             let base = model(stopsOnRoute)
             func ready(_ car: Car) -> Car { var car = car; car.trackerUserId = car.trackerUserId ?? "u3"; return car }
-            let siti = Car(id: "c5", name: "Siti’s Bezza", color: "#8E8E93", trackerUserId: nil, isLead: false, route: nil,
+            let siti = Car(id: "c5", name: "Siti’s Bezza", color: "#737378", trackerUserId: nil, isLead: false, route: nil,
                            mergeOffset: nil, state: .convoy, number: 5)
             let crowded = LobbyModel(
                 sampleTrip: base.trip!, cars: joining(base).cars.map(ready) + [siti],

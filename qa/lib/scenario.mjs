@@ -46,7 +46,7 @@ export const CAR4_START = { latitude: 4.1990, longitude: 101.2560 };
  */
 export const CARS = [
   { key: 'car1', kind: 'main', name: 'Aisha’s Myvi', displayName: 'Aisha', color: '#2563EB', startOffset: 5000, speed: 27.9, phase: 0.0, organizer: true },
-  { key: 'car2', kind: 'main', name: 'Wyna’s X70', displayName: 'Wyna', color: '#D9480F', startOffset: 4200, speed: 27.7, phase: 1.3, gap: { from: 200, to: 380 } },
+  { key: 'car2', kind: 'main', name: 'Wyna’s X70', displayName: 'Wyna', color: '#CC450D', startOffset: 4200, speed: 27.7, phase: 1.3, gap: { from: 200, to: 380 } },
   { key: 'car3', kind: 'main', name: 'Hafiz’s Hilux', displayName: 'Hafiz', color: '#0F766E', startOffset: 2900, speed: 27.5, phase: 2.6 },
   { key: 'car4', kind: 'merge', name: 'Daniel’s City', displayName: 'Daniel', color: '#7C3AED', mergeAt: 408, ownCruise: 15, mainSpeed: 27.2 },
   { key: 'car5-app', kind: 'app', name: 'the app', startOffset: 1900, speed: 27.4 },
@@ -117,7 +117,7 @@ export const REBUILD = {
 };
 export const REBUILD_CARS = [
   { key: 'car1', kind: 'main', name: 'Aisha’s Myvi', displayName: 'Aisha', color: '#2563EB', startOffset: 5000, speed: 27.9, organizer: true, synthetic: true },
-  { key: 'car2', kind: 'main', name: 'Wyna’s X70', displayName: 'Wyna', color: '#D9480F', startOffset: 4200, speed: 27.7, synthetic: true },
+  { key: 'car2', kind: 'main', name: 'Wyna’s X70', displayName: 'Wyna', color: '#CC450D', startOffset: 4200, speed: 27.7, synthetic: true },
   { key: 'car3', kind: 'main', name: 'Hafiz’s Hilux', displayName: 'Hafiz', color: '#0F766E', startOffset: REBUILD.next.offset, speed: 0, synthetic: true },
   { key: 'car4', kind: 'main', name: 'Daniel’s City', displayName: 'Daniel', color: '#7C3AED', startOffset: 13_500, speed: 27.9, synthetic: true },
 ];

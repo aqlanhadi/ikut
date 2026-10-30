@@ -14,7 +14,7 @@ enum OwnWayDemo {
         let model = LobbyModel.sample(started: false, seconds: 2 * 3600 + 40 * 60, stops: [], route: LobbyStopsDemo.route)
         planner.sync(trip: model.trip, stops: model.stops)
         func car(route: [CLLocationCoordinate2D]?, mergeOffset: Double?, state: CarState) -> Car {
-            Car(id: "c2", name: "Wyna’s X70", color: "#D9480F", trackerUserId: "u2", isLead: false,
+            Car(id: "c2", name: "Wyna’s X70", color: "#CC450D", trackerUserId: "u2", isLead: false,
                 route: route.map(Polyline.encode), mergeOffset: mergeOffset, state: state, number: 2)
         }
         let info = OwnWayInfo()

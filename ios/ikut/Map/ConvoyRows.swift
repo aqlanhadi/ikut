@@ -155,7 +155,7 @@ struct JoiningRowView: View {
     let rows = [
         row("c1", 1, "#2563EB", "Aqlan’s car", subtitle: "Lead · " + ConvoyFormat.speed(metersPerSecond: 96 / 3.6),
             "Lead", ConvoyFormat.eta(Date().addingTimeInterval(3_000)), mine: true),
-        row("c2", 2, "#D9480F", "Wyna’s X70", subtitle: ConvoyFormat.speed(metersPerSecond: 92 / 3.6),
+        row("c2", 2, "#CC450D", "Wyna’s X70", subtitle: ConvoyFormat.speed(metersPerSecond: 92 / 3.6),
             ConvoyFormat.distance(1_800), ConvoyFormat.behind(70)),
         row("c5", 5, "#BE185D", "Faiz’s car", subtitle: ConvoyFormat.speed(metersPerSecond: 90 / 3.6),
             ConvoyFormat.distance(8_000), ConvoyFormat.behind(330), separated: true),

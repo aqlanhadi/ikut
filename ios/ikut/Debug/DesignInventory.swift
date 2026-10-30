@@ -98,7 +98,7 @@ frame|width 30, height 30||App/HomeMapContent.swift:134
 frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
-color|#8E8E93|8E8E93|Join/JoinSheet.swift:429
+color|#737378|737378|Join/JoinSheet.swift:429
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:186
 opacity|0.5||Lobby/LobbyMap.swift:273
 padding|6||Lobby/LobbyMap.swift:297
@@ -109,7 +109,7 @@ font|11||Lobby/LobbyMap.swift:321
 font|12||Lobby/LobbyMap.swift:323
 frame|width 8, height 8||Lobby/LobbyMap.swift:325
 frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
-color|#D9480F|D9480F|Lobby/LobbyView.swift:70
+color|#CC450D|CC450D|Lobby/LobbyView.swift:70
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:782
 frame|width 30||Location/LocationAskStep.swift:33
 frame|width 14, height 14||Map/ConvoyPanel.swift:271
@@ -148,7 +148,7 @@ frame|width 20||Trip/CreateTripView.swift:98
 font|34||Trip/MapPickView.swift:113
 frame|width 80||Trip/NewTripSheet.swift:109
 color|#2563EB|2563EB|Trip/TripService.swift:18
-color|#D9480F|D9480F|Trip/TripService.swift:18
+color|#CC450D|CC450D|Trip/TripService.swift:18
 color|#0F766E|0F766E|Trip/TripService.swift:18
 color|#7C3AED|7C3AED|Trip/TripService.swift:18
 color|#BE185D|BE185D|Trip/TripService.swift:18

@@ -134,11 +134,11 @@ describe("eventExpiryCutoff", () => {
 describe("pickCarColor", () => {
   it("keeps a free requested colour", () => assert.equal(pickCarColor("#7C3AED", ["#2563EB"]), "#7C3AED"));
   it("replaces a taken colour with the first free palette colour", () => {
-    assert.equal(pickCarColor("#D9480F", ["#2563EB", "#0F766E", "#D9480F"]), "#7C3AED");
-    assert.equal(pickCarColor("#d9480f", ["#2563EB", "#D9480F"]), "#0F766E");
+    assert.equal(pickCarColor("#CC450D", ["#2563EB", "#0F766E", "#CC450D"]), "#7C3AED");
+    assert.equal(pickCarColor("#cc450d", ["#2563EB", "#CC450D"]), "#0F766E");
   });
   it("cycles by car count when the palette is exhausted", () => {
-    const all = ["#2563EB", "#D9480F", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
+    const all = ["#2563EB", "#CC450D", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
     assert.equal(pickCarColor("#2563EB", all), "#2563EB");
   });
 });

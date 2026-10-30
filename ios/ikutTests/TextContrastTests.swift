@@ -51,4 +51,19 @@ struct TextContrastTests {
     @Test func theBrandAccentIsNotWhatAWhiteLabelSitsOn() {
         #expect(Self.contrast(0xFFFFFF, rgb("ikutAccent", dark: true)) < 4.5)
     }
+
+    private func hex(_ s: String) -> UInt32 { UInt32(s.dropFirst(), radix: 16)! }
+
+    /// White numbers and icons sit on every car colour, so a colour that fails breaks the suite.
+    @Test func whiteReadsOnEveryCarColour() {
+        for colour in TripService.palette {
+            let ratio = Self.contrast(0xFFFFFF, hex(colour))
+            #expect(ratio >= 4.5, "white on \(colour): \(ratio)")
+        }
+    }
+
+    /// The grey behind "My own car" (JoinSheet) and the badge's add symbol.
+    @Test func whiteReadsOnTheMyOwnCarGrey() {
+        #expect(Self.contrast(0xFFFFFF, hex("#737378")) >= 4.5)
+    }
 }

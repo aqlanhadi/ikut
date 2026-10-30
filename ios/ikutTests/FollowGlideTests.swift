@@ -264,7 +264,7 @@ struct FollowGlideModelTests {
 
     @Test func anotherCarGlidesOverTheTimeBetweenItsWrites() {
         let model = model(isTracker: true, carAt: tapah)
-        let car2 = Car(id: "c2", name: "Wyna’s X70", color: "#D9480F", trackerUserId: "u2", isLead: false, route: nil,
+        let car2 = Car(id: "c2", name: "Wyna’s X70", color: "#CC450D", trackerUserId: "u2", isLead: false, route: nil,
                        mergeOffset: nil, state: .convoy, number: 2)
         model.setCars(model.cars + [car2])
         let mine = position(tapah, at: t0)

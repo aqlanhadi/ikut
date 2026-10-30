@@ -25,7 +25,7 @@ enum JoinDemo {
                 destinationCoordinate: withCoordinate ? PreviewCoordinate(latitude: 4.5975, longitude: 101.09) : nil,
                 cars: [
                     PreviewCar(id: "c1", name: "Aqlan’s Myvi", color: "#2563EB", hasTracker: !leadUntracked, number: 1, isLead: true),
-                    PreviewCar(id: "c2", name: "Wyna’s X70", color: "#D9480F", hasTracker: true, number: 2),
+                    PreviewCar(id: "c2", name: "Wyna’s X70", color: "#CC450D", hasTracker: true, number: 2),
                 ],
                 stops: withStops
                     ? [

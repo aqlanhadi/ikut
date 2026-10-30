@@ -68,7 +68,7 @@ final class LobbyModel {
             sampleTrip: trip,
             cars: [
                 car("c1", "Aqlan’s Myvi", "#2563EB", 1, tracker: "u1", lead: true),
-                car("c2", "Wyna’s X70", "#D9480F", 2, tracker: "u2"),
+                car("c2", "Wyna’s X70", "#CC450D", 2, tracker: "u2"),
                 car("c3", "Hafiz’s Hilux", "#0F766E", 3, tracker: started ? "u3" : nil),
                 car("c4", "Daniel’s City", "#7C3AED", 4, tracker: "u4"),
             ],

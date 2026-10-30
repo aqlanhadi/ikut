@@ -45,7 +45,7 @@ private let ownCoordinates = [
 
 struct MapMarkerTests {
     @Test func markerPerCarWithColorNumberAndHeading() {
-        let cars = [car("a", number: 1, lead: true), car("b", name: "Wyna’s X70", number: 2, color: "#D9480F")]
+        let cars = [car("a", number: 1, lead: true), car("b", name: "Wyna’s X70", number: 2, color: "#CC450D")]
         let snap = snapshot(
             cars: cars, positions: ["a": position(heading: 90, offset: 2000), "b": position(heading: 200, offset: 500)])
         let markers = MapMarkerBuilder.markers(from: snap, myCarId: "b")
@@ -54,7 +54,7 @@ struct MapMarkerTests {
         #expect(markers[0].heading == 90)
         #expect(markers[0].isLead)
         #expect(!markers[0].isMine)
-        #expect(markers[1].colorHex == "#D9480F")
+        #expect(markers[1].colorHex == "#CC450D")
         #expect(markers[1].isMine)
         #expect(!markers[1].isLead)
         // My own car reads its name; the "You" tag is drawn after it.
@@ -538,7 +538,7 @@ struct TripMapEmulatorTests {
             from: LocationFix(latitude: 40.7, longitude: -120.95, speed: 22, course: 90, timestamp: Date()), battery: nil)
         try await writer.write(first, tripId: ids.tripId, carId: ids.carId)
         let joined = try await EmulatorTrip.joinAsGuest(
-            code: code, name: "Wyna", carName: "Wyna's car", color: "#D9480F", tracker: true)
+            code: code, name: "Wyna", carName: "Wyna's car", color: "#CC450D", tracker: true)
         try await writer.write(other, tripId: ids.tripId, carId: joined.carId)
         // As the tracker of its car, the second member moves it from joining to convoy, as a driving car is.
         try await Firestore.firestore().document("\(FirestorePaths.cars(tripId: ids.tripId))/\(joined.carId)")

@@ -28,7 +28,7 @@ struct MapMarkersDemo: View {
     var body: some View {
         let cars = [
             car("c1", 1, "Aqlan’s Myvi", "#2563EB", lead: true, mine: true),
-            car("c2", 2, "Wyna’s X70", "#D9480F", heading: 200),
+            car("c2", 2, "Wyna’s X70", "#CC450D", heading: 200),
             car("c3", 3, "Hafiz’s Hilux", "#0F766E", heading: 90, joining: true),
             car("c4", 4, "Daniel’s City", "#7C3AED", stale: true, age: "2 min ago"),
             car("c5", 5, "Siti’s Bezza", "#CA8A04", heading: nil, stale: true, paused: true),

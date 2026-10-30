@@ -67,7 +67,7 @@ struct LobbyView: View {
     /// In a sample lobby: whether to show the organizer's card.
     var sampleOrganizer = true
     /// The car colour a sample participant's own route is drawn in.
-    let sampleCarColor = "#D9480F"
+    let sampleCarColor = "#CC450D"
     /// In a sample lobby: the driving layer Start switches to (a demo map; nil, the live one), handed what continues
     /// below its convoy when pulled up.
     var sampleDriving: LobbyView.SampleDriving?

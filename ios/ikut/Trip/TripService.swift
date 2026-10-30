@@ -15,7 +15,7 @@ enum TripService {
     static let codeLength = 6
 
     /// Fixed car colors (hex); the organizer's car takes the first.
-    static let palette = ["#2563EB", "#D9480F", "#0F766E", "#7C3AED", "#BE185D", "#A16207"]
+    static let palette = ["#2563EB", "#CC450D", "#0F766E", "#7C3AED", "#BE185D", "#A16207"]
 
     static func generateCode<G: RandomNumberGenerator>(using generator: inout G) -> String {
         String((0..<codeLength).map { _ in codeAlphabet.randomElement(using: &generator)! })

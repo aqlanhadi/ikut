@@ -504,7 +504,7 @@ export function composeTrack(main, { startOffset = 0, start = null, deviation = 
 export const MAX_GENERATED = 8;
 export const FIRST_NAMES = ['Mei Ling', 'Arjun', 'Siti', 'Kumar', 'Aina', 'Wei Jie', 'Farah', 'Raj'];
 export const CAR_MODELS = ['Myvi', 'Axia', 'Saga', 'City', 'X70', 'Hilux', 'Persona', 'Vios'];
-/** Distinct from the phones (#0a6cff, #d9480f), Daniel (#7C3AED), Hafiz (#0F766E) and each other. */
+/** Distinct from the phones (#0a6cff, #cc450d), Daniel (#7C3AED), Hafiz (#0F766E) and each other. */
 export const PALETTE = ['#c2255c', '#2b8a3e', '#b08900', '#1098ad', '#495057', '#8b5e34'];
 
 /** The next generated car's first name, car name and colour, skipping those in use (`used`: [{ label, color }]). */

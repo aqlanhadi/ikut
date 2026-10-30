@@ -426,7 +426,7 @@ struct JoinSheet: View {
                 ) { model.select(car) }
             }
             carRow(
-                name: "My own car", badge: CarBadge(symbol: Symbol.add, colorHex: "#8E8E93", size: IconSize.small.base),
+                name: "My own car", badge: CarBadge(symbol: Symbol.add, colorHex: "#737378", size: IconSize.small.base),
                 detail: "Shares this car’s location", selected: model.selection == .newCar
             ) { model.selectNewCar() }
         } header: {
