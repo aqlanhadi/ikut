@@ -60,6 +60,15 @@ if (current.startsWith('worktree-agent-')) {
   }
 }
 
+// ---- private files: not in git, so a worktree gets links to the main checkout's copies
+for (const rel of ['CLAUDE.local.md', '.claude/agents', '.claude/hooks', '.claude/settings.json']) {
+  const from = path.join(repo, rel);
+  const to = path.join(worktree, rel);
+  if (!fs.existsSync(from) || fs.existsSync(to)) continue;
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.symlinkSync(from, to);
+}
+
 // ---- build and log folders
 const dd = `/tmp/ikut-dd-${task}`;
 const logs = `/tmp/ikut-logs-${task}`;
