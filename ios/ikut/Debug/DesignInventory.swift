@@ -101,15 +101,15 @@ frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
 color|#737378|737378|Join/JoinSheet.swift:390
-color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:221
-opacity|0.5||Lobby/LobbyMap.swift:314
-padding|6||Lobby/LobbyMap.swift:338
-padding|1||Lobby/LobbyMap.swift:338
-radius|6||Lobby/LobbyMap.swift:339
-font|12||Lobby/LobbyMap.swift:360
-font|11||Lobby/LobbyMap.swift:362
-font|12||Lobby/LobbyMap.swift:364
-frame|width 8, height 8||Lobby/LobbyMap.swift:366
+color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:223
+opacity|0.5||Lobby/LobbyMap.swift:316
+padding|6||Lobby/LobbyMap.swift:340
+padding|1||Lobby/LobbyMap.swift:340
+radius|6||Lobby/LobbyMap.swift:341
+font|12||Lobby/LobbyMap.swift:362
+font|11||Lobby/LobbyMap.swift:364
+font|12||Lobby/LobbyMap.swift:366
+frame|width 8, height 8||Lobby/LobbyMap.swift:368
 frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#CC450D|CC450D|Lobby/LobbyView.swift:70
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:815

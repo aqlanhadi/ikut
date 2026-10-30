@@ -141,7 +141,7 @@ struct TripsHomeView: View {
                 // Once per appearance (Home is new after a trip): where the phone last knew you were.
                 if model.here == nil, !model.isDemo, model.routes.isEmpty { model.here = Self.lastKnownLocation() }
                 // The app's first frame (back from a trip, HomeView flies it with the switch, `enteredWithCamera`).
-                if let camera = model.entryCamera(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding) {
+                if let camera = model.entryCamera(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding, safeTop: statusBar) {
                     move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
                 }
             }
@@ -283,12 +283,12 @@ struct TripsHomeView: View {
         guard let picked = model.picked else { return }
         // Above the short sheet, a left trip's included, whose padding follows it down.
         let insets = Self.obscured(mapHeight: mapHeight, sheet: sheetCover().bottom,
-                                   reach: HomeSheet.reach(model.mode, compact: compact), padding: mapPadding)
+                                   reach: HomeSheet.reach(model.mode, compact: compact), padding: mapPadding, safeTop: statusBar)
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
-            region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
+            region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top, aspect: fitAspect)
         } else if let route = model.pickedRoute {
-            region = PickedTripLogic.fit(route, bottomObscured: insets.bottom, topObscured: insets.top)
+            region = PickedTripLogic.fit(route, bottomObscured: insets.bottom, topObscured: insets.top, aspect: fitAspect)
         } else {
             region = nil
         }
@@ -337,9 +337,9 @@ struct TripsHomeView: View {
     /// Points the camera at every drawn route, above the compact sheet.
     func fit(animated: Bool) {
         guard model.flow == nil, model.joinFlow == nil, model.nameStep == nil else { return }
-        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding, safeTop: statusBar)
         guard let region = PastTripsMapLogic.region(fitting: model.routes, bottomObscured: insets.bottom,
-                                                    topObscured: insets.top) else { return }
+                                                    topObscured: insets.top, aspect: fitAspect) else { return }
         move(to: .region(region), animated: animated)
     }
 
@@ -350,15 +350,23 @@ struct TripsHomeView: View {
     /// (which pushed the fit far south).
     nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = HomeSheet.compactHeight,
                                       reach: CGFloat = HomeSheet.defaultReach,
-                                      padding: CGFloat = LobbySheet.defaultMapPadding) -> (top: Double, bottom: Double) {
-        let height = mapHeight > sheet + Self.topObscured ? mapHeight : 874
+                                      padding: CGFloat = LobbySheet.defaultMapPadding,
+                                      safeTop: CGFloat = LobbyMapLogic.typicalBar) -> (top: Double, bottom: Double) {
+        let topRoom = LobbyMapLogic.bar(safeTop: safeTop) + markerRoom
+        let height = mapHeight > sheet + topRoom ? mapHeight : 874
         let area = max(1, height - padding)
-        return (Double(Self.topObscured / area), Double((max(sheet, reach) - padding) / area))
+        return (Double(topRoom / area), Double((max(sheet, reach) - padding) / area))
     }
 
-    /// Status bar (about 62 pt) plus the half of a destination marker (30 pt) drawn above its coordinate and a breath, so a
-    /// route's top has about the room its bottom has above the sheet.
-    nonisolated private static let topObscured: CGFloat = 92
+    /// Below the status bar, the half of a destination marker (a 30 pt circle centred on its coordinate) and a breath, so a
+    /// route's top has about the room its bottom has above the sheet. The create flow keeps more
+    /// (`HomeSheet.createPinRoom`): its pin stands above its coordinate.
+    nonisolated static let markerRoom: CGFloat = 30
+
+    /// The status bar height the cameras keep clear, from the one map (the lobby reads it the same way).
+    private var statusBar: CGFloat { stage.space.safeTop }
+    /// The shape of what MapKit frames, so a wide route is centred by the latitude the view shows.
+    private var fitAspect: Double { MapFit.aspect(width: stage.space.screenWidth, height: mapHeight, padding: mapPadding) }
 
     // MARK: Create flow
 
@@ -376,10 +384,10 @@ struct TripsHomeView: View {
     /// Before there is a place, the view around you when the camera shows you, else the fixed region it has.
     private func refocusCreate(animated: Bool) {
         guard let flow = model.flow else { return }
-        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact, padding: mapPadding)
-        let place = flow.region(bottomObscured: insets.bottom, topObscured: insets.top)
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact, padding: mapPadding, safeTop: statusBar)
+        let place = flow.region(bottomObscured: insets.bottom, topObscured: insets.top, aspect: fitAspect)
         guard let region = HomeCamera.create(place: place, here: model.here, follows: followsFixes(hasPlace: place != nil),
-                                             bottomObscured: insets.bottom, topObscured: insets.top) else { return }
+                                             bottomObscured: insets.bottom, topObscured: insets.top, aspect: fitAspect) else { return }
         move(to: .region(region), animated: animated)
     }
 
@@ -435,8 +443,8 @@ struct TripsHomeView: View {
     /// The list's view of you above its short sheet, when it has no routes to show.
     private func showHere(animated: Bool) {
         guard let here = model.here, model.flow == nil, model.joinFlow == nil, model.nameStep == nil, model.picked == nil, model.routes.isEmpty else { return }
-        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
-        move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)), animated: animated)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding, safeTop: statusBar)
+        move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top, aspect: fitAspect)), animated: animated)
     }
 
     // MARK: Join flow
@@ -461,8 +469,8 @@ struct TripsHomeView: View {
     /// The camera for a found code: the trip's end above the sheet; nothing before that.
     private func refocusJoin(animated: Bool) {
         guard let joinFlow = model.joinFlow else { return }
-        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact, padding: mapPadding)
-        guard let region = JoinSteps.region(for: joinFlow.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) else { return }
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact, padding: mapPadding, safeTop: statusBar)
+        guard let region = JoinSteps.region(for: joinFlow.model.preview, bottomObscured: insets.bottom, topObscured: insets.top, aspect: fitAspect) else { return }
         move(to: .region(region), animated: animated)
     }
 

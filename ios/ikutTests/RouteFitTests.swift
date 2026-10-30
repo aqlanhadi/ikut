@@ -135,4 +135,44 @@ struct RouteFitTests {
         #expect(stage.aimed == flying)
         stage.flight.cancel()
     }
+
+    /// Home's path at the small phone (375 x 667, a 20 pt status bar) and a large text size: the fractions come from the
+    /// measured status bar and the fit from the measured aspect, so a wide route is centred in the strip Home leaves.
+    @Test(arguments: [CGFloat(1), 1.6])
+    func homesFitIsCentredOnASmallPhone(scale: CGFloat) throws {
+        let screen: CGFloat = 667, width: CGFloat = 375
+        let padding = LobbySheet.mapPadding(scaledMedium: LobbySheet.compactHeight * scale, screenHeight: screen)
+        let insets = TripsHomeView.obscured(mapHeight: screen, reach: HomeSheet.reach(.list, compact: HomeSheet.compact(scaled: HomeSheet.compactHeight * scale, screenHeight: screen)), padding: padding, safeTop: 20)
+        let aspect = MapFit.aspect(width: width, height: screen, padding: padding)
+        let h = Double(screen - padding)
+        // The top room follows the status bar: 20 + the marker, not the iPhone 17's 62.
+        #expect(abs(insets.top * h - Double(20 + TripsHomeView.markerRoom)) < 1e-9)
+        for f in fixtures {
+            let r = route(f)
+            let region = try #require(PastTripsMapLogic.region(fitting: [r], bottomObscured: insets.bottom, topObscured: insets.top, aspect: aspect))
+            let pts = r.coordinates.map { point($0, in: region, width: Double(width), height: h) }
+            let minY = pts.map(\.y).min()!, maxY = pts.map(\.y).max()!, minX = pts.map(\.x).min()!, maxX = pts.map(\.x).max()!
+            #expect(abs(minX - (Double(width) - maxX)) < 1.0, "\(f.name) x")
+            #expect(abs((minY - insets.top * h) - (h * (1 - insets.bottom) - maxY)) < 1.0, "\(f.name) y")
+        }
+    }
+
+    /// The create flow's top room follows the status bar too, and is today's 110 at the iPhone 17's 62 pt.
+    @Test func theCreateFlowsTopRoomFollowsTheStatusBar() {
+        let at62 = HomeSheet.createInsets(mapHeight: 874, sheet: 470, compact: 300, padding: 269)
+        #expect(abs(at62.top * Double(874 - 269) - 110) < 1e-9)
+        let at20 = HomeSheet.createInsets(mapHeight: 667, sheet: 330, compact: 300, padding: 200, safeTop: 20)
+        #expect(abs(at20.top * Double(667 - 200) - 68) < 1e-9)
+        #expect(HomeSheet.createTopRoom == 110)
+    }
+
+    /// The map is as tall as the screen less the padding: `screenHeight` is the layer's bottom edge, never the safe-area
+    /// frame's height (778), which put every fraction on the wrong height.
+    @MainActor @Test func screenHeightIsTheLayersBottomEdgeNotTheFrameHeight() {
+        let space = MapSpace()
+        space.measure(frame: CGRect(x: 0, y: 62, width: 402, height: 778))
+        space.measure(layer: LayerFrame(minY: 62, bottomEdge: 874, height: 778, safeTop: 62))
+        #expect(space.screenHeight == 874)
+        #expect(space.screenHeight != space.frame.height)
+    }
 }

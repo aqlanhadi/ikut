@@ -147,7 +147,7 @@ enum LobbyMapLogic {
     /// under it, and room for the destination flag, which stands about `flagRoom` above its coordinate, so the flag
     /// lands clear of both. Before the map is measured a typical status bar and phone height stand in.
     static func topFraction(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat = 0) -> Double {
-        let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
+        let bar = bar(safeTop: safeTop) + buttonBand
         return Double((bar + flagRoom) / viewport(mapHeight: mapHeight, safeTop: safeTop, bottomPadding: bottomPadding))
     }
 
@@ -159,13 +159,15 @@ enum LobbyMapLogic {
 
     /// The part of the map MapKit fits a region inside (the map less the bottom padding), so the fractions are of it.
     private static func viewport(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat) -> CGFloat {
-        let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
+        let bar = bar(safeTop: safeTop) + buttonBand
         let measured = mapHeight - bottomPadding
         return measured > 2 * (bar + flagRoom) ? measured : 874 - bottomPadding
     }
 
     /// The status bar before it is measured.
     static let typicalBar: CGFloat = 62
+    /// The status bar height every camera keeps clear: the measured top safe area, a typical one before it is measured.
+    static func bar(safeTop: CGFloat) -> CGFloat { safeTop > 0 ? safeTop : typicalBar }
     /// Under the status bar: the gap above the round map button, the button (56 pt) and a margin below it.
     static let buttonBand: CGFloat = CornerButton.top + 56 + Spacing.xs
     /// The destination flag: its pin and name above the coordinate, with a margin.

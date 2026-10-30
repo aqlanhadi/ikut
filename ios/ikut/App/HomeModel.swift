@@ -155,15 +155,16 @@ final class HomeModel {
     /// typical phone). Nil, no move: a flow (Where to?, joining) or a picked trip keeps its own camera, or the routes make
     /// no region.
     func entryCamera(mapHeight: CGFloat, reach: CGFloat = HomeSheet.defaultReach,
-                     padding: CGFloat = LobbySheet.defaultMapPadding) -> MapCameraPosition? {
-        let insets = TripsHomeView.obscured(mapHeight: mapHeight, reach: reach, padding: padding)
+                     padding: CGFloat = LobbySheet.defaultMapPadding, safeTop: CGFloat = LobbyMapLogic.typicalBar,
+                     aspect: Double = MapFit.referenceAspect) -> MapCameraPosition? {
+        let insets = TripsHomeView.obscured(mapHeight: mapHeight, reach: reach, padding: padding, safeTop: safeTop)
         if mapHeight > 0, !routes.isEmpty {
             guard flow == nil, joinFlow == nil, nameStep == nil else { return nil }
-            return PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) }
+            return PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom, topObscured: insets.top, aspect: aspect).map { .region($0) }
         }
         if routes.isEmpty, let here {
             guard flow == nil, joinFlow == nil, picked == nil, nameStep == nil else { return nil }
-            return .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top))
+            return .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top, aspect: aspect))
         }
         return listCamera
     }

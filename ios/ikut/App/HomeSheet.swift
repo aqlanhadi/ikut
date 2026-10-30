@@ -79,19 +79,25 @@ enum HomeSheet {
 
     /// Room kept between the camera's content and the sheet's top edge when making a trip.
     static let createMargin: CGFloat = 24
-    /// Status bar plus room for a pin drawn above its coordinate.
-    static let createTopRoom: CGFloat = 110
+    /// Room above the status bar's bottom for a pin drawn above its coordinate in the create flow (New trip, Where to?): a
+    /// teardrop pin standing on its coordinate with its name above it. Home's list differs on purpose
+    /// (`TripsHomeView.markerRoom`): its markers are circles centred on the coordinate.
+    static let createPinRoom: CGFloat = 48
+    /// The room kept clear at the top at the reference status bar (62 pt: 110, what the camera always kept on an iPhone 17).
+    static let createTopRoom: CGFloat = LobbyMapLogic.typicalBar + createPinRoom
 
     /// What the camera keeps clear for Where to? and New trip, as fractions of the part of the map the camera frames.
     /// MapKit frames the map above its bottom safe area (`padding`, the one constant `LobbySheet.mapPadding`), so the
     /// fractions are of that part, not of the whole screen. `sheet` is the cover's bottom; the bottom fraction is what it
     /// covers beyond the padding (the list's reach at least, as before), and negative when that is lower than the
     /// padding (the strip then reaches below the frame's edge).
-    static func createInsets(mapHeight: CGFloat, sheet: CGFloat, compact: CGFloat, padding: CGFloat) -> (top: Double, bottom: Double) {
-        let full = mapHeight > sheet + createTopRoom ? mapHeight : 874
+    static func createInsets(mapHeight: CGFloat, sheet: CGFloat, compact: CGFloat, padding: CGFloat,
+                             safeTop: CGFloat = LobbyMapLogic.typicalBar) -> (top: Double, bottom: Double) {
+        let topRoom = LobbyMapLogic.bar(safeTop: safeTop) + createPinRoom
+        let full = mapHeight > sheet + topRoom ? mapHeight : 874
         let area = max(1, full - padding)
         let cleared = max(reach(.list, compact: compact), sheet + createMargin)
-        return (Double(createTopRoom / area), Double((cleared - padding) / area))
+        return (Double(topRoom / area), Double((cleared - padding) / area))
     }
 
     /// A sheet pulled up for one step does not stay tall for the next: New trip opens at its own height.

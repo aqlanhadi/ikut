@@ -29,8 +29,9 @@ enum HomeCamera {
     }
 
     /// The view around `here`, centred in the part of the map the sheet and the status bar leave clear.
-    static func around(_ here: CLLocationCoordinate2D, bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion {
-        PickedTripLogic.focus(on: here, span: hereSpan, bottomObscured: bottomObscured, topObscured: topObscured)
+    static func around(_ here: CLLocationCoordinate2D, bottomObscured: Double, topObscured: Double,
+                       aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion {
+        PickedTripLogic.focus(on: here, span: hereSpan, bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
     }
 
     /// Meters a fix has to move from the last view around you to move the camera again.
@@ -58,10 +59,10 @@ enum HomeCamera {
     /// Where to?'s camera: the place (or the route) when there is one; with none yet, the view around you when the
     /// camera follows you, else nil: the camera stays on the fixed region it has.
     static func create(place: MKCoordinateRegion?, here: CLLocationCoordinate2D?, follows: Bool,
-                       bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion? {
+                       bottomObscured: Double, topObscured: Double, aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion? {
         if let place { return place }
         guard follows, let here else { return nil }
-        return around(here, bottomObscured: bottomObscured, topObscured: topObscured)
+        return around(here, bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
     }
 
     /// Where Close (Where to?, joining) or Back to trips takes the camera.
