@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
+import { runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
 import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
 import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
@@ -215,5 +216,110 @@ describe("App Check options", () => {
   it("are always off in the emulators", () => {
     assert.equal(appCheckOptionsFor({ FUNCTIONS_EMULATOR: "true" }).enforceAppCheck, false);
     assert.equal(appCheckOptionsFor({}).enforceAppCheck, APPCHECK_ENFORCE);
+  });
+});
+
+// A sorted fake list standing in for the trips query: (ms, id) order, "strictly after the cursor".
+function fakeList(items: SweepItem<string>[], reads: string[]) {
+  const sorted = [...items].sort((a, b) => a.ms - b.ms || a.id.localeCompare(b.id));
+  return async (after: SweepCursor | null, limit: number) => {
+    const rest = sorted.filter((i) => !after || i.ms > after.ms || (i.ms === after.ms && i.id > after.id)).slice(0, limit);
+    for (const r of rest) reads.push(r.id);
+    return rest;
+  };
+}
+const trips = (n: number): SweepItem<string>[] => Array.from({ length: n }, (_, i) => ({ id: `t${String(i).padStart(2, "0")}`, ms: 1000 + i, item: "x" }));
+
+describe("runSweep", () => {
+  const base = { pageSize: 3, outOfTime: () => false };
+
+  it("finishes a backlog bigger than one run's cap over several runs, oldest first, never reading a finished trip again", async () => {
+    const reads: string[] = [];
+    const handled: string[] = [];
+    const list = fakeList(trips(7), reads);
+    let cursor: SweepCursor | null = null;
+    const runs: boolean[] = [];
+    for (let run = 0; run < 5; run++) {
+      const o = await runSweep<string>({ ...base, list, cursor, maxItems: 3, handle: async (i) => { handled.push(i.id); } });
+      cursor = o.cursor;
+      runs.push(o.more);
+      if (!o.more) break;
+    }
+    assert.deepEqual(handled, ["t00", "t01", "t02", "t03", "t04", "t05", "t06"]);
+    assert.deepEqual(runs, [true, true, false]);
+    // Each trip was fetched exactly once.
+    assert.deepEqual(reads, handled);
+  });
+
+  it("a finished trip is not read again by the next run", async () => {
+    const reads: string[] = [];
+    const list = fakeList(trips(2), reads);
+    const first = await runSweep<string>({ ...base, list, cursor: null, maxItems: 10, handle: async () => {} });
+    assert.equal(first.handled, 2);
+    reads.length = 0;
+    const second = await runSweep<string>({ ...base, list, cursor: first.cursor, maxItems: 10, handle: async () => {} });
+    assert.equal(second.handled, 0);
+    assert.deepEqual(reads, []);
+  });
+
+  it("saves the cursor after each page", async () => {
+    const saved: (string | null)[] = [];
+    await runSweep<string>({ ...base, list: fakeList(trips(7), []), cursor: null, maxItems: 100, handle: async () => {},
+      save: async (c) => { saved.push(c?.id ?? null); } });
+    assert.deepEqual(saved, ["t02", "t05", "t06"]);
+  });
+
+  it("a trip that throws is counted and the sweep moves past it", async () => {
+    const failedIds: string[] = [];
+    const o = await runSweep<string>({ ...base, list: fakeList(trips(4), []), cursor: null, maxItems: 10,
+      handle: async (i) => { if (i.id === "t01") throw new Error("boom"); }, onFailure: (id) => failedIds.push(id) });
+    assert.equal(o.failed, 1);
+    assert.equal(o.handled, 4);
+    assert.deepEqual(failedIds, ["t01"]);
+    assert.equal(o.cursor?.id, "t03");
+  });
+
+  it("stops at the time budget and keeps its place", async () => {
+    let calls = 0;
+    const o = await runSweep<string>({ ...base, list: fakeList(trips(6), []), cursor: null, maxItems: 100,
+      outOfTime: () => calls >= 4, handle: async () => { calls++; } });
+    assert.equal(o.handled, 4);
+    assert.equal(o.more, true);
+    assert.equal(o.cursor?.id, "t03");
+  });
+
+  it("items that share a sort time are each handled once", async () => {
+    const same = ["a", "b", "c", "d"].map((id) => ({ id, ms: 5, item: "x" }));
+    const handled: string[] = [];
+    let cursor: SweepCursor | null = null;
+    for (let i = 0; i < 4; i++) {
+      const o = await runSweep<string>({ ...base, pageSize: 1, list: fakeList(same, []), cursor, maxItems: 2, handle: async (it) => { handled.push(it.id); } });
+      cursor = o.cursor;
+    }
+    assert.deepEqual(handled, ["a", "b", "c", "d"]);
+  });
+
+  it("wrap: starts over from the beginning once the list runs dry", async () => {
+    const list = fakeList(trips(3), []);
+    const first = await runSweep<string>({ ...base, list, cursor: null, maxItems: 10, wrap: true, handle: async () => {} });
+    assert.equal(first.handled, 3);
+    const second = await runSweep<string>({ ...base, list, cursor: first.cursor, maxItems: 10, wrap: true, handle: async () => {} });
+    assert.equal(second.wrapped, true);
+    assert.equal(second.cursor, null);
+    const handled: string[] = [];
+    await runSweep<string>({ ...base, list, cursor: second.cursor, maxItems: 10, wrap: true, handle: async (i) => { handled.push(i.id); } });
+    assert.deepEqual(handled, ["t00", "t01", "t02"]);
+  });
+
+  it("wrap: busy old trips at the front do not starve the ones behind them", async () => {
+    // 4 trips stay busy (never ended); the cap is 2 per run. Every trip is still checked within two runs.
+    const list = fakeList(trips(4), []);
+    const seen = new Set<string>();
+    let cursor: SweepCursor | null = null;
+    for (let run = 0; run < 2; run++) {
+      const o = await runSweep<string>({ ...base, list, cursor, maxItems: 2, wrap: true, handle: async (i) => { seen.add(i.id); } });
+      cursor = o.cursor;
+    }
+    assert.equal(seen.size, 4);
   });
 });

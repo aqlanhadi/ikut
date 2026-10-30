@@ -1,11 +1,11 @@
 // Run via `npm run test:emulator` (inside firebase emulators:exec).
 import assert from "node:assert/strict";
-import { before, describe, it } from "node:test";
+import { before, beforeEach, describe, it } from "node:test";
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { endIdleTrips } from "../lib/endIdleTrips.js";
-import { purgeTripData } from "../lib/retention.js";
+import { purgeTripData } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { previewTripData } from "../lib/previewTrip.js";
 import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
@@ -449,7 +449,11 @@ describe("previewTrip (emulator)", () => {
   });
 });
 
+// The jobs keep a cursor in jobState/<job>; a test that seeds trips behind the cursor starts from a clean one.
+const resetJobState = async (job: string) => { await db.collection("jobState").doc(job).delete(); };
+
 describe("endIdleTrips (emulator)", () => {
+  beforeEach(() => resetJobState("endIdleTrips"));
   const NOW = new Date();
   const hoursAgo = (h: number) => Timestamp.fromMillis(NOW.getTime() - h * 3_600_000);
 
@@ -537,6 +541,7 @@ describe("endIdleTrips (emulator)", () => {
 });
 
 describe("purgeTripData (emulator)", () => {
+  beforeEach(() => resetJobState("purgeTripData"));
   const NOW = new Date();
   const at = (hours: number) => Timestamp.fromMillis(NOW.getTime() - hours * 3_600_000);
   const point = new GeoPoint(1, 1);
@@ -768,5 +773,102 @@ describe("member cleanup (emulator)", () => {
     }
     assert.equal((await carRef.get()).exists, false, "car c9 still exists 5s after member delete");
     assert.equal((await ref.collection("positions").doc("c9").get()).exists, false);
+  });
+});
+
+describe("retention progress (emulator)", () => {
+  const NOW = new Date();
+  const at = (hours: number) => Timestamp.fromMillis(NOW.getTime() - hours * 3_600_000);
+  const point = new GeoPoint(1, 1);
+  beforeEach(() => resetJobState("purgeTripData"));
+
+  // endedAt 100 days back, `step` minutes apart, so these sort before trips the other tests seed.
+  async function seedOld(n: number) {
+    const refs: FirebaseFirestore.DocumentReference[] = [];
+    for (let i = 0; i < n; i++) {
+      const code = freshCode();
+      const ref = db.collection("trips").doc();
+      await ref.set({
+        name: "T", code, organizerId: "org-" + code, route: "", destination: { name: "D", coordinate: point },
+        status: "ended", createdAt: at(24 * 101),
+        endedAt: Timestamp.fromMillis(NOW.getTime() - 100 * 86_400_000 - (n - i) * 60_000 - Math.floor(Math.random() * 1000)),
+      });
+      await ref.collection("positions").doc("lead").set({ location: point, speed: 0, heading: 0, routeOffset: 0, updatedAt: at(1) });
+      refs.push(ref);
+    }
+    return refs;
+  }
+  const positionsLeft = async (refs: FirebaseFirestore.DocumentReference[]) =>
+    (await Promise.all(refs.map(async (r) => (await r.collection("positions").get()).size))).map((n) => n > 0);
+
+  it("a backlog bigger than the per-run cap is finished over several runs, oldest first", async () => {
+    const refs = await seedOld(5);
+    // Old leftovers from earlier runs of this suite sort first; run until ours are done, capping at 2 a run.
+    let runs = 0;
+    const seenDone: boolean[][] = [];
+    for (; runs < 20; runs++) {
+      const r = await purgeTripData(db, NOW, { maxTrips: 2 });
+      seenDone.push((await positionsLeft(refs)).map((left) => !left));
+      if (!r.more) break;
+    }
+    assert.deepEqual(seenDone[seenDone.length - 1], [true, true, true, true, true]);
+    // Never out of order: a newer trip is purged only after every older one.
+    for (const done of seenDone) {
+      const firstUndone = done.indexOf(false);
+      if (firstUndone >= 0) assert.ok(done.slice(firstUndone).every((d) => !d), JSON.stringify(done));
+    }
+    assert.ok(runs >= 2, "needed more than one run");
+  });
+
+  it("a finished trip is not read again", async () => {
+    await seedOld(3);
+    await purgeTripData(db, NOW);
+    const again = await purgeTripData(db, NOW);
+    assert.equal(again.examined, 0);
+    assert.equal(again.more, false);
+    const state = (await db.collection("jobState").doc("purgeTripData").get()).data()!;
+    assert.equal(typeof state.cursorMs, "number");
+  });
+
+  it("the expired-events sweep runs when the trip loop is out of cap or out of time", async () => {
+    const refs = await seedOld(2);
+    const active = db.collection("trips").doc();
+    await active.set({ name: "T", code: freshCode(), organizerId: "o", route: "", destination: { name: "D", coordinate: point }, status: "active", createdAt: at(2) });
+    const ev = active.collection("events").doc("old");
+    await ev.set({ type: "hazard", category: "hazard", severity: "low", location: point, heading: 0, routeOffset: 0, authorId: "x", carId: "lead", createdAt: at(5), expiresAt: at(3) });
+    const capped = await purgeTripData(db, NOW, { maxTrips: 0 });
+    assert.equal(capped.more, true);
+    assert.equal((await ev.get()).exists, false);
+    assert.deepEqual(await positionsLeft(refs), [true, true], "the trips were left for the next run");
+
+    const ev2 = active.collection("events").doc("old2");
+    await ev2.set({ type: "hazard", category: "hazard", severity: "low", location: point, heading: 0, routeOffset: 0, authorId: "x", carId: "lead", createdAt: at(5), expiresAt: at(3) });
+    const late = await purgeTripData(db, NOW, { tripBudgetMs: -1 });
+    assert.equal(late.more, true);
+    assert.equal((await ev2.get()).exists, false);
+  });
+});
+
+describe("endIdleTrips progress (emulator)", () => {
+  const NOW = new Date();
+  const hoursAgo = (h: number) => Timestamp.fromMillis(NOW.getTime() - h * 3_600_000);
+  beforeEach(() => resetJobState("endIdleTrips"));
+
+  it("goes round: busy old trips at the front do not keep the idle ones behind them from being checked", async () => {
+    const mk = async (createdH: number, lastActivityH: number) => {
+      const ref = db.collection("trips").doc();
+      await ref.set({ name: "T", code: freshCode(), organizerId: "o", route: "", destination: { name: "D", coordinate: new GeoPoint(1, 1) },
+        status: "active", createdAt: hoursAgo(createdH), lastActivityAt: hoursAgo(lastActivityH) });
+      return ref;
+    };
+    // Older than every trip the other tests create (40000 hours back), so they sort first. Two busy, then an idle one.
+    const busy1 = await mk(40_300, 1);
+    const busy2 = await mk(40_200, 1);
+    const idle = await mk(40_100, 30);
+    let ended = 0;
+    for (let run = 0; run < 400 && ended === 0; run++) ended += await endIdleTrips(db, NOW, { maxTrips: 2 });
+    assert.equal((await idle.get()).data()!.status, "ended");
+    assert.equal((await busy1.get()).data()!.status, "active");
+    assert.equal((await busy2.get()).data()!.status, "active");
   });
 });
