@@ -147,12 +147,12 @@ frame|width 20||Trip/CreateTripView.swift:84
 frame|width 20||Trip/CreateTripView.swift:98
 font|34||Trip/MapPickView.swift:113
 frame|width 80||Trip/NewTripSheet.swift:109
-color|#2563EB|2563EB|Trip/TripService.swift:18
-color|#CC450D|CC450D|Trip/TripService.swift:18
-color|#0F766E|0F766E|Trip/TripService.swift:18
-color|#7C3AED|7C3AED|Trip/TripService.swift:18
-color|#BE185D|BE185D|Trip/TripService.swift:18
-color|#A16207|A16207|Trip/TripService.swift:18
+color|#2563EB|2563EB|Trip/TripService.swift:19
+color|#CC450D|CC450D|Trip/TripService.swift:19
+color|#0F766E|0F766E|Trip/TripService.swift:19
+color|#7C3AED|7C3AED|Trip/TripService.swift:19
+color|#BE185D|BE185D|Trip/TripService.swift:19
+color|#A16207|A16207|Trip/TripService.swift:19
 opacity|0.25||UI/GlassSurface.swift:86
 frame|minHeight 58||UI/Theme.swift:198
 frame|height 28||UI/TripComponents.swift:108
