@@ -306,6 +306,7 @@
 		F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519810884A2F43AD0A1C337 /* HomeView.swift */; };
 		F8E045C650D5F0F83C461892 /* PlaceResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF960678563AF80F4392D216 /* PlaceResultRow.swift */; };
 		FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52C0A56BCBBB39D114D5E659 /* Motion.swift */; };
+		FB51D1A672EE0EFBD53B0034 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */; };
 		FD0670372EDB335CD4F4D390 /* StopApproachDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */; };
 		FD7128624DA204DAC7C1E861 /* IkutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DBB4EC8798CACA623AE229 /* IkutApp.swift */; };
 		FDFF2E6CAE8C2F8A39EF06AE /* JoinStepperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B89CD36B48802E9292F07AF /* JoinStepperTests.swift */; };
@@ -520,6 +521,7 @@
 		930848C6717DEC58B1DC47B5 /* ButtonSizesDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonSizesDemo.swift; sourceTree = "<group>"; };
 		94110B44C36ABA8B33885499 /* TripMapContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapContentTests.swift; sourceTree = "<group>"; };
 		951F1A803F9A4E5253A97CE1 /* PlacesRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefreshTests.swift; sourceTree = "<group>"; };
+		96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		969AB41D53300836956F03B0 /* LobbySheetSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbySheetSections.swift; sourceTree = "<group>"; };
 		9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAll.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
@@ -872,6 +874,7 @@
 			isa = PBXGroup;
 			children = (
 				7DC390858FBBDA52C3ED0823 /* Info.plist */,
+				96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */,
 				FD88D2E34D13FB464F448E3D /* PrivacyInfo.xcprivacy */,
 				A45C54A8C84EB3562F40722B /* Alerts */,
 				0C3C6779B68FE359CFD8B4DB /* App */,
@@ -1340,6 +1343,7 @@
 			files = (
 				41B20B0B136B5216FB3D26AC /* Assets.xcassets in Resources */,
 				6B68A5A78A26EA440465AAA7 /* GoogleService-Info.plist in Resources */,
+				FB51D1A672EE0EFBD53B0034 /* Localizable.xcstrings in Resources */,
 				45BAED86337E8591BE1EEE93 /* PrivacyInfo.xcprivacy in Resources */,
 				875D0079B62FB671E73E3916 /* README-places.md in Resources */,
 				B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */,
@@ -1730,8 +1734,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
 				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS_ALLOW_IN_DEBUG = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -1914,8 +1921,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
 				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS_ALLOW_IN_DEBUG = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

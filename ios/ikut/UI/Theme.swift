@@ -82,7 +82,7 @@ struct CardHeader<Content: View>: View {
 
     var body: some View {
         HStack(spacing: Spacing.s) {
-            Text(title.uppercased()).accessibilityAddTraits(.isHeader)
+            Text(title).textCase(.uppercase).accessibilityAddTraits(.isHeader)
             content
         }
         .font(.footnote)

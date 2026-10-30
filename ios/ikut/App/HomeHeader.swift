@@ -50,7 +50,7 @@ struct HomeHeader: View {
     @ViewBuilder
     private var profileButton: some View {
         if let name = profileName {
-            RoundGlassIconButton(text: name.prefix(1).uppercased(), label: "Your name and settings", size: barHeight, exact: true) {
+            RoundGlassIconButton(text: String(name.prefix(1)), label: "Your name and settings", size: barHeight, exact: true) {
                 onProfile(name)
             }
         }

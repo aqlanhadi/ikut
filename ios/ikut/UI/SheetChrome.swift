@@ -155,7 +155,7 @@ struct RoundGlassIconButton: View {
     @ViewBuilder private var faceView: some View {
         switch face {
         case .symbol(let name): Image(systemName: name).font(glyph)
-        case .text(let text): Text(text).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
+        case .text(let text): Text(text).textCase(.uppercase).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
         }
     }
 
