@@ -6,7 +6,10 @@ import Observation
 /// merges it with the copy cached on the phone, and caches the result.
 enum RecapService {
     @MainActor static func fetch(tripId: String, db: Firestore = Firestore.firestore()) async throws -> RecapSnapshot {
-        let trip = try await db.document(FirestorePaths.trip(tripId)).getDocument(as: Trip.self)
+        let tripDoc = try await db.document(FirestorePaths.trip(tripId)).getDocument()
+        // Deleted 90 days after the end: say so, rather than a decoding failure.
+        guard tripDoc.exists else { throw NotStored() }
+        let trip = try tripDoc.data(as: Trip.self)
         let cars = try await db.collection(FirestorePaths.cars(tripId: tripId)).getDocuments().decoded(Car.self)
         let members = try await db.collection(FirestorePaths.members(tripId: tripId)).getDocuments().decoded(Member.self)
         // Positions and events may already be purged (7 days after the end); an empty list is fine.
@@ -36,7 +39,19 @@ enum RecapService {
                                createdAt: e.createdAt, expiresAt: e.expiresAt, message: e.message)
                 }
             }
-            .sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) })
+            .sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) },
+            summary: trip.summary)
+    }
+
+    /// The trip no longer exists on the server.
+    struct NotStored: Error {}
+
+    /// The server no longer has this trip for this phone: deleted (90 days), or this phone isn't a member any more.
+    static func isNotStored(_ error: Error) -> Bool { error is NotStored || HomeNow.isGone(error) }
+
+    /// Removes this trip's cached recap (Delete from history).
+    static func removeCache(tripId: String) {
+        if let url = cacheURL(tripId) { try? FileManager.default.removeItem(at: url) }
     }
 
     // MARK: Cache
@@ -75,6 +90,9 @@ final class RecapModel {
 
     /// Plain words, without the system's message.
     static let couldntLoad = "Couldn’t load this recap. Check your signal and try again."
+    /// The trip is gone from the server and nothing of it is kept on this phone: nothing to retry.
+    static let notStored = "This trip is no longer stored. Trips are deleted 90 days after they end."
+    private(set) var isNotStored = false
 
     /// For tests: a failed load.
     init(failedTripId: String) {
@@ -82,6 +100,15 @@ final class RecapModel {
         errorMessage = Self.couldntLoad
         fetch = { try await RecapService.fetch(tripId: $0) }
         persist = true
+    }
+
+    /// For previews: the trip is gone from the server and nothing is kept here.
+    init(notStoredTripId: String) {
+        tripId = notStoredTripId
+        isNotStored = true
+        errorMessage = Self.notStored
+        fetch = { try await RecapService.fetch(tripId: $0) }
+        persist = false
     }
 
     /// `fetch` and `persist` are for tests: a load that doesn't touch the server or the phone's files.
@@ -111,6 +138,7 @@ final class RecapModel {
     func retry(myUserId: String?) async {
         guard snapshot == nil else { return }
         errorMessage = nil
+        isNotStored = false
         await load(myUserId: myUserId)
     }
 
@@ -126,7 +154,10 @@ final class RecapModel {
             apply(merged)
             errorMessage = nil
         } catch {
-            if snapshot == nil { errorMessage = Self.couldntLoad }
+            if snapshot == nil {
+                isNotStored = RecapService.isNotStored(error)
+                errorMessage = isNotStored ? Self.notStored : Self.couldntLoad
+            }
         }
         if originName == nil, let first = snapshot.flatMap({ Polyline.decode($0.route).first }) {
             originName = await RouteBuilder.placeName(at: first)
@@ -181,6 +212,12 @@ enum PastTrips {
             if entry.leftAt == nil { entry.leftAt = old.leftAt }
         }
         return Array(([entry] + list.filter { $0.id != entry.id }).prefix(limit))
+    }
+
+    /// Forgets one trip: the entry only (its files go with `HistoryDelete`).
+    static func remove(tripId: String, defaults: UserDefaults = .standard) {
+        let list = all(defaults: defaults).filter { $0.id != tripId }
+        if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: key) }
     }
 
     /// The other members' names (everyone in `names` except `userId`), for `Entry.others`.

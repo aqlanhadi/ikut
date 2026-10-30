@@ -153,6 +153,18 @@ struct RecapRouteMap: View {
 
 #if DEBUG
 extension RecapSnapshot {
+    /// 30 days after the end: events and positions purged, the server's summary left (D107).
+    @MainActor static func purgedDemo(now: Date = Date()) -> RecapSnapshot {
+        var s = demo(now: now)
+        s.endedAt = now.addingTimeInterval(-30 * 86_400)
+        s.createdAt = s.endedAt?.addingTimeInterval(-10_020)
+        s.events = []
+        s.positions = []
+        s.summary = TripSummary(distanceMeters: 205_000, durationSeconds: 9_600, peopleCount: 4, carCount: 3, stopCount: 2,
+                                roadReportCount: 5, summarisedAt: s.endedAt)
+        return s
+    }
+
     /// KL to Ipoh on the demo route, for previews and the screenshot test.
     @MainActor static func demo(now: Date = Date()) -> RecapSnapshot {
         let main = MapDemo.densify(MapDemo.mainWaypoints)

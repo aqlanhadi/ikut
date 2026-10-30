@@ -60,13 +60,16 @@ struct PickedTripHeader: View {
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, Spacing.xxs).padding(.top, Spacing.s)
-                Button("Try again") { Task { await model.retry(myUserId: Auth.auth().currentUser?.uid) } }
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.accentText)
-                    .ikutRow(fillWidth: true)
-                    .background(Color(.tertiarySystemFill), in: Capsule())
-                    .contentShape(Capsule())
-                    .padding(.top, Spacing.m)
+                // A trip gone from the server has nothing to try again.
+                if !model.isNotStored {
+                    Button("Try again") { Task { await model.retry(myUserId: Auth.auth().currentUser?.uid) } }
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentText)
+                        .ikutRow(fillWidth: true)
+                        .background(Color(.tertiarySystemFill), in: Capsule())
+                        .contentShape(Capsule())
+                        .padding(.top, Spacing.m)
+                }
             } else {
                 HStack(spacing: Spacing.s) {
                     ProgressView()

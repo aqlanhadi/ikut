@@ -69,8 +69,18 @@ struct RecapSnapshot: Codable, Sendable, Equatable {
     var memberCars: [String: String]
     var positions: [RecapPosition]
     var events: [RecapEvent]
+    /// The server's end-of-trip numbers (D107): what the recap shows once the events are purged. Nil in a copy
+    /// cached before they existed, or for a trip whose summary isn't written yet.
+    var summary: TripSummary? = nil
 
     var destination: CLLocationCoordinate2D { .init(latitude: destinationLatitude, longitude: destinationLongitude) }
+
+    /// Ended more than the retention ago with no events left: the server's purge has run, so the counts the events
+    /// gave are the summary's to give. A copy cached before the purge still has its events and stays live.
+    func eventsArePurged(now: Date) -> Bool {
+        guard let endedAt, events.isEmpty else { return false }
+        return now.timeIntervalSince(endedAt) > RecapLogic.retention
+    }
 }
 
 /// One stat tile.
@@ -164,6 +174,7 @@ enum RecapLogic {
     static func merge(cached: RecapSnapshot?, fresh: RecapSnapshot) -> RecapSnapshot {
         guard let cached, cached.tripId == fresh.tripId else { return fresh }
         var out = fresh
+        if out.summary == nil { out.summary = cached.summary }
         let freshEventIds = Set(fresh.events.map(\.id))
         out.events += cached.events.filter { !freshEventIds.contains($0.id) }
         out.events.sort { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
@@ -335,15 +346,20 @@ enum RecapLogic {
 
     static func recap(_ s: RecapSnapshot, originName: String? = nil, now: Date = Date()) -> Recap {
         let arrivals = arrivals(positions: s.positions, destination: s.destination)
-        let duration = duration(start: s.createdAt, end: s.endedAt)
-        let distance = routeDistance(s.route)
+        // Once the server purged the events (7 days after the end) the recap reads the trip's own summary, so stops and
+        // road reports aren't shown as zero. The summary's duration counts from the first Start Trip (from creation if
+        // it never started); the live recap counts from creation, so the summary's number is shown only in this case.
+        let summary = s.eventsArePurged(now: now) ? s.summary : nil
+        let duration = summary?.durationSeconds ?? duration(start: s.createdAt, end: s.endedAt)
+        let distance = summary?.distanceMeters ?? routeDistance(s.route)
         let spread = finalSpread(positions: s.positions)
-        let stops = s.events.filter { $0.category == .stopRequest }.count
-        let reports = s.events.filter(isRoadReport).count
-        let people = Set(s.memberNames.keys).count
+        let stops = summary?.stopCount ?? s.events.filter { $0.category == .stopRequest }.count
+        let reports = summary?.roadReportCount ?? s.events.filter(isRoadReport).count
+        let people = summary?.peopleCount ?? Set(s.memberNames.keys).count
+        let carCount = summary?.carCount ?? s.cars.count
 
         var subtitle = [originName.map { "\($0) to \(s.destinationName)" } ?? "To \(s.destinationName)"]
-        subtitle.append(s.cars.count == 1 ? "1 car" : "\(s.cars.count) cars")
+        subtitle.append(carCount == 1 ? "1 car" : "\(carCount) cars")
         if people > 0 { subtitle.append(people == 1 ? "1 person" : "\(people) people") }
 
         let arrivedNote: String
@@ -354,7 +370,7 @@ enum RecapLogic {
         } else {
             arrivedNote = "\(arrivals.count) of \(s.cars.count) arrived"
         }
-        let timeNote = [s.createdAt, s.endedAt].allSatisfy { $0 != nil }
+        let timeNote = summary?.durationSeconds == nil && [s.createdAt, s.endedAt].allSatisfy { $0 != nil }
             ? "\(clock(s.createdAt!)) to \(clock(s.endedAt!))" : ""
         let spreadTile: RecapStat = spread.map {
             RecapStat(label: "Final spread", value: String(format: "%.1f", $0 / 1000), unit: "km", note: "Front to back at the end")
@@ -378,7 +394,7 @@ enum RecapLogic {
 
         return Recap(
             title: s.name, subtitle: subtitle.joined(separator: " · "), startedAt: s.createdAt, endedAt: s.endedAt,
-            duration: duration, routeDistance: distance, carCount: s.cars.count, peopleCount: people,
+            duration: duration, routeDistance: distance, carCount: carCount, peopleCount: people,
             stopCount: stops, roadReportCount: reports, arrivals: arrivals, finalSpread: spread, stats: stats,
             awards: awards(s, arrivals: arrivals), timeline: timeline(s, arrivals: arrivals, originName: originName),
             notes: notes)

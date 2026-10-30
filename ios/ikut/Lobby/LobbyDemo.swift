@@ -340,6 +340,12 @@ enum DemoScreens {
         }
         /// A lobby is the trip screen's lobby mode, over the screen's one map.
         func trip<V: View>(_ view: V) -> AnyView { nav(TripScreenHost { view }) }
+        func recapPage(_ model: RecapModel) -> AnyView {
+            AnyView(NavigationStack {
+                Color.clear.navigationTitle("Trips").navigationBarTitleDisplayMode(.inline)
+                    .navigationDestination(isPresented: .constant(true)) { RecapView(model: model) }
+            })
+        }
         func home(_ state: String) -> AnyView {
             // Home is the Home mode of the app's one map (D54).
             AnyView(TripScreenHost(mode: .home) { HomePickedDemo.view(state) }.environment(AuthModel()).environment(LocationPermission()))
@@ -599,6 +605,13 @@ enum DemoScreens {
         case "home-open-trip-late":
             return nav(TripScreenHost(mode: .home, makeTrip: { OpenTrip.sample(tripId: $0) }) { HomeOpenTripLateDemo() })
         case "home-picked-failed": return home("failed")
+        // Delete from history (D107): the ask, and the words when the leave didn't land.
+        case "home-past-delete-ask": return home("delete-ask")
+        case "home-past-delete-failed": return home("delete-failed")
+        // The recap of a trip whose events were purged (the server's summary), and of one gone from the server.
+        case "recap-from-summary":
+            return recapPage(RecapModel(snapshot: .purgedDemo(), originName: "Tanjung Malim"))
+        case "recap-trip-gone": return recapPage(RecapModel(notStoredTripId: "gone"))
         // A trip left early, picked: its route, and no recap (D54, #421).
         case "home-picked-left": return home("left")
         case "stop-request-places": return AnyView(StopCardPreview(scene: "responder", screen: "places"))

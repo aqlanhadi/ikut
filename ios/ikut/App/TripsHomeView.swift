@@ -37,6 +37,8 @@ struct TripsHomeView: View {
     @State private var newName = ""
     @State private var renameError: String?
     @State private var settingsShown = false
+    /// The past trip whose Delete from history is being asked about.
+    @State private var deleting: PastTrips.Entry?
     #if DEBUG
     /// A launch state opens with a name alert up: `rename` (the field) or `rename-error` (it couldn't be saved).
     var demoAlert: String?
@@ -569,6 +571,8 @@ struct TripsHomeView: View {
             switch demoAlert {
             case "settings", "settings-design", "settings-design-fonts": settingsShown = true
             case "rename": newName = "Nurul"; renaming = true
+            case "delete-ask": deleting = model.past.first { HistoryDelete.canDelete($0) }
+            case "delete-failed": model.deleteProblem = HistoryDelete.couldntLeave
             case "rename-error": renameError = "Use 1 to \(DisplayName.maxLength) characters."
             default: break
             }
@@ -611,6 +615,12 @@ struct TripsHomeView: View {
                 } else {
                     ForEach(parts.past) { entry in
                         Button { open(entry) } label: { HomePastRow(entry: entry) }
+                            .swipeActions(edge: .trailing) {
+                                Button("Delete", systemImage: Symbol.delete, role: .destructive) { deleting = entry }
+                            }
+                            .contextMenu {
+                                Button("Delete from history", systemImage: Symbol.delete, role: .destructive) { deleting = entry }
+                            }
                     }
                 }
             }
@@ -618,6 +628,16 @@ struct TripsHomeView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollBounceBehavior(.basedOnSize)
+        .confirmAlert(
+            "Delete this trip from your history?",
+            message: "It is removed from this phone and you leave the trip. The trip itself is deleted from the server 90 days after it ended.",
+            action: "Delete", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
+        ) {
+            if let entry = deleting { Task { await model.delete(entry) } }
+        }
+        .alert(model.deleteProblem ?? "", isPresented: Binding(get: { model.deleteProblem != nil }, set: { if !$0 { model.deleteProblem = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
         .onAppear { if !model.isDemo { model.reloadPast() } }
         // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
         .task(id: parts.now.map(\.id)) {

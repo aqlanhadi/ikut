@@ -131,6 +131,13 @@ enum PastTripsMapService {
         save(Array(cache.values))
     }
 
+    /// Drops one trip's route from the file cache (Delete from history).
+    static func forget(tripId: String) {
+        var cache = cachedRoutes()
+        guard cache.removeValue(forKey: tripId) != nil else { return }
+        save(Array(cache.values))
+    }
+
     /// What to write to the file cache after a load: the routes Home still lists, or nothing when the load
     /// was for one trip outside them (`keeping: false`), which must not shrink the 12-trip cache.
     static func routesToKeep(_ entries: [PastTrips.Entry], cache: [String: PastTripRoute], keeping: Bool) -> [PastTripRoute]? {

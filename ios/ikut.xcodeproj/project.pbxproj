@@ -78,6 +78,7 @@
 		3AE7CB9FD6B10610505C93EE /* TripEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17EB484B1F7FD361B7EB9E11 /* TripEvent.swift */; };
 		3BDC0CAEB4A0D68F7B58D638 /* MapColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7965946011270463EE3762F1 /* MapColors.swift */; };
 		3C240B4486DA232F9E1504AA /* StopAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B7CE38A043F2B0EBAC9A5 /* StopAskModel.swift */; };
+		3D6945C5DB401AD1B68F2A31 /* HistoryDeleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68FCF585FA09AEA3B51AB27 /* HistoryDeleteTests.swift */; };
 		3E02B8B76CF74C64C90ADFAD /* StopArrivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */; };
 		3E3947EE2E72D11FC40409C1 /* HomeNowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4E6220545874C63A72429B /* HomeNowTests.swift */; };
 		3E6A5D5154BD66BCF5B44BFA /* LocationAskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FE3485E8DF3951CE95A9ABD /* LocationAskStep.swift */; };
@@ -321,6 +322,7 @@
 		F77BAC801AA01A5EA25572C3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519810884A2F43AD0A1C337 /* HomeView.swift */; };
 		F8DCE64D30FFB9AFB86B1E15 /* ExitFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C70CCB41C196ECA0F0858DF /* ExitFlow.swift */; };
 		F8E045C650D5F0F83C461892 /* PlaceResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF960678563AF80F4392D216 /* PlaceResultRow.swift */; };
+		F9C4A43F002799D269CFD4D5 /* HistoryDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4768AA5F7F13B94DAC71DBF4 /* HistoryDelete.swift */; };
 		FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52C0A56BCBBB39D114D5E659 /* Motion.swift */; };
 		FB51D1A672EE0EFBD53B0034 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */; };
 		FD0670372EDB335CD4F4D390 /* StopApproachDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */; };
@@ -455,6 +457,7 @@
 		43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeNowEmulatorTests.swift; sourceTree = "<group>"; };
 		4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		456F6193440599A0317F386C /* TripExitMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripExitMenu.swift; sourceTree = "<group>"; };
+		4768AA5F7F13B94DAC71DBF4 /* HistoryDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDelete.swift; sourceTree = "<group>"; };
 		48AAE1E4ECEB3FDD4AEE0F07 /* RecapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapView.swift; sourceTree = "<group>"; };
 		48B40EC9426F8A1EFD05AC7D /* ikut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ikut.entitlements; sourceTree = "<group>"; };
 		4A620E8A51928B21C76E9227 /* FollowGlide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowGlide.swift; sourceTree = "<group>"; };
@@ -657,6 +660,7 @@
 		F4CFFBB865974E7B13D6A7AE /* AppCheckSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCheckSetup.swift; sourceTree = "<group>"; };
 		F56C3DA55D52C315FF1422E4 /* ConvoyOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyOrdering.swift; sourceTree = "<group>"; };
 		F56D59AA9467F430D986EC9F /* HomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSheet.swift; sourceTree = "<group>"; };
+		F68FCF585FA09AEA3B51AB27 /* HistoryDeleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDeleteTests.swift; sourceTree = "<group>"; };
 		F849A1145EA5F7AF5598EF32 /* TripMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapContent.swift; sourceTree = "<group>"; };
 		F96D7D95AD4B85B47A729BFE /* DrivingGlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivingGlanceTests.swift; sourceTree = "<group>"; };
 		F972FD505779E98F561F7AA8 /* RouteFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteFitTests.swift; sourceTree = "<group>"; };
@@ -694,6 +698,7 @@
 				F4CFFBB865974E7B13D6A7AE /* AppCheckSetup.swift */,
 				89E8EC027CCE192C122FA9F7 /* Backend.swift */,
 				6CAD86226D34FC774F9DB35D /* ContentView.swift */,
+				4768AA5F7F13B94DAC71DBF4 /* HistoryDelete.swift */,
 				CB4DB8EBF9DB24B8BE80FE61 /* HomeCamera.swift */,
 				2E5BF62FE297FAF566E38721 /* HomeHeader.swift */,
 				2B2B86DD84637F94BD8CD6C9 /* HomeMapContent.swift */,
@@ -1089,6 +1094,7 @@
 				ED21589D476E823056C68F4D /* FollowGlideTests.swift */,
 				80CB5B7D4DB737C2F8E47883 /* HandOverTests.swift */,
 				3444E323182FDDB4B67D7428 /* HazardTests.swift */,
+				F68FCF585FA09AEA3B51AB27 /* HistoryDeleteTests.swift */,
 				C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */,
 				C91D939C4B6B3F841C81E964 /* HomeModelTests.swift */,
 				43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */,
@@ -1492,6 +1498,7 @@
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
 				27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */,
 				5626212E868D041FB840F37F /* HazardRegionMonitor.swift in Sources */,
+				F9C4A43F002799D269CFD4D5 /* HistoryDelete.swift in Sources */,
 				D2524C7FCC6D0876AC013798 /* HomeCamera.swift in Sources */,
 				F6017A198D489282BE790269 /* HomeHeader.swift in Sources */,
 				76C148E268AE2ACA0726EA9B /* HomeMapContent.swift in Sources */,
@@ -1685,6 +1692,7 @@
 				92645091B22B66E6182B8677 /* Geometry.swift in Sources */,
 				951121969EF5A902CF0DD942 /* HandOverTests.swift in Sources */,
 				079075CB6B156BCB6CBF0CEA /* HazardTests.swift in Sources */,
+				3D6945C5DB401AD1B68F2A31 /* HistoryDeleteTests.swift in Sources */,
 				D4001445E5CE74D71F3D5092 /* HomeCameraTests.swift in Sources */,
 				B653006A61ACC89FFD7094C8 /* HomeModelTests.swift in Sources */,
 				A773017CB9C9B79C20C393FC /* HomeNowEmulatorTests.swift in Sources */,
