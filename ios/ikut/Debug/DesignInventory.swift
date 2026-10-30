@@ -60,6 +60,8 @@ DrivingList|ViewModifier|Map/TripMapView.swift|2
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|2
 LocationAskContent|View|Location/LocationAskStep.swift|2
 NameLine|View|Map/ConvoyRows.swift|2
+NameStepButton|View|Auth/NameStep.swift|2
+NameStepSections|View|Auth/NameStep.swift|2
 PausedBanner|View|Lobby/PausedBanner.swift|2
 QRCodeSheet|View|Lobby/LobbyView.swift|2
 QRScannerView|View|DeepLink/QRScannerView.swift|2
@@ -98,7 +100,7 @@ frame|width 30, height 30||App/HomeMapContent.swift:134
 frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
-color|#737378|737378|Join/JoinSheet.swift:429
+color|#737378|737378|Join/JoinSheet.swift:390
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:214
 opacity|0.5||Lobby/LobbyMap.swift:304
 padding|6||Lobby/LobbyMap.swift:328
