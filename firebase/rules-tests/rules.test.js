@@ -122,26 +122,19 @@ describe('reads', () => {
 
 describe('trips', () => {
   beforeEach(() => seed());
-  it('organizer creates trip + own member doc + code claim in one batch', () =>
-    assertSucceeds(tripBatch('newOrg', {
+  // D108: trips are made only by the createTrip function (admin SDK). The tests send the batch the app used to send
+  // (D103), well formed in every way, and it is still refused: deleting `allow create: if false` makes the first fail.
+  it('a well-formed create (trip, organizer member and code claim in one batch) is refused', () =>
+    assertFails(tripBatch('newOrg', {
       extra: (b, f) => b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N' })),
     })));
-  it('create with wrong organizerId fails', () =>
-    assertFails(tripBatch('x', { trip: { organizerId: 'y' }, claimOver: { organizerId: 'y' } })));
-  it('create with bad code fails', () =>
-    assertFails(tripBatch('x', { code: 'abc123' })));
-  it('create with status ended fails', () => assertFails(tripBatch('x', { trip: { status: 'ended' } })));
-  it('create with missing field fails', async () => {
-    const f = db('x');
-    const d = tripDoc({ organizerId: 'x', code: NEW_CODE, createdAt: serverTimestamp() });
-    delete d.route;
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/t2'), d);
-    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't2', organizerId: 'x', createdAt: serverTimestamp() });
-    await assertFails(b.commit());
+  it('a trip create alone, with or without a claim, is refused', async () => {
+    await assertFails(tripBatch('newOrg'));
+    await assertFails(tripBatch('newOrg', { claim: false }));
   });
-  it('create with client createdAt fails', () => assertFails(tripBatch('x', { trip: { createdAt: Timestamp.now() } })));
-  it('unauthenticated create fails', () => assertFails(tripBatch(null, { trip: { organizerId: 'x' } })));
+  it('an unauthenticated create is refused', () => assertFails(tripBatch(null, { trip: { organizerId: 'x' } })));
+  it('a create on its own, outside a batch, is refused', () =>
+    assertFails(setDoc(doc(db('newOrg'), 'trips/t3'), tripDoc({ organizerId: 'newOrg', createdAt: serverTimestamp() }))));
   it('organizer can rename', () => assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { name: 'New' })));
   it('organizer can end trip with endedAt = request.time', () =>
     assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() })));
@@ -190,19 +183,6 @@ describe('trip startedAt is write-once', () => {
 describe('D95: trip and event timestamps are server time or capped', () => {
   beforeEach(() => seed());
   const far = Timestamp.fromDate(new Date('9999-01-01T00:00:00Z'));
-  const createWith = (extra) => tripBatch('att', {
-    id: 'd95', trip: extra,
-    extra: (b, f) => b.set(doc(f, 'trips/d95/members/att'), memberDoc({ role: 'organizer', displayName: 'A', carId: 'c' })),
-  });
-  it('create with lastActivityAt in year 9999 fails', () => assertFails(createWith({ lastActivityAt: far })));
-  it('create with a client lastActivityAt of now fails, server time passes', async () => {
-    await assertFails(createWith({ lastActivityAt: ts() }));
-    await assertSucceeds(createWith({ lastActivityAt: serverTimestamp() }));
-  });
-  it('create with a client startedAt fails (even server time: Start Trip is its own write)', async () => {
-    await assertFails(createWith({ startedAt: ts(86400000) }));
-    await assertFails(createWith({ startedAt: serverTimestamp() }));
-  });
   it('organizer cannot push lastActivityAt to year 9999 or a client time', async () => {
     await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: far }));
     await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { lastActivityAt: ts() }));
@@ -239,10 +219,10 @@ describe('members', () => {
     assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy' })));
   it('member cannot set pushToken (D98: every member can read member docs; push tokens will live in an owner-only doc)', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { pushToken: 'tok' })));
-  it('organizer cannot create their member doc with a pushToken', () => {
-    return assertFails(tripBatch('newOrg', {
-      extra: (b, f) => b.set(doc(f, 'trips/t2/members/newOrg'), memberDoc({ role: 'organizer', displayName: 'N', pushToken: 'tok' })),
-    }));
+  it('the organizer cannot create their own member doc, with or without a trip create (D108)', async () => {
+    await assertFails(setDoc(doc(db('org'), `trips/${T}/members/org2`), memberDoc({ role: 'organizer' })));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/t5'), tripDoc({ organizerId: 'o5', code: 'FIVE55' })));
+    await assertFails(setDoc(doc(db('o5'), 'trips/t5/members/o5'), { displayName: 'O', carId: 'c', role: 'organizer' }));
   });
   it('member cannot change own carId', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { carId: 'carB' })));
@@ -1203,13 +1183,7 @@ describe('guessLimits (server only)', () => {
 
 describe('D98: size caps', () => {
   beforeEach(() => seed());
-  const tripCreate = (over, destination) => tripBatch('newOrg', { trip: { ...(destination ? { destination } : {}), ...over } });
   const big = (n) => 'x'.repeat(n);
-  it('a trip with ordinary text and a long real route is created', () =>
-    assertSucceeds(tripCreate({ name: big(200), route: big(200000) }, { name: big(300), coordinate: pt })));
-  it('a trip name over 200 characters is refused', () => assertFails(tripCreate({ name: big(201) })));
-  it('a destination name over 300 characters is refused', () => assertFails(tripCreate({}, { name: big(301), coordinate: pt })));
-  it('a trip route over 200,000 characters is refused', () => assertFails(tripCreate({ route: big(200001) })));
   it('the organizer cannot grow the route or name of the trip past the caps', async () => {
     await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { route: big(200001) }));
     await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { name: big(201) }));
@@ -1229,88 +1203,31 @@ describe('D98: size caps', () => {
     assertFails(setDoc(doc(db('mem'), `trips/${T}/events/e2`), event({ message: big(281) }))));
 });
 
-describe('D103: trip codes are unique among trips', () => {
+describe('D108: code claims belong to the server', () => {
   beforeEach(() => seed());
-  const claimOnly = (uid, code, data) => setDoc(doc(db(uid), `codes/${code}`), data);
-  const tripBatchWithExtraClaim = () => assertFails(tripBatch('newOrg', {
-    extra: (b, f) => b.set(doc(f, 'codes/SQUAT9'), { tripId: 't2', organizerId: 'newOrg', createdAt: serverTimestamp() }),
-  }));
+  const claim = (uid, code, tripId) => setDoc(doc(db(uid), `codes/${code}`), { tripId, organizerId: uid ?? 'x', createdAt: serverTimestamp() });
 
-  it('a normal create (trip and claim in one batch) passes', () => assertSucceeds(tripBatch('newOrg')));
-  it('a trip created with a code another trip holds is refused', () => assertFails(tripBatch('newOrg', { code: 'ABC123' })));
-  it('a trip created with a code still held by an ended trip is refused (the claim stays until the purge)', async () => {
-    await seed({ ended: true });
-    await assertFails(tripBatch('newOrg', { code: 'ABC123' }));
+  it('a client cannot create a claim: not for a free code, not with a trip, not for its own existing trip', async () => {
+    await assertFails(claim('newOrg', 'FREE22', 'nothing'));
+    await assertFails(claim('org', 'OLD222', T));
+    await assertFails(claim(null, 'FREE33', 'nothing'));
+    await assertFails(tripBatch('newOrg'));
   });
-  it('known gap: a code held only by an older trip (made before claims, no code doc) can still be taken by a new trip', async () => {
-    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1'), tripDoc({ organizerId: 'org', code: 'OLD111' })));
-    await assertSucceeds(tripBatch('newOrg', { code: 'OLD111' }));
-  });
-  it('a trip created without claiming its code is refused', () => assertFails(tripBatch('newOrg', { claim: false })));
-  it('a claim naming another trip id is refused', () => assertFails(tripBatch('newOrg', { claimOver: { tripId: 'other' } })));
-  it('a claim naming another organizer is refused', () => assertFails(tripBatch('newOrg', { claimOver: { organizerId: 'org' } })));
-  it('a claim with a client createdAt, or an extra field, is refused', async () => {
-    await assertFails(tripBatch('newOrg', { claimOver: { createdAt: Timestamp.now() } }));
-    await assertFails(tripBatch('newOrg', { claimOver: { admin: true } }));
-  });
-  it('a claim whose code differs from the trip code is refused', async () => {
-    const f = db('newOrg');
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'newOrg', code: 'AAA222', createdAt: serverTimestamp() }));
-    b.set(doc(f, 'codes/BBB333'), { tripId: 't2', organizerId: 'newOrg', createdAt: serverTimestamp() });
-    await assertFails(b.commit());
-  });
-  it('a claim on its own, with no trip created, is refused', () =>
-    assertFails(claimOnly('newOrg', 'LONE22', { tripId: 'nothing', organizerId: 'newOrg', createdAt: serverTimestamp() })));
-  it('a claim pointing at a trip that already exists is refused (claims are made only with a new trip)', () =>
-    assertFails(claimOnly('org', 'OLD222', { tripId: T, organizerId: 'org', createdAt: serverTimestamp() })));
-  it('an organizer cannot create a second trip with a code their own claim holds for another trip (trip side)', async () => {
-    await assertSucceeds(tripBatch('alice', { id: 'tA' }));
-    await assertFails(tripBatch('alice', { id: 'tB', claim: false }));
-  });
-  it('one batch cannot create two trips with one code and one claim', async () => {
-    const f = db('alice');
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/t1'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
-    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
-    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't1', organizerId: 'alice', createdAt: serverTimestamp() });
-    await assertFails(b.commit());
-  });
-  it('one batch cannot create two trips with one code, each writing a claim for it', async () => {
-    const f = db('alice');
-    const b = writeBatch(f);
-    b.set(doc(f, 'trips/t1'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
-    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't1', organizerId: 'alice', createdAt: serverTimestamp() });
-    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
-    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't2', organizerId: 'alice', createdAt: serverTimestamp() });
-    await assertFails(b.commit());
-  });
-  it('a trip cannot hold a second code: an extra claim for another code naming the same trip is refused (claim side)', () =>
-    tripBatchWithExtraClaim());
-  it('an older trip with no claim cannot be given one afterwards, even by its own organizer', async () => {
-    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1'), tripDoc({ organizerId: 'org', code: 'OLD111' })));
-    await assertFails(claimOnly('org', 'OLD111', { tripId: 'old1', organizerId: 'org', createdAt: serverTimestamp() }));
-  });
-  it('a claim for a code of the wrong shape is refused', () =>
-    assertFails(tripBatch('newOrg', { code: 'abc12' })));
-  it('a trip cannot be created pointing at a claim made for another trip', async () => {
-    // Someone else holds codes/NEW234 for trip tA; a new trip tB with that code has no claim of its own.
-    await tripBatch('alice', { id: 'tA' });
-    await assertFails(tripBatch('bob', { id: 'tB', claim: false }));
-    await assertFails(tripBatch('bob', { id: 'tB' }));
-  });
-  it('two creates racing for one code: the second is refused', async () => {
-    await assertSucceeds(tripBatch('alice', { id: 'tA' }));
-    await assertFails(tripBatch('bob', { id: 'tB' }));
-  });
-  it('a client cannot read, overwrite, update or delete a code doc', async () => {
+  it('a client cannot read, overwrite, update or delete a code doc, or list codes', async () => {
     await assertFails(getDoc(doc(db('org'), 'codes/ABC123')));
     await assertFails(getDoc(doc(db('stranger'), 'codes/ABC123')));
+    await assertFails(getDoc(doc(db('stranger'), 'codes/FREE22')));
     await assertFails(setDoc(doc(db('org'), 'codes/ABC123'), { tripId: 'tX', organizerId: 'org', createdAt: serverTimestamp() }));
     await assertFails(updateDoc(doc(db('org'), 'codes/ABC123'), { tripId: 'tX' }));
     await assertFails(deleteDoc(doc(db('org'), 'codes/ABC123')));
     await assertFails(deleteDoc(doc(db('stranger'), 'codes/ABC123')));
     await assertFails(getDocs(collection(db('org'), 'codes')));
+  });
+  it('guess and create counters are not readable or writable by clients', async () => {
+    for (const c of ['guessLimits', 'createLimits']) {
+      await assertFails(getDoc(doc(db('org'), `${c}/org`)));
+      await assertFails(setDoc(doc(db('org'), `${c}/org`), { misses: [] }));
+    }
   });
   it('an older trip with no code doc keeps working: members read it and the organizer renames and ends it', async () => {
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1'), tripDoc({ organizerId: 'org', code: 'OLD111' })));

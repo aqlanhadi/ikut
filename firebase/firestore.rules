@@ -21,10 +21,6 @@ service cloud.firestore {
       return /databases/$(database)/documents/trips/$(tripId)/cars/$(carId);
     }
 
-    function codePath(code) {
-      return /databases/$(database)/documents/codes/$(code);
-    }
-
     // Current trip data (before this write).
     function trip(tripId) {
       return get(tripPath(tripId)).data;
@@ -271,22 +267,11 @@ service cloud.firestore {
 
     // ---------- rules ----------
 
-    // Code claims (D103): one doc per trip code, made in the batch that creates the trip. A create only succeeds while
-    // no doc has that id, so a second trip cannot take a code that is in use. Clients never read (a doc names a trip
-    // id), update or delete one: only the purge job (admin) removes it, 7 days after its trip ended.
+    // Code claims (D103, D108): one doc per trip code, made by the createTrip function (admin SDK) in the same batch as
+    // its trip. Clients never read (a doc names a trip id), create, update or delete one, so nobody can test whether a
+    // code is in use by trying to claim it; only the purge job (admin) removes one, 7 days after its trip ended.
     match /codes/{code} {
-      allow read, update, delete: if false;
-
-      allow create: if isSignedIn()
-        && code.matches('^[A-Z0-9]{6}$')
-        && request.resource.data.keys().hasOnly(['tripId', 'organizerId', 'createdAt'])
-        && request.resource.data.keys().hasAll(['tripId', 'organizerId', 'createdAt'])
-        && isString(request.resource.data.tripId, 1, 128)
-        && request.resource.data.organizerId == request.auth.uid
-        && request.resource.data.createdAt == request.time
-        && !exists(tripPath(request.resource.data.tripId))
-        && getAfter(tripPath(request.resource.data.tripId)).data.code == code
-        && getAfter(tripPath(request.resource.data.tripId)).data.organizerId == request.auth.uid;
+      allow read, write: if false;
     }
 
     // Trips: members read; organizer creates and updates; nobody deletes.
@@ -294,24 +279,10 @@ service cloud.firestore {
       allow get: if isMember(tripId);
       allow list: if false;
 
-      allow create: if isSignedIn()
-        && validTripShape(request.resource.data)
-        && request.resource.data.organizerId == request.auth.uid
-        && request.resource.data.status == 'active'
-        && request.resource.data.code.matches('^[A-Z0-9]{6}$')
-        // The code is claimed in the same batch (D103): codes/{code} is created, for this trip and this organizer. A
-        // code doc can only be created while none exists, so two trips never hold the same code (older trips have no
-        // code doc and keep working; their codes can still be copied until they end).
-        && existsAfter(codePath(request.resource.data.code))
-        && getAfter(codePath(request.resource.data.code)).data.tripId == tripId
-        && getAfter(codePath(request.resource.data.code)).data.organizerId == request.auth.uid
-        && request.resource.data.createdAt == request.time
-        && optionalOf(request.resource.data, 'endedAt') == null
-        // Server time only (D95): a client value (year 9999) would keep the trip from ever idle-ending, and a made-up
-        // startedAt would forge when the trip began.
-        && (optionalOf(request.resource.data, 'lastActivityAt') == null
-            || request.resource.data.lastActivityAt == request.time)
-        && optionalOf(request.resource.data, 'startedAt') == null;
+      // Trips are created only by the createTrip function (D108, admin SDK), which picks a free code and writes the trip,
+      // the organizer's member doc and the code claim in one batch. No client create, so a code cannot be probed by
+      // trying to create a trip with it.
+      allow create: if false;
 
       allow update: if isSignedIn()
         && resource.data.organizerId == request.auth.uid
@@ -346,19 +317,12 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // Members: organizer bootstraps own doc; self updates; self or organizer deletes.
+      // Members: created only by the functions; self updates; self or organizer deletes.
       match /members/{userId} {
         allow read: if isMember(tripId);
 
-        allow create: if isSignedIn()
-          && userId == request.auth.uid
-          && getAfter(tripPath(tripId)).data.organizerId == request.auth.uid
-          && getAfter(tripPath(tripId)).data.status == 'active'
-          && request.resource.data.keys().hasOnly(['displayName', 'carId', 'role'])
-          && request.resource.data.keys().hasAll(['displayName', 'carId', 'role'])
-          && request.resource.data.role == 'organizer'
-          && isString(request.resource.data.displayName, 1, 30)
-          && isString(request.resource.data.carId, 1, 128);
+        // The organizer's own doc is written by createTrip and everyone else's by joinTrip (admin SDK): no client create.
+        allow create: if false;
 
         // carId is never changed by a client; only joinTrip (admin SDK) moves a member between cars.
         allow update: if isMember(tripId)
