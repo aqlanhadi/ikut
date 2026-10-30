@@ -26,9 +26,13 @@ struct TripServiceTests {
     @Test func otherCreateFailuresUsePlainWords() {
         let m = TripService.createFailureMessage
         #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")
-        #expect(m(.unauthenticated, nil) == "You’re signed out. Close ikut, open it again and try again.")
+        #expect(m(.unauthenticated, nil) == "You’re signed out. Close ikut and open it again, then make your trip.")
         #expect(m(.unavailable, nil) != m(.internal, nil))
-        for code in [FunctionsErrorCode.internal, .invalidArgument, .notFound] {
+        #expect(m(.invalidArgument, nil) == "Use a shorter name, then try again.")
+        // `aborted` is the server's "no free code": plain words, and not the no-signal message.
+        #expect(m(.aborted, nil) == "Couldn’t set up your trip just now. Please try again.")
+        #expect(TripService.callTimeout >= 20 && TripService.callTimeout <= 25)
+        for code in [FunctionsErrorCode.internal, .aborted, .notFound] {
             let text = m(code, nil)
             #expect(text == "Couldn’t set up your trip just now. Please try again.")
             #expect(!text.localizedCaseInsensitiveContains("error") && !text.localizedCaseInsensitiveContains("failed"))

@@ -52,6 +52,9 @@ enum TripService {
     /// Longer than `ServerWrite.defaultTimeout`: the first write also opens the connection.
     static let createTimeout: Duration = .seconds(15)
 
+    /// How long the `createTrip` call may take (seconds) before the person is told to check their signal.
+    static let callTimeout: TimeInterval = 20
+
     /// What the person reads when the create call fails. A rate-limited call says how long to wait (the server sends
     /// `details.retryAfterSeconds`, like the join limit); a code collision never reaches the app (the server retries).
     struct CreateFailure: LocalizedError, Equatable {
@@ -66,9 +69,11 @@ enum TripService {
             if seconds > 12 * 3600 { return "You’ve made a lot of trips today. Try again tomorrow." }
             return "You’ve made a lot of trips lately. Wait \(JoinService.waitPhrase(seconds: seconds)) and try again."
         case .unauthenticated, .permissionDenied:
-            return "You’re signed out. Close ikut, open it again and try again."
+            return "You’re signed out. Close ikut and open it again, then make your trip."
         case .unavailable, .deadlineExceeded:
             return "Can’t reach the server. Check your signal and try again."
+        case .invalidArgument:
+            return "Use a shorter name, then try again."
         default:
             return "Couldn’t set up your trip just now. Please try again."
         }
@@ -131,7 +136,10 @@ enum TripService {
             name: name, destination: destination, route: route, organizerName: organizer.displayName, carId: carId)
         let tripId: String
         do {
-            let result = try await Backend.functions.httpsCallable("createTrip").call(payload)
+            // The callable's own wait is 70 s; the old batch gave up after 15 (`createTimeout`), so about that here.
+            let callable = Backend.functions.httpsCallable("createTrip")
+            callable.timeoutInterval = callTimeout
+            let result = try await callable.call(payload)
             guard let data = result.data as? [String: Any], let id = data["tripId"] as? String, !id.isEmpty else {
                 throw CreateFailure(message: createFailureMessage(code: nil, retryAfterSeconds: nil))
             }

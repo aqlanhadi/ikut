@@ -7,7 +7,7 @@ import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTr
 import { MAX_SIMPLIFY_POINTS, decodePolyline, encodePolyline, routeFrom, simplifiedRoute, thin } from "../src/previewRoute.ts";
 import { DAY_MS, recentMisses, tooManyTries, waitMs } from "../src/guessLimit.ts";
 import { CODE_ALPHABET, CODE_LENGTH, generateCode, parseCreateInput } from "../src/createTrip.ts";
-import { HOUR_MS, MAX_PER_DAY, MAX_PER_HOUR, createWaitMs, recentCreates, tooManyTrips, DAY_MS as CREATE_DAY_MS } from "../src/createLimit.ts";
+import { EMULATOR_LIMITS, PRODUCTION_LIMITS, limitsFor, HOUR_MS, MAX_PER_DAY, MAX_PER_HOUR, createWaitMs, recentCreates, tooManyTrips, DAY_MS as CREATE_DAY_MS } from "../src/createLimit.ts";
 import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
@@ -448,6 +448,16 @@ describe("createTrip codes (D108)", () => {
     assert.ok(!/[OIL01]/.test(CODE_ALPHABET));
     assert.equal(CODE_ALPHABET.length, 31);
   });
+  it("the default draw does not use Math.random (its state leaks from codes handed out)", () => {
+    const real = Math.random;
+    Math.random = () => 0;
+    try {
+      const codes = new Set(Array.from({ length: 20 }, () => generateCode()));
+      assert.ok(!codes.has("AAAAAA") && codes.size > 15, [...codes].join());
+    } finally {
+      Math.random = real;
+    }
+  });
   it("real draws are 6 characters from the alphabet and not all the same", () => {
     const seen = new Set(Array.from({ length: 50 }, () => generateCode()));
     assert.ok(seen.size > 40);
@@ -469,6 +479,10 @@ describe("parseCreateInput (D108)", () => {
     rejects(() => parseCreateInput({ ...ok, name: "x".repeat(201) }));
     rejects(() => parseCreateInput({ ...ok, route: "x".repeat(200_001) }));
     rejects(() => parseCreateInput({ ...ok, destination: { ...ok.destination, name: "x".repeat(301) } }));
+  });
+  it("counts the organizer's name in characters, as the app does: 30 emoji pass, 31 do not", () => {
+    parseCreateInput({ ...ok, organizerName: "😀".repeat(30) });
+    rejects(() => parseCreateInput({ ...ok, organizerName: "😀".repeat(31) }));
   });
   it("refuses a bad place, time, name or car id", () => {
     rejects(() => parseCreateInput(null));
@@ -495,6 +509,15 @@ describe("create limit (D108)", () => {
     assert.ok(spread.every((t) => t > NOW - CREATE_DAY_MS));
     assert.equal(createWaitMs(spread, NOW), spread[0]! + CREATE_DAY_MS - NOW);
     assert.equal(createWaitMs(spread.slice(1), NOW), 0);
+  });
+  it("the emulator gets much looser limits; production keeps 20 and 50", () => {
+    assert.deepEqual(limitsFor({ FUNCTIONS_EMULATOR: "true" }), EMULATOR_LIMITS);
+    assert.deepEqual(limitsFor({}), PRODUCTION_LIMITS);
+    assert.deepEqual(PRODUCTION_LIMITS, { perHour: 20, perDay: 50 });
+    assert.ok(EMULATOR_LIMITS.perHour >= 1000 && EMULATOR_LIMITS.perDay >= 5000);
+    const times = Array.from({ length: 100 }, (_, i) => NOW - (i + 1) * MIN);
+    assert.ok(createWaitMs(times, NOW, PRODUCTION_LIMITS) > 0);
+    assert.equal(createWaitMs(times, NOW, EMULATOR_LIMITS), 0);
   });
   it("old, malformed and future entries are ignored", () => {
     assert.deepEqual(recentCreates({ creates: [NOW - CREATE_DAY_MS, NOW - 5, "x", NOW + 10 * MIN] }, NOW), [NOW - 5]);

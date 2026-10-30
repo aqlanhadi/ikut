@@ -5,7 +5,8 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { endIdleTrips } from "../lib/endIdleTrips.js";
-import { CREATE_LIMITS, MAX_PER_HOUR } from "../lib/createLimit.js";
+import { CREATE_LIMITS, PRODUCTION_LIMITS, sweepCreateLimits } from "../lib/createLimit.js";
+import { createTripForUser } from "../lib/createTripCall.js";
 import { createTripWithFreeCode, generateCode, type CreateTripInput } from "../lib/createTrip.js";
 import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
 import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
@@ -1265,7 +1266,7 @@ describe("createTrip (emulator, D108)", () => {
     await db.collection("codes").doc("AAAAAA").set({ tripId: "someone", organizerId: "x", createdAt: Timestamp.now() });
     await assert.rejects(
       createTripWithFreeCode(db, u.uid, { name: "T", destination: { name: "D", latitude: 1, longitude: 1 }, route: "", organizerName: "Sam", carId: "c1" }, { random: () => 0, maxTries: 3 }),
-      (e: { code?: string; message?: string }) => e.code === "unavailable" && /try again/i.test(e.message ?? "") && !/taken|in use/i.test(e.message ?? ""),
+      (e: { code?: string; message?: string }) => e.code === "aborted" && /try again/i.test(e.message ?? "") && !/taken|in use/i.test(e.message ?? ""),
     );
     assert.equal((await db.collection("trips").where("organizerId", "==", u.uid).get()).size, 0);
   });
@@ -1288,21 +1289,44 @@ describe("createTrip (emulator, D108)", () => {
     assert.equal((await db.collection(CREATE_LIMITS).doc(u.uid).get()).exists, false, "a refused request is not counted");
   });
 
+  // The emulator's own limits are loose (1000 an hour), so these pass the production numbers explicitly.
+  const production = { limits: PRODUCTION_LIMITS };
+  const createsOf = async (uid: string) => (await db.collection(CREATE_LIMITS).doc(uid).get()).data()?.creates ?? [];
+
   it("cuts a user off after 20 an hour with a wait time; another user is unaffected", async () => {
     const u = await newUser();
-    for (let i = 0; i < MAX_PER_HOUR; i++) {
-      const r = await create(input(), u.token);
-      assert.equal(r.status, 200, `create ${i + 1}: ${JSON.stringify(r.body)}`);
-    }
-    const r = await create(input(), u.token);
-    assert.equal(r.status, 429, JSON.stringify(r.body));
-    assert.equal(r.body.error.status, "RESOURCE_EXHAUSTED");
-    assert.match(r.body.error.message, /^Too many new trips\. Wait (a minute|\d+ minutes) and try again\.$/);
-    assert.equal(r.body.error.details.reason, "too-many-trips");
-    assert.ok(r.body.error.details.retryAfterSeconds > 0 && r.body.error.details.retryAfterSeconds <= 3600);
-    assert.equal((await db.collection("trips").where("organizerId", "==", u.uid).get()).size, MAX_PER_HOUR, "the refused call wrote nothing");
+    for (let i = 0; i < PRODUCTION_LIMITS.perHour; i++) await createTripForUser(db, u.uid, input(), production);
+    await assert.rejects(createTripForUser(db, u.uid, input(), production), (e: any) =>
+      e.code === "resource-exhausted"
+      && /^Too many new trips\. Wait (a minute|\d+ minutes) and try again\.$/.test(e.message)
+      && e.details.reason === "too-many-trips" && e.details.retryAfterSeconds > 0 && e.details.retryAfterSeconds <= 3600);
+    assert.equal((await db.collection("trips").where("organizerId", "==", u.uid).get()).size, PRODUCTION_LIMITS.perHour, "the refused call wrote nothing");
     const other = await newUser();
-    assert.equal((await create(input(), other.token)).status, 200);
+    await createTripForUser(db, other.uid, input(), production);
+  });
+
+  it("a call that finds no free code gives its slot back", async () => {
+    const u = await newUser();
+    await createTripForUser(db, u.uid, input(), production);
+    const before = await createsOf(u.uid);
+    assert.equal(before.length, 1);
+    await db.collection("codes").doc("AAAAAA").set({ tripId: "someone", organizerId: "x", createdAt: Timestamp.now() });
+    await assert.rejects(createTripForUser(db, u.uid, input(), { ...production, random: () => 0, maxTries: 2 }), (e: any) => e.code === "aborted");
+    assert.deepEqual(await createsOf(u.uid), before, "the failed call is not counted");
+    // A user whose only call failed has no counter left.
+    const v = await newUser();
+    await assert.rejects(createTripForUser(db, v.uid, input(), { ...production, random: () => 0, maxTries: 2 }), (e: any) => e.code === "aborted");
+    assert.equal((await db.collection(CREATE_LIMITS).doc(v.uid).get()).exists, false);
+  });
+
+  it("sweepCreateLimits removes expired counters and keeps current ones", async () => {
+    const old = db.collection(CREATE_LIMITS).doc("sweep-old");
+    const fresh = db.collection(CREATE_LIMITS).doc("sweep-fresh");
+    await old.set({ creates: [Date.now() - 2 * 86_400_000], expiresAt: Timestamp.fromMillis(Date.now() - 86_400_000) });
+    await fresh.set({ creates: [Date.now()], expiresAt: Timestamp.fromMillis(Date.now() + 86_400_000) });
+    assert.ok((await sweepCreateLimits(db)) >= 1);
+    assert.equal((await old.get()).exists, false);
+    assert.equal((await fresh.get()).exists, true);
   });
 
   it("generateCode draws from the alphabet the app shows", () => {

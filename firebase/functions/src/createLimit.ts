@@ -20,6 +20,19 @@ export const DAY_MS = 24 * HOUR_MS;
 export const MAX_PER_HOUR = 20;
 export const MAX_PER_DAY = 50;
 
+export interface CreateLimits {
+  perHour: number;
+  perDay: number;
+}
+export const PRODUCTION_LIMITS: CreateLimits = { perHour: MAX_PER_HOUR, perDay: MAX_PER_DAY };
+/** The emulators: the UI suites, drives and the owner's phone create dozens of trips an hour as one long-lived account. */
+export const EMULATOR_LIMITS: CreateLimits = { perHour: 1000, perDay: 5000 };
+
+/** Loose limits in the Functions emulator (as App Check is relaxed there), the real ones everywhere else. */
+export function limitsFor(env: Record<string, string | undefined> = process.env): CreateLimits {
+  return env.FUNCTIONS_EMULATOR === "true" ? EMULATOR_LIMITS : PRODUCTION_LIMITS;
+}
+
 interface LimitDoc {
   creates?: unknown;
   expiresAt?: Timestamp;
@@ -34,11 +47,11 @@ export function recentCreates(data: LimitDoc | undefined, now: number): number[]
 }
 
 /** Milliseconds until one more create is allowed, or 0 when it is allowed now. `creates` is sorted, inside the day. */
-export function createWaitMs(creates: number[], now: number): number {
+export function createWaitMs(creates: number[], now: number, limits: CreateLimits = PRODUCTION_LIMITS): number {
   let wait = 0;
   const inHour = creates.filter((t) => t > now - HOUR_MS);
-  if (inHour.length >= MAX_PER_HOUR) wait = Math.max(wait, inHour[inHour.length - MAX_PER_HOUR]! + HOUR_MS - now);
-  if (creates.length >= MAX_PER_DAY) wait = Math.max(wait, creates[creates.length - MAX_PER_DAY]! + DAY_MS - now);
+  if (inHour.length >= limits.perHour) wait = Math.max(wait, inHour[inHour.length - limits.perHour]! + HOUR_MS - now);
+  if (creates.length >= limits.perDay) wait = Math.max(wait, creates[creates.length - limits.perDay]! + DAY_MS - now);
   return Math.max(0, wait);
 }
 
@@ -54,11 +67,13 @@ export function tooManyTrips(waitMilliseconds: number): HttpsError {
 }
 
 /** Counts this call or throws resource-exhausted without counting. Returns the recorded slot. */
-export async function reserveCreate(db: Firestore, uid: string, now: number = Date.now()): Promise<number> {
+export async function reserveCreate(
+  db: Firestore, uid: string, now: number = Date.now(), limits: CreateLimits = limitsFor(),
+): Promise<number> {
   const ref = db.collection(CREATE_LIMITS).doc(uid);
   return db.runTransaction(async (tx: Transaction) => {
     const creates = recentCreates((await tx.get(ref)).data() as LimitDoc | undefined, now);
-    const wait = createWaitMs(creates, now);
+    const wait = createWaitMs(creates, now, limits);
     if (wait > 0) throw tooManyTrips(wait);
     tx.set(ref, { creates: [...creates, now], expiresAt: Timestamp.fromMillis(now + DAY_MS) });
     return now;

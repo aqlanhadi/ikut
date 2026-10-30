@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { FieldValue, GeoPoint, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { HttpsError } from "firebase-functions/v2/https";
@@ -42,10 +43,16 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** One random code; `random` returns a number in [0, 1) (injectable for tests). */
-export function generateCode(random: () => number = Math.random): string {
+/**
+ * One random code. The default draw is `crypto.randomInt` (not predictable from earlier codes, unlike Math.random,
+ * whose state leaks from codes handed out); `random` returns a number in [0, 1) and is only for tests that need a fixed draw.
+ */
+export function generateCode(random?: () => number): string {
   let code = "";
-  for (let i = 0; i < CODE_LENGTH; i++) code += CODE_ALPHABET[Math.floor(random() * CODE_ALPHABET.length)];
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    const at = random ? Math.floor(random() * CODE_ALPHABET.length) : randomInt(CODE_ALPHABET.length);
+    code += CODE_ALPHABET[at];
+  }
   return code;
 }
 
@@ -64,7 +71,10 @@ export function parseCreateInput(data: unknown): CreateTripInput {
       && (typeof routeSeconds !== "number" || !Number.isFinite(routeSeconds) || routeSeconds < 0)) invalid("That route time is not valid.");
   if (typeof organizerName !== "string") invalid("Enter your name.");
   const cleanName = organizerName.trim().replace(/\s+/g, " ");
-  if (cleanName.length < 1 || cleanName.length > MEMBER_NAME_MAX) invalid(`Your name is 1 to ${MEMBER_NAME_MAX} characters.`);
+  // Counted in characters ([...name]), as the app does (DisplayName.swift), so an emoji is one. joinTrip still counts
+  // UTF-16 units (known gap, left as it is).
+  const chars = [...cleanName].length;
+  if (chars < 1 || chars > MEMBER_NAME_MAX) invalid(`Your name is 1 to ${MEMBER_NAME_MAX} characters.`);
   // Ids that could escape the cars collection path are refused.
   if (typeof carId !== "string" || carId.length < 1 || carId.length > CAR_ID_MAX || carId.includes("/")) invalid("Choose a car.");
   return {
@@ -78,7 +88,7 @@ export function parseCreateInput(data: unknown): CreateTripInput {
  * Picks a code nobody holds and writes the trip, the organizer's member doc and the code claim in one transaction, so
  * either all three exist or none does. A code is taken when `codes/{code}` exists (an active trip, or one ended less
  * than 7 days ago) or an older trip, made before claims, is active with it. A taken code is never reported: the next
- * random code is tried, up to `maxTries`, then a plain "try again" (`unavailable`). Returns the trip id and its code.
+ * random code is tried, up to `maxTries`, then a plain "try again" (`aborted`). Returns the trip id and its code.
  *
  * D104 (code rotation) is meant to draw with `generateCode` and test with `isCodeFree` the same way.
  */
@@ -108,7 +118,8 @@ export async function createTripWithFreeCode(
     if (done) return { tripId: tripRef.id, code };
   }
   logger.error("createTrip: no free code found", { tries: opts.maxTries ?? MAX_PICK_TRIES });
-  throw new HttpsError("unavailable", "Couldn’t set up your trip just now. Please try again.");
+  // `aborted`, not `unavailable`: the app reads unavailable as "no signal".
+  throw new HttpsError("aborted", "Couldn’t set up your trip just now. Please try again.");
 }
 
 /** True when no claim holds `code` and no active trip uses it. Reads only, inside the transaction. */
