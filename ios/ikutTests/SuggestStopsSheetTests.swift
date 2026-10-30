@@ -128,4 +128,16 @@ struct SuggestStopsSheetTests {
         #expect(model.picks.isEmpty)
         #expect(model.state == .nothing)
     }
+
+    /// The four Debug launch states each show their own screen (D113), not all "Can't suggest".
+    @Test func demoStatesAreDistinct() throws {
+        let plain = SuggestStopsDemo.model()
+        let moved = SuggestStopsDemo.model(moved: 1)
+        #expect(plain.state == .ready)
+        #expect(moved.state == .ready)
+        #expect(moved.after != plain.after)
+        #expect(SuggestStopsDemo.model(nothing: true).state == .nothing)
+        #expect(SuggestStopsDemo.model(noRoute: true).state == .cantSuggest)
+        #expect(SuggestStopsDemo.model(seconds: 50 * 60).state == .short)
+    }
 }
