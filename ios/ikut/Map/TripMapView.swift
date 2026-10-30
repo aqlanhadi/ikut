@@ -403,7 +403,12 @@ struct TripMapView: View {
             // the step is a keyframe glide instead, which it plays as given (D70); one too small to see is placed.
             if cause == .none, !reduceMotion, let step, let camera = next.camera {
                 let points = (stage.seenView.map { CameraPace.travel(from: $0, to: view) } ?? 1) * Double(mapWidth)
-                stage.glide(to: camera, duration: step > 0 && points >= MarkerGlide.placeUnder ? step : 0.01)
+                // Too small to see (parked, or under 1.5 pt): nothing to move, or placed without a glide (D71).
+                if step > 0, points >= MarkerGlide.placeUnder {
+                    stage.glide(to: camera, duration: step)
+                } else if points > 0.05 {
+                    stage.place(next)
+                }
                 return
             }
             // A sheet or banner move while a follow glide runs: MapKit keeps playing the glide over a `withAnimation`

@@ -114,6 +114,36 @@ struct FollowGlideTests {
         #expect(MarkerGlide.worthGliding(CGSize(width: 0, height: 28)))
     }
 
+    @Test func anotherCarsStepOfAFewPointsIsPlacedButMineStillGlides() {
+        let few = CGSize(width: 0, height: 4)
+        #expect(MarkerGlide.worthGliding(few, isMine: true))
+        #expect(!MarkerGlide.worthGliding(few, isMine: false))
+        #expect(MarkerGlide.worthGliding(CGSize(width: 0, height: 14), isMine: false))
+    }
+
+    @Test func aZoomPlacesTheSlidesOnceAtItsStartAndOnceWhenItSettles() {
+        var watch = MarkerGlide.ZoomWatch()
+        let first = watch.moved(to: 0.01)  // first reading only sets the scale
+        let drift = watch.moved(to: 0.0102)
+        #expect(!first && !drift)
+        // A Follow to Fit flight: 40 readings over a 20x zoom out place once, not at every tenth.
+        var places = 0
+        var scale = 0.01
+        for _ in 0..<40 {
+            scale *= 1.08
+            if watch.moved(to: scale) { places += 1 }
+        }
+        #expect(places == 1)
+        let ended = watch.settled(at: scale)
+        // Settled: read afresh, so the next small drift places nothing, and a settle with no zoom places nothing.
+        let after = watch.moved(to: scale * 1.02)
+        let idle = watch.settled(at: scale * 1.02)
+        #expect(ended && !after && !idle)
+        // A second zoom places again.
+        let second = watch.moved(to: scale * 2)
+        #expect(second)
+    }
+
     @Test func theGlideIsLinearWithoutReduceMotionAndAStepWithIt() {
         #expect(Motion.follow(interval: 0.9, reduceMotion: false) == .linear(duration: 0.9))
         #expect(Motion.follow(interval: 0.9, reduceMotion: true) == nil)

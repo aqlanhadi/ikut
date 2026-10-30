@@ -165,7 +165,7 @@ struct TripMapContent: MapContent {
             Annotation(marker.name, coordinate: marker.coordinate.clCoordinate, anchor: .center) {
                 MapMarkerView(marker: marker, cameraHeading: style.cameraHeading, containerWidth: style.containerWidth)
                     .modifier(MarkerGlide(coordinate: marker.coordinate, duration: marker.glide,
-                                          place: style.placeSlides, point: style.point))
+                                          place: style.placeSlides, point: style.point, isMine: marker.isMine))
             }
             .annotationTitles(.hidden)
         }
@@ -184,12 +184,17 @@ struct MarkerGlide: ViewModifier {
     var duration: TimeInterval
     var place: Int
     var point: ((MapCoordinate) -> CGPoint?)?
+    /// My own car (the one the camera follows) keeps the small threshold; the others' steps are worth less.
+    var isMine = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var offset = CGSize.zero
     @State private var slide: Slide?
 
     /// A step shorter than this, in points, is placed: a standing car, or one far out at Fit zoom.
     static let placeUnder: CGFloat = 1.5
+    /// Another car's step shorter than this, in points, is placed (D71): its write comes every 5 s, so a few points
+    /// is a crawl nobody sees, and its slide costs a layout of the marker on every frame.
+    static let placeUnderOther: CGFloat = 6
     /// A scale change bigger than this share places the slides.
     static let scaleTolerance = 0.1
 
@@ -210,8 +215,32 @@ struct MarkerGlide: ViewModifier {
         return abs(to / from - 1) > scaleTolerance
     }
 
-    static func worthGliding(_ from: CGSize) -> Bool {
-        (from.width * from.width + from.height * from.height).squareRoot() >= placeUnder
+    static func worthGliding(_ from: CGSize, isMine: Bool = true) -> Bool {
+        (from.width * from.width + from.height * from.height).squareRoot() >= (isMine ? placeUnder : placeUnderOther)
+    }
+
+    /// Places the running slides once per zoom, not at every tenth of its way (D71): a Follow to Fit flight moves the
+    /// scale by tens of percent and used to rebuild the map content about 40 times. The first move past the tolerance
+    /// places them, the rest of that zoom is ignored, and when the camera settles they are placed once more (a slide
+    /// begun mid-zoom started from a conversion at a scale the map has left) and the scale is read afresh.
+    struct ZoomWatch: Equatable {
+        private(set) var scale: Double?
+        private(set) var zooming = false
+
+        /// The scale as it moves; true when the slides must be placed now.
+        mutating func moved(to latitudeDelta: Double) -> Bool {
+            guard let was = scale else { scale = latitudeDelta; return false }
+            guard !zooming, MarkerGlide.scaleMoved(from: was, to: latitudeDelta) else { return false }
+            zooming = true
+            return true
+        }
+
+        /// The camera came to rest at `latitudeDelta`; true when a zoom was running, so the slides must be placed again.
+        mutating func settled(at latitudeDelta: Double) -> Bool {
+            scale = latitudeDelta
+            defer { zooming = false }
+            return zooming
+        }
     }
 
     func body(content: Content) -> some View {
