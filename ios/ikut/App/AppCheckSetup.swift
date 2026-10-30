@@ -8,7 +8,8 @@ import DeviceCheck
 
 /// Which App Check provider the app uses, decided once at launch.
 enum AppCheckProviderChoice: Equatable {
-    /// The local emulators don't check tokens, so the app sends none.
+    /// The local emulators don't check tokens, so the app sends none. Firebase then logs
+    /// "Cannot instantiate FIRAppCheck … without a provider factory" on every launch; it is harmless.
     case none
     /// Debug token, registered by hand in the Firebase console. Simulator, Debug builds, unsupported devices.
     case debug
