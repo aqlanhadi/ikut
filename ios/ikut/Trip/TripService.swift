@@ -34,7 +34,22 @@ enum TripService {
     }
 
     /// "Trip to Ipoh": the name a trip gets when created from Where to?; the organizer can rename it.
-    static func defaultTripName(destination: String) -> String { "Trip to \(destination)" }
+    /// A long place name is cut (with an ellipsis) so the name never passes `nameMaxLength`.
+    static func defaultTripName(destination: String) -> String {
+        let prefix = "Trip to "
+        let room = nameMaxLength - prefix.count
+        let place = destination.count <= room ? destination : String(destination.prefix(room - 1)) + "…"
+        return prefix + place
+    }
+
+    /// Longest trip name the app accepts. The rules refuse over 200; 60 is what fits a title on the screens.
+    static let nameMaxLength = 60
+
+    /// What to say when a typed trip name (already trimmed) is too long; nil when it is fine. Empty is not a problem on
+    /// New trip (it gets the default), so callers that need a name check emptiness themselves.
+    static func nameProblem(_ trimmed: String) -> String? {
+        trimmed.count > nameMaxLength ? "Use 1 to \(nameMaxLength) characters." : nil
+    }
 
     static func makeTrip(
         name: String, code: String, organizerId: String,

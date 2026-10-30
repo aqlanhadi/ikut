@@ -163,6 +163,22 @@ function cutOwnStart(points: LatLng[]): LatLng[] {
   return rest < ROUTE_LEAD_CUT_METERS ? [] : out;
 }
 
+/**
+ * Most points `simplify` ever sees (D98). Douglas-Peucker is quadratic on a crafted zigzag, and a route string can be
+ * up to 200,000 characters (about 100,000 points); a longer line is thinned evenly first. A real route at 50 characters
+ * per km has about 15 points per km, so 1,500 points keep the shape of a 100 km drive at under 100 m and of
+ * anything longer coarsely, which a preview line at 100 m tolerance does not miss.
+ */
+export const MAX_SIMPLIFY_POINTS = 1_500;
+
+/** At most `max` points spread evenly by index, always including the first and the last. */
+export function thin(points: LatLng[], max: number): LatLng[] {
+  const n = points.length;
+  if (n <= max || max < 2) return n <= max ? points : points.slice(0, max);
+  const step = (n - 1) / (max - 1);
+  return Array.from({ length: max }, (_, i) => points[i === max - 1 ? n - 1 : Math.round(i * step)]);
+}
+
 /** The main route as a precision-5 polyline of at most `maxPoints` points, widening the tolerance until it fits; "" when unreadable. */
 export function simplifiedRoute(
   encoded: unknown,
@@ -177,11 +193,15 @@ export function simplifiedRoute(
     ? routeFrom(points, Math.max(0, meet.routeOffset), meet.coordinate, ROUTE_MIN_METERS)
     : cutOwnStart(points);
   if (points.length < 2) return "";
+  // Offsets above are measured on the full line; thinning comes after, so they stay exact. Both steps are linear.
+  points = thin(points, MAX_SIMPLIFY_POINTS);
   let tol = toleranceMeters;
   points = simplify(points, tol);
-  while (points.length > maxPoints && tol < 20_000) {
-    tol *= 2;
+  // Each pass starts from the last one's output; at most 4 passes (tolerance x4 each: 100 m up to 25 km), then the line
+  // is thinned evenly if it still has too many points, so the answer always fits and the loop always ends.
+  for (let pass = 0; points.length > maxPoints && pass < 4; pass++) {
+    tol *= 4;
     points = simplify(points, tol);
   }
-  return encodePolyline(points);
+  return encodePolyline(thin(points, maxPoints));
 }

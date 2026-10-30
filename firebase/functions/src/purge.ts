@@ -8,6 +8,7 @@ import {
   deleteEventsWithVotesOf,
   deleteInBatches,
   eventExpiryCutoff,
+  purgeMemberPrivates,
   purgeStopTraces,
   shouldPurgeTripData,
   type PurgeResult,
@@ -35,14 +36,15 @@ export interface PurgeOptions {
   clock?: () => number;
 }
 
-type PurgeCounts = { positions: number; events: number; votes: number; stops: number; answers: number };
+type PurgeCounts = { positions: number; events: number; votes: number; stops: number; answers: number; cars: number; tokens: number };
 
-/** Deletes one ended trip's positions, events (with votes) and stop traces. Throws if any step does. */
+/** Deletes one ended trip's positions, events (with votes) and stop traces, and clears cars' own routes and members' push tokens. Throws if any step does. */
 async function purgeOneTrip(db: Firestore, ref: FirebaseFirestore.DocumentReference): Promise<PurgeCounts> {
   const positions = await deleteInBatches(db, ref.collection("positions"));
   const events = await deleteEventsWithVotes(db, await ref.collection("events").listDocuments());
   const traces = await purgeStopTraces(db, ref);
-  return { positions, events: events.events, votes: events.votes, stops: traces.stops, answers: traces.answers };
+  const privates = await purgeMemberPrivates(db, ref);
+  return { positions, events: events.events, votes: events.votes, stops: traces.stops, answers: traces.answers, cars: privates.cars, tokens: privates.tokens };
 }
 
 function addCounts(result: PurgeResult, c: PurgeCounts): void {
@@ -51,13 +53,15 @@ function addCounts(result: PurgeResult, c: PurgeCounts): void {
   result.votes += c.votes;
   result.stopsCleared += c.stops;
   result.answers += c.answers;
+  result.carsCleared += c.cars;
+  result.tokensCleared += c.tokens;
   // Purged trips are not read again, but a retried one can be empty: count only those that had something to delete.
-  if (c.positions + c.events + c.votes + c.stops + c.answers > 0) result.trips++;
+  if (c.positions + c.events + c.votes + c.stops + c.answers + c.cars + c.tokens > 0) result.trips++;
 }
 
 /**
  * Step 1: positions and events (with their stop votes) of ended trips older than POSITION_RETENTION_MS, stop traces
- * cleared, skip answers deleted (the trip and stop docs stay). Trips are taken oldest first from a cursor kept in
+ * cleared, skip answers deleted, each car's own route and mergeOffset and each member's pushToken cleared (the trip, stop, car and member docs stay). Trips are taken oldest first from a cursor kept in
  * `jobState/purgeTripData`, at most `maxTrips` per run, so a finished trip is never read again and a big backlog is
  * worked off over several runs instead of starting over from the oldest every time. A trip whose purge threw is
  * kept in `retry` and tried first next run. A trip's endedAt is server time (rules and functions), so a trip that
@@ -135,7 +139,7 @@ export async function sweepExpiredEvents(db: Firestore, now: Date, result: Purge
 }
 
 export function emptyPurgeResult(): PurgeResult {
-  return { trips: 0, failed: 0, examined: 0, more: false, stopsCleared: 0, answers: 0, votes: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
+  return { trips: 0, failed: 0, examined: 0, more: false, stopsCleared: 0, carsCleared: 0, tokensCleared: 0, answers: 0, votes: 0, positions: 0, endedTripEvents: 0, expiredEvents: 0 };
 }
 
 /**
