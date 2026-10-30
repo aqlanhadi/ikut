@@ -7,43 +7,55 @@ import Testing
 struct MapPaddingTests {
     // MARK: the padding
 
-    @Test func thePaddingIsTheMediumSheetLineAtTheTextSize() {
-        #expect(LobbySheet.mapPadding(scaledMedium: LobbySheet.compactHeight)
-                == LobbySheet.compactHeight + BottomSheet.detentExtra)
-        #expect(LobbySheet.mapPadding(scaledMedium: 520) == 520 + BottomSheet.detentExtra)
-        // Capped like the sheet, and never 0.
-        #expect(LobbySheet.mapPadding(scaledMedium: 5000) == LobbySheet.compactHeight * 1.4 + BottomSheet.detentExtra)
-        #expect(LobbySheet.mapPadding(scaledMedium: 0) > 0)
+    /// D114: the padding is the minimum resting sheet's line, Home's short list sheet and its gap, at the text size.
+    @Test(arguments: [CGFloat(470), 560, 658, 900])
+    func thePaddingIsHomesShortSheetLineAtTheTextSize(scaledMedium: CGFloat) {
+        let scale = scaledMedium / LobbySheet.compactHeight
+        let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight * scale)
+        #expect(LobbySheet.mapPadding(scaledMedium: scaledMedium) == compact + BottomSheet.detentExtra)
+        #expect(LobbySheet.mapPadding(scaledMedium: scaledMedium) == HomeSheet.reach(.list, compact: compact))
     }
 
-    @Test func theLobbyPassesItsAlreadyCappedHeightAndGetsTheSameValue() {
-        // The lobby layer hands over `compact` (already capped), the driving layer the raw scaled height.
-        for scaled in [CGFloat(300), 470, 520, 640, 900] {
-            #expect(LobbySheet.mapPadding(scaledMedium: LobbySheet.compact(scaled: scaled))
-                    == LobbySheet.mapPadding(scaledMedium: scaled))
+    @Test func thePaddingAtTheDefaultAndExtremeSizes() {
+        #expect(LobbySheet.defaultMapPadding == HomeSheet.compactHeight + BottomSheet.detentExtra)
+        // Capped like Home's sheet, and never 0.
+        #expect(LobbySheet.mapPadding(scaledMedium: 5000) == HomeSheet.compactHeight * 1.5 + BottomSheet.detentExtra)
+        #expect(LobbySheet.mapPadding(scaledMedium: 0) > 0)
+        // Never above the lobby's medium sheet, so the lobby's sheet always covers the logo.
+        for scaled in [CGFloat(470), 560, 658, 900] {
+            #expect(LobbySheet.mapPadding(scaledMedium: scaled)
+                    <= LobbySheet.cover(compact: LobbySheet.compact(scaled: scaled)).bottom)
         }
     }
 
     // MARK: one constant for every screen (D109)
 
     /// The padding is a function of the text size alone (`TripMapSpec` has no padding field, no layer sets one), so a
-    /// mode switch (Leave, Back to trips, End, Start trip) can never change it. At each text size the lobby's cover is
-    /// that line, and every Home mode's sheet is read relative to it: the room is the cover less the padding.
+    /// mode switch (Leave, Back to trips, End, Start trip) can never change it. At each text size, every Home mode's
+    /// sheet and the lobby's are read relative to it, and the strip's bottom edge on screen (the padding plus the
+    /// fraction of the frame) is the cover itself, as before the padding moved.
     @Test(arguments: [CGFloat(470), 560, 658, 900])
-    func everyScreenSharesOnePaddingAndReadsItsCoverRelativeToIt(scaledMedium: CGFloat) {
+    func everyScreenSharesOnePaddingAndKeepsItsStripEdge(scaledMedium: CGFloat) {
         let padding = LobbySheet.mapPadding(scaledMedium: scaledMedium)
-        let scale = LobbySheet.compact(scaled: scaledMedium) / LobbySheet.compactHeight
+        let scale = scaledMedium / LobbySheet.compactHeight
         let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight * scale)
-        #expect(LobbySheet.cover(compact: LobbySheet.compact(scaled: scaledMedium)).bottom == padding)
+        let frame = Double(874 - padding)
         for mode in [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join] {
             let cover = HomeSheet.cover(mode, compact: compact)
-            let insets = TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom,
-                                                reach: HomeSheet.reach(mode, compact: compact), padding: padding)
-            #expect(abs(insets.bottom * Double(874 - padding)
-                        - Double(max(cover.bottom, HomeSheet.reach(mode, compact: compact)) - padding)) < 1e-9)
+            let reach = HomeSheet.reach(mode, compact: compact)
+            let insets = TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, reach: reach, padding: padding)
+            #expect(abs(Double(padding) + insets.bottom * frame - Double(max(cover.bottom, reach))) < 1e-9, "\(mode)")
+            #expect(abs(insets.top * frame - 110) < 1e-9)
+            let create = HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact, padding: padding)
+            let cleared = max(HomeSheet.reach(.list, compact: compact), cover.bottom + HomeSheet.createMargin)
+            #expect(abs(Double(padding) + create.bottom * frame - Double(cleared)) < 1e-9, "\(mode)")
         }
-        // The same value however it is asked for: from the raw scaled height or the sheet's capped one.
-        #expect(padding == LobbySheet.mapPadding(scaledMedium: LobbySheet.compact(scaled: scaledMedium)))
+        // The lobby keeps the trip above its medium sheet: positive now, the edge still its sheet's top.
+        let lobbyCompact = LobbySheet.compact(scaled: scaledMedium)
+        let lobby = LobbySheet.cover(compact: lobbyCompact)
+        let fraction = LobbyMapLogic.bottomFraction(mapHeight: 874, safeTop: 62, cover: lobby.bottom, bottomPadding: padding)
+        #expect(fraction > 0)
+        #expect(abs(Double(padding) + fraction * frame - Double(lobby.bottom)) < 1e-9)
     }
 
     /// The list's camera at a scaled text size: the strip's bottom edge, measured from the screen's bottom, is the list's
@@ -95,7 +107,8 @@ struct MapPaddingTests {
     private let coverBottom: CGFloat = 282
     private let truth = 3.1e-8
 
-    private func room(padding: CGFloat) -> MapCameraRoom {
+    private func room(padding: CGFloat, coverBottom: CGFloat? = nil) -> MapCameraRoom {
+        let coverBottom = coverBottom ?? self.coverBottom
         let span = reportedSpan(perPoint: truth, mapHeight: 874, padding: padding, distance: 2500)
         let scale = MapCameraRoom.latitudePerPointPerMeter(latitudeDelta: span, mapHeight: 874, padding: padding, distance: 2500)
         return MapCameraRoom(width: 402, height: max(874 - padding, 0), top: top, bottom: coverBottom - padding,
@@ -122,6 +135,25 @@ struct MapPaddingTests {
             let y = carY(room(padding: padding), padding: padding, centre: centre)
             #expect(abs((y ?? 0) - stripCentre) < 0.01, "padding \(padding)")
         }
+    }
+
+    /// Driving at the default text size (D114): the folded sheet is Home's short one (300, never lower: 220 content plus
+    /// the 62 bar is 282, raised to it), a gap under the padding (330), so the room's bottom is negative and the logo shows above it; the unfolded one (about 512)
+    /// is taller, so it is positive and covers the logo. Either way my car sits at the middle of the strip above the sheet.
+    @Test(arguments: [HomeSheet.compactHeight, PanelSheet.unfoldedEstimate + PanelSheet.barEstimate])
+    func drivingFollowsAboveItsSheetAtTheDefaultPadding(sheet: CGFloat) {
+        let padding = LobbySheet.defaultMapPadding
+        let room = room(padding: padding, coverBottom: sheet)
+        #expect((room.bottom < 0) == (sheet < padding))
+        let centre = MapCoordinate(latitude: 3, longitude: 101)
+        let y = carY(room, padding: padding, centre: centre)
+        #expect(abs((y ?? 0) - Double(top + 874 - sheet) / 2) < 0.01)
+        // The whole convoy fit lands in the same strip.
+        let region = GeoRegion(center: centre, latitudeSpan: 0.02, longitudeSpan: 0.02)
+        let fit = room.fit(region)
+        let height = Double(874 - padding), perPoint = fit.latitudeSpan / height
+        let fitY = height / 2 + (fit.center.latitude - region.center.latitude) / perPoint
+        #expect(abs(fitY - Double(top + 874 - sheet) / 2) < 0.01)
     }
 
     @Test func fitShowsTheSameStripForAnyPadding() {

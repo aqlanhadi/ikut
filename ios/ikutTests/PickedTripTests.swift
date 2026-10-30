@@ -148,10 +148,10 @@ struct PickedTripTests {
         // Both ends of the route sit between the sheet's top edge and the status bar.
         #expect(3.1 >= visibleBottom)
         #expect(4.6 <= mapTop - r.span.latitudeDelta * insets.top)
-        // The camera reads the sheet relative to the map's one constant padding: a short sheet is lower than it
-        // (negative), a taller one keeps the part above it.
+        // The camera reads the sheet relative to the map's one constant padding: the short sheet is that line
+        // (zero), a taller one keeps the part above it.
         let padding = LobbySheet.defaultMapPadding
-        #expect(insets.bottom < 0)
+        #expect(insets.bottom == 0)
         let tall = TripsHomeView.obscured(mapHeight: 874, sheet: 500 + padding).bottom
         #expect(abs(tall - 500.0 / Double(874 - padding)) < 1e-9)
         #expect(tall > insets.bottom)

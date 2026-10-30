@@ -132,8 +132,8 @@ struct ConvoySheetStateTests {
     @Test func theTopBannerAddsToEveryHeightOnlyWhileItIsThere() {
         var s = measured()
         s.topContent = 50
-        let with = s.measuredHeights(room: room, hasTopBanner: true)
-        let without = s.measuredHeights(room: room, hasTopBanner: false)
+        let with = s.measuredHeights(room: room, hasTopBanner: true, minShort: 0)
+        let without = s.measuredHeights(room: room, hasTopBanner: false, minShort: 0)
         #expect(with.short == without.short + 50)
         #expect(with.tall == without.tall + 50)
     }

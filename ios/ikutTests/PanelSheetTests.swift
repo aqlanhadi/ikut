@@ -49,9 +49,47 @@ struct PanelSheetTests {
         #expect(StopPillView.questionRadius == 44)
     }
 
+    // MARK: The folded sheet is never lower than Home's short sheet (D114)
+
+    @Test(arguments: [CGFloat(470), 560, 658, 900])
+    func theFoldedSheetIsAtLeastHomesShortSheetAndEqualsItWhenTheContentIsSmaller(scaledMedium: CGFloat) {
+        let home = LobbySheet.homeShort(scaledMedium: scaledMedium)
+        let small = PanelSheet.heights(folded: 100, unfolded: 480, bar: 62, room: 2000, minShort: home)
+        #expect(small.short == home.rounded())
+        #expect(small.tall >= small.short)
+        let big = PanelSheet.heights(folded: 700, unfolded: 900, bar: 62, room: 2000, minShort: home)
+        #expect(big.short == 762)
+        #expect(big.short >= home.rounded())
+    }
+
+    @Test func atTheDefaultTextSizeTheRestingSheetIsHomesOnWhileDriving() {
+        #expect(LobbySheet.homeShort(scaledMedium: LobbySheet.compactHeight) == HomeSheet.compactHeight)
+        // Before D114 the estimate gave 282; now the same 300 as Home.
+        #expect(heights(folded: nil, unfolded: nil, bar: nil).short == 300)
+    }
+
+    @Test func theRoomStillCapsTheFoldedSheet() {
+        let h = PanelSheet.heights(folded: 100, unfolded: 480, bar: 62, room: 250, minShort: 300)
+        #expect(h.short == 250)
+        #expect(h.tall == 250)
+    }
+
+    @Test func detentsStillMapWhenShortIsTheMinimumAndWhenTallEqualsShort() {
+        let h = PanelSheet.heights(folded: 100, unfolded: 120, bar: 62, room: 700, minShort: 300)
+        #expect(h.short == 300)
+        #expect(h.tall == 300)
+        #expect(PanelSheet.choice(.height(300), in: h) == .folded)
+        #expect(PanelSheet.choice(.height(700), in: h) == .pulledUp)
+        let t = PanelSheet.heights(folded: 100, unfolded: 480, bar: 62, room: 700, minShort: 300)
+        #expect(PanelSheet.choice(.height(300), in: t) == .folded)
+        #expect(PanelSheet.choice(.height(542), in: t) == .unfolded)
+        #expect(PanelSheet.choice(.height(700), in: t) == .pulledUp)
+    }
+
     @Test func aLayoutNotSeenYetUsesTheEstimate() {
         let h = heights(folded: nil, unfolded: nil, bar: nil)
-        #expect(h.short == PanelSheet.foldedEstimate + PanelSheet.barEstimate)
+        // 220 + 62 = 282 is under Home's short sheet (300), which is the folded sheet's minimum (D114).
+        #expect(h.short == max(PanelSheet.foldedEstimate + PanelSheet.barEstimate, HomeSheet.compactHeight))
         #expect(h.tall == PanelSheet.unfoldedEstimate + PanelSheet.barEstimate)
     }
 
@@ -214,7 +252,7 @@ struct PanelSheetTests {
         #expect(PanelSheet.choice(.height(480), in: now) == nil)
         #expect(PanelSheet.choice(.height(446), in: now) == .unfolded)
         // Likewise a short that moved under a folded sheet.
-        #expect(PanelSheet.choice(.height(300), in: heights(folded: 280)) == nil)
+        #expect(PanelSheet.choice(.height(300), in: heights(folded: 340)) == nil)
     }
 
     @Test func theSheetAddsNothingButTheBarToTheContent() {

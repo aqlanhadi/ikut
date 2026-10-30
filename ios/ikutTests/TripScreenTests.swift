@@ -673,10 +673,11 @@ struct OneMapTests {
     func theLobbysCameraReadsTheOneCoverWithTheSameFit(compact: CGFloat) {
         let cover = LobbySheet.cover(compact: compact)
         let padding = LobbySheet.mapPadding(scaledMedium: compact)
-        // The medium sheet is the one padding itself, so the lobby's fit keeps nothing below the frame; its top fraction
-        // is of the frame inside that padding.
-        #expect(cover.bottom == padding)
-        #expect(LobbyMapLogic.bottomFraction(mapHeight: 874, safeTop: 62, cover: cover.bottom, bottomPadding: padding) == 0)
+        // The medium sheet is taller than the padding (the minimum sheet's line, D114), so the lobby's fit keeps the part
+        // above it clear: the strip's edge is the sheet's top. Its top fraction is of the frame inside the padding.
+        #expect(cover.bottom > padding)
+        #expect(LobbyMapLogic.bottomFraction(mapHeight: 874, safeTop: 62, cover: cover.bottom, bottomPadding: padding)
+            == Double(cover.bottom - padding) / Double(874 - padding))
         #expect(LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: padding)
             == Double((62 + LobbyMapLogic.buttonBand + LobbyMapLogic.flagRoom) / (874 - padding)))
         #expect(cover.top == LobbyMapLogic.buttonBand)

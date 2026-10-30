@@ -54,8 +54,8 @@ struct PastTripsMapTests {
         // Every height the map can report, including 0 before its first layout.
         for height: CGFloat in [0, 1, 300, 672, 778, 874] {
             let insets = TripsHomeView.obscured(mapHeight: height)
-            // The list's sheet is lower than the map's one constant padding: the strip reaches below the frame.
-            #expect(insets.bottom < 0, "height \(height)")
+            // The list's sheet is the map's one constant padding (D114): the strip ends at the frame's edge.
+            #expect(insets.bottom == 0, "height \(height)")
             #expect(insets.top > 0 && insets.top < 0.7, "height \(height)")
             let r = try #require(PastTripsMapLogic.region(fitting: [a, b], bottomObscured: insets.bottom,
                                                           topObscured: insets.top))
