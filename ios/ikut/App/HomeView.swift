@@ -231,7 +231,9 @@ struct HomeView: View {
                 onOpenTrip: { entry, started in begin(.trip(tripId: entry.id, started: started)) },
                 // The organiser tracks their own car; a joiner when they share theirs.
                 onCreated: { tripId in openTrip(tripId, started: false, tracks: true) },
-                onJoined: { tripId, tracks in openTrip(tripId, started: false, tracks: tracks) }
+                onJoined: { tripId, tracks in openTrip(tripId, started: false, tracks: tracks) },
+                // The name step in Home's sheet signed the person in: location, then Where to? in the same sheet (D112).
+                onNamed: { Task { await open(.create, keepingSheet: true) } }
             )
         }
     }
@@ -292,33 +294,50 @@ struct HomeView: View {
             home.joining = JoinStart(code: code)
             return
         }
-        if auth.state == .signedIn {
+        if case .create = route, HomeModel.newTripStart(signedIn: auth.state == .signedIn) == .name {
+            // The name is the first step of Where to?, in Home's one sheet (D112): no separate name sheet.
+            home.askingName = true
+        } else if auth.state == .signedIn {
             Task { await open(route) }
         } else {
+            // A link while naming: joining asks for the name itself, so the name step goes first.
+            if case .join = route, home.nameStep != nil { home.closeNaming() }
             afterName = route
             showName = true
         }
     }
 
-    private func open(_ route: Route, replacing: Bool = false) async {
+    /// `keepingSheet`: Home's sheet is showing the name step and stays up (the spinner on it) through iOS's location
+    /// prompt, until Where to? replaces it; any other end puts the list back.
+    private func open(_ route: Route, replacing: Bool = false, keepingSheet: Bool = false) async {
         // A join link (or code) opened during Where to? or New trip leaves that flow: Home is not left on it afterwards.
-        if case .join = route { home.creating = false }
-        opening = true
-        defer { opening = false }
+        if case .join = route {
+            home.creating = false
+            // Joining asks for the name in its own steps: the name step before Where to? goes.
+            if home.nameStep != nil { home.closeNaming() }
+        }
+        opening = !keepingSheet
+        defer {
+            opening = false
+            if keepingSheet { home.endNameHandOff() }
+        }
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
                 if await location.requestWhenInUse() == .notDetermined { return }
+                // A join link took the sheet over while iOS's prompt was up.
+                if keepingSheet, home.nameStep == nil { return }
             case .requestFullAccuracy:
                 if await location.requestFullAccuracy() == .reduced {
-                    showDenied = true
+                    if !keepingSheet || home.nameStep != nil { showDenied = true }
                     return
                 }
+                if keepingSheet, home.nameStep == nil { return }
             case .showSettingsPrompt:
                 showDenied = true
                 return
             case .ready, .showAlwaysExplainer:
-                if case .create = route { home.creating = true; return }
+                if case .create = route { if keepingSheet { home.creatingAfterName() } else { home.creating = true }; return }
                 if case .join(let code) = route {
                     // A link on a fresh install opens Home first: there is no Welcome to push Join over any more.
                     hasSeenWelcome = true

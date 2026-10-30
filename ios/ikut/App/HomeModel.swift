@@ -44,6 +44,9 @@ final class HomeModel {
     /// New trip was tapped and its gates (name, location) are through: the sheet becomes Where to? over this map.
     /// Cleared again when the flow closes or the trip is made.
     var creating = false
+    /// New trip was tapped by someone signed out: the sheet becomes the name step, the first step of Where to? (D112).
+    /// Cleared when that step closes or Where to? takes over.
+    var askingName = false
     /// Join was opened and its gates are through: the sheet becomes the join steps. Cleared when the sheet closes or the
     /// trip is joined.
     var joining: JoinStart?
@@ -58,6 +61,8 @@ final class HomeModel {
     var flow: NewTripFlow?
     /// The join steps over this map; nil while the sheet shows its list.
     var joinFlow: JoinStepper?
+    /// The name step before Where to? (D112), in the same sheet; nil unless someone signed out is starting a trip.
+    var nameStep: NameStepState?
     /// The trip was made and its lobby is being opened: the flow stays until Home's sheet is covered, so the list never flashes.
     var finishingCreate = false
     /// The same for a trip that was joined.
@@ -89,7 +94,7 @@ final class HomeModel {
     /// What the sheet's content changing runs on: the camera's motion, or a short crossfade with Reduce Motion.
     var motion: Animation? { HomeSheet.motion(reduceMotion: reduceMotion) }
 
-    var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow, leftTripPicked: picked?.isLeft == true, joining: joinFlow != nil) }
+    var mode: HomeSheet.Mode { HomeSheet.mode(flow: flow, leftTripPicked: picked?.isLeft == true, joining: joinFlow != nil, naming: nameStep != nil) }
 
     // MARK: The list
 
@@ -153,11 +158,11 @@ final class HomeModel {
                      padding: CGFloat = LobbySheet.defaultMapPadding) -> MapCameraPosition? {
         let insets = TripsHomeView.obscured(mapHeight: mapHeight, reach: reach, padding: padding)
         if mapHeight > 0, !routes.isEmpty {
-            guard flow == nil, joinFlow == nil else { return nil }
+            guard flow == nil, joinFlow == nil, nameStep == nil else { return nil }
             return PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) }
         }
         if routes.isEmpty, let here {
-            guard flow == nil, joinFlow == nil, picked == nil else { return nil }
+            guard flow == nil, joinFlow == nil, picked == nil, nameStep == nil else { return nil }
             return .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top))
         }
         return listCamera
@@ -244,17 +249,64 @@ final class HomeModel {
 
     // MARK: Where to? and New trip
 
+    /// Where tapping Where to? starts: signed in goes on to the location check and Where to?; signed out starts with the
+    /// name, a step of the same sheet (D112).
+    enum NewTripStart: Equatable { case location, name }
+
+    static func newTripStart(signedIn: Bool) -> NewTripStart { signedIn ? .location : .name }
+
     /// New trip's gates are through: Where to? takes over the sheet and the map. A trip picked on the map is put away
     /// first, and `goBack` runs its camera return.
     func beginCreate(camera: MapCameraPosition, flow newFlow: @autoclosure () -> NewTripFlow = NewTripFlow(),
                      goBack: (CameraReturn) -> Void) {
-        guard flow == nil else { return }
+        guard flow == nil, joinFlow == nil else { return }
+        // Coming from the name step, the camera was saved there.
+        if nameStep == nil { cameraBeforeCreate = camera }
+        if let back = closePicked(camera: camera) { goBack(back) }
+        withAnimation(motion) {
+            expanded = false
+            nameStep = nil
+            flow = newFlow()
+        }
+        askingName = false
+    }
+
+    /// Someone signed out starts a trip: the name step takes over the sheet, the first step of Where to? (D112). Where to?
+    /// follows in the same sheet (`beginCreate`) once the name is signed in. The camera stays where it is.
+    func beginNaming(camera: MapCameraPosition, goBack: (CameraReturn) -> Void) {
+        guard nameStep == nil, flow == nil else { return }
         cameraBeforeCreate = camera
         if let back = closePicked(camera: camera) { goBack(back) }
         withAnimation(motion) {
             expanded = false
-            flow = newFlow()
+            nameStep = NameStepState()
         }
+    }
+
+    /// The name step goes: Close, a location answer that stops the trip, or a link that opens Join instead. Back to
+    /// Home's list; nothing was written.
+    func closeNaming() {
+        withAnimation(motion) {
+            nameStep = nil
+            expanded = false
+        }
+        askingName = false
+        cameraBeforeCreate = nil
+    }
+
+    /// The name was signed in: Where to? is asked for, but only while the name step is still the sheet. A join link that
+    /// took it over meanwhile (D112) is not followed by a Where to? hidden under the join steps.
+    @discardableResult
+    func creatingAfterName() -> Bool {
+        guard nameStep != nil else { return false }
+        creating = true
+        return true
+    }
+
+    /// The hand-off from the name step ended: if Where to? wasn't asked for (a location answer stopped the trip), the list
+    /// comes back; if a link took the sheet over, it is left alone.
+    func endNameHandOff() {
+        if nameStep != nil, !creating { closeNaming() }
     }
 
     /// Back to Home's list. Nothing was written.
@@ -304,12 +356,15 @@ final class HomeModel {
         flow?.cancel()
         if picked != nil { picked = nil }
         creating = false
+        askingName = false
+        nameStep = nil
         let hasName = signedIn && !(displayName ?? "").isEmpty
         let stepper = JoinStepper.begin(start, displayName: displayName ?? "",
                                         plan: JoinSteps.plan(hasName: hasName, location: location), api: api)
         withAnimation(motion) {
             expanded = false
             flow = nil
+            nameStep = nil
             joinFlow = stepper
         }
         cameraBeforeCreate = nil

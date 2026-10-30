@@ -8,9 +8,11 @@ import SwiftUI
 /// and the one sheet its content (`TripSheetSpec`), and moves the shared camera, so opening a trip is a camera move and
 /// a sheet change on the same map.
 struct TripsHomeView: View {
-    @Environment(AuthModel.self) private var auth
+    @Environment(AuthModel.self) var auth
     @Environment(TripScreenModel.self) private var stage
     @Environment(LocationPermission.self) private var location
+    /// The name step's field (`nameStepSheet`).
+    @FocusState var nameFocused: Bool
     /// Home's flows and what they remember (`HomeModel`); HomeView makes it and hands it in.
     let given: HomeModel
     /// A demo's own model, kept across redraws of its parent (which makes a new view, and so a new seeded model, each time).
@@ -28,6 +30,8 @@ struct TripsHomeView: View {
     var onCreated: (String) -> Void = { _ in }
     /// The trip was joined: its id, to open its lobby, and whether this phone tracks its car.
     var onJoined: (String, Bool) -> Void = { _, _ in }
+    /// The name step signed the person in: carry on to Where to? (`HomeView`).
+    var onNamed: () -> Void = {}
 
     @State private var renaming = false
     @State private var newName = ""
@@ -58,8 +62,9 @@ struct TripsHomeView: View {
 
     init(model: HomeModel = HomeModel.launching(), onNewTrip: @escaping () -> Void, onJoin: @escaping () -> Void,
          onOpenTrip: @escaping (PastTrips.Entry, Bool) -> Void = { _, _ in }, onCreated: @escaping (String) -> Void = { _ in },
-         onJoined: @escaping (String, Bool) -> Void = { _, _ in }) {
+         onJoined: @escaping (String, Bool) -> Void = { _, _ in }, onNamed: @escaping () -> Void = {}) {
         given = model
+        self.onNamed = onNamed
         self.onJoined = onJoined
         self.onCreated = onCreated
         self.onNewTrip = onNewTrip
@@ -73,12 +78,13 @@ struct TripsHomeView: View {
     init(demo past: [PastTrips.Entry], routes: [PastTripRoute], picked: PickedTrip? = nil,
          selecting itemId: String? = nil, expanded: Bool = false, tappable: RecapModel? = nil, tour: Bool = false,
          cameraTour: Bool = false,
-         creating createFlow: NewTripFlow? = nil, joining joinStepper: JoinStepper? = nil, nowStatus: [String: String] = [:]) {
+         creating createFlow: NewTripFlow? = nil, naming nameStep: NameStepState? = nil, joining joinStepper: JoinStepper? = nil, nowStatus: [String: String] = [:]) {
         let seeded = HomeModel.launching()
         if let joinStepper {
             seeded.joinFlow = joinStepper
             if let camera = Self.demoJoinCamera(joinStepper) { seeded.listCamera = camera }
         }
+        seeded.nameStep = nameStep
         if let createFlow {
             seeded.flow = createFlow
             if let camera = Self.demoCreateCamera(createFlow) { seeded.listCamera = camera }
@@ -141,7 +147,7 @@ struct TripsHomeView: View {
             .onChange(of: HomeSheet.cover(model.mode, compact: compact), initial: true) { _, cover in stage.cover(cover, from: .home) }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
-                if model.flow != nil { refocusCreate(animated: false) } else if model.joinFlow != nil { refocusJoin(animated: false) } else if model.picked != nil { refocus(animated: false) } else if !model.routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if model.here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
+                if model.flow != nil { refocusCreate(animated: false) } else if model.joinFlow != nil { refocusJoin(animated: false) } else if model.nameStep != nil { /* the camera stays */ } else if model.picked != nil { refocus(animated: false) } else if !model.routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if model.here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
             }
             // Your location, once it may be read: the first fix (and a real move after it) moves Home's view of you.
             .task(id: locationGranted) { if !model.isDemo, locationGranted { await watchLocation() } }
@@ -161,6 +167,9 @@ struct TripsHomeView: View {
             }
         }
         #endif
+        .onChange(of: model.askingName) { _, now in
+            if now { model.beginNaming(camera: stage.camera) { goBack($0) } } else if model.nameStep != nil, !model.creating { model.closeNaming() }
+        }
         .onChange(of: model.creating) { _, now in
             if now { beginCreate() } else if model.flow != nil, !model.finishingCreate { closeCreate() }
         }
@@ -326,7 +335,7 @@ struct TripsHomeView: View {
 
     /// Points the camera at every drawn route, above the compact sheet.
     func fit(animated: Bool) {
-        guard model.flow == nil, model.joinFlow == nil else { return }
+        guard model.flow == nil, model.joinFlow == nil, model.nameStep == nil else { return }
         let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         guard let region = PastTripsMapLogic.region(fitting: model.routes, bottomObscured: insets.bottom,
                                                     topObscured: insets.top) else { return }
@@ -423,7 +432,7 @@ struct TripsHomeView: View {
 
     /// The list's view of you above its short sheet, when it has no routes to show.
     private func showHere(animated: Bool) {
-        guard let here = model.here, model.flow == nil, model.joinFlow == nil, model.picked == nil, model.routes.isEmpty else { return }
+        guard let here = model.here, model.flow == nil, model.joinFlow == nil, model.nameStep == nil, model.picked == nil, model.routes.isEmpty else { return }
         let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)), animated: animated)
     }
@@ -479,6 +488,9 @@ struct TripsHomeView: View {
         return ZStack(alignment: .top) {
             if let joinFlow = model.joinFlow {
                 JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: { joined($0, tracks: $1) })
+                    .transition(.opacity)
+            } else if let nameStep = model.nameStep {
+                nameStepSheet(nameStep)
                     .transition(.opacity)
             } else if let flow = model.flow {
                 Group {

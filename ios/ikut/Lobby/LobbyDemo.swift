@@ -422,6 +422,11 @@ enum DemoScreens {
         case "home-empty": return home("empty")
         case "home-new-trip-error": return home("new-trip-error")
         case "home-new-trip-creating": return home("new-trip-creating")
+        // The name as the first step of Where to? in Home's one sheet (D112): empty, with a name, signing in, the error line.
+        case "home-new-trip-name": return home("new-trip-name")
+        case "home-new-trip-name-typed": return home("new-trip-name-typed")
+        case "home-new-trip-name-signing-in": return home("new-trip-name-signing-in")
+        case "home-new-trip-name-error": return home("new-trip-name-error")
         case "root-loading": return AnyView(ProgressView())
         case "alert-banner": return AnyView(MapDemo.alertBanner())
         case "road-offline": return AnyView(MapDemo.view(online: false))
