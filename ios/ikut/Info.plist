@@ -31,6 +31,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>IKUTAppAttest</key>
+	<string>$(IKUT_APPATTEST)</string>
 	<key>IKUTEmulatorHost</key>
 	<string>$(IKUT_EMULATOR_HOST)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

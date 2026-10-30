@@ -1,6 +1,7 @@
 import { FieldValue, type CollectionReference, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
+import { defineBoolean } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import type { Car, Member, Trip } from "./model.js";
 
@@ -240,7 +241,30 @@ export async function findActiveTripId(db: Firestore, code: string): Promise<str
   return snap.docs[0]!.id;
 }
 
-export const joinTrip = onCall(async (request): Promise<JoinResult> => {
+/**
+ * Whether callables reject requests without a valid App Check token. Committed value is false
+ * (`firebase/functions/.env`), because the Firebase CLI stops a non-interactive deploy when the
+ * parameter has no value. Turn it on for production only, in `firebase/functions/.env.ikut-b1083`
+ * (`APPCHECK_ENFORCE=true`). Lives here, not in its own file, because the unit tests load this
+ * file as plain TypeScript.
+ */
+export const APPCHECK_ENFORCE = defineBoolean("APPCHECK_ENFORCE", {
+  default: false,
+  description: "Reject callable requests without a valid App Check token",
+});
+
+/**
+ * The emulators run as project ikut-b1083 and would load its `.env`, but the app sends no token to
+ * them, so enforcement is always off there.
+ */
+export function appCheckOptionsFor(env: Record<string, string | undefined>) {
+  return { enforceAppCheck: env.FUNCTIONS_EMULATOR === "true" ? false : APPCHECK_ENFORCE };
+}
+
+/** Options for the callables the app reaches before it has joined a trip. */
+export const appCheckOptions = appCheckOptionsFor(process.env);
+
+export const joinTrip = onCall(appCheckOptions, async (request): Promise<JoinResult> => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
   const input = parseJoinInput(request.data);

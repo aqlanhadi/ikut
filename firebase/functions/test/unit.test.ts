@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
 import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
-import { normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
+import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
 
@@ -203,5 +203,17 @@ describe("simplifiedRoute", () => {
   });
   it("gives an empty line for nothing readable", () => {
     for (const bad of ["", undefined, 5, "?"]) assert.equal(simplifiedRoute(bad), "");
+  });
+});
+
+describe("App Check options", () => {
+  it("are driven by APPCHECK_ENFORCE, which is off unless set", () => {
+    assert.equal(appCheckOptions.enforceAppCheck, APPCHECK_ENFORCE);
+    assert.equal(APPCHECK_ENFORCE.name, "APPCHECK_ENFORCE");
+    assert.equal(APPCHECK_ENFORCE.value(), false);
+  });
+  it("are always off in the emulators", () => {
+    assert.equal(appCheckOptionsFor({ FUNCTIONS_EMULATOR: "true" }).enforceAppCheck, false);
+    assert.equal(appCheckOptionsFor({}).enforceAppCheck, APPCHECK_ENFORCE);
   });
 });
