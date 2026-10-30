@@ -8,7 +8,8 @@ import Testing
     nonisolated static let sizes: [CGFloat] = [470, 560, 658, 900]
 
     @Test func theStopsAtTheDefaultTextSizeOnTheReferenceScreen() {
-        #expect(SheetStops.collapsed(scale: 1, screenHeight: 874) == 282)
+        // The real folded convoy sheet (193 content + 46 bar, measured); `CollapsedStopCalibrationUITests` keeps it honest.
+        #expect(SheetStops.collapsed(scale: 1, screenHeight: 874) == 239)
         #expect(SheetStops.mid(scale: 1, screenHeight: 874) == 470)
         #expect(SheetStops.tall == .large)
     }
@@ -26,13 +27,14 @@ import Testing
 
     @Test func aSmallPhoneKeepsItsMap() {
         #expect(abs(SheetStops.mid(scale: 1, screenHeight: 667) - 366.85) < 0.01)
-        #expect(abs(SheetStops.collapsed(scale: 1, screenHeight: 667) - 280.14) < 0.01)
+        #expect(SheetStops.collapsed(scale: 1, screenHeight: 667) == 239)
+        #expect(abs(SheetStops.collapsed(scale: 4, screenHeight: 667) - 280.14) < 0.01)
     }
 
     @Test func theStopsGrowWithTheTextSizeAndNeverShrinkBelowTheDefault() {
-        #expect(SheetStops.collapsed(scale: 0.5) == 282)
+        #expect(SheetStops.collapsed(scale: 0.5) == 239)
         #expect(SheetStops.mid(scale: 0.5) == 470)
-        #expect(SheetStops.collapsed(scale: 1.2) > 282)
+        #expect(SheetStops.collapsed(scale: 1.2) > 239)
         // Mid is already at its 55% cap on 874 pt, so it only grows on a taller screen.
         #expect(SheetStops.mid(scale: 1.9, screenHeight: 1200) > 470)
     }
@@ -49,8 +51,8 @@ import Testing
     @Test func theLobbyAndNewTripAreTheMidStopAndTheDrivingUnfoldedSheetNeverPassesIt() {
         let mid = SheetStops.mid(scale: 1)
         #expect(LobbySheet.compact(scaled: LobbySheet.compactHeight) == mid)
-        #expect(HomeSheet.height(.newTrip, compact: 282) == mid)
-        #expect(HomeSheet.height(.newTrip, compact: 282, medium: 400) == 400)
+        #expect(HomeSheet.height(.newTrip, compact: 239) == mid)
+        #expect(HomeSheet.height(.newTrip, compact: 239, medium: 400) == 400)
         #expect(PanelSheet.heights(folded: nil, unfolded: nil, room: nil, mid: mid).tall == mid)
     }
 
@@ -75,17 +77,17 @@ import Testing
 
     @Test func unfoldedIsTheSmallerOfItsMeasuredHeightAndMid() {
         // A big convoy (content 700) is capped at mid and scrolls; a small one (content 300) stays as measured.
-        let big = PanelSheet.heights(folded: 220, unfolded: 700, bar: 62, room: 2000, mid: 470)
-        #expect(big.short == 282 && big.tall == 470)
-        let small = PanelSheet.heights(folded: 220, unfolded: 300, bar: 62, room: 2000, mid: 470)
-        #expect(small.tall == 362)
+        let big = PanelSheet.heights(folded: 193, unfolded: 700, bar: 46, room: 2000, mid: 470)
+        #expect(big.short == 239 && big.tall == 470)
+        let small = PanelSheet.heights(folded: 193, unfolded: 300, bar: 46, room: 2000, mid: 470)
+        #expect(small.tall == 346)
         // Never under the folded sheet, even when mid is lower than it (a small phone at a large text size).
         let low = PanelSheet.heights(folded: 400, unfolded: 700, bar: 62, room: 2000, mid: 367)
         #expect(low.tall == low.short)
     }
 
     @Test func theDetentChoiceStillMapsWhenUnfoldedEqualsMidOrFolded() {
-        let capped = PanelSheet.heights(folded: 220, unfolded: 700, bar: 62, room: 2000, mid: 470)
+        let capped = PanelSheet.heights(folded: 193, unfolded: 700, bar: 46, room: 2000, mid: 470)
         #expect(PanelSheet.choice(.height(capped.short), in: capped) == .folded)
         #expect(PanelSheet.choice(.height(capped.tall), in: capped) == .unfolded)
         #expect(PanelSheet.choice(.height(capped.full), in: capped) == .pulledUp)
@@ -94,7 +96,7 @@ import Testing
         #expect(PanelSheet.choice(.height(same.short), in: same) == .folded)
         #expect(PanelSheet.choice(.height(same.full), in: same) == .pulledUp)
         // Mid equal to the room: the one top detent is pulled up.
-        let tight = PanelSheet.heights(folded: 220, unfolded: 700, bar: 62, room: 470, mid: 470)
+        let tight = PanelSheet.heights(folded: 193, unfolded: 700, bar: 46, room: 470, mid: 470)
         #expect(PanelSheet.choice(.height(tight.tall), in: tight) == .pulledUp)
     }
 }

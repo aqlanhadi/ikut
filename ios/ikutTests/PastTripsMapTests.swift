@@ -132,9 +132,9 @@ struct HomeSheetTests {
 
     @Test func reachIsTheTopOfTheRealListSheet() {
         // Measured on an iPhone 17 (874 pt): a detent is a sheet 20.7 pt taller than it and the reach adds the
-        // gap (28.7 over the detent), so the 282 pt one (D115; the
-        // 300 pt one measured 320.7 pt tall, its top at 545.3) has its top at 874 - 310.7.
-        #expect(abs(HomeSheet.defaultReach - (874 - 563.3)) < 2)
+        // gap (28.7 over the detent), so the 239 pt one (D116; the
+        // 300 pt one measured 320.7 pt tall, its top at 545.3) has its top at 874 - 267.7.
+        #expect(abs(HomeSheet.defaultReach - (874 - 605.3)) < 2)
         #expect(HomeSheet.reach(.list, compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
         #expect(HomeSheet.reach(.list, compact: 390) == 420)
         #expect(HomeSheet.reach(.list, compact: -5) == HomeSheet.detentExtra)
@@ -164,17 +164,17 @@ struct HomeSheetTests {
         // replaces the detent.
         let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight)
         #expect(compact == HomeSheet.compactHeight)
-        #expect(HomeSheet.detent(expanded: false, compact: compact) == .height(282))
+        #expect(HomeSheet.detent(expanded: false, compact: compact) == .height(239))
         #expect(HomeSheet.detent(expanded: true, compact: compact) == .large)
-        #expect(HomeSheet.detents(compact: compact) == [.height(282), .large])
+        #expect(HomeSheet.detents(compact: compact) == [.height(239), .large])
     }
 
     @Test func theShortHeightGrowsWithTheTextSizeWithinALimit() {
         // Smaller text never goes below the design's height; the largest sizes stop at 1.5x so the tall detent stays tall.
-        #expect(HomeSheet.compact(scaled: 250) == HomeSheet.compactHeight)
+        #expect(HomeSheet.compact(scaled: 200) == HomeSheet.compactHeight)
         #expect(HomeSheet.compact(scaled: 340) == 340)
-        // The collapsed stop never takes more than 42% of the screen (D116).
-        #expect(HomeSheet.compact(scaled: 900) == 874 * SheetStops.collapsedShare)
+        // It stops at 1.5x (358.5 on 874 pt, under the 42% screen share, 367).
+        #expect(HomeSheet.compact(scaled: 900) == HomeSheet.compactHeight * 1.5)
     }
 
     @Test func aLateRefitOnlyMovesAPictureThatIsOff() {

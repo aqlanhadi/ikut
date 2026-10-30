@@ -113,3 +113,26 @@ final class LobbyStopsUITests: XCTestCase {
         reveal("Tapah R&R")
     }
 }
+
+/// Keeps the collapsed stop honest (D116): the folded convoy panel and its bar, as the real sheet measures them, are as
+/// tall as `SheetStops.collapsed` at the default text size (239, or 273 with a wrapped name; `SheetStopsTests` pins that constant). If the panel's rows
+/// change height, this fails until the constant (`PanelSheet.foldedEstimate` and `barEstimate`) is updated. Needs no emulator.
+@MainActor
+final class CollapsedStopCalibrationUITests: XCTestCase {
+    func testTheFoldedConvoySheetMeasuresTheCollapsedStop() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["IKUT_SCREEN"] = "road-panel-short-5"
+        app.launch()
+        let marker = app.descendants(matching: .any)["driving.foldedMeasured"].firstMatch
+        XCTAssertTrue(marker.waitForExistence(timeout: 15), "no measured marker")
+        let predicate = NSPredicate(format: "value != nil AND value != ''")
+        expectation(for: predicate, evaluatedWith: marker)
+        waitForExpectations(timeout: 10)
+        let measured = Double(marker.value as? String ?? "") ?? -1
+        // The From name comes from a place lookup (the simulator's own answer), so the title is one line (239) or wraps to two
+        // (273, one 34 pt title line more): either is the panel as designed; any other height means a row changed.
+        let oneLine = abs(measured - 239) <= 2, wrapped = abs(measured - 273) <= 2
+        XCTAssertTrue(oneLine || wrapped, "the folded sheet measures \(measured), not the collapsed stop's 239 (273 with a wrapped name)")
+    }
+}

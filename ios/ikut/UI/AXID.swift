@@ -165,6 +165,8 @@ enum AXID {
         static let createError = "createTripError"
         static let destinationField = "destinationField"
         static let drivingSheet = "driving.sheet"
+        /// Debug only: the folded panel plus the bar as measured, before the collapsed floor (the calibration UI test).
+        static let foldedMeasured = "driving.foldedMeasured"
         static let journeyBehind = "trip.journey.behind"
         static let mapPickLabel = "mapPick.label"
         static let newTripNameField = "newTripNameField"
@@ -297,6 +299,7 @@ enum AXID {
         Trip.createError,
         Trip.destinationField,
         Trip.drivingSheet,
+        Trip.foldedMeasured,
         Trip.journeyBehind,
         Trip.mapPickLabel,
         Trip.newTripNameField,

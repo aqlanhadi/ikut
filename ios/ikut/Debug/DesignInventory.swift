@@ -125,9 +125,9 @@ frame|height 30||Map/ConvoyRows.swift:39
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
-frame|width 10, height 10||Map/TripMapView.swift:626
-frame|width 12, height 12||Map/TripMapView.swift:647
-frame|minHeight 56||Map/TripMapView.swift:659
+frame|width 10, height 10||Map/TripMapView.swift:635
+frame|width 12, height 12||Map/TripMapView.swift:656
+frame|minHeight 56||Map/TripMapView.swift:668
 frame|height 150||Recap/RecapContent.swift:65
 frame|height 30||Recap/RecapContent.swift:72
 frame|width 0.5||Recap/RecapContent.swift:146
