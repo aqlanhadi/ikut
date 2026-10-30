@@ -1676,6 +1676,9 @@ describe("handing the trip to another member (emulator, D106)", () => {
     await sweepExpiredEvents(db, new Date(now), emptyPurgeResult());
     assert.equal((await old.get()).exists, false);
     assert.equal((await fresh.get()).exists, true);
+  });
+});
+
 describe("trip summary and 90-day delete (emulator, D107)", () => {
   beforeEach(() => resetJobState("purgeTripsFull"));
   const NOW = new Date();
