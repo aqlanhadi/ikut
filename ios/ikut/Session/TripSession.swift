@@ -279,7 +279,8 @@ final class TripSession {
 
     // MARK: - Leave and end
 
-    /// Stops tracking right away (before any network call), releases tracker duty, then deletes the member doc.
+    /// Stops tracking right away (before any network call), asks the server whether this phone is the organiser of a
+    /// live trip (who cannot leave, D106), then releases tracker duty and deletes the member doc in one batch.
     func leave() async throws {
         stopTrackingNow()
         isClosing = true
@@ -287,10 +288,9 @@ final class TripSession {
         // this phone is no longer a member has already happened (`leaveCountsAsLeft`); anything else keeps the person
         // in the trip with a plain message.
         do {
-            if car?.trackerUserId == userId, let carId = member?.carId ?? car?.id {
-                try await leaveStep(.releaseTracker(carId: carId))
-            }
-            try await leaveStep(.deleteMember)
+            if trip?.status == .active { try await leaveStep(.checkNotOrganizer) }
+            let releasing = car?.trackerUserId == userId ? (member?.carId ?? car?.id) : nil
+            try await leaveStep(.deleteMember(releasingCar: releasing))
         } catch let still as StillInTrip {
             // Still a member (and, as far as the server says, the organiser): nothing was left, so this phone goes on.
             isClosing = false
@@ -308,14 +308,29 @@ final class TripSession {
         do {
             if let leaveWriter { return try await leaveWriter(step) }
             switch step {
-            case .releaseTracker(let carId):
-                let carRef = db.document(FirestorePaths.car(tripId: tripId, carId: carId))
-                try await ServerWrite.commit {
-                    try await carRef.updateData(["trackerUserId": FieldValue.delete(), "pausedAt": FieldValue.delete()])
+            case .checkNotOrganizer:
+                do {
+                    let snapshot = try await db.document(FirestorePaths.trip(tripId)).getDocument(source: .server)
+                    if let live = try? snapshot.data(as: Trip.self), live.status == .active, live.organizerId == userId {
+                        throw StillInTrip()
+                    }
+                } catch let still as StillInTrip {
+                    throw still
+                } catch {
+                    return
                 }
-            case .deleteMember:
-                let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
-                try await ServerWrite.commit { try await memberRef.delete() }
+            case .deleteMember(let carId):
+                // One batch, so a delete the rules refuse takes the release with it. The rules judge each write against
+                // the state before the batch: the car update still sees a member.
+                nonisolated(unsafe) let batch = db.batch()
+                if let carId {
+                    batch.updateData(
+                        ["trackerUserId": FieldValue.delete(), "pausedAt": FieldValue.delete()],
+                        forDocument: db.document(FirestorePaths.car(tripId: tripId, carId: carId)))
+                }
+                batch.deleteDocument(db.document(FirestorePaths.member(tripId: tripId, userId: userId)))
+                // Offline it stays queued and the phone leaves anyway (ServerWrite).
+                try await ServerWrite.commit { try await batch.commit() }
             case .confirmGone:
                 // A phone that is no longer a member cannot read the doc (permission denied): that, or no doc, is left.
                 let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))

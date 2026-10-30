@@ -38,10 +38,14 @@ extension CarRouteService: CarRouteControlling {}
 /// Writes (a date) or clears (nil) `pausedAt` on the car doc; tests substitute a fake.
 typealias PauseWriter = @MainActor (_ carId: String, _ pausedAt: Date?) async throws -> Void
 
-/// One write of Leave trip: give up sharing for the car, then delete this phone's member doc.
+/// The steps of Leave trip. First (D106) the server says whether this phone is the live trip's organiser, who cannot
+/// leave: `StillInTrip` before anything is written. Then one batch: give up sharing for the car (when this phone is its
+/// tracker) and delete this phone's member doc, together, so a refused delete leaves the car's tracker as it was.
 enum LeaveStep: Equatable {
-    case releaseTracker(carId: String)
-    case deleteMember
+    /// Throws `StillInTrip` when the server's trip says this phone is its organiser and it is active. Anything else
+    /// (offline, unreadable) returns: the rules decide at the delete.
+    case checkNotOrganizer
+    case deleteMember(releasingCar: String?)
     /// After a refused member delete (D106): the server says whether this phone is still a member. Returns when it is
     /// not (it has left); throws `StillInTrip` when it is (the refusal was the organiser's rule, not a lost reply).
     case confirmGone

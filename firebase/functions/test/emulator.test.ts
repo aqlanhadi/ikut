@@ -1368,12 +1368,13 @@ describe("removed members and new codes (emulator, D104)", () => {
     const [gone, left] = t.people as [string, string];
     await remove(t.tripId, t.organizer, gone);
     await memberRef(t.tripId, left).delete();
-    const carsBefore = (await db.collection("trips").doc(t.tripId).collection("cars").get()).size;
+    // onMemberDeleted removes the leavers' empty cars on its own time, so compare ids, not counts: no NEW car appears.
+    const carIds = async () => new Set((await db.collection("trips").doc(t.tripId).collection("cars").get()).docs.map((d) => d.id));
+    const carsBefore = await carIds();
 
     await assert.rejects(join(gone, t.tripId, t.code), (e: any) => e.code === "permission-denied" && e.message === REMOVED_FROM_TRIP);
     assert.equal((await memberRef(t.tripId, gone).get()).exists, false);
-    const cars = await db.collection("trips").doc(t.tripId).collection("cars").get();
-    assert.equal(cars.size, carsBefore, "the refused call made no car");
+    for (const id of await carIds()) assert.ok(carsBefore.has(id), "the refused call made no car");
 
     const back = await join(left, t.tripId, t.code);
     assert.equal(back.tripId, t.tripId);
@@ -1485,10 +1486,11 @@ describe("removed members and new codes (emulator, D104)", () => {
     await remove(t.tripId, t.organizer, gone);
     const id = await findActiveTripId(db, t.code);
     await rotateCodeForUser(db, t.organizer, t.tripId);
-    const carsBefore = (await db.collection("trips").doc(t.tripId).collection("cars").get()).size;
+    const carIds = async () => (await db.collection("trips").doc(t.tripId).collection("cars").get()).docs.map((d) => d.id);
+    const carsBefore = new Set(await carIds());
     await rejected(join(gone, id, t.code), "not-found");
     assert.equal((await memberRef(t.tripId, gone).get()).exists, false);
-    assert.equal((await db.collection("trips").doc(t.tripId).collection("cars").get()).size, carsBefore);
+    for (const cid of await carIds()) assert.ok(carsBefore.has(cid), "the refused call made no car");
   });
 
   it("previewTrip gives a removed person only the removed words, and nothing for an old code after a new one", async () => {
