@@ -1,5 +1,6 @@
 import CoreLocation
 import FirebaseFirestore
+import FirebaseFunctions
 import Foundation
 
 /// The signed-in user creating a trip.
@@ -8,7 +9,7 @@ struct TripOrganizer: Sendable, Equatable {
     var displayName: String
 }
 
-/// Writes new trips to Firestore.
+/// Creates trips (through the server) and edits them (to Firestore).
 enum TripService {
     /// A–Z and 2–9 without O, I, L (0 and 1 are already excluded).
     static let codeAlphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
@@ -16,15 +17,6 @@ enum TripService {
 
     /// Fixed car colors (hex); the organizer's car takes the first.
     static let palette = ["#2563EB", "#CC450D", "#0F766E", "#7C3AED", "#BE185D", "#A16207"]
-
-    static func generateCode<G: RandomNumberGenerator>(using generator: inout G) -> String {
-        String((0..<codeLength).map { _ in codeAlphabet.randomElement(using: &generator)! })
-    }
-
-    static func generateCode() -> String {
-        var generator = SystemRandomNumberGenerator()
-        return generateCode(using: &generator)
-    }
 
     static func carName(for displayName: String) -> String { "\(displayName)'s car" }
 
@@ -51,25 +43,6 @@ enum TripService {
         trimmed.count > nameMaxLength ? "Use 1 to \(nameMaxLength) characters." : nil
     }
 
-    static func makeTrip(
-        name: String, code: String, organizerId: String,
-        destination: DestinationResult, route: BuiltRoute
-    ) -> Trip {
-        Trip(
-            name: name, code: code, organizerId: organizerId, route: route.polyline,
-            destination: Destination(
-                name: destination.name,
-                coordinate: GeoPoint(
-                    latitude: destination.coordinate.latitude,
-                    longitude: destination.coordinate.longitude)),
-            routeSeconds: route.travelTime,
-            status: .active, createdAt: nil)
-    }
-
-    static func makeOrganizerMember(organizer: TripOrganizer, carId: String) -> Member {
-        Member(displayName: organizer.displayName, carId: carId, role: .organizer)
-    }
-
     static func makeOrganizerCar(organizer: TripOrganizer, name: String, color: String) -> Car {
         Car(
             name: name, color: color, trackerUserId: organizer.id, isLead: true,
@@ -79,52 +52,71 @@ enum TripService {
     /// Longer than `ServerWrite.defaultTimeout`: the first write also opens the connection.
     static let createTimeout: Duration = .seconds(15)
 
-    /// How many codes `createTrip` tries before giving up (D103).
-    static let codeAttempts = 5
+    /// How long the `createTrip` call may take (seconds) before the person is told to check their signal.
+    static let callTimeout: TimeInterval = 20
 
-    /// Raised when every code tried was turned away.
-    struct CodeUnavailable: LocalizedError {
-        var errorDescription: String? { "Couldn’t set up your trip just now. Please try again." }
+    /// What the person reads when the create call fails. A rate-limited call says how long to wait (the server sends
+    /// `details.retryAfterSeconds`, like the join limit); a code collision never reaches the app (the server retries).
+    struct CreateFailure: LocalizedError, Equatable {
+        var message: String
+        var errorDescription: String? { message }
     }
 
-    /// The rules turn a trip away when its code is already claimed, and say only "permission denied" (a client can't
-    /// read the claims). That is the one error a fresh code can fix, so it is the one retried.
-    static func isCodeCollision(_ error: Error) -> Bool {
-        let ns = error as NSError
-        return ns.domain == FirestoreErrorDomain && ns.code == FirestoreErrorCode.permissionDenied.rawValue
-    }
-
-    /// Runs `attempt` with a fresh code until one is accepted, at most `attempts` times; returns the accepted code.
-    /// Only a collision (`isCodeCollision`) moves on to the next code; any other error, and an offline write, goes
-    /// straight to the caller. After the last collision it throws `CodeUnavailable`.
-    static func claimingCode(
-        isolation: isolated (any Actor)? = #isolation,
-        attempts: Int = codeAttempts,
-        nextCode: () -> String = { generateCode() },
-        collision: (Error) -> Bool = { isCodeCollision($0) },
-        _ attempt: (String) async throws -> Void
-    ) async throws -> String {
-        // Any permission-denied counts as a collision (a client can't tell them apart), so a real denial is tried
-        // `attempts` times too before the plain message.
-        for _ in 0..<attempts {
-            let code = nextCode()
-            do {
-                try await attempt(code)
-                return code
-            } catch where collision(error) {
-                continue
-            }
+    static func createFailureMessage(code: FunctionsErrorCode?, retryAfterSeconds: Int?) -> String {
+        switch code {
+        case .resourceExhausted:
+            guard let seconds = retryAfterSeconds else { return "You’ve made a lot of trips lately. Try again in a little while." }
+            if seconds > 12 * 3600 { return "You’ve made a lot of trips today. Try again tomorrow." }
+            return "You’ve made a lot of trips lately. Wait \(JoinService.waitPhrase(seconds: seconds)) and try again."
+        case .unauthenticated, .permissionDenied:
+            return "You’re signed out. Close ikut and open it again, then make your trip."
+        case .unavailable, .deadlineExceeded:
+            return "Can’t reach the server. Check your signal and try again."
+        case .invalidArgument:
+            return "Use a shorter name, then try again."
+        default:
+            return "Couldn’t set up your trip just now. Please try again."
         }
-        throw CodeUnavailable()
     }
 
-    /// Creates the trip, its code claim and the organizer's member doc in one batch, then the organizer's car.
+    /// The failure `createTrip` throws for an error from the callable.
+    static func createFailure(_ error: Error) -> Error {
+        let ns = error as NSError
+        guard ns.domain == FunctionsErrorDomain else {
+            return ns.domain == NSURLErrorDomain
+                ? CreateFailure(message: createFailureMessage(code: .unavailable, retryAfterSeconds: nil)) : error
+        }
+        let details = ns.userInfo[FunctionsErrorDetailsKey] as? [String: Any]
+        let wait = details?["reason"] as? String == "too-many-trips" ? (details?["retryAfterSeconds"] as? NSNumber)?.intValue : nil
+        return CreateFailure(message: createFailureMessage(code: FunctionsErrorCode(rawValue: ns.code), retryAfterSeconds: wait))
+    }
+
+    /// What the `createTrip` callable is sent (functions/src/createTrip.ts, `parseCreateInput`).
+    static func createPayload(
+        name: String, destination: DestinationResult, route: BuiltRoute, organizerName: String, carId: String
+    ) -> [String: Any] {
+        [
+            "name": name,
+            "destination": [
+                "name": destination.name,
+                "latitude": destination.coordinate.latitude,
+                "longitude": destination.coordinate.longitude,
+            ],
+            "route": route.polyline,
+            "routeSeconds": route.travelTime,
+            "organizerName": organizerName,
+            "carId": carId,
+        ]
+    }
+
+    /// Creates the trip through the `createTrip` callable (D108), then the organizer's car.
     ///
-    /// The claim (`codes/{code}`) is what keeps two trips from sharing a code: the rules only accept it while no one
-    /// holds the code. On a collision the whole batch is refused and the next try uses a new code.
+    /// The server picks the code and writes the trip, the organizer's member doc and the code claim in one go; the app
+    /// only learns the trip id (and the code, which it reads from the trip like everyone else). The rules refuse any
+    /// client create of a trip, so nobody can probe codes by creating.
     ///
-    /// The car goes in a second write because the rules only let existing members create cars,
-    /// and `exists()` can't see documents from the same batch.
+    /// The car goes in a second write because the rules only let existing members create cars. Its id is chosen here
+    /// and sent with the call, so the organizer's member doc names it.
     @MainActor
     static func createTrip(
         name: String,
@@ -135,38 +127,34 @@ enum TripService {
         carColor: String? = nil
     ) async throws -> (tripId: String, carId: String) {
         let db = Firestore.firestore()
-        let tripRef = db.collection(FirestorePaths.trips).document()
-        let carRef = db.collection(FirestorePaths.cars(tripId: tripRef.documentID)).document()
-
-        let tripId = tripRef.documentID
-        let member = makeOrganizerMember(organizer: organizer, carId: carRef.documentID)
+        let carId = db.collection(FirestorePaths.trips).document().documentID
         let car = makeOrganizerCar(
             organizer: organizer, name: carName ?? Self.carName(for: organizer.displayName),
             color: carColor ?? palette[0])
 
-        _ = try await claimingCode { code in
-            let trip = makeTrip(
-                name: name, code: code, organizerId: organizer.id,
-                destination: destination, route: route)
-            nonisolated(unsafe) let batch = db.batch()
-            try batch.setData(from: trip, forDocument: tripRef)
-            batch.setData(
-                ["tripId": tripId, "organizerId": organizer.id, "createdAt": FieldValue.serverTimestamp()],
-                forDocument: db.document(FirestorePaths.code(code)))
-            try batch.setData(
-                from: member, forDocument: db.document(FirestorePaths.member(tripId: tripId, userId: organizer.id)))
-            // A trip the server hasn't seen can't be joined, so a queued create is a failure here.
-            guard try await ServerWrite.commit(within: createTimeout, { try await batch.commit() }) else {
-                throw ServerWrite.Offline()
+        nonisolated(unsafe) let payload = createPayload(
+            name: name, destination: destination, route: route, organizerName: organizer.displayName, carId: carId)
+        let tripId: String
+        do {
+            // The callable's own wait is 70 s; the old batch gave up after 15 (`createTimeout`), so about that here.
+            let callable = Backend.functions.httpsCallable("createTrip")
+            callable.timeoutInterval = callTimeout
+            let result = try await callable.call(payload)
+            guard let data = result.data as? [String: Any], let id = data["tripId"] as? String, !id.isEmpty else {
+                throw CreateFailure(message: createFailureMessage(code: nil, retryAfterSeconds: nil))
             }
+            tripId = id
+        } catch {
+            throw createFailure(error)
         }
 
         // Encode first: `setData(from:)` has no async overload, so awaiting it wouldn't wait for the server.
         nonisolated(unsafe) let carData = try Firestore.Encoder().encode(car)
+        let carRef = db.document(FirestorePaths.car(tripId: tripId, carId: carId))
         guard try await ServerWrite.commit(within: createTimeout, { try await carRef.setData(carData) }) else {
             throw ServerWrite.Offline()
         }
-        return (tripRef.documentID, carRef.documentID)
+        return (tripId, carId)
     }
 }
 

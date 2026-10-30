@@ -254,7 +254,7 @@ rules or functions older than the build. `node prod-smoke.mjs --emulators` runs 
 (Auth :9099, Firestore :8080, Functions :5001, project `ikut-b1083`); test it there, never point a change at production.
 It checks, in order (the Swift each step mirrors is in the script's comments):
 
-- anonymous sign-in; **Create trip** with `routeSeconds` (`TripService.createTrip`), the organiser's car;
+- anonymous sign-in; a client create of a trip or a code claim is refused; **Create trip** through the `createTrip` callable (`TripService.createTrip`: returns only the trip id and a code, with `routeSeconds`), the organiser's car;
 - the lobby's stop batch (`TripService.write`): `route`, `routeSeconds`, `stopCount: 1` and a planned **meeting stop**
   (`kind meet`, `coordinate`, `meetAt`, `order 0`);
 - `previewTrip`: the organiser's first name, a route that starts at the meeting point (not the organiser's start),

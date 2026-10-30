@@ -6,6 +6,8 @@ import { compareKeys, cursorFromState, cursorToState, runSweep, type SweepCursor
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
 import { MAX_SIMPLIFY_POINTS, decodePolyline, encodePolyline, routeFrom, simplifiedRoute, thin } from "../src/previewRoute.ts";
 import { DAY_MS, recentMisses, tooManyTries, waitMs } from "../src/guessLimit.ts";
+import { CODE_ALPHABET, CODE_LENGTH, generateCode, parseCreateInput } from "../src/createTrip.ts";
+import { EMULATOR_LIMITS, PRODUCTION_LIMITS, limitsFor, HOUR_MS, MAX_PER_DAY, MAX_PER_HOUR, createWaitMs, recentCreates, tooManyTrips, DAY_MS as CREATE_DAY_MS } from "../src/createLimit.ts";
 import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
@@ -432,5 +434,98 @@ describe("guess limit", () => {
     assert.deepEqual(e.details, { reason: "too-many-guesses", retryAfterSeconds: 181 });
     assert.match(tooManyTries(1000).message, /Wait a minute/);
     assert.ok(!/full|cars/i.test(e.message));
+  });
+});
+
+describe("createTrip codes (D108)", () => {
+  it("a code is 6 characters of the app's alphabet, whatever the random number", () => {
+    for (const r of [0, 0.5, 0.999999]) {
+      const c = generateCode(() => r);
+      assert.equal(c.length, CODE_LENGTH);
+      assert.ok([...c].every((ch) => CODE_ALPHABET.includes(ch)), c);
+    }
+    assert.equal(generateCode(() => 0), "AAAAAA");
+    assert.ok(!/[OIL01]/.test(CODE_ALPHABET));
+    assert.equal(CODE_ALPHABET.length, 31);
+  });
+  it("the default draw does not use Math.random (its state leaks from codes handed out)", () => {
+    const real = Math.random;
+    Math.random = () => 0;
+    try {
+      const codes = new Set(Array.from({ length: 20 }, () => generateCode()));
+      assert.ok(!codes.has("AAAAAA") && codes.size > 15, [...codes].join());
+    } finally {
+      Math.random = real;
+    }
+  });
+  it("real draws are 6 characters from the alphabet and not all the same", () => {
+    const seen = new Set(Array.from({ length: 50 }, () => generateCode()));
+    assert.ok(seen.size > 40);
+    for (const c of seen) assert.match(c, /^[A-HJKMNP-Z2-9]{6}$/);
+  });
+});
+
+describe("parseCreateInput (D108)", () => {
+  const ok = { name: "Trip to Ipoh", destination: { name: "Ipoh", latitude: 4.6, longitude: 101.1 }, route: "_p~iF~ps|U", routeSeconds: 600, organizerName: "  Sam  ", carId: "car1" };
+  it("takes a well-formed request and trims the organizer's name", () => {
+    const r = parseCreateInput(ok);
+    assert.equal(r.organizerName, "Sam");
+    assert.equal(r.routeSeconds, 600);
+    assert.equal(parseCreateInput({ ...ok, routeSeconds: undefined }).routeSeconds, undefined);
+    assert.equal(parseCreateInput({ ...ok, name: "" }).name, "");
+  });
+  it("holds the caps the rules had: name 200, destination 300, route 200,000", () => {
+    parseCreateInput({ ...ok, name: "x".repeat(200), route: "x".repeat(200_000), destination: { ...ok.destination, name: "x".repeat(300) } });
+    rejects(() => parseCreateInput({ ...ok, name: "x".repeat(201) }));
+    rejects(() => parseCreateInput({ ...ok, route: "x".repeat(200_001) }));
+    rejects(() => parseCreateInput({ ...ok, destination: { ...ok.destination, name: "x".repeat(301) } }));
+  });
+  it("counts the organizer's name in characters, as the app does: 30 emoji pass, 31 do not", () => {
+    parseCreateInput({ ...ok, organizerName: "😀".repeat(30) });
+    rejects(() => parseCreateInput({ ...ok, organizerName: "😀".repeat(31) }));
+  });
+  it("refuses a bad place, time, name or car id", () => {
+    rejects(() => parseCreateInput(null));
+    rejects(() => parseCreateInput({ ...ok, destination: { ...ok.destination, latitude: 91 } }));
+    rejects(() => parseCreateInput({ ...ok, destination: { name: "x", latitude: "1", longitude: 1 } }));
+    rejects(() => parseCreateInput({ ...ok, routeSeconds: -1 }));
+    rejects(() => parseCreateInput({ ...ok, organizerName: "   " }));
+    rejects(() => parseCreateInput({ ...ok, organizerName: "a".repeat(31) }));
+    rejects(() => parseCreateInput({ ...ok, carId: "a/b" }));
+    rejects(() => parseCreateInput({ ...ok, carId: "" }));
+  });
+});
+
+describe("create limit (D108)", () => {
+  const NOW = 10 * CREATE_DAY_MS;
+  const MIN = 60_000;
+  it("20 an hour pass, the 21st waits until the oldest is an hour old", () => {
+    const times = Array.from({ length: MAX_PER_HOUR }, (_, i) => NOW - (50 - i) * MIN);
+    assert.equal(createWaitMs(times.slice(1), NOW), 0);
+    assert.equal(createWaitMs(times, NOW), times[0]! + HOUR_MS - NOW);
+  });
+  it("50 in a day wait for the day cap even when the hour is quiet", () => {
+    const spread = Array.from({ length: MAX_PER_DAY }, (_, i) => NOW - (i * 25 + 61) * MIN).sort((a, b) => a - b);
+    assert.ok(spread.every((t) => t > NOW - CREATE_DAY_MS));
+    assert.equal(createWaitMs(spread, NOW), spread[0]! + CREATE_DAY_MS - NOW);
+    assert.equal(createWaitMs(spread.slice(1), NOW), 0);
+  });
+  it("the emulator gets much looser limits; production keeps 20 and 50", () => {
+    assert.deepEqual(limitsFor({ FUNCTIONS_EMULATOR: "true" }), EMULATOR_LIMITS);
+    assert.deepEqual(limitsFor({}), PRODUCTION_LIMITS);
+    assert.deepEqual(PRODUCTION_LIMITS, { perHour: 20, perDay: 50 });
+    assert.ok(EMULATOR_LIMITS.perHour >= 1000 && EMULATOR_LIMITS.perDay >= 5000);
+    const times = Array.from({ length: 100 }, (_, i) => NOW - (i + 1) * MIN);
+    assert.ok(createWaitMs(times, NOW, PRODUCTION_LIMITS) > 0);
+    assert.equal(createWaitMs(times, NOW, EMULATOR_LIMITS), 0);
+  });
+  it("old, malformed and future entries are ignored", () => {
+    assert.deepEqual(recentCreates({ creates: [NOW - CREATE_DAY_MS, NOW - 5, "x", NOW + 10 * MIN] }, NOW), [NOW - 5]);
+  });
+  it("the error is resource-exhausted, plain, with a retry hint", () => {
+    const e = tooManyTrips(3 * MIN + 1);
+    assert.equal(e.code, "resource-exhausted");
+    assert.match(e.message, /^Too many new trips\. Wait 4 minutes and try again\.$/);
+    assert.deepEqual(e.details, { reason: "too-many-trips", retryAfterSeconds: 181 });
   });
 });

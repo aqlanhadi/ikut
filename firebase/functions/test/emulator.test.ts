@@ -5,6 +5,9 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { endIdleTrips } from "../lib/endIdleTrips.js";
+import { CREATE_LIMITS, PRODUCTION_LIMITS, sweepCreateLimits } from "../lib/createLimit.js";
+import { createTripForUser } from "../lib/createTripCall.js";
+import { createTripWithFreeCode, generateCode, type CreateTripInput } from "../lib/createTrip.js";
 import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
 import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
@@ -1185,5 +1188,148 @@ describe("wrong-code limit (emulator)", () => {
     assert.ok(deleted >= 1);
     assert.equal((await old.get()).exists, false);
     assert.equal((await fresh.get()).exists, true);
+  });
+});
+
+describe("createTrip (emulator, D108)", () => {
+  const input = (over: Record<string, unknown> = {}) => ({
+    name: "Trip to Ipoh", destination: { name: "Ipoh", latitude: 4.6, longitude: 101.1 }, route: "_p~iF~ps|U",
+    routeSeconds: 600, organizerName: "Sam", carId: "car-" + Math.random().toString(36).slice(2), ...over,
+  });
+  const create = (data: unknown, token?: string) => callFn("createTrip", data, token);
+  const claimOf = async (code: string) => (await db.collection("codes").doc(code).get());
+
+  it("writes the trip, the organizer and the claim together, and returns only the trip id and the code", async () => {
+    const u = await newUser();
+    const data = input();
+    const r = await create(data, u.token);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(Object.keys(r.body.result).sort(), ["code", "tripId"]);
+    const { tripId, code } = r.body.result;
+    assert.match(code, /^[A-HJKMNP-Z2-9]{6}$/);
+
+    const trip = (await db.collection("trips").doc(tripId).get()).data()!;
+    assert.equal(trip.code, code);
+    assert.equal(trip.organizerId, u.uid);
+    assert.equal(trip.status, "active");
+    assert.equal(trip.name, "Trip to Ipoh");
+    assert.equal(trip.route, data.route);
+    assert.equal(trip.routeSeconds, 600);
+    assert.equal(trip.destination.name, "Ipoh");
+    assert.equal(trip.destination.coordinate.latitude, 4.6);
+    assert.ok(trip.createdAt && Math.abs(trip.createdAt.toMillis() - Date.now()) < 60_000, "server time");
+    assert.equal(trip.startedAt, undefined);
+    assert.equal(trip.endedAt, undefined);
+
+    const member = (await db.collection("trips").doc(tripId).collection("members").doc(u.uid).get()).data()!;
+    assert.deepEqual(member, { displayName: "Sam", carId: data.carId, role: "organizer" });
+    const claim = (await claimOf(code)).data()!;
+    assert.equal(claim.tripId, tripId);
+    assert.equal(claim.organizerId, u.uid);
+    assert.ok(claim.createdAt);
+  });
+
+  it("the code works for joinTrip, so the claim and the trip agree", async () => {
+    const organizer = await newUser();
+    const joiner = await newUser();
+    const r = await create(input(), organizer.token);
+    const j = await call({ code: r.body.result.code, displayName: "Ali", car: newCar(), tracker: false }, joiner.token);
+    assert.equal(j.status, 200, JSON.stringify(j.body));
+    assert.equal(j.body.result.tripId, r.body.result.tripId);
+  });
+
+  it("when the first draws collide, a free code is returned: never one already claimed", async () => {
+    const u = await newUser();
+    const [a, b, c] = ["TAKEN2", "TAKEN3", "FREE22"];
+    await db.collection("codes").doc(a).set({ tripId: "someone", organizerId: "x", createdAt: Timestamp.now() });
+    // An older active trip, made before claims, holds the second code with no claim doc.
+    await db.collection("trips").doc("old-" + b).set({
+      name: "Old", code: b, organizerId: "x", route: "", destination: { name: "D", coordinate: new GeoPoint(1, 1) },
+      status: "active", createdAt: Timestamp.now(),
+    });
+    const draws = [a, b, c];
+    let i = 0;
+    // Maps each wanted code to the random numbers that make generateCode produce it.
+    const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    const randoms = draws.flatMap((code) => [...code].map((ch) => (alphabet.indexOf(ch) + 0.5) / alphabet.length));
+    const out = await createTripWithFreeCode(db, u.uid, { name: "T", destination: { name: "D", latitude: 1, longitude: 1 }, route: "", organizerName: "Sam", carId: "c1" } as CreateTripInput, { random: () => randoms[i++]! });
+    assert.equal(out.code, c);
+    assert.equal(i, 18, "three codes were drawn");
+    assert.equal((await claimOf(c)).data()!.tripId, out.tripId);
+    assert.equal((await claimOf(a)).data()!.tripId, "someone", "the taken claim is untouched");
+    // Nothing from the two refused tries was left behind.
+    assert.equal((await db.collection("trips").where("organizerId", "==", u.uid).get()).size, 1);
+  });
+
+  it("with no free code in the tries it says try again, and leaves no trip, member or claim", async () => {
+    const u = await newUser();
+    await db.collection("codes").doc("AAAAAA").set({ tripId: "someone", organizerId: "x", createdAt: Timestamp.now() });
+    await assert.rejects(
+      createTripWithFreeCode(db, u.uid, { name: "T", destination: { name: "D", latitude: 1, longitude: 1 }, route: "", organizerName: "Sam", carId: "c1" }, { random: () => 0, maxTries: 3 }),
+      (e: { code?: string; message?: string }) => e.code === "aborted" && /try again/i.test(e.message ?? "") && !/taken|in use/i.test(e.message ?? ""),
+    );
+    assert.equal((await db.collection("trips").where("organizerId", "==", u.uid).get()).size, 0);
+  });
+
+  it("parallel creates never share a code", async () => {
+    const users = await Promise.all(Array.from({ length: 6 }, () => newUser()));
+    const rs = await Promise.all(users.map((u) => create(input(), u.token)));
+    const codes = rs.map((r) => r.body.result?.code);
+    assert.equal(new Set(codes).size, 6, JSON.stringify(rs.map((r) => r.body)));
+  });
+
+  it("signed-out callers and malformed requests are refused and write nothing", async () => {
+    const before = (await db.collection("codes").get()).size;
+    assert.equal((await create(input())).body.error.status, "UNAUTHENTICATED");
+    const u = await newUser();
+    for (const bad of [null, input({ route: "x".repeat(200_001) }), input({ organizerName: "" }), input({ carId: "a/b" }), input({ destination: { name: "x", latitude: 200, longitude: 0 } })]) {
+      assert.equal((await create(bad, u.token)).body.error.status, "INVALID_ARGUMENT");
+    }
+    assert.equal((await db.collection("codes").get()).size, before);
+    assert.equal((await db.collection(CREATE_LIMITS).doc(u.uid).get()).exists, false, "a refused request is not counted");
+  });
+
+  // The emulator's own limits are loose (1000 an hour), so these pass the production numbers explicitly.
+  const production = { limits: PRODUCTION_LIMITS };
+  const createsOf = async (uid: string) => (await db.collection(CREATE_LIMITS).doc(uid).get()).data()?.creates ?? [];
+
+  it("cuts a user off after 20 an hour with a wait time; another user is unaffected", async () => {
+    const u = await newUser();
+    for (let i = 0; i < PRODUCTION_LIMITS.perHour; i++) await createTripForUser(db, u.uid, input(), production);
+    await assert.rejects(createTripForUser(db, u.uid, input(), production), (e: any) =>
+      e.code === "resource-exhausted"
+      && /^Too many new trips\. Wait (a minute|\d+ minutes) and try again\.$/.test(e.message)
+      && e.details.reason === "too-many-trips" && e.details.retryAfterSeconds > 0 && e.details.retryAfterSeconds <= 3600);
+    assert.equal((await db.collection("trips").where("organizerId", "==", u.uid).get()).size, PRODUCTION_LIMITS.perHour, "the refused call wrote nothing");
+    const other = await newUser();
+    await createTripForUser(db, other.uid, input(), production);
+  });
+
+  it("a call that finds no free code gives its slot back", async () => {
+    const u = await newUser();
+    await createTripForUser(db, u.uid, input(), production);
+    const before = await createsOf(u.uid);
+    assert.equal(before.length, 1);
+    await db.collection("codes").doc("AAAAAA").set({ tripId: "someone", organizerId: "x", createdAt: Timestamp.now() });
+    await assert.rejects(createTripForUser(db, u.uid, input(), { ...production, random: () => 0, maxTries: 2 }), (e: any) => e.code === "aborted");
+    assert.deepEqual(await createsOf(u.uid), before, "the failed call is not counted");
+    // A user whose only call failed has no counter left.
+    const v = await newUser();
+    await assert.rejects(createTripForUser(db, v.uid, input(), { ...production, random: () => 0, maxTries: 2 }), (e: any) => e.code === "aborted");
+    assert.equal((await db.collection(CREATE_LIMITS).doc(v.uid).get()).exists, false);
+  });
+
+  it("sweepCreateLimits removes expired counters and keeps current ones", async () => {
+    const old = db.collection(CREATE_LIMITS).doc("sweep-old");
+    const fresh = db.collection(CREATE_LIMITS).doc("sweep-fresh");
+    await old.set({ creates: [Date.now() - 2 * 86_400_000], expiresAt: Timestamp.fromMillis(Date.now() - 86_400_000) });
+    await fresh.set({ creates: [Date.now()], expiresAt: Timestamp.fromMillis(Date.now() + 86_400_000) });
+    assert.ok((await sweepCreateLimits(db)) >= 1);
+    assert.equal((await old.get()).exists, false);
+    assert.equal((await fresh.get()).exists, true);
+  });
+
+  it("generateCode draws from the alphabet the app shows", () => {
+    assert.match(generateCode(), /^[A-HJKMNP-Z2-9]{6}$/);
   });
 });

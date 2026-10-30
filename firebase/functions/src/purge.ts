@@ -1,6 +1,7 @@
 import { Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import type { Trip } from "./model.js";
+import { sweepCreateLimits } from "./createLimit.js";
 import { sweepGuessLimits } from "./guessLimit.js";
 import {
   POSITION_RETENTION_MS,
@@ -138,6 +139,11 @@ export async function sweepExpiredEvents(db: Firestore, now: Date, result: Purge
     await sweepGuessLimits(db, now);
   } catch (err) {
     logger.error("sweepExpiredEvents: guess limit sweep failed", { err: String(err) });
+  }
+  try {
+    await sweepCreateLimits(db, now);
+  } catch (err) {
+    logger.error("sweepExpiredEvents: create limit sweep failed", { err: String(err) });
   }
 }
 

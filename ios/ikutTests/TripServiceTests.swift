@@ -1,5 +1,6 @@
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseFunctions
 import Foundation
 import Testing
 @testable import ikut
@@ -7,70 +8,62 @@ import Testing
 struct TripServiceTests {
     private let organizer = TripOrganizer(id: "uid1", displayName: "Aqlan")
 
-    @Test func codeHasSixCharsFromAlphabet() {
-        for _ in 0..<500 {
-            let code = TripService.generateCode()
-            #expect(code.count == 6)
-            #expect(code.allSatisfy { TripService.codeAlphabet.contains($0) })
-            #expect(code.range(of: "^[A-Z0-9]{6}$", options: .regularExpression) != nil)
-        }
-    }
-
     @Test func alphabetExcludesAmbiguousCharacters() {
         for c in "OIL01" { #expect(!TripService.codeAlphabet.contains(c)) }
         #expect(Set(TripService.codeAlphabet).count == TripService.codeAlphabet.count)
         #expect(TripService.codeAlphabet.count == 31)
     }
 
-    @Test func codesAreRoughlyUnique() {
-        let codes = Set((0..<10_000).map { _ in TripService.generateCode() })
-        #expect(codes.count > 9_990)
+    @Test func aRateLimitedCreateSaysHowLongToWait() {
+        let m = TripService.createFailureMessage
+        #expect(m(.resourceExhausted, 240) == "You’ve made a lot of trips lately. Wait 4 minutes and try again.")
+        #expect(m(.resourceExhausted, 20) == "You’ve made a lot of trips lately. Wait a minute and try again.")
+        #expect(m(.resourceExhausted, 3 * 3600) == "You’ve made a lot of trips lately. Wait 3 hours and try again.")
+        #expect(m(.resourceExhausted, 13 * 3600) == "You’ve made a lot of trips today. Try again tomorrow.")
+        #expect(m(.resourceExhausted, nil) == "You’ve made a lot of trips lately. Try again in a little while.")
     }
 
-    private struct Collision: Error {}
-    private struct Down: Error {}
-
-    @Test func claimingCodeRetriesWithAFreshCodeOnACollision() async throws {
-        var codes = ["AAAAAA", "BBBBBB", "CCCCCC"].makeIterator()
-        var tried: [String] = []
-        let accepted = try await TripService.claimingCode(nextCode: { codes.next()! }, collision: { $0 is Collision }) { code in
-            tried.append(code)
-            if tried.count <= 2 { throw Collision() }
+    @Test func otherCreateFailuresUsePlainWords() {
+        let m = TripService.createFailureMessage
+        #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")
+        #expect(m(.unauthenticated, nil) == "You’re signed out. Close ikut and open it again, then make your trip.")
+        #expect(m(.unavailable, nil) != m(.internal, nil))
+        #expect(m(.invalidArgument, nil) == "Use a shorter name, then try again.")
+        // `aborted` is the server's "no free code": plain words, and not the no-signal message.
+        #expect(m(.aborted, nil) == "Couldn’t set up your trip just now. Please try again.")
+        #expect(TripService.callTimeout >= 20 && TripService.callTimeout <= 25)
+        for code in [FunctionsErrorCode.internal, .aborted, .notFound] {
+            let text = m(code, nil)
+            #expect(text == "Couldn’t set up your trip just now. Please try again.")
+            #expect(!text.localizedCaseInsensitiveContains("error") && !text.localizedCaseInsensitiveContains("failed"))
         }
-        #expect(accepted == "CCCCCC")
-        #expect(tried == ["AAAAAA", "BBBBBB", "CCCCCC"])
     }
 
-    @Test func claimingCodeGivesUpAfterTheBoundWithAPlainMessage() async {
-        var tries = 0
-        do {
-            _ = try await TripService.claimingCode(collision: { $0 is Collision }) { _ in tries += 1; throw Collision() }
-            Issue.record("should have thrown")
-        } catch {
-            #expect(error is TripService.CodeUnavailable)
-            #expect(error.localizedDescription == "Couldn’t set up your trip just now. Please try again.")
-        }
-        #expect(tries == TripService.codeAttempts)
-        #expect(TripService.codeAttempts == 5)
+    @Test func aCallableErrorWithDetailsBecomesTheWaitMessage() {
+        let limited = NSError(domain: FunctionsErrorDomain, code: FunctionsErrorCode.resourceExhausted.rawValue, userInfo: [
+            FunctionsErrorDetailsKey: ["reason": "too-many-trips", "retryAfterSeconds": 600],
+            NSLocalizedDescriptionKey: "Too many new trips. Wait 10 minutes and try again.",
+        ])
+        #expect(TripService.createFailure(limited).localizedDescription
+            == "You’ve made a lot of trips lately. Wait 10 minutes and try again.")
+        // Details of another limit are not read as a wait.
+        let other = NSError(domain: FunctionsErrorDomain, code: FunctionsErrorCode.resourceExhausted.rawValue, userInfo: [
+            FunctionsErrorDetailsKey: ["reason": "too-many-guesses", "retryAfterSeconds": 600],
+        ])
+        #expect(TripService.createFailure(other).localizedDescription
+            == "You’ve made a lot of trips lately. Try again in a little while.")
+        let offline = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+        #expect(TripService.createFailure(offline).localizedDescription == "Can’t reach the server. Check your signal and try again.")
     }
 
-    @Test func claimingCodeDoesNotRetryOtherErrors() async {
-        var tries = 0
-        do {
-            _ = try await TripService.claimingCode(collision: { $0 is Collision }) { _ in tries += 1; throw Down() }
-            Issue.record("should have thrown")
-        } catch {
-            #expect(error is Down)
-        }
-        #expect(tries == 1)
-    }
-
-    @Test func onlyPermissionDeniedCountsAsACollision() {
-        let denied = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.permissionDenied.rawValue)
-        let unavailable = NSError(domain: FirestoreErrorDomain, code: FirestoreErrorCode.unavailable.rawValue)
-        #expect(TripService.isCodeCollision(denied))
-        #expect(!TripService.isCodeCollision(unavailable))
-        #expect(!TripService.isCodeCollision(ServerWrite.Offline()))
+    @Test func theCreatePayloadCarriesTheTripAndNothingAboutACode() throws {
+        let payload = TripService.createPayload(
+            name: "Raya", destination: Fixtures.kotaBharu, route: Fixtures.longRoute, organizerName: "Aqlan", carId: "car1")
+        #expect(Set(payload.keys) == ["name", "destination", "route", "routeSeconds", "organizerName", "carId"])
+        #expect(payload["route"] as? String == Fixtures.longRoute.polyline)
+        let place = try #require(payload["destination"] as? [String: Any])
+        #expect(place["name"] as? String == "Kota Bharu")
+        #expect(place["latitude"] as? Double == 6.1254)
     }
 
     @Test func distanceFormatting() {
@@ -101,24 +94,7 @@ struct TripServiceTests {
 
     }
 
-    @Test func tripDocumentMatchesRules() {
-        let trip = TripService.makeTrip(
-            name: "Raya", code: "ABC234", organizerId: "uid1", destination: Fixtures.kotaBharu, route: Fixtures.longRoute)
-        #expect(trip.status == .active)
-        #expect(trip.organizerId == "uid1")
-        #expect(trip.route == Fixtures.longRoute.polyline)
-        #expect(trip.createdAt == nil)
-        #expect(trip.endedAt == nil)
-        #expect(trip.destination.name == "Kota Bharu")
-        #expect(trip.destination.coordinate.latitude == 6.1254)
-    }
-
-    @Test func memberAndCarDocumentsMatchRules() {
-        let member = TripService.makeOrganizerMember(organizer: organizer, carId: "car1")
-        #expect(member.role == .organizer)
-        #expect(member.carId == "car1")
-        #expect(member.displayName == "Aqlan")
-
+    @Test func carDocumentMatchesRules() {
         let car = TripService.makeOrganizerCar(
             organizer: organizer, name: TripService.carName(for: "Aqlan"), color: TripService.palette[0])
         #expect(car.name == "Aqlan's car")
@@ -177,7 +153,7 @@ struct TripServiceEmulatorTests {
         #expect(moved.routeOffset == 130_000)
     }
 
-    @Test func createTripWritesTripMemberAndCar() async throws {
+    @Test func createTripThroughTheServerWritesTripMemberAndCar() async throws {
         let auth = AuthModel()
         try await auth.signInAsGuest(name: "Aqlan")
         let uid = try #require(Auth.auth().currentUser?.uid)
@@ -196,6 +172,7 @@ struct TripServiceEmulatorTests {
         #expect(trip.route == Fixtures.longRoute.polyline)
         #expect(trip.code.range(of: "^[A-Z0-9]{6}$", options: .regularExpression) != nil)
         #expect(trip.createdAt != nil)
+        #expect(trip.routeSeconds == Fixtures.longRoute.travelTime)
 
         let member = try await db.document(FirestorePaths.member(tripId: ids.tripId, userId: uid))
             .getDocument(as: Member.self)
