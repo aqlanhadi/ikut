@@ -24,6 +24,48 @@ struct MapPaddingTests {
         }
     }
 
+    // MARK: one constant for every screen (D109)
+
+    /// The padding is a function of the text size alone (`TripMapSpec` has no padding field, no layer sets one), so a
+    /// mode switch (Leave, Back to trips, End, Start trip) can never change it. At each text size the lobby's cover is
+    /// that line, and every Home mode's sheet is read relative to it: the room is the cover less the padding.
+    @Test(arguments: [CGFloat(470), 560, 658, 900])
+    func everyScreenSharesOnePaddingAndReadsItsCoverRelativeToIt(scaledMedium: CGFloat) {
+        let padding = LobbySheet.mapPadding(scaledMedium: scaledMedium)
+        let scale = LobbySheet.compact(scaled: scaledMedium) / LobbySheet.compactHeight
+        let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight * scale)
+        #expect(LobbySheet.cover(compact: LobbySheet.compact(scaled: scaledMedium)).bottom == padding)
+        for mode in [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join] {
+            let cover = HomeSheet.cover(mode, compact: compact)
+            let insets = TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom,
+                                                reach: HomeSheet.reach(mode, compact: compact), padding: padding)
+            #expect(abs(insets.bottom * Double(874 - padding)
+                        - Double(max(cover.bottom, HomeSheet.reach(mode, compact: compact)) - padding)) < 1e-9)
+        }
+        // The same value however it is asked for: from the raw scaled height or the sheet's capped one.
+        #expect(padding == LobbySheet.mapPadding(scaledMedium: LobbySheet.compact(scaled: scaledMedium)))
+    }
+
+    /// The list's camera at a scaled text size: the strip's bottom edge, measured from the screen's bottom, is the list's
+    /// reach (the sheet and its gap), whatever the padding is, so the camera is not framed by the default padding.
+    @Test(arguments: [CGFloat(300), 450], [CGFloat(470), 658])
+    @MainActor func theListsStripEdgeIsItsReachAtAScaledTextSize(compact: CGFloat, scaledMedium: CGFloat) {
+        let padding = LobbySheet.mapPadding(scaledMedium: scaledMedium)
+        let reach = HomeSheet.reach(.list, compact: compact)
+        let insets = TripsHomeView.obscured(mapHeight: 874, reach: reach, padding: padding)
+        let frame = Double(874 - padding)
+        // Frame bottom is `padding` above the screen's bottom; the strip's bottom edge is `bottom * frame` above that.
+        let edgeFromBottom = Double(padding) + insets.bottom * frame
+        #expect(abs(edgeFromBottom - Double(reach)) < 1e-9)
+        #expect(abs(insets.top * frame - 110) < 1e-9)
+        // The entry camera takes the same numbers.
+        let route = PastTripRoute(id: "r", name: "R", destinationName: "D", destinationLatitude: 5, destinationLongitude: 101,
+                                  points: [[3, 101.5], [5, 101]])
+        let model = HomeModel(routes: [route])
+        #expect(model.entryCamera(mapHeight: 874, reach: reach, padding: padding)
+            == PastTripsMapLogic.region(fitting: [route], bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) })
+    }
+
     // MARK: the scale read off the map
 
     /// What MapKit reports for a camera `distance` away over a map `mapHeight` tall with `padding` at the bottom: the

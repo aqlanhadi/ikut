@@ -22,27 +22,23 @@ enum HomeSheet {
     }
 
     static let detentExtra = BottomSheet.detentExtra
-    /// From the screen's bottom edge to the top of the list's short sheet.
-    static let defaultReach: CGFloat = legalInset(compact: compactHeight)
+    /// From the screen's bottom edge to the top of the list's short sheet and the gap above it, at the default text size.
+    static let defaultReach: CGFloat = reach(.list, compact: compactHeight)
 
-    /// The map's bottom safe area: from the screen's bottom edge up to the top of the short sheet, which is its height
-    /// plus `detentExtra`. MapKit keeps its own 10 pt between the logo and Legal and the edge of that area, which is
-    /// Apple's 10 pt above the sheet. Fixed from the first frame: the tall sheet covers them and the map doesn't move
-    /// when the sheet is pulled up or down (owner 2026-10-25, #343).
-    static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
-
-    /// The map's bottom safe area in `mode`: the list's, except a left trip's short sheet, which the logo and Legal
-    /// follow down so they sit just above it (#437). Where to?, New trip and joining keep the list's (`createInsets`).
-    static func legalInset(_ mode: Mode, compact: CGFloat) -> CGFloat {
-        mode == .leftTrip ? legalInset(compact: height(.leftTrip, compact: compact)) : legalInset(compact: compact)
+    /// How far up from the screen's bottom edge the camera keeps the short sheet of `mode` and the gap above it
+    /// clear: the list's, except a left trip's short sheet (#437). Where to?, New trip and joining keep the list's
+    /// (`createInsets`). This used to be the map's bottom padding; the padding is now one constant for every screen
+    /// (`LobbySheet.mapPadding`, D109) and the camera reads this relative to it (`obscured`, `createInsets`), so the
+    /// tall sheet covers the map on purpose and moves nothing (#343).
+    static func reach(_ mode: Mode, compact: CGFloat) -> CGFloat {
+        max(0, mode == .leftTrip ? height(.leftTrip, compact: compact) : compact) + detentExtra
     }
 
     /// What Home's sheet shows: its list, or one of the two steps of making a trip over the same map (MapFirst B2, B3).
     enum Mode: Equatable { case list, whereTo, newTrip, leftTrip, join }
 
     /// A trip you left early picked on Home: its header and the two-line note, nothing below. Its short detent is this
-    /// fraction of the list's (so it scales with the text size, as the list's does). The map's padding follows it
-    /// (`legalInset(_:compact:)`), so Legal sits just above it.
+    /// fraction of the list's (so it scales with the text size, as the list's does).
     static let leftTripFraction: CGFloat = 0.62
 
     /// Where to? with the keyboard up (B2), and New trip with the route drawn (B3).
@@ -58,8 +54,8 @@ enum HomeSheet {
         return flow.ready == nil ? .whereTo : .newTrip
     }
 
-    /// What Home's sheet covers of the map for its camera (D63 C4): the short sheet of `mode`. The tall one covers the
-    /// map on purpose and moves nothing (#343), so it is not a parameter.
+    /// What Home's sheet covers of the map for its camera (D63 C4): the short sheet of `mode`. The
+    /// tall one covers the map on purpose and moves nothing (#343), so it is not a parameter.
     static func cover(_ mode: Mode, compact: CGFloat) -> MapCover { MapCover(top: 0, bottom: height(mode, compact: compact)) }
 
     /// The short detent's height for `mode`.
@@ -87,13 +83,15 @@ enum HomeSheet {
     static let createTopRoom: CGFloat = 110
 
     /// What the camera keeps clear for Where to? and New trip, as fractions of the part of the map the camera frames.
-    /// MapKit frames the map above its bottom safe area (`legalInset`, fixed at the list's inset), so the fractions
-    /// are of that part, not of the whole screen: the sheet covers only the part of itself above the padding.
-    static func createInsets(mapHeight: CGFloat, sheet: CGFloat, compact: CGFloat) -> (top: Double, bottom: Double) {
-        let padding = legalInset(compact: compact)
+    /// MapKit frames the map above its bottom safe area (`padding`, the one constant `LobbySheet.mapPadding`), so the
+    /// fractions are of that part, not of the whole screen. `sheet` is the cover's bottom; the bottom fraction is what it
+    /// covers beyond the padding (the list's reach at least, as before), and negative when that is lower than the
+    /// padding (the strip then reaches below the frame's edge).
+    static func createInsets(mapHeight: CGFloat, sheet: CGFloat, compact: CGFloat, padding: CGFloat) -> (top: Double, bottom: Double) {
         let full = mapHeight > sheet + createTopRoom ? mapHeight : 874
         let area = max(1, full - padding)
-        return (Double(createTopRoom / area), Double(max(0, sheet - padding + createMargin) / area))
+        let cleared = max(reach(.list, compact: compact), sheet + createMargin)
+        return (Double(createTopRoom / area), Double((cleared - padding) / area))
     }
 
     /// A sheet pulled up for one step does not stay tall for the next: New trip opens at its own height.

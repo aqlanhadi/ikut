@@ -42,6 +42,9 @@ struct TripsHomeView: View {
     /// The short sheet's height, the same for the list and a picked trip so a pick never resizes it. Follows the
     /// text size and nothing else.
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
+    /// The lobby's medium height at the text size, for the map's one constant bottom padding (the host's, D109).
+    @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
+    var mapPadding: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if DEBUG
     /// Demo that can be tapped through: picking a trip gives it this recap (no server). `tour` also picks the
@@ -131,7 +134,7 @@ struct TripsHomeView: View {
                 // Once per appearance (Home is new after a trip): where the phone last knew you were.
                 if model.here == nil, !model.isDemo, model.routes.isEmpty { model.here = Self.lastKnownLocation() }
                 // The app's first frame (back from a trip, HomeView flies it with the switch, `enteredWithCamera`).
-                if let camera = model.entryCamera(mapHeight: mapHeight) {
+                if let camera = model.entryCamera(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding) {
                     move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
                 }
             }
@@ -214,10 +217,7 @@ struct TripsHomeView: View {
                 onRecapDotTap: { id in
                     if let item = model.picked?.model.recap?.timeline.first(where: { $0.id == id }) { selectItem(item) }
                 }),
-            // The logo and Legal ride 10 pt above the short sheet instead of under it, from the first frame, and stay
-            // there when the sheet is pulled up (it covers them, as in Apple Maps; owner 2026-10-25, #343).
-            // A left trip's short sheet takes them down with it (#437).
-            bottomPadding: HomeSheet.legalInset(model.mode, compact: compact),
+            // No padding of its own: the host keeps the one constant (D109), so leaving a trip flies on without a cut.
             hidesControls: true,
             onTap: model.picked != nil ? { closePicked() } : nil)
     }
@@ -273,7 +273,7 @@ struct TripsHomeView: View {
         guard let picked = model.picked else { return }
         // Above the short sheet, a left trip's included, whose padding follows it down.
         let insets = Self.obscured(mapHeight: mapHeight, sheet: sheetCover().bottom,
-                                   padding: HomeSheet.legalInset(model.mode, compact: compact))
+                                   reach: HomeSheet.reach(model.mode, compact: compact), padding: mapPadding)
         let region: MKCoordinateRegion?
         if let c = picked.selectedItem?.coordinate {
             region = PickedTripLogic.focus(on: c, bottomObscured: insets.bottom, topObscured: insets.top)
@@ -327,22 +327,23 @@ struct TripsHomeView: View {
     /// Points the camera at every drawn route, above the compact sheet.
     func fit(animated: Bool) {
         guard model.flow == nil, model.joinFlow == nil else { return }
-        let insets = Self.obscured(mapHeight: mapHeight)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         guard let region = PastTripsMapLogic.region(fitting: model.routes, bottomObscured: insets.bottom,
                                                     topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
 
-    /// Fractions of the map's height kept clear of routes: the status bar plus room for a flag at
-    /// the top, and the compact sheet at the bottom (the map runs under both). Before the map has a
-    /// height the typical phone height stands in, rather than dividing by zero (which pushed the
-    /// fit far south).
+    /// Fractions of the part of the map the camera frames (the map less `padding`, the one constant bottom padding) kept
+    /// clear of routes: the status bar plus room for a flag at the top, and at the bottom what `sheet` (the cover's
+    /// bottom) or the list's `reach`, whichever is higher, covers beyond the padding; negative when that is lower than
+    /// the padding. Before the map has a height the typical phone height stands in, rather than dividing by zero
+    /// (which pushed the fit far south).
     nonisolated static func obscured(mapHeight: CGFloat, sheet: CGFloat = HomeSheet.compactHeight,
-                                      padding: CGFloat = HomeSheet.defaultReach) -> (top: Double, bottom: Double) {
+                                      reach: CGFloat = HomeSheet.defaultReach,
+                                      padding: CGFloat = LobbySheet.defaultMapPadding) -> (top: Double, bottom: Double) {
         let height = mapHeight > sheet + Self.topObscured ? mapHeight : 874
-        // The map's bottom safe-area padding (`HomeSheet.legalInset`) is already kept clear, since MapKit fits
-        // inside it; only the part of the sheet above that padding is left for the camera.
-        return (Double(Self.topObscured / height), Double(max(0, sheet - padding) / height))
+        let area = max(1, height - padding)
+        return (Double(Self.topObscured / area), Double((max(sheet, reach) - padding) / area))
     }
 
     /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
@@ -364,7 +365,7 @@ struct TripsHomeView: View {
     /// Before there is a place, the view around you when the camera shows you, else the fixed region it has.
     private func refocusCreate(animated: Bool) {
         guard let flow = model.flow else { return }
-        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact)
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact, padding: mapPadding)
         let place = flow.region(bottomObscured: insets.bottom, topObscured: insets.top)
         guard let region = HomeCamera.create(place: place, here: model.here, follows: followsFixes(hasPlace: place != nil),
                                              bottomObscured: insets.bottom, topObscured: insets.top) else { return }
@@ -423,7 +424,7 @@ struct TripsHomeView: View {
     /// The list's view of you above its short sheet, when it has no routes to show.
     private func showHere(animated: Bool) {
         guard let here = model.here, model.flow == nil, model.joinFlow == nil, model.picked == nil, model.routes.isEmpty else { return }
-        let insets = Self.obscured(mapHeight: mapHeight)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)), animated: animated)
     }
 
@@ -449,7 +450,7 @@ struct TripsHomeView: View {
     /// The camera for a found code: the trip's end above the sheet; nothing before that.
     private func refocusJoin(animated: Bool) {
         guard let joinFlow = model.joinFlow else { return }
-        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact)
+        let insets = HomeSheet.createInsets(mapHeight: mapHeight, sheet: sheetCover().bottom, compact: compact, padding: mapPadding)
         guard let region = JoinSteps.region(for: joinFlow.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
     }
@@ -466,7 +467,7 @@ struct TripsHomeView: View {
     // MARK: Sheet
 
     /// The short detent's height: one for the list and a picked trip.
-    private var compact: CGFloat { HomeSheet.compact(scaled: shortHeight) }
+    var compact: CGFloat { HomeSheet.compact(scaled: shortHeight) }
 
     /// Apple's own sheet over the map: drag it between a short and a tall detent, as in Apple Maps. It is
     /// always up (no dismiss), and the map behind it takes touches while it is short. The name alerts are

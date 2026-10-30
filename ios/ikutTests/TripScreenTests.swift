@@ -55,12 +55,12 @@ struct TripScreenTests {
     }
 
     @Test func theLastLayerToPublishWinsSoOnlyTheOneOnScreenIsDrawn() {
-        var value: TripMapSpec? = TripMapSpec(bottomPadding: 1)
-        TripMapSpecKey.reduce(value: &value) { TripMapSpec(bottomPadding: 2) }
-        #expect(value?.bottomPadding == 2)
+        var value: TripMapSpec? = TripMapSpec(hidesControls: false)
+        TripMapSpecKey.reduce(value: &value) { TripMapSpec(hidesControls: true) }
+        #expect(value?.hidesControls == true)
         // A sibling that publishes nothing leaves the one that did.
         TripMapSpecKey.reduce(value: &value) { nil }
-        #expect(value?.bottomPadding == 2)
+        #expect(value?.hidesControls == true)
     }
 
     @Test func eachLayerAsksForItsOwnMapLayers() {
@@ -651,16 +651,17 @@ struct OneMapTests {
 
     // MARK: Each mode's camera reads it, with the same results as before
 
-    @Test(arguments: [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join])
-    func homesCameraReadsTheOneCoverWithTheSameInsets(mode: HomeSheet.Mode) {
-        let compact = HomeSheet.compactHeight
+    @Test(arguments: [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join], [CGFloat(300), 450])
+    func homesCameraReadsTheOneCoverRelativeToTheOnePadding(mode: HomeSheet.Mode, compact: CGFloat) {
         let cover = HomeSheet.cover(mode, compact: compact)
-        let padding = HomeSheet.legalInset(mode, compact: compact)
-        // What the picked trip and the create steps aimed with before: the mode's short sheet, measured by Home itself.
-        #expect(TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, padding: padding)
-            == TripsHomeView.obscured(mapHeight: 874, sheet: HomeSheet.height(mode, compact: compact), padding: padding))
-        #expect(HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact)
-            == HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.height(mode, compact: compact), compact: compact))
+        let padding = LobbySheet.mapPadding(scaledMedium: LobbySheet.compactHeight)
+        let reach = HomeSheet.reach(mode, compact: compact)
+        // What the picked trip and the create steps aim with: the cover less the one padding, as fractions of the frame.
+        let area = Double(874 - padding)
+        #expect(TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, reach: reach, padding: padding)
+            == (Double(110 / (874 - padding)), Double(max(cover.bottom, reach) - padding) / area))
+        #expect(HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact, padding: padding).bottom
+            == Double(max(HomeSheet.reach(.list, compact: compact), cover.bottom + HomeSheet.createMargin) - padding) / area)
         #expect(cover.top == 0)
     }
 
@@ -671,8 +672,13 @@ struct OneMapTests {
     @Test(arguments: [CGFloat(470), 560])
     func theLobbysCameraReadsTheOneCoverWithTheSameFit(compact: CGFloat) {
         let cover = LobbySheet.cover(compact: compact)
-        #expect(LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: cover.bottom)
-            == LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: LobbySheet.legalInset(compact: compact)))
+        let padding = LobbySheet.mapPadding(scaledMedium: compact)
+        // The medium sheet is the one padding itself, so the lobby's fit keeps nothing below the frame; its top fraction
+        // is of the frame inside that padding.
+        #expect(cover.bottom == padding)
+        #expect(LobbyMapLogic.bottomFraction(mapHeight: 874, safeTop: 62, cover: cover.bottom, bottomPadding: padding) == 0)
+        #expect(LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: padding)
+            == Double((62 + LobbyMapLogic.buttonBand + LobbyMapLogic.flagRoom) / (874 - padding)))
         #expect(cover.top == LobbyMapLogic.buttonBand)
     }
 

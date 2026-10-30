@@ -20,12 +20,16 @@ enum LobbySheet {
     /// Legal ride above it and stay put when the sheet is pulled up.
     static func legalInset(compact: CGFloat) -> CGFloat { max(0, compact) + detentExtra }
 
-    /// The one bottom padding the lobby's map and the driving map both publish (D101): the screen's bottom edge to the top
-    /// of the medium sheet, so MapKit's logo and Legal ride 10 pt above that line in both. It is the same before, during
-    /// and after Start trip (MapKit refits at once to a changed safe area, which cut the paced flight into one frame)
-    /// and never follows the driving sheet; what covers the map beyond it goes into the camera (`MapCameraRoom`), where
-    /// it animates. `scaledMedium` is the medium height at the text size (an already capped one stays as it is).
+    /// The one bottom padding of the map on every screen (D101, D109): the screen's bottom edge to the top of the lobby's
+    /// medium sheet, so MapKit's logo and Legal ride 10 pt above that line on Home, in the lobby and while driving. The
+    /// host (`TripScreenHost`) applies it; no layer sets its own. It is the same before, during and after Start trip,
+    /// Leave, Back to trips and End (MapKit refits at once to a changed safe area, which cut the paced flight into one
+    /// frame) and a function of the text size alone, never of the mode or the sheet; what covers the map beyond it goes
+    /// into the camera (`MapCameraRoom`, `HomeSheet.createInsets`), where it animates. `scaledMedium` is the medium height
+    /// at the text size (an already capped one stays as it is).
     static func mapPadding(scaledMedium: CGFloat) -> CGFloat { legalInset(compact: compact(scaled: scaledMedium)) }
+    /// `mapPadding` at the default text size.
+    static let defaultMapPadding = mapPadding(scaledMedium: compactHeight)
 
     /// What the lobby's sheet covers of the map for its camera (D63 C4): the medium sheet (the camera fits the trip above
     /// it, inside the map's bottom safe area); the tall one covers the map on purpose and moves nothing, so it is not a
@@ -130,15 +134,23 @@ enum LobbyMapLogic {
     /// The fraction of the map's height kept clear at the top: the status bar (`safeTop`, the map's own top safe area:
     /// the lobby has no navigation bar, its header is in the sheet), the round "show the whole trip" button that hangs
     /// under it, and room for the destination flag, which stands about `flagRoom` above its coordinate, so the flag
-    /// lands clear of both. The sheet needs none at the bottom: the map's bottom safe area (`LobbySheet.legalInset`)
-    /// already sits above the medium sheet, and MapKit fits inside it (`bottomPadding`). Before the map is measured a
-    /// typical status bar and phone height stand in.
+    /// lands clear of both. Before the map is measured a typical status bar and phone height stand in.
     static func topFraction(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat = 0) -> Double {
         let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
-        // MapKit fits a region inside the map's safe area, so the fractions are of the part above the bottom padding.
+        return Double((bar + flagRoom) / viewport(mapHeight: mapHeight, safeTop: safeTop, bottomPadding: bottomPadding))
+    }
+
+    /// The fraction of the frame kept clear at the bottom: what the lobby's sheet (`cover`) covers beyond the map's one
+    /// bottom padding. Zero when the cover is the padding itself (the medium sheet at the same text size).
+    static func bottomFraction(mapHeight: CGFloat, safeTop: CGFloat, cover: CGFloat, bottomPadding: CGFloat) -> Double {
+        Double((cover - bottomPadding) / viewport(mapHeight: mapHeight, safeTop: safeTop, bottomPadding: bottomPadding))
+    }
+
+    /// The part of the map MapKit fits a region inside (the map less the bottom padding), so the fractions are of it.
+    private static func viewport(mapHeight: CGFloat, safeTop: CGFloat, bottomPadding: CGFloat) -> CGFloat {
+        let bar = (safeTop > 0 ? safeTop : typicalBar) + buttonBand
         let measured = mapHeight - bottomPadding
-        let viewport = measured > 2 * (bar + flagRoom) ? measured : 874 - bottomPadding
-        return Double((bar + flagRoom) / viewport)
+        return measured > 2 * (bar + flagRoom) ? measured : 874 - bottomPadding
     }
 
     /// The status bar before it is measured.
@@ -221,8 +233,6 @@ struct LobbyMapLayer: View {
             .preference(key: TripMapSpecKey.self, value: TripMapSpec(
                 input: .lobby(route: route, pins: pins, ownRoute: ownRoute, ownColorHex: ownColorHex),
                 style: TripMapStyle(onCandidateTap: onCandidateTap),
-                // The logo and Legal ride above the medium sheet from the first frame, and stay when it is pulled up.
-                bottomPadding: LobbySheet.mapPadding(scaledMedium: sheetCompact),
                 hidesControls: true))
     }
 
@@ -235,10 +245,12 @@ struct LobbyMapLayer: View {
         // The one cover, written first so a fit made in the sheet's transaction reads the lobby's own (D63 C4).
         stage.cover(LobbySheet.cover(compact: sheetCompact), from: .lobby)
         let cover = stage.space.cover(in: .lobby) ?? LobbySheet.cover(compact: sheetCompact)
-        guard let region = LobbyMapLogic.region(for: target, route: route, pins: pins, bottomObscured: 0,
-                                                topObscured: LobbyMapLogic.topFraction(mapHeight: stage.space.frame.height,
-                                                                                       safeTop: stage.space.safeTop,
-                                                                                       bottomPadding: cover.bottom)) else { return }
+        let padding = LobbySheet.mapPadding(scaledMedium: sheetCompact)
+        let height = stage.space.frame.height, safeTop = stage.space.safeTop
+        guard let region = LobbyMapLogic.region(
+            for: target, route: route, pins: pins,
+            bottomObscured: LobbyMapLogic.bottomFraction(mapHeight: height, safeTop: safeTop, cover: cover.bottom, bottomPadding: padding),
+            topObscured: LobbyMapLogic.topFraction(mapHeight: height, safeTop: safeTop, bottomPadding: padding)) else { return }
         onStop = target != .wholeTrip
         fitted = true
         let position = MapCameraPosition.region(region)
