@@ -146,8 +146,8 @@ struct DesignSharedSection: View {
             }
             "CarBadge".code
             HStack(spacing: Spacing.s) {
-                CarBadge(number: 1, colorHex: "#2563EB"); CarBadge(number: 2, colorHex: "#D9480F")
-                CarBadge(symbol: Symbol.add, colorHex: "#8E8E93")
+                CarBadge(number: 1, colorHex: "#2563EB"); CarBadge(number: 2, colorHex: "#CC450D")
+                CarBadge(symbol: Symbol.add, colorHex: "#737378")
             }
             "RoundGlassIconButton".code
             HStack(spacing: Spacing.s) {

@@ -218,7 +218,7 @@ export async function joinTripTransaction(
 }
 
 /** Keep in sync with TripService.palette in the iOS app. */
-export const CAR_PALETTE = ["#2563EB", "#D9480F", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
+export const CAR_PALETTE = ["#2563EB", "#CC450D", "#0F766E", "#7C3AED", "#BE185D", "#A16207"];
 
 /**
  * The requested colour if no car in the trip uses it, else the first palette colour that is free

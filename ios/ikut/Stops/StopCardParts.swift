@@ -180,7 +180,7 @@ struct StopVoterRow: View {
     }
     let rows = [
         row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true, .ok),
-        row("c2", 2, "#D9480F", "Wyna’s X70", .waiting),
+        row("c2", 2, "#CC450D", "Wyna’s X70", .waiting),
         row("c3", 3, "#0F766E", "Hafiz’s Hilux", .ok),
     ]
     return VStack(spacing: Spacing.xs) {

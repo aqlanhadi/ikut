@@ -176,12 +176,12 @@ struct MergePointView: View {
     }
     let markers = [
         marker("c1", 1, "Aqlan’s Myvi", "#2563EB", lead: true, mine: true),
-        marker("c2", 2, "Wyna’s X70", "#D9480F", heading: 200),
+        marker("c2", 2, "Wyna’s X70", "#CC450D", heading: 200),
         marker("c3", 3, "Hafiz’s Hilux", "#0F766E", heading: 90, joining: true),
         marker("c4", 4, "Daniel’s City", "#7C3AED", stale: true, age: "2 min ago"),
         marker("c5", 5, "Siti’s Bezza", "#CA8A04", heading: nil, stale: true, paused: true),
         marker("c6", 6, "Aisha’s Ativa", "#0891B2", heading: nil, arrived: true),
-        marker("c7", nil, "Old car", "#8E8E93", heading: nil),
+        marker("c7", nil, "Old car", "#737378", heading: nil),
     ]
     return VStack(alignment: .leading, spacing: Spacing.l) {
         ForEach(markers) { MapMarkerView(marker: $0, cameraHeading: 0, containerWidth: 390) }

@@ -393,7 +393,7 @@ test('coordinates and lists are checked with plain words', () => {
 
 test('new cars take the next first name, car name and colour, distinct from the phones and each other', () => {
   const used = [{ label: 'Daniel', color: '#7C3AED' }, { label: 'Hafiz', color: '#0F766E' }];
-  const seen = new Set(['#0a6cff', '#d9480f', '#7c3aed', '#0f766e']);
+  const seen = new Set(['#0a6cff', '#cc450d', '#7c3aed', '#0f766e']);
   for (let i = 0; i < 6; i++) {
     const c = nextCar(used, 3 + i);
     assert.ok(FIRST_NAMES.includes(c.label));

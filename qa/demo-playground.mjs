@@ -48,7 +48,7 @@ const FIRST_GENERATED = [
   { key: 'daniel', label: 'Daniel', name: 'Daniel’s City', color: '#7C3AED' },
   { key: 'hafiz', label: 'Hafiz', name: 'Hafiz’s Hilux', color: '#0F766E' },
 ];
-const PHONE_COLORS = { phone1: '#0a6cff', phone2: '#d9480f' };
+const PHONE_COLORS = { phone1: '#0a6cff', phone2: '#cc450d' };
 const DEFAULTS = { phone1: 3000, phone2: 2200, daniel: 1400, hafiz: 600 };
 const KEYS = ['phone1', 'phone2', 'daniel', 'hafiz'];
 const DEFAULT_KMH = 90;

@@ -24,7 +24,7 @@ struct RecapLogicTests {
             createdAt: t0, endedAt: ended.map { t0.addingTimeInterval($0) },
             cars: [
                 RecapCar(id: "c1", name: "Myvi", color: "#2563EB", number: 1, isLead: true),
-                RecapCar(id: "c2", name: "Axia", color: "#D9480F", number: 2, isLead: false),
+                RecapCar(id: "c2", name: "Axia", color: "#CC450D", number: 2, isLead: false),
             ],
             memberNames: ["u1": "Aqlan", "u2": "Wyna", "u3": "Faiz"], memberCars: ["u1": "c1", "u2": "c2", "u3": "c1"],
             positions: positions, events: events)

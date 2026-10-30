@@ -282,7 +282,7 @@ struct JoinModelTests {
         let preview = try JoinService.parsePreview([
             "tripId": "t1", "name": "Raya", "destinationName": "Ipoh",
             "cars": [["id": "c1", "name": "Myvi", "color": "#2563EB", "hasTracker": false, "isLead": true],
-                     ["id": "c2", "name": "X70", "color": "#D9480F", "hasTracker": false]],
+                     ["id": "c2", "name": "X70", "color": "#CC450D", "hasTracker": false]],
         ] as [String: Any])
         #expect(preview.cars.map(\.isLead) == [true, false])
     }

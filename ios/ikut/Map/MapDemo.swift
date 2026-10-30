@@ -80,7 +80,7 @@ enum MapDemo {
 
         var cars = [
             car("c1", "Aqlan’s Myvi", "#2563EB", number: 1, lead: true),
-            car("c2", "Wyna’s X70", "#D9480F", number: 2),
+            car("c2", "Wyna’s X70", "#CC450D", number: 2),
             car("c3", "Hafiz’s Hilux", "#0F766E", number: 3, state: .joining, route: Polyline.encode(own.coordinates)),
             car("c4", "Daniel’s City", "#7C3AED", number: 4),
         ]
@@ -238,7 +238,7 @@ enum MapDemo {
             }
             let rows = [
                 row("c1", 1, "#2563EB", "Aqlan’s Myvi (you)", mine: true),
-                row("c2", 2, "#D9480F", "Wyna’s X70"),
+                row("c2", 2, "#CC450D", "Wyna’s X70"),
                 row("c3", 3, "#0F766E", "Hafiz’s Hilux"),
                 row("c4", 4, "#7C3AED", "Daniel’s City"),
             ] + (fiveCars ? [row("c5", 5, "#BE185D", "Faiz’s car")] : [])

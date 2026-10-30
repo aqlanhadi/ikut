@@ -14,7 +14,7 @@ struct OwnWayTests {
 
     private func car(route: [CLLocationCoordinate2D]?, mergeOffset: Double?, state: CarState = .joining) -> Car {
         Car.fixture(
-            "c", name: "Wyna’s X70", number: .some(nil), state: state, color: "#D9480F", tracker: "u",
+            "c", name: "Wyna’s X70", number: .some(nil), state: state, color: "#CC450D", tracker: "u",
             route: route.map(Polyline.encode), mergeOffset: mergeOffset)
     }
 

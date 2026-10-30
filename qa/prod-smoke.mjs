@@ -149,7 +149,7 @@ try {
 
   // JoinService.join (the joinTrip callable)
   const joined = (await httpsCallable(guest.fns, 'joinTrip')({
-    code, displayName: 'Smoke Guest', car: { newCar: { name: "Smoke Guest's car", color: '#D9480F' } }, tracker: true,
+    code, displayName: 'Smoke Guest', car: { newCar: { name: "Smoke Guest's car", color: '#CC450D' } }, tracker: true,
   })).data;
   const guestCar = await getDoc(doc(guest.db, `trips/${tripRef.id}/cars/${joined.carId}`));
   check(joined.tripId === tripRef.id && guestCar.data()?.number === 2, 'joinTrip adds a second car numbered 2', `number ${guestCar.data()?.number}`);
