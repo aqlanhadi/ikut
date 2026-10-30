@@ -34,6 +34,8 @@ export interface FullPurgeOptions {
 export interface FullPurgeResult {
   /** Trips deleted completely. */
   deleted: number;
+  /** Retried trips whose doc was already gone and whose leftovers were cleaned. */
+  cleaned: number;
   /** Summaries written for ended trips (still inside the 7 days) that had none. */
   summarised: number;
   failed: number;
@@ -94,7 +96,7 @@ export async function purgeOldTrips(db: Firestore, now: Date = new Date(), opts:
   const clock = opts.clock ?? Date.now;
   const deadline = clock() + (opts.budgetMs ?? FULL_BUDGET_MS);
   const outOfTime = () => clock() >= deadline;
-  const result: FullPurgeResult = { deleted: 0, summarised: 0, failed: 0, more: false };
+  const result: FullPurgeResult = { deleted: 0, cleaned: 0, summarised: 0, failed: 0, more: false };
   try {
     result.summarised = await backfillSummaries(db, now);
   } catch (err) {
@@ -118,7 +120,10 @@ export async function purgeOldTrips(db: Firestore, now: Date = new Date(), opts:
     try {
       const snap = await ref.get();
       if (snap.exists) await tryDelete(ref, snap.data() as Trip);
-      else await cleanUpGoneTrip(db, ref);
+      else {
+        await cleanUpGoneTrip(db, ref);
+        result.cleaned++;
+      }
     } catch (err) {
       stillFailing.push(id);
       result.failed++;

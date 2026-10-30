@@ -565,6 +565,10 @@ describe("summaryDurationSeconds", () => {
     assert.equal(summaryDurationSeconds(trip, (100 + 10 * 3600) * 1000, idle), 20 * 3600);
     assert.equal(summaryDurationSeconds(trip, null, idle), 20 * 3600);
   });
+  it("a trip created and forgotten (idle end, no activity after creation) has no duration, not zero", () => {
+    const trip = { createdAt: t(0), endedAt: t(40 * 3600) };
+    assert.equal(summaryDurationSeconds(trip, 0, 12 * 3600 * 1000), null);
+  });
   it("is null when the end is not after the start, or there is no end", () => {
     assert.equal(summaryDurationSeconds({ createdAt: t(10), endedAt: t(10) }), null);
     assert.equal(summaryDurationSeconds({ createdAt: t(10) }), null);

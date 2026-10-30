@@ -1777,6 +1777,17 @@ describe("trip summary and 90-day delete (emulator, D107)", () => {
     assert.equal(s.durationSeconds, 10 * 3600);
   });
 
+  it("a created-and-forgotten trip ended by the idle job gets a null duration, not the whole wait", async () => {
+    const { ref } = await seedFull({ status: "active" });
+    await db.recursiveDelete(ref.collection("positions"));
+    await db.recursiveDelete(ref.collection("events"));
+    await resetJobState("endIdleTrips");
+    await endIdleTrips(db, NOW);
+    const s = await waitForSummary(ref);
+    assert.ok(s, "no summary after the idle end");
+    assert.equal(s.durationSeconds, null);
+  });
+
   it("an organiser's end counts Start Trip to the end, and recent activity does not cut it short", async () => {
     const { ref } = await seedFull({ status: "active", startedH: 5, lastActivityH: 2 });
     await endNow(ref);

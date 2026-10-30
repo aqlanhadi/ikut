@@ -26,10 +26,11 @@ export async function buildTripSummary(db: Firestore, tripRef: FirebaseFirestore
     newest("positions", "updatedAt"),
     newest("events", "createdAt"),
   ]);
-  const lastActivity = Math.max(lastPosition, lastEvent, trip.lastActivityAt?.toMillis() ?? 0, trip.startedAt?.toMillis() ?? 0);
+  // The same signals isIdle counts (createdAt, lastActivityAt, newest position and event) plus startedAt.
+  const lastActivity = Math.max(trip.createdAt.toMillis(), lastPosition, lastEvent, trip.lastActivityAt?.toMillis() ?? 0, trip.startedAt?.toMillis() ?? 0);
   return {
     distanceMeters: routeDistanceMeters(trip.route ?? ""),
-    durationSeconds: summaryDurationSeconds(trip, lastActivity > 0 ? lastActivity : null, IDLE_MS),
+    durationSeconds: summaryDurationSeconds(trip, lastActivity, IDLE_MS),
     peopleCount: members.data().count,
     carCount: cars.data().count,
     stopCount: stops.docs.filter((d) => d.get("arrivedAt") != null).length,
