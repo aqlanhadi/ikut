@@ -10,5 +10,6 @@ export { handOverTrip } from "./handOverTripCall.js";
 export { createTrip } from "./createTripCall.js";
 export { previewTrip } from "./previewTrip.js";
 export { endIdleTripsJob } from "./endIdleTrips.js";
-export { purgeTripDataJob, purgeExpiredEventsJob } from "./purgeTripDataJob.js";
+export { purgeTripDataJob, purgeExpiredEventsJob, purgeTripsFullJob } from "./purgeTripDataJob.js";
 export { onMemberDeleted } from "./memberCleanup.js";
+export { onTripEnded } from "./summary.js";

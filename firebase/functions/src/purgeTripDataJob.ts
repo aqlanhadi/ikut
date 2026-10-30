@@ -1,6 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { purgeOldTrips } from "./fullPurge.js";
 import { emptyPurgeResult, purgeTripData, sweepExpiredEvents } from "./purge.js";
 
 /**
@@ -24,5 +25,16 @@ export const purgeExpiredEventsJob = onSchedule(
     const result = emptyPurgeResult();
     await sweepExpiredEvents(getFirestore(), new Date(), result);
     logger.info("purgeExpiredEventsJob: done", { expiredEvents: result.expiredEvents, votes: result.votes });
+  },
+);
+
+/**
+ * Every day, on its own (the 6-hourly job's 540 seconds are spoken for): trips ended more than 90 days ago are deleted
+ * completely, and an ended trip still inside its 7 days that has no summary gets one (D107).
+ */
+export const purgeTripsFullJob = onSchedule(
+  { schedule: "every day 04:30", timeZone: "Asia/Kuala_Lumpur", timeoutSeconds: 540 },
+  async () => {
+    await purgeOldTrips(getFirestore());
   },
 );
