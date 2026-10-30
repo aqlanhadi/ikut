@@ -21,6 +21,12 @@ struct RecapMapView: View {
     @State private var legalReach: CGFloat = 0
     @State private var stepperTop: CGFloat = 0
     @State private var screenHeight: CGFloat = 0
+    @State private var screenWidth: CGFloat = 0
+    /// The header's bottom edge, in the screen's points.
+    @State private var headerBottom: CGFloat = 0
+    /// True while the camera shows the whole route (the opening view, or a step with no place); the fit follows the
+    /// header and card until a step moves the camera or the person pans it.
+    @State private var overview = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var steps: [RecapTimelineItem] { recap.timeline }
@@ -31,16 +37,21 @@ struct RecapMapView: View {
                       legalInset: legalReach, camera: $camera, onCamera: { seen.record($0, latitudeDelta: $1) })
             .ignoresSafeArea()
             .onGeometryChange(for: CGFloat.self, of: { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom }) { screenHeight = $0 }
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { screenWidth = $0 }
             .overlay(alignment: .top) { header }
             .overlay(alignment: .bottom) { stepper }
             // Legal follows the card's top in the same transaction as the step (the card's new height is known
             // at once), so it moves with the card and nothing jumps afterwards.
             .onChange(of: stepperTop) { _, _ in
                 legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
+                refit()
             }
+            .onChange(of: headerBottom) { _, _ in refit() }
+            .onChange(of: screenWidth) { _, _ in refit() }
             .onChange(of: tourStep) { _, step in if let step { self.step(to: min(step, steps.count - 1)) } }
             .onChange(of: screenHeight) { _, _ in
                 legalReach = MapLegal.reach(sheetTop: stepperTop, screenHeight: screenHeight, current: legalReach)
+                refit()
             }
     }
 
@@ -56,6 +67,19 @@ struct RecapMapView: View {
         }
         .padding(.horizontal, CornerButton.edge)
         .padding(.top, CornerButton.top)
+        .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).maxY }) { headerBottom = $0 }
+    }
+
+    /// The whole route in the strip between the header and the card, once both are measured (D120).
+    private var fit: MKCoordinateRegion? {
+        RecapFit.region(snapshot: snapshot, headerBottom: headerBottom, cardTop: stepperTop, width: screenWidth)
+    }
+
+    /// Refits the overview as the header or card measure or change (large text, a taller step card), in place.
+    private func refit() {
+        guard overview, !camera.positionedByUser, let region = fit else { return }
+        var t = Transaction(); t.disablesAnimations = true
+        withTransaction(t) { camera = .region(region) }
     }
 
     private var stepper: some View {
@@ -102,6 +126,7 @@ struct RecapMapView: View {
     /// without a place, from or to, jumps.
     private func step(to new: Int) {
         guard new != index, steps.indices.contains(new) else { return }
+        overview = steps[new].coordinate == nil
         let move = RecapLogic.stepMove(from: current?.coordinate, to: steps[new].coordinate)
         // From where the camera is: the landing of a flight still in the air, else the camera as drawn (after a pan
         // too), else the step on screen.
@@ -115,7 +140,7 @@ struct RecapMapView: View {
         guard move == .fly, let center = steps[new].coordinate else {
             flight.cancel()
             var t = Transaction(); t.disablesAnimations = true
-            withTransaction(t) { camera = steps[new].coordinate.map { .region(Self.region(at: $0)) } ?? .automatic }
+            withTransaction(t) { camera = steps[new].coordinate.map { .region(Self.region(at: $0)) } ?? fit.map { .region($0) } ?? .automatic }
             return
         }
         let region = Self.region(at: center)
@@ -128,6 +153,46 @@ struct RecapMapView: View {
     }
 
     private static let span = 0.15
+}
+
+/// Where the recap map's overview camera goes (D120): every point of the route and its pins centred in the strip the
+/// header and the step card leave, with the same shared fit as the lobby and Home. MapKit frames the map from the top
+/// of the screen down to the card's top (the card is the map's bottom padding), so that height is the frame.
+enum RecapFit {
+    /// The destination's pin stands about this far above its coordinate, kept clear of the header.
+    static let pinRoom: CGFloat = 40
+    /// A little air under the header.
+    static let headerGap: CGFloat = Spacing.xs
+
+    static func region(snapshot: RecapSnapshot, headerBottom: CGFloat, cardTop: CGFloat, width: CGFloat) -> MKCoordinateRegion? {
+        guard headerBottom > 0, cardTop > headerBottom + pinRoom * 2, width > 0 else { return nil }
+        let points = Polyline.decode(snapshot.route) + snapshot.positions.map(\.coordinate)
+        let route = PastTripRoute(id: snapshot.tripId, name: "", destinationName: "", destinationLatitude: snapshot.destination.latitude,
+                                  destinationLongitude: snapshot.destination.longitude, points: points.map { [$0.latitude, $0.longitude] })
+        let top = headerBottom + headerGap + pinRoom
+        guard let region = PastTripsMapLogic.region(fitting: [route], bottomObscured: 0, topObscured: Double(top / cardTop),
+                                                    aspect: MapFit.aspect(width: width, height: cardTop, padding: 0)) else { return nil }
+        return balanced(region, points: points + [snapshot.destination], width: width, top: top, bottom: cardTop)
+    }
+
+    /// The shared fit centres by degrees of latitude, but a tall route in a short strip spans enough of the Mercator
+    /// projection for that to leave the margins a couple of points apart: nudge the centre by the difference, worked out
+    /// with MapKit's own framing (the larger scale of the two spans never exceeded).
+    static func balanced(_ region: MKCoordinateRegion, points: [CLLocationCoordinate2D], width: CGFloat, top: CGFloat,
+                         bottom: CGFloat) -> MKCoordinateRegion {
+        func mapPoint(_ lat: Double, _ lng: Double) -> MKMapPoint { MKMapPoint(CLLocationCoordinate2D(latitude: lat, longitude: lng)) }
+        let nw = mapPoint(region.center.latitude + region.span.latitudeDelta / 2, region.center.longitude - region.span.longitudeDelta / 2)
+        let se = mapPoint(region.center.latitude - region.span.latitudeDelta / 2, region.center.longitude + region.span.longitudeDelta / 2)
+        let scale = min(Double(width) / abs(se.x - nw.x), Double(bottom) / abs(se.y - nw.y))
+        let ys = points.map { MKMapPoint($0).y }
+        guard scale > 0, let north = ys.min(), let south = ys.max() else { return region }
+        let centre = MKMapPoint(region.center)
+        let topMargin = Double(bottom / 2) + (north - centre.y) * scale - Double(top)
+        let bottomMargin = Double(bottom) - (Double(bottom / 2) + (south - centre.y) * scale)
+        var moved = centre
+        moved.y -= (bottomMargin - topMargin) / 2 / scale
+        return MKCoordinateRegion(center: moved.coordinate, span: region.span)
+    }
 }
 
 #if DEBUG
