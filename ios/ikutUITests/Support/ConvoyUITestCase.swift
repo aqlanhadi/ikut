@@ -260,11 +260,19 @@ class ConvoyUITestCase: XCTestCase {
             let continueButton = inSheet.exists ? inSheet : app.buttons["Continue"]
             continueButton.tap()
             // The keyboard going down can move the sheet under that tap: tap again if it's still there.
-            if !sheetName.waitForNonExistence(timeout: 5), continueButton.isHittable { continueButton.tap() }
+            // The button can vanish between asking whether it exists and whether it is hittable (the sheet moves on while
+            // signing in), and asking a missing element isHittable throws: ask through a predicate wait, which does not.
+            if !sheetName.waitForNonExistence(timeout: 5), Self.hittableNow(continueButton) { continueButton.tap() }
             _ = sheetName.waitForNonExistence(timeout: 15)
         }
         // Wakes the permission monitor; at the top edge, so it can't land on a sheet's dimmed area or a control.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).tap()
+    }
+
+    /// Whether `element` exists and is hittable right now, without throwing when it has just gone.
+    static func hittableNow(_ element: XCUIElement) -> Bool {
+        let ready = NSPredicate(format: "exists == true AND hittable == true")
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: ready, object: element)], timeout: 0.5) == .completed
     }
 
     /// The join sheet's first steps, when this phone needs them (D58): "Welcome to ikut" with the name (signed out), then
