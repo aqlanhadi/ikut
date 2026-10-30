@@ -343,7 +343,13 @@ final class TripSession {
         } catch where TripSessionLogic.leaveCountsAsLeft(error) {
             // A refused member delete is a left phone only if the server agrees it is no longer a member: the rules also
             // refuse the live organiser's own delete (D106).
-            if case .deleteMember = step { try await leaveStep(.confirmGone) }
+            if case .deleteMember(let release) = step {
+                // A batch with the release refused (the trip ended, the tracker already released, the car gone) must not
+                // keep an ordinary member in: the delete alone goes next. For the live organiser that is refused too, and
+                // the car's tracker was never touched.
+                if release != nil { return try await leaveStep(.deleteMember(releasingCar: nil)) }
+                try await leaveStep(.confirmGone)
+            }
             return
         }
     }

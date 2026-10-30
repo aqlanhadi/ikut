@@ -759,6 +759,34 @@ struct SessionEmulatorTests {
         #expect(tracker.startCount == 1)
     }
 
+    /// A member who tracks a car leaves just after the trip ended: the batch with the release is refused (the car rule
+    /// needs an active trip), the delete alone goes through, and they leave cleanly.
+    @Test func aTrackingMemberLeavesCleanlyJustAfterTheTripEnded() async throws {
+        let s = try await EmulatorTrip.make(name: "Session", route: Fixtures.longRoute)
+        nonisolated(unsafe) let organizerUser = try #require(Auth.auth().currentUser)
+        let code = try await Firestore.firestore().document(FirestorePaths.trip(s.tripId)).getDocument(as: Trip.self).code
+        let (uid2, _) = try await EmulatorTrip.joinAsGuest(
+            code: code, name: "Siti", carName: "Siti's car", color: "#CC450D", tracker: true, viaAuthModel: true)
+        nonisolated(unsafe) let memberUser = try #require(Auth.auth().currentUser)
+        let tracker = FakeTrackingController()
+        let session = TripSession(tripId: s.tripId, userId: uid2, tracker: tracker)
+        session.start()
+        defer { session.stop() }
+        await waitUntil(.seconds(10)) { tracker.isTracking }
+        // The phone has not heard the trip ended yet: end it from the organiser's account, then leave at once.
+        try await Auth.auth().updateCurrentUser(organizerUser)
+        try await Firestore.firestore().document(FirestorePaths.trip(s.tripId))
+            .updateData(["status": "ended", "endedAt": FieldValue.serverTimestamp()])
+        try await Auth.auth().updateCurrentUser(memberUser)
+        let memberGone = Flag()
+        let watch = Firestore.firestore().document(FirestorePaths.member(tripId: s.tripId, userId: uid2))
+            .addSnapshotListener { snapshot, _ in if let snapshot, !snapshot.exists { memberGone.set() } }
+        defer { watch.remove() }
+        try await session.leave()
+        await waitUntil(.seconds(10)) { memberGone.value }
+        #expect(memberGone.value)
+    }
+
     /// D106: the organiser of an active trip cannot leave. leave() says so before writing anything: the member doc is
     /// still on the server, the car's tracker is unchanged, and the phone goes on sharing.
     @Test func theOrganiserOfAnActiveTripCannotLeaveAndKeepsSharing() async throws {
@@ -799,9 +827,11 @@ struct SessionEmulatorTests {
                     return
                 }
                 guard case .deleteMember(let release) = step else { return }
-                #expect(release == carId)
+                // The batch with the release, then (retried) the delete alone: both refused for the new organiser.
                 let batch = db.batch()
-                batch.updateData(["trackerUserId": FieldValue.delete()], forDocument: db.document(FirestorePaths.car(tripId: tripId, carId: carId)))
+                if release != nil {
+                    batch.updateData(["trackerUserId": FieldValue.delete()], forDocument: db.document(FirestorePaths.car(tripId: tripId, carId: carId)))
+                }
                 batch.deleteDocument(db.document(FirestorePaths.member(tripId: tripId, userId: uid)))
                 try await batch.commit()
             })
@@ -944,8 +974,22 @@ struct SessionLeaveTests {
             if case .deleteMember = step { throw refused }
         }
         try await session.leave()
-        // The tracker's release goes in the same batch as the delete (a refused delete releases nothing).
-        #expect(steps == [.checkNotOrganizer, .deleteMember(releasingCar: "c1"), .confirmGone])
+        // The release goes in the same batch as the delete; the delete refused alone too, and nobody lists this phone.
+        #expect(steps == [.checkNotOrganizer, .deleteMember(releasingCar: "c1"), .deleteMember(releasingCar: nil), .confirmGone])
+        #expect(!tracker.isTracking)
+    }
+
+    /// D54 review, kept: a batch with the tracker release refused (trip ended, tracker already released, car gone) does not
+    /// keep an ordinary member in: the delete alone goes next and they leave.
+    @Test func aRefusedTrackerReleaseStillLeavesWithTheDeleteAlone() async throws {
+        var steps: [LeaveStep] = []
+        let refused = firestoreError(.permissionDenied)
+        let (session, tracker) = session { step in
+            steps.append(step)
+            if step == .deleteMember(releasingCar: "c1") { throw refused }
+        }
+        try await session.leave()
+        #expect(steps == [.checkNotOrganizer, .deleteMember(releasingCar: "c1"), .deleteMember(releasingCar: nil)])
         #expect(!tracker.isTracking)
     }
 
@@ -962,8 +1006,8 @@ struct SessionLeaveTests {
         await #expect(throws: StillInTrip()) { try await session.leave() }
         #expect(StillInTrip().localizedDescription == "You’re the organiser now. Hand the trip over or end it.")
         #expect(!session.isClosing)
-        // The release only ever travelled in the refused batch, and sharing is back on.
-        #expect(steps == [.checkNotOrganizer, .deleteMember(releasingCar: "c1"), .confirmGone])
+        // The release only ever travelled in the refused batch, the delete alone was refused too, and sharing is back on.
+        #expect(steps == [.checkNotOrganizer, .deleteMember(releasingCar: "c1"), .deleteMember(releasingCar: nil), .confirmGone])
         await waitUntil(.seconds(5)) { tracker.isTracking }
         #expect(tracker.isTracking)
     }
