@@ -1,6 +1,7 @@
 import { FieldValue, type CollectionReference, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
+import { defineBoolean } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import type { Car, Member, Trip } from "./model.js";
 
@@ -240,7 +241,21 @@ export async function findActiveTripId(db: Firestore, code: string): Promise<str
   return snap.docs[0]!.id;
 }
 
-export const joinTrip = onCall(async (request): Promise<JoinResult> => {
+/**
+ * Whether callables reject requests without a valid App Check token. Off by default so deploying
+ * this code doesn't lock out a build that doesn't send tokens yet; turn it on at deploy time with
+ * `APPCHECK_ENFORCE=true` (e.g. in `firebase/functions/.env.<project>`). Lives here, not in its
+ * own file, because the unit tests load this file as plain TypeScript.
+ */
+export const APPCHECK_ENFORCE = defineBoolean("APPCHECK_ENFORCE", {
+  default: false,
+  description: "Reject callable requests without a valid App Check token",
+});
+
+/** Options for the callables the app reaches before it has joined a trip. */
+export const appCheckOptions = { enforceAppCheck: APPCHECK_ENFORCE };
+
+export const joinTrip = onCall(appCheckOptions, async (request): Promise<JoinResult> => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
   const input = parseJoinInput(request.data);

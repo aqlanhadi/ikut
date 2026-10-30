@@ -1,6 +1,6 @@
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { NO_ACTIVE_TRIP, findActiveTripId, isRecord, normalizeCode } from "./joinTrip.js";
+import { NO_ACTIVE_TRIP, appCheckOptions, findActiveTripId, isRecord, normalizeCode } from "./joinTrip.js";
 import { simplifiedRoute } from "./previewRoute.js";
 import type { Car, Member, PlannedStop, PreviewCar, PreviewStop, PreviewTripResult, Trip } from "./model.js";
 
@@ -91,7 +91,7 @@ async function firstNameOf(tripRef: FirebaseFirestore.DocumentReference, organiz
   return first ? first : undefined;
 }
 
-export const previewTrip = onCall(async (request): Promise<PreviewTripResult> => {
+export const previewTrip = onCall(appCheckOptions, async (request): Promise<PreviewTripResult> => {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
   if (!isRecord(request.data)) throw new HttpsError("invalid-argument", "Invalid request.");
   const code = normalizeCode(request.data.code);
