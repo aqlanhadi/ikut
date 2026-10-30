@@ -35,6 +35,7 @@ enum Backend {
     /// Call at launch, before any other Firebase use. Safe to call again (e.g. from previews).
     static func configure() {
         guard FirebaseApp.app() == nil else { return }
+        AppCheckProviderChoice.current.install()
         FirebaseApp.configure()
         defer { dropUserFromOtherBackend() }
 

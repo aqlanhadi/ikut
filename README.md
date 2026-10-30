@@ -45,6 +45,21 @@ Debug builds talk to the local emulators (start them first). Set `IKUT_USE_PRODU
 
 For field tests and battery runs, install with the `ikut-release` scheme. It builds Release, which always uses production, so the app works when opened from the home screen. Free-provisioning installs expire after 7 days.
 
+## App Check
+
+App Check makes the app prove to Firebase that it is the real app, so someone who only has the committed `GoogleService-Info.plist` can't call the backend.
+
+- Release build on a real iPhone: Apple App Attest. This needs the App Attest entitlement, which a free personal team can't sign; until the paid team is set up (see the comment on `IKUT_APPATTEST` in `ios/project.yml`), Release builds use the debug provider like the rest.
+- Debug builds, the simulator, and any device without App Attest: the App Check debug provider. The first launch prints a debug token in the Xcode console.
+- Against the local emulators the app sends no token and the emulators ignore App Check, so tests and simulated drives work as before.
+
+Console steps, in this order:
+
+1. Firebase console, App Check, Apps: register the iOS app (`dev.aqlan.ikut`) with App Attest.
+2. In the same place, add a debug token for each phone or simulator that runs a Debug build against production (Manage debug tokens).
+3. Deploy the functions with `APPCHECK_ENFORCE=true` (for example in `firebase/functions/.env.<project>`). Without it `joinTrip` and `previewTrip` accept calls with or without a token.
+4. Check that joining a trip still works from a registered build, then switch on Enforce for Cloud Firestore in the App Check page.
+
 ## Cloud Functions
 
 TypeScript, Node 22 runtime, region asia-southeast1. `firebase/functions/src/model.ts` mirrors the Swift models in `ios/ikut/Model/`; keep the two in sync.
