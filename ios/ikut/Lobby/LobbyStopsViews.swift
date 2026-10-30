@@ -49,7 +49,7 @@ struct StopNote: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.ikutAccent)
                 .padding(.top, Spacing.xs)
-                .accessibilityIdentifier("stops.retry")
+                .accessibilityIdentifier(AXID.Stops.retry)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

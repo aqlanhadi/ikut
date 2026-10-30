@@ -20,7 +20,7 @@ struct HomeHeader: View {
             HStack(spacing: Spacing.s) {
                 SheetSearchButton(placeholder: "Where to?", action: onNewTrip)
                     .trackingHeight($barHeight)
-                    .accessibilityIdentifier("homeWhereTo")
+                    .accessibilityIdentifier(AXID.Home.whereTo)
                 profileButton
             }
             .padding(.top, Spacing.xs)
@@ -43,7 +43,7 @@ struct HomeHeader: View {
                 .surfaceTile(radius: Radius.inner)
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("homeJoin")
+            .accessibilityIdentifier(AXID.Home.join)
         }
     }
 

@@ -20,6 +20,6 @@ struct CarRow: View {
                 .foregroundStyle(text.ready ? Color.ikutPositive : Color.ikutWarning)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("lobby.car.\(number)")
+        .accessibilityIdentifier(AXID.Lobby.car(number))
     }
 }

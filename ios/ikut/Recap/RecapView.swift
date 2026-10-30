@@ -57,7 +57,7 @@ struct RecapView: View {
                 RecapMapView(recap: recap, snapshot: snapshot) { showMap = false }
             }
         }
-        .accessibilityIdentifier("recap")
+        .accessibilityIdentifier(AXID.Recap.root)
     }
 }
 

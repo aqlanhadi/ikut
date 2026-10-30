@@ -49,7 +49,7 @@ struct StopApproachPill: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(alert.title), \(alert.body), \(ConvoyFormat.distance(distance))")
-            .accessibilityIdentifier("stopapproach.pill")
+            .accessibilityIdentifier(AXID.Alerts.stopApproachPill)
         }
         .announces("\(alert.title), \(alert.body)", id: alert.id)
     }
@@ -76,7 +76,7 @@ struct CatchUpPill: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel([title, subtitle, ConvoyFormat.distance(distance)].compactMap { $0 }.joined(separator: ", "))
-            .accessibilityIdentifier("catchup.pill")
+            .accessibilityIdentifier(AXID.Alerts.catchupPill)
         }
         .announces(alert.title, id: alert.id)
     }
@@ -106,7 +106,7 @@ struct RouteNoticeBanner: View {
             title: notice.text, symbol: notice.waiting ? "antenna.radiowaves.left.and.right.slash" : "arrow.triangle.turn.up.right.diamond.fill",
             circle: notice.waiting ? Color.white.dimmed(.faded) : .green)
             .announces(notice.text)
-            .accessibilityIdentifier("route.notice")
+            .accessibilityIdentifier(AXID.Alerts.routeNotice)
     }
 }
 

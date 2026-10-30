@@ -186,7 +186,7 @@ struct ConvoyPanel: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ConvoyHeader.label(title: convoy.title, text: text, destination: destination, arrive: arrive))
         .accessibilityAddTraits(.isHeader)
-        .accessibilityIdentifier("convoy.header")
+        .accessibilityIdentifier(AXID.Convoy.header)
         // A tap on the header folds or unfolds the list. It is also the button VoiceOver and the UI tests find
         // ("Expand convoy list"), beside the header's own words. The Next stop cell is in the grid below, not
         // under this tap, so the two never meet.
@@ -296,7 +296,7 @@ struct ConvoyPanel: View {
         .padding(.top, Spacing.s)
         .accessibilityLabel([parts.driving, parts.joining, parts.spread].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint("Shows the convoy list")
-        .accessibilityIdentifier("convoy.summary")
+        .accessibilityIdentifier(AXID.Convoy.summary)
     }
 
     private var stats: some View {
@@ -348,7 +348,7 @@ struct ConvoyPanel: View {
             .padding(.vertical, Spacing.s)
             .background(Color.ikutWarning.fill(.tint), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             .padding(.bottom, Spacing.s)
-            .accessibilityIdentifier("convoy.separation")
+            .accessibilityIdentifier(AXID.Convoy.separation)
     }
 }
 
@@ -376,7 +376,7 @@ struct ConvoyActionBar: View {
             }
             .ikutButton(.primary, tint: .ikutAccentFill)
             .disabled(!canReport)
-            .accessibilityIdentifier("convoy.report")
+            .accessibilityIdentifier(AXID.Convoy.report)
             Button(action: onStop) {
                 // "Pit stop" with a map pin, as in Map.dc.html: a bare "Stop" read as "Stop Trip".
                 // An open stop shows its reason's icon and how it stands; the label never wraps, the
@@ -400,14 +400,14 @@ struct ConvoyActionBar: View {
                                 .overlay(Capsule().strokeBorder(Color(.systemBackground), lineWidth: 2))
                                 .offset(x: 6, y: -6)
                                 .accessibilityHidden(true)
-                                .accessibilityIdentifier("stop.badge")
+                                .accessibilityIdentifier(AXID.Stop.badge)
                         }
                     }
             }
             .ikutButton(.secondary, tint: .primary)
             .layoutPriority(1)
             .accessibilityLabel(stopButton.accessibilityLabel)
-            .accessibilityIdentifier("stop.button")
+            .accessibilityIdentifier(AXID.Stop.button)
         }
         .sheetActionBar(lift: lift)
         .buttonSurface(.glass)

@@ -82,7 +82,7 @@ extension LobbyView {
                 }
                 .ikutButton(.link)
                 .sensoryFeedback(.success, trigger: copiedCount)
-                .accessibilityIdentifier("lobby.copyCode")
+                .accessibilityIdentifier(AXID.Lobby.copyCode)
                 Button { showQR = true } label: {
                     HStack(spacing: Spacing.s) {
                         Image(systemName: "qrcode").accessibilityHidden(true)
@@ -92,7 +92,7 @@ extension LobbyView {
                     .frame(maxWidth: .infinity)
                 }
                 .ikutButton(.link)
-                .accessibilityIdentifier("lobby.showQR")
+                .accessibilityIdentifier(AXID.Lobby.showQR)
             }
         } header: {
             Text("Trip code")
@@ -108,12 +108,12 @@ extension LobbyView {
                 if !isSample || sampleSharing {
                     Toggle("Keep screen on", isOn: Binding(
                         get: { stage.keepScreenOn }, set: { stage.keepScreenOn = $0 }))
-                        .accessibilityIdentifier("lobby.keepAwake")
+                        .accessibilityIdentifier(AXID.Lobby.keepAwake)
                 }
                 if canPause {
                     listOption(
                         session.isPaused ? "Resume sharing" : "Pause sharing", systemImage: session.isPaused ? "play.fill" : "pause.fill",
-                        id: session.isPaused ? "lobby.resume" : "lobby.pause"
+                        id: session.isPaused ? AXID.Lobby.resume : AXID.Lobby.pause
                     ) { run { session.isPaused ? try await session.resumeSharing() : try await session.pauseSharing() } }
                 }
             }
@@ -125,10 +125,10 @@ extension LobbyView {
         if canEnd || canLeaveTrip {
             Section {
                 if canEnd {
-                    listOption("End trip", systemImage: "flag.checkered", id: "lobby.endTrip", destructive: true) { confirmEnd = true }
+                    listOption("End trip", systemImage: "flag.checkered", id: AXID.Lobby.endTrip, destructive: true) { confirmEnd = true }
                 }
                 if canLeaveTrip {
-                    listOption("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", id: "lobby.leaveTrip", destructive: true) {
+                    listOption("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", id: AXID.Lobby.leaveTrip, destructive: true) {
                         confirmLeave = true
                     }
                 }
@@ -154,11 +154,11 @@ extension LobbyView {
     /// change it; a participant reads it), as system rows.
     func tripSection(_ trip: Trip) -> some View {
         Section {
-            systemTripRow("Name", value: trip.name, tappable: canEdit, id: "lobby.rename", hint: "Rename") {
+            systemTripRow("Name", value: trip.name, tappable: canEdit, id: AXID.Lobby.rename, hint: "Rename") {
                 renameText = trip.name
                 renaming = true
             }
-            systemTripRow("Destination", value: trip.destination.name, tappable: canChangeDestination, id: "lobby.destination", hint: "Change destination") {
+            systemTripRow("Destination", value: trip.destination.name, tappable: canChangeDestination, id: AXID.Lobby.destination, hint: "Change destination") {
                 showChangeDestination = true
             }
         } header: {
@@ -228,11 +228,11 @@ extension LobbyView {
                     .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
             }
             if canEditStops {
-                stopAction("Add a stop", systemImage: "plus", caption: nil, id: "stops.add") { openAddStop() }
+                stopAction("Add a stop", systemImage: "plus", caption: nil, id: AXID.Stops.add) { openAddStop() }
                     .disabled(!StopListLogic.canAdd(among: stops))
                 stopAction(
                     "Suggest stops", systemImage: "sparkles",
-                    caption: LobbyContent.suggestCaption(routeSeconds: trip.routeSeconds ?? routeInfo.travelTime), id: "stops.suggest"
+                    caption: LobbyContent.suggestCaption(routeSeconds: trip.routeSeconds ?? routeInfo.travelTime), id: AXID.Stops.suggest
                 ) { showSuggestStops = true }
             }
             if isOrganizer {
@@ -335,7 +335,7 @@ extension LobbyView {
                 Label(behind, systemImage: "checkmark.circle")
                     .font(.subheadline)
                     .foregroundStyle(Color.surfaceSecondary)
-                    .accessibilityIdentifier("trip.journey.behind")
+                    .accessibilityIdentifier(AXID.Trip.journeyBehind)
             }
             ForEach(journey.ahead) { text in
                 if let stop = stops.first(where: { $0.id == text.id }) {

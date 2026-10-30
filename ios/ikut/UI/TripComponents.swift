@@ -115,7 +115,7 @@ struct StatGrid: View {
         if let action = item.action {
             Button(action: action) { content(item) }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("stat.\(item.caption)")
+                .accessibilityIdentifier(AXID.Trip.stat(item.caption))
                 .accessibilityAddTraits(.isButton)
         } else {
             content(item)

@@ -87,7 +87,7 @@ struct WelcomeView: View {
                     Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity)
                 }
                 .ikutButton(.link)
-                .accessibilityIdentifier("welcomeJoin")
+                .accessibilityIdentifier(AXID.Welcome.join)
             }
             .padding(.horizontal, Spacing.hero)
             .padding(.bottom, Spacing.m)

@@ -111,7 +111,7 @@ struct StopMessageTile: View {
         .surfaceTile()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Message: \(text)")
-        .accessibilityIdentifier("stop.message")
+        .accessibilityIdentifier(AXID.Stop.message)
     }
 }
 
@@ -137,7 +137,7 @@ struct StopVoterRow: View {
         .ikutRow()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(StopLogic.voterAccessibilityLabel(row))
-        .accessibilityIdentifier("stop.voter.\(row.number.map(String.init) ?? row.carId)")
+        .accessibilityIdentifier(AXID.Stop.voter(row.number.map(String.init) ?? row.carId))
     }
 
     /// On dark glass the chip text is lifted toward white and the chip sits on a darker base, so

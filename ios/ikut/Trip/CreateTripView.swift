@@ -48,7 +48,7 @@ struct CreateTripView: View {
             if let message = model.errorMessage {
                 Section {
                     InlineNote(message, tone: .alert)
-                        .accessibilityIdentifier("createTripError")
+                        .accessibilityIdentifier(AXID.Trip.createError)
                         .lobbyRow()
                 }
             }
@@ -106,7 +106,7 @@ struct CreateTripView: View {
                         .focused($searchFocused)
                         .disabled(model.isWorking)
                         .accessibilityLabel("Destination")
-                        .accessibilityIdentifier("destinationField")
+                        .accessibilityIdentifier(AXID.Trip.destinationField)
                         .onChange(of: model.query) { model.queryChanged() }
                         .onSubmit { model.submit() }
                 }

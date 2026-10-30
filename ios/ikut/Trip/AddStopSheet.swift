@@ -98,7 +98,7 @@ struct AddStopContent: View {
                     searchFocused = false
                     if !model.back() { onBack() }
                 }
-                .accessibilityIdentifier("addStop.back")
+                .accessibilityIdentifier(AXID.AddStop.back)
             } trailing: { Color.clear }
             .padding(.horizontal, Spacing.l)
             .padding(.bottom, Spacing.xs)
@@ -118,7 +118,7 @@ struct AddStopContent: View {
                     .autocorrectionDisabled()
                     .submitLabel(.search)
                     .focused($searchFocused)
-                    .accessibilityIdentifier("addStop.search")
+                    .accessibilityIdentifier(AXID.AddStop.search)
                     .onChange(of: search.query) { model.search.queryChanged() }
                     .onSubmit { model.search.submit() }
             }
@@ -145,7 +145,7 @@ struct AddStopContent: View {
             } else if model.rows.isEmpty {
                 Text("No R&R on our side of the road along this trip. Search for a place instead.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("addStop.none")
+                    .accessibilityIdentifier(AXID.AddStop.none)
             } else {
                 ForEach(model.rows) { row in rnrRow(row) }
             }
@@ -180,7 +180,7 @@ struct AddStopContent: View {
         .id(row.id)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("addStop.rnr.\(row.number)")
+        .accessibilityIdentifier(AXID.AddStop.rnr(row.number))
     }
 
     /// On a material, not the tile fill: the rows scroll under it.
@@ -189,14 +189,14 @@ struct AddStopContent: View {
             Text("Stay").font(.callout)
             Spacer(minLength: Spacing.s)
             Text(StopFormat.length(minutes: model.stay)).font(.body.weight(.semibold)).monospacedDigit()
-                .accessibilityIdentifier("addStop.stay")
+                .accessibilityIdentifier(AXID.AddStop.stay)
             HStack(spacing: Spacing.xs) {
                 Button { model.step(-1) } label: { Image(systemName: "minus").inlineRoundLabel() }
                     .disabled(!AddStopLogic.canStep(model.stay, by: -1))
-                    .accessibilityLabel("Shorter").accessibilityIdentifier("addStop.shorter")
+                    .accessibilityLabel("Shorter").accessibilityIdentifier(AXID.AddStop.shorter)
                 Button { model.step(1) } label: { Image(systemName: "plus").inlineRoundLabel() }
                     .disabled(!AddStopLogic.canStep(model.stay, by: 1))
-                    .accessibilityLabel("Longer").accessibilityIdentifier("addStop.longer")
+                    .accessibilityLabel("Longer").accessibilityIdentifier(AXID.AddStop.longer)
             }
             .buttonStyle(.bordered).buttonBorderShape(.circle).tint(Color.ikutAccent)
         }
@@ -217,7 +217,7 @@ struct AddStopContent: View {
                 } label: { Text(title).wrapsAtAccessibilitySizes(lines: 2).font(.headline).frame(maxWidth: .infinity) }
                     .ikutButton(.primary)
                     .disabled(model.draft == nil)
-                    .accessibilityIdentifier("addStop.add")
+                    .accessibilityIdentifier(AXID.AddStop.add)
             }
             .sheetActionBar(lift: barLift)
         }
@@ -294,7 +294,7 @@ struct AddStopContent: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("addStop.kind.\(option.rawValue)")
+        .accessibilityIdentifier(AXID.AddStop.kind(option.rawValue))
     }
 
     private func chip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {

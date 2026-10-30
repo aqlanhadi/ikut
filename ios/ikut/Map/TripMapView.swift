@@ -625,7 +625,7 @@ struct TripMapView: View {
                 .font(.caption)
                 .foregroundStyle(Color.surfaceSecondary)
                 .lineLimit(1)
-                .accessibilityIdentifier("trip.pill.status")
+                .accessibilityIdentifier(AXID.Trip.pillStatus)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -636,7 +636,7 @@ struct TripMapView: View {
                     .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                     .padding(.top, Spacing.xxs).padding(.trailing, Spacing.xs)
                     .accessibilityHidden(true)
-                    .accessibilityIdentifier("trip.pill.errorDot")
+                    .accessibilityIdentifier(AXID.Trip.pillErrorDot)
             }
         }
         .accessibilityElement(children: .contain)
@@ -831,7 +831,7 @@ struct TripMapView: View {
             .modifier(DrivingList(hasBanner: topBanner != nil))
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { listWidth = $0 }
             // The pulled-up marker: UI tests and VoiceOver find the lobby below the convoy by it.
-            .accessibilityIdentifier(continuationShown ? "trip.pulledUp" : "driving.sheet")
+            .accessibilityIdentifier(continuationShown ? AXID.Trip.pulledUp : AXID.Trip.drivingSheet)
             // On the list itself: around the ScrollViewReader the bar did not inset the content, so the last rows
             // (Leave trip, End trip) stayed under it.
             .sheetBottomBar { actionBar }

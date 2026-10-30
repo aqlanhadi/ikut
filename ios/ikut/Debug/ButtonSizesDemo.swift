@@ -28,7 +28,7 @@ struct ButtonSizesDemo: View {
                     row("recapSheet.done") { Button {} label: { Text("Done").frame(maxWidth: .infinity) }.ikutButton(.link) }
                     ForEach(["primary", "secondary", "positive", "ghost", "destructive"], id: \.self) { name in
                         row("stopCard.\(name)") {
-                            StopActionButton(title: name.capitalized, style: Self.style(name), id: "sizes.\(name)", action: {})
+                            StopActionButton(title: name.capitalized, style: Self.style(name), id: AXID.Debug.sizes(name), action: {})
                         }
                     }
                 }
@@ -88,7 +88,7 @@ struct ButtonSizesDemo: View {
     private func row<C: View>(_ name: String, @ViewBuilder _ button: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             button().onGeometryChange(for: CGFloat.self) { $0.size.height } action: { Heights.shared.set(name, $0) }
-            Text(name).font(.caption2.monospaced()).foregroundStyle(.secondary).accessibilityIdentifier("sizes.\(name).caption")
+            Text(name).font(.caption2.monospaced()).foregroundStyle(.secondary).accessibilityIdentifier(AXID.Debug.sizesCaption(name))
         }
     }
 }

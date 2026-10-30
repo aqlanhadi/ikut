@@ -23,8 +23,8 @@ struct ReportSheet: View {
         // The same frame, sheet and tiles as the stop cards (title, close button, 20 pt padding, the message tile's
         // fill); the grid needs no cap, so it never scrolls inside one.
         CardSheetFrame(
-            title: "What’s on the road?", bodyCap: .infinity, closeIdentifier: "sheet.close",
-            containerIdentifier: "report.card", onClose: { dismiss() }
+            title: "What’s on the road?", bodyCap: .infinity, closeIdentifier: AXID.Sheet.close,
+            containerIdentifier: AXID.Report.card, onClose: { dismiss() }
         ) {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 2), spacing: Spacing.s) {
                 ForEach(ReportOption.events) { option in

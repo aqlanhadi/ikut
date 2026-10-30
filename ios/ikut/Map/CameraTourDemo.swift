@@ -46,7 +46,7 @@ struct CameraTourDemo: View {
                 .background(.regularMaterial, in: Capsule())
                 .offset(y: -140)
                 .allowsHitTesting(false)
-                .accessibilityIdentifier("cameraTour.caption")
+                .accessibilityIdentifier(AXID.Map.cameraTourCaption)
         }
         .task { await play() }
     }
