@@ -104,6 +104,8 @@ enum TripService {
         collision: (Error) -> Bool = { isCodeCollision($0) },
         _ attempt: (String) async throws -> Void
     ) async throws -> String {
+        // Any permission-denied counts as a collision (a client can't tell them apart), so a real denial is tried
+        // `attempts` times too before the plain message.
         for _ in 0..<attempts {
             let code = nextCode()
             do {

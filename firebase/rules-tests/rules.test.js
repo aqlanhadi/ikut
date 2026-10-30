@@ -1232,6 +1232,9 @@ describe('D98: size caps', () => {
 describe('D103: trip codes are unique among trips', () => {
   beforeEach(() => seed());
   const claimOnly = (uid, code, data) => setDoc(doc(db(uid), `codes/${code}`), data);
+  const tripBatchWithExtraClaim = () => assertFails(tripBatch('newOrg', {
+    extra: (b, f) => b.set(doc(f, 'codes/SQUAT9'), { tripId: 't2', organizerId: 'newOrg', createdAt: serverTimestamp() }),
+  }));
 
   it('a normal create (trip and claim in one batch) passes', () => assertSucceeds(tripBatch('newOrg')));
   it('a trip created with a code another trip holds is refused', () => assertFails(tripBatch('newOrg', { code: 'ABC123' })));
@@ -1261,6 +1264,33 @@ describe('D103: trip codes are unique among trips', () => {
     assertFails(claimOnly('newOrg', 'LONE22', { tripId: 'nothing', organizerId: 'newOrg', createdAt: serverTimestamp() })));
   it('a claim pointing at a trip that already exists is refused (claims are made only with a new trip)', () =>
     assertFails(claimOnly('org', 'OLD222', { tripId: T, organizerId: 'org', createdAt: serverTimestamp() })));
+  it('an organizer cannot create a second trip with a code their own claim holds for another trip (trip side)', async () => {
+    await assertSucceeds(tripBatch('alice', { id: 'tA' }));
+    await assertFails(tripBatch('alice', { id: 'tB', claim: false }));
+  });
+  it('one batch cannot create two trips with one code and one claim', async () => {
+    const f = db('alice');
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/t1'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
+    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
+    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't1', organizerId: 'alice', createdAt: serverTimestamp() });
+    await assertFails(b.commit());
+  });
+  it('one batch cannot create two trips with one code, each writing a claim for it', async () => {
+    const f = db('alice');
+    const b = writeBatch(f);
+    b.set(doc(f, 'trips/t1'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
+    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't1', organizerId: 'alice', createdAt: serverTimestamp() });
+    b.set(doc(f, 'trips/t2'), tripDoc({ organizerId: 'alice', code: NEW_CODE, createdAt: serverTimestamp() }));
+    b.set(doc(f, `codes/${NEW_CODE}`), { tripId: 't2', organizerId: 'alice', createdAt: serverTimestamp() });
+    await assertFails(b.commit());
+  });
+  it('a trip cannot hold a second code: an extra claim for another code naming the same trip is refused (claim side)', () =>
+    tripBatchWithExtraClaim());
+  it('an older trip with no claim cannot be given one afterwards, even by its own organizer', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trips/old1'), tripDoc({ organizerId: 'org', code: 'OLD111' })));
+    await assertFails(claimOnly('org', 'OLD111', { tripId: 'old1', organizerId: 'org', createdAt: serverTimestamp() }));
+  });
   it('a claim for a code of the wrong shape is refused', () =>
     assertFails(tripBatch('newOrg', { code: 'abc12' })));
   it('a trip cannot be created pointing at a claim made for another trip', async () => {
