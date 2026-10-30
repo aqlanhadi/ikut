@@ -12,6 +12,12 @@ ikut keeps a group of cars travelling together in sync: a live convoy map, one-t
 for the cars behind. SwiftUI app (iOS 17+) in `ios/`, Firebase (Firestore rules, Cloud Functions, emulator config) in
 `firebase/`, simulated drives and demos in `qa/`.
 
+## Where things are
+
+`ios/ikut/` is organised by feature (`Map`, `Lobby`, `Session`, `Stops`, `Convoy`, `Recap` and so on); the code map is in
+`README.md`, *Code layout*. Shared views and the design tokens are in `ios/ikut/UI/`. Cloud Functions are in
+`firebase/functions/src/`, and the Firestore rules in `firebase/firestore.rules`.
+
 ## Rules for changes
 
 - **The Xcode project is generated.** Change settings in `ios/project.yml`, then run `xcodegen` in `ios/`. Never edit
