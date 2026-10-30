@@ -375,10 +375,11 @@ enum MapObscuredInsets {
 }
 
 /// The strip of the map the camera aims at: `top` and `bottom` points in from the edges of a
-/// `width` × `height` frame, which is the map less its safe area. The safe area keeps out only the
-/// folded panel, so the Legal label stays above it; the rest (an unfolded panel, a card, the banners)
-/// is put into the camera here. A panel folding then changes the camera itself, which animates,
-/// where a changed safe area makes MapKit refit at once.
+/// `width` × `height` frame, which is the map less its safe area (the one constant bottom padding, D101). What covers
+/// the map (the sheet at any height, a card, the banners) is put into the camera here, so a panel folding changes the
+/// camera itself, which animates, where a changed safe area makes MapKit refit at once. `bottom` is measured from the
+/// frame's bottom, so it is negative when the cover is lower than the padding. A frame of no height (a short screen
+/// at a large padding) leaves a fit as it is.
 struct MapCameraRoom: Equatable {
     var width: CGFloat = 0
     var height: CGFloat = 0
@@ -387,6 +388,16 @@ struct MapCameraRoom: Equatable {
     /// Latitude degrees per point for each meter of camera distance, read off the map once it has
     /// drawn; 0 until then, and follow is not moved.
     var latitudePerPointPerMeter = 0.0
+
+    /// The map's scale from its own camera: MapKit reports the region of the frame inside its bottom padding, so the
+    /// latitude span is divided by that frame's height (the map less `padding`), not the whole map's. Nil when no frame
+    /// is left (a short screen at a large padding) or the reading says nothing.
+    static func latitudePerPointPerMeter(latitudeDelta: Double, mapHeight: CGFloat, padding: CGFloat,
+                                         distance: Double) -> Double? {
+        let frame = mapHeight - padding
+        guard frame > 0, distance > 0, latitudeDelta > 0 else { return nil }
+        return latitudeDelta / Double(frame) / distance
+    }
 
     /// `target` aimed at the middle of the strip, and a fit grown so it fills the strip.
     func target(_ target: CameraTarget?) -> CameraTarget? {

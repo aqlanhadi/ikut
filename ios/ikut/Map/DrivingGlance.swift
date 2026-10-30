@@ -3,14 +3,6 @@ import SwiftUI
 /// The small rules that keep the driving map readable at a glance (D34 piece 2a): where the Apple logo and
 /// Legal link sit, what fades or moves, how long information stays, and what stays until it is dealt with.
 enum DrivingGlance {
-    /// The map's bottom safe area for the folded sheet: from the screen's bottom edge to the sheet's top (its detent
-    /// height and what a floating sheet adds, `BottomSheet.detentExtra`), so MapKit's own 10 pt between the logo
-    /// and the edge of that area is Apple's 10 pt above the sheet. Nothing before the sheet is up. Only the folded
-    /// sheet: following the unfolded one would move the convoy fit (Q15 report).
-    static func legalInset(foldedSheetHeight: CGFloat) -> CGFloat {
-        foldedSheetHeight > 0 ? foldedSheetHeight + BottomSheet.detentExtra : 0
-    }
-
     /// Follow / Fit fades out while the sheet is tall (the sheet would cut through it) and returns when folded.
     static func modeControlOpacity(panelExpanded: Bool) -> Double { panelExpanded ? 0 : 1 }
 

@@ -4,11 +4,6 @@ import Testing
 @testable import ikut
 
 struct DrivingGlanceTests {
-    @Test func legalInsetReachesTheTopOfTheFoldedSheet() {
-        #expect(DrivingGlance.legalInset(foldedSheetHeight: 180) == 210)
-        #expect(DrivingGlance.legalInset(foldedSheetHeight: 0) == 0)
-    }
-
     @Test func modeControlFadesWhileTheSheetIsTall() {
         #expect(DrivingGlance.modeControlOpacity(panelExpanded: true) == 0)
         #expect(DrivingGlance.modeControlOpacity(panelExpanded: false) == 1)
