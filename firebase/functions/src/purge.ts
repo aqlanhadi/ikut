@@ -1,7 +1,7 @@
 import { Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import type { Trip } from "./model.js";
-import { ROTATE_LIMITS, sweepCreateLimits } from "./createLimit.js";
+import { HANDOVER_LIMITS, ROTATE_LIMITS, sweepCreateLimits } from "./createLimit.js";
 import { sweepGuessLimits } from "./guessLimit.js";
 import {
   POSITION_RETENTION_MS,
@@ -149,6 +149,11 @@ export async function sweepExpiredEvents(db: Firestore, now: Date, result: Purge
     await sweepCreateLimits(db, now, 1000, ROTATE_LIMITS);
   } catch (err) {
     logger.error("sweepExpiredEvents: new-code limit sweep failed", { err: String(err) });
+  }
+  try {
+    await sweepCreateLimits(db, now, 1000, HANDOVER_LIMITS);
+  } catch (err) {
+    logger.error("sweepExpiredEvents: hand-over limit sweep failed", { err: String(err) });
   }
 }
 

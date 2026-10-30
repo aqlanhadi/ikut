@@ -17,6 +17,8 @@ import { HttpsError } from "firebase-functions/v2/https";
 export const CREATE_LIMITS = "createLimits";
 /** Per-trip counters for new codes (rotateTrip.ts), the same shape as `createLimits`. */
 export const ROTATE_LIMITS = "rotateLimits";
+/** Per-trip counters for hand-overs (handOverTrip.ts), the same shape. */
+export const HANDOVER_LIMITS = "handOverLimits";
 export const HOUR_MS = 60 * 60_000;
 export const DAY_MS = 24 * HOUR_MS;
 export const MAX_PER_HOUR = 20;

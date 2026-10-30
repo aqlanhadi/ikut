@@ -38,19 +38,23 @@ function tooManyCodes(waitMilliseconds: number): HttpsError {
     { reason: "too-many-codes", retryAfterSeconds: seconds });
 }
 
-async function reserve(db: Firestore, tripId: string, now: number, limits: CreateLimits): Promise<void> {
-  const ref = db.collection(ROTATE_LIMITS).doc(tripId);
+/** Counts one call for the trip in `collection`, or throws what `tooMany` makes of the wait. Shared with the hand-over limit. */
+export async function reserve(
+  db: Firestore, tripId: string, now: number, limits: CreateLimits,
+  collection: string = ROTATE_LIMITS, tooMany: (waitMilliseconds: number) => HttpsError = tooManyCodes,
+): Promise<void> {
+  const ref = db.collection(collection).doc(tripId);
   await db.runTransaction(async (tx: Transaction) => {
     const times = recentCreates((await tx.get(ref)).data(), now);
     const wait = createWaitMs(times, now, limits);
-    if (wait > 0) throw tooManyCodes(wait);
+    if (wait > 0) throw tooMany(wait);
     tx.set(ref, { creates: [...times, now], expiresAt: Timestamp.fromMillis(now + DAY_MS) });
   });
 }
 
 /** Gives back the slot of a call that changed nothing. Never throws. */
-async function release(db: Firestore, tripId: string, slot: number): Promise<void> {
-  const ref = db.collection(ROTATE_LIMITS).doc(tripId);
+export async function release(db: Firestore, tripId: string, slot: number, collection: string = ROTATE_LIMITS): Promise<void> {
+  const ref = db.collection(collection).doc(tripId);
   try {
     await db.runTransaction(async (tx: Transaction) => {
       const times = recentCreates((await tx.get(ref)).data(), Date.now());

@@ -142,6 +142,11 @@ describe('trips', () => {
     assertFails(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: ts() })));
   it('non-organizer member cannot update', () => assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { name: 'Hax' })));
   it('organizerId is immutable', () => assertFails(updateDoc(doc(db('org'), `trips/${T}`), { organizerId: 'mem' })));
+  it('organizerId cannot be changed by the organizer together with an allowed field, nor by a member (D106: only handOverTrip moves it)', async () => {
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { organizerId: 'mem', name: 'Mine now' }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { organizerId: 'mem' }));
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { organizerId: 'someone-outside' }));
+  });
   it('code is immutable', () => assertFails(updateDoc(doc(db('org'), `trips/${T}`), { code: 'ZZZZZZ' })));
   it('ended trip cannot be reactivated', async () => {
     await seed({ ended: true });
@@ -289,6 +294,18 @@ describe('members', () => {
   it('cannot update another member', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/other`), { displayName: 'Hax' })));
   it('member can leave', () => assertSucceeds(deleteDoc(doc(db('mem'), `trips/${T}/members/mem`))));
+  it('the organizer of an active trip cannot leave: their own member doc stays until they hand over or end (D106)', async () => {
+    await assertFails(deleteDoc(doc(db('org'), `trips/${T}/members/org`)));
+    // Handed over (the function's write, here with the rules off): the old organiser is a member and may leave.
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { organizerId: 'mem' }));
+    await assertSucceeds(deleteDoc(doc(db('org'), `trips/${T}/members/org`)));
+  });
+  it('the new organiser of an active trip cannot leave either, and ending the trip lets the organiser leave', async () => {
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { organizerId: 'mem' }));
+    await assertFails(deleteDoc(doc(db('mem'), `trips/${T}/members/mem`)));
+    await assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() }));
+    await assertSucceeds(deleteDoc(doc(db('mem'), `trips/${T}/members/mem`)));
+  });
   it('member can leave an ended trip, and then cannot read its cars or positions', async () => {
     await seed({ ended: true });
     await assertSucceeds(getDoc(doc(db('mem'), `trips/${T}/cars/carA`)));

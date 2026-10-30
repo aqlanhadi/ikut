@@ -14,6 +14,8 @@ import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { ROTATE_LIMITS } from "../lib/createLimit.js";
 import { findActiveTripId, joinTripTransaction, parseJoinInput, REMOVED_FROM_TRIP } from "../lib/joinTrip.js";
 import { ROTATE_PRODUCTION_LIMITS, isValidTripId, rotateCodeForUser } from "../lib/rotateTrip.js";
+import { HANDOVER_LIMITS } from "../lib/createLimit.js";
+import { HANDOVER_PRODUCTION_LIMITS, handOverTripForUser } from "../lib/handOverTrip.js";
 import { previewTripData } from "../lib/previewTrip.js";
 import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
 
@@ -1517,5 +1519,106 @@ describe("removed members and new codes (emulator, D104)", () => {
     await sweepCreateLimits(db, new Date(now), 1000, ROTATE_LIMITS);
     assert.equal((await old.get()).exists, false);
     assert.equal((await fresh.get()).exists, true);
+  });
+});
+
+describe("handing the trip to another member (emulator, D106)", () => {
+  const input = () => ({
+    name: "Trip", destination: { name: "Ipoh", latitude: 4.6, longitude: 101.1 }, route: "_p~iF~ps|U",
+    routeSeconds: 600, organizerName: "Sam", carId: "car-" + Math.random().toString(36).slice(2),
+  });
+  const tripRef = (id: string) => db.collection("trips").doc(id);
+  const memberRef = (id: string, uid: string) => tripRef(id).collection("members").doc(uid);
+  async function trip(n = 1) {
+    const organizer = (await newUser()).uid;
+    const { tripId, code } = await createTripForUser(db, organizer, input(), { limits: { perHour: 1000, perDay: 1000 } });
+    const people: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const u = (await newUser()).uid;
+      await joinTripTransaction(db, u, tripId, parseJoinInput({ code, displayName: "Ali", car: newCar(), tracker: false }));
+      people.push(u);
+    }
+    return { organizer, tripId, code, people };
+  }
+  const rejected = (p: Promise<unknown>, code: string) => assert.rejects(p, (e: any) => e.code === code, code);
+
+  it("moves the trip, the code claim and the two roles; the new organiser can rotate the code, the old one cannot", async () => {
+    const t = await trip(2);
+    const [next, other] = t.people as [string, string];
+    const r = await handOverTripForUser(db, t.organizer, t.tripId, next);
+    assert.deepEqual(r, { ok: true });
+    assert.equal((await tripRef(t.tripId).get()).data()!.organizerId, next);
+    assert.equal((await db.collection("codes").doc(t.code).get()).data()!.organizerId, next);
+    assert.equal((await memberRef(t.tripId, next).get()).data()!.role, "organizer");
+    assert.equal((await memberRef(t.tripId, t.organizer).get()).data()!.role, "member");
+    assert.equal((await memberRef(t.tripId, other).get()).data()!.role, "member");
+    // The new organiser holds the organiser's powers: a new code (it also writes their id into the claim) ...
+    const rotated = await rotateCodeForUser(db, next, t.tripId);
+    assert.equal((await db.collection("codes").doc(rotated.code).get()).data()!.organizerId, next);
+    // ... and the old one no longer has them.
+    await rejected(rotateCodeForUser(db, t.organizer, t.tripId), "permission-denied");
+    await rejected(handOverTripForUser(db, t.organizer, t.tripId, other), "permission-denied");
+    // Handing it on again from the new organiser works.
+    await handOverTripForUser(db, next, t.tripId, other);
+    assert.equal((await tripRef(t.tripId).get()).data()!.organizerId, other);
+  });
+
+  it("only the organiser of an active trip; a missing trip and someone else's say the same; an ended trip is failed-precondition", async () => {
+    const t = await trip(1);
+    const stranger = (await newUser()).uid;
+    const a: any = await handOverTripForUser(db, t.people[0]!, t.tripId, t.people[0]).catch((e) => e);
+    const b: any = await handOverTripForUser(db, stranger, "no-such-trip", t.people[0]).catch((e) => e);
+    const c: any = await handOverTripForUser(db, stranger, t.tripId, stranger).catch((e) => e);
+    for (const e of [a, b, c]) { assert.equal(e.code, "permission-denied"); assert.equal(e.message, a.message); }
+    assert.equal((await tripRef(t.tripId).get()).data()!.organizerId, t.organizer, "nothing moved");
+    await tripRef(t.tripId).update({ status: "ended", endedAt: FieldValue.serverTimestamp() });
+    await rejected(handOverTripForUser(db, t.organizer, t.tripId, t.people[0]), "failed-precondition");
+    assert.equal((await tripRef(t.tripId).get()).data()!.organizerId, t.organizer);
+  });
+
+  it("the target must be another current member: not yourself, not a stranger, not someone who left; nothing is half done", async () => {
+    const t = await trip(2);
+    const [gone, stay] = t.people as [string, string];
+    await memberRef(t.tripId, gone).delete();
+    const stranger = (await newUser()).uid;
+    for (const target of [t.organizer, stranger, gone, "", "a/b", 5 as unknown as string]) {
+      await assert.rejects(handOverTripForUser(db, t.organizer, t.tripId, target), (e: any) =>
+        e.code === "invalid-argument" && e.message === "Pick someone who is in the trip.", String(target));
+    }
+    assert.equal((await tripRef(t.tripId).get()).data()!.organizerId, t.organizer);
+    assert.equal((await db.collection("codes").doc(t.code).get()).data()!.organizerId, t.organizer);
+    assert.equal((await memberRef(t.tripId, t.organizer).get()).data()!.role, "organizer");
+    assert.equal((await memberRef(t.tripId, stay).get()).data()!.role, "member");
+  });
+
+  it("two hand-overs at once: one wins, the other finds it is no longer the organiser", async () => {
+    const t = await trip(2);
+    const results = await Promise.allSettled([
+      handOverTripForUser(db, t.organizer, t.tripId, t.people[0]), handOverTripForUser(db, t.organizer, t.tripId, t.people[1])]);
+    assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+    const org = (await tripRef(t.tripId).get()).data()!.organizerId;
+    assert.ok(t.people.includes(org));
+    assert.equal((await db.collection("codes").doc(t.code).get()).data()!.organizerId, org);
+  });
+
+  it("5 hand-overs an hour per trip, 10 a day, then resource-exhausted with the wait; a call that changes nothing gives its slot back", async () => {
+    const t = await trip(1);
+    const [b] = t.people as [string];
+    const now = Date.now();
+    const lim = { limits: HANDOVER_PRODUCTION_LIMITS };
+    // Hand the trip back and forth: each call is made by whoever holds it.
+    let [from, to] = [t.organizer, b];
+    for (let i = 0; i < HANDOVER_PRODUCTION_LIMITS.perHour; i++) {
+      await handOverTripForUser(db, from, t.tripId, to, { ...lim, now: now + i });
+      [from, to] = [to, from];
+    }
+    await assert.rejects(handOverTripForUser(db, from, t.tripId, to, { ...lim, now: now + 10 }), (e: any) =>
+      e.code === "resource-exhausted" && e.details?.reason === "too-many-handovers" && e.details.retryAfterSeconds > 0);
+    await handOverTripForUser(db, from, t.tripId, to, { ...lim, now: now + 61 * 60_000 });
+    // A refused call (here: not a member) spent nothing.
+    const u = await trip(1);
+    const used = async () => ((await db.collection(HANDOVER_LIMITS).doc(u.tripId).get()).data()?.creates ?? []).length;
+    await rejected(handOverTripForUser(db, u.organizer, u.tripId, "nobody", lim), "invalid-argument");
+    assert.equal(await used(), 0);
   });
 });
