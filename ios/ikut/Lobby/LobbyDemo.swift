@@ -232,7 +232,9 @@ extension LobbyStopsDemo {
 /// The Suggest stops sheet on KL to Ipoh (SuggestStops.dc.html): one R&R on our side of the route.
 @MainActor
 enum SuggestStopsDemo {
-    static func sheet(seconds: Double = 2 * 3600 + 25 * 60, moved: Int = 0, nothing: Bool = false, noRoute: Bool = false) -> some View {
+    /// The model the sheet reads. It gets one fuel station so `canSuggest` holds (the bundled places file isn't loaded in
+    /// a demo); without a route it can't suggest, and with no candidates there is nothing to suggest.
+    static func model(seconds: Double = 2 * 3600 + 25 * 60, moved: Int = 0, nothing: Bool = false, noRoute: Bool = false) -> SuggestStopsModel {
         let line = RouteLine(LobbyStopsDemo.route)
         let at = CLLocationCoordinate2D(latitude: 4.2, longitude: 101.25)
         let offset = line.project(at)?.offset ?? 0
@@ -240,8 +242,14 @@ enum SuggestStopsDemo {
             id: "demo/tapah", kind: .services, name: "R&R Tapah (northbound)", coordinate: at, ring: nil,
             facilities: [.fuel, .food, .toilets], brands: [], offset: offset, distance: 40, side: .left,
             carriageway: .ours, ours: true, entrance: at, slipEntrance: false, routeOffset: offset)
-        let model = SuggestStopsModel(line: noRoute ? nil : line, routeSeconds: seconds, existing: [], sites: [], fuel: [], candidates: nothing ? [] : [tapah])
+        let model = SuggestStopsModel(line: noRoute ? nil : line, routeSeconds: seconds, existing: [], sites: [], fuel: [FuelStation(id: "demo/pump", coordinate: at, name: nil)], candidates: nothing ? [] : [tapah])
         for _ in 0..<abs(moved) { model.step(moved > 0 ? 1 : -1) }
+        return model
+    }
+
+    static func sheet(seconds: Double = 2 * 3600 + 25 * 60, moved: Int = 0, nothing: Bool = false, noRoute: Bool = false) -> some View {
+        let model = model(seconds: seconds, moved: moved, nothing: nothing, noRoute: noRoute)
+        let line = RouteLine(LobbyStopsDemo.route)
         let summary = "KL to Ipoh · \(RouteFormat.distance(line.length)) · \(ConvoyFormat.duration(seconds))"
         return SuggestStopsSheet(model: model, summary: summary, canAdd: { true }, onAdd: { _ in })
     }
