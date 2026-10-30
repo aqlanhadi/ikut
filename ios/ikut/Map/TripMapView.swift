@@ -72,9 +72,11 @@ struct TripMapView: View {
     /// The camera inputs last acted on, by the sheet's own change (`setShown`) or by the watcher, so the watcher seeing
     /// the same ones after a sheet change makes no second move (D63 C4).
     @State private var inputsWatch = CameraInputsWatch()
-    /// The bottom inset the map keeps as safe area: the folded panel's, so the Legal label sits
-    /// above it. The rest of what covers the map goes into the camera (`cameraRoom`).
-    @State private var legalInset: CGFloat = 0
+    /// The lobby sheet's medium height at this text size: the map's one bottom padding is the lobby's (D101).
+    @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
+    /// The bottom inset the map keeps as safe area, the same as the lobby's and constant (`DrivingGlance.mapPadding`).
+    /// What covers the map is put into the camera (`cameraRoom`), not into this.
+    private var legalInset: CGFloat { DrivingGlance.mapPadding(mode: .driving, scaledMedium: mediumHeight) }
     /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
     @State private var latitudePerPointPerMeter = 0.0
     /// The top cover (banner stack, from the map's top edge) the camera was last aimed with: where my car sits in the visible strip
@@ -336,7 +338,6 @@ struct TripMapView: View {
     /// The camera's move for a change of its inputs: none when my car stays comfortably in view under a new banner,
     /// otherwise one, on the motion of the sheet or banner that caused it.
     private func cameraInputsChanged(from old: CameraInsetMove.Inputs, to new: CameraInsetMove.Inputs) {
-        if !panelExpanded, cardNow == nil { legalInset = DrivingGlance.legalInset(foldedSheetHeight: new.bottom) }
         // The first look: aim at the target, as before the watcher.
         guard old != new else { move(to: model.cameraTarget, animated: true); return }
         let plan = CameraInsetMove.plan(old: old, new: new, frameHeight: mapFullHeight, aimedTop: aimedTop)
@@ -354,12 +355,12 @@ struct TripMapView: View {
         move(to: model.cameraTarget, animated: true, plan: plan, step: step)
     }
 
-    /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`).
+    /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`); its `bottom` is negative when the cover is lower than the padding.
     private var cameraRoom: MapCameraRoom {
         let inputs = cameraInputs
         return MapCameraRoom(
             width: mapWidth, height: max(mapFullHeight - legalInset, 0),
-            top: inputs.top, bottom: max(inputs.bottom - legalInset, 0),
+            top: inputs.top, bottom: inputs.bottom - legalInset,
             latitudePerPointPerMeter: latitudePerPointPerMeter)
     }
 

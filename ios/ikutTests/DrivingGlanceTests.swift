@@ -4,9 +4,20 @@ import Testing
 @testable import ikut
 
 struct DrivingGlanceTests {
-    @Test func legalInsetReachesTheTopOfTheFoldedSheet() {
-        #expect(DrivingGlance.legalInset(foldedSheetHeight: 180) == 210)
-        #expect(DrivingGlance.legalInset(foldedSheetHeight: 0) == 0)
+    @Test func theMapPaddingIsTheLobbysMediumSheetForLobbyAndDriving() {
+        for scaled in [CGFloat(470), 520, 900] {
+            let lobby = DrivingGlance.mapPadding(mode: .lobby, scaledMedium: scaled)
+            #expect(lobby == LobbySheet.legalInset(compact: LobbySheet.compact(scaled: scaled)))
+            #expect(DrivingGlance.mapPadding(mode: .driving, scaledMedium: scaled) == lobby)
+            #expect(lobby > 0)
+        }
+    }
+
+    @Test func theMapPaddingIsTheSameAtEveryStepOfStartTrip() {
+        let steps: [TripScreenMode] = [.lobby, .lobby, .driving, .driving, .driving]
+        let seen = steps.map { DrivingGlance.mapPadding(mode: $0, scaledMedium: LobbySheet.compactHeight) }
+        #expect(Set(seen).count == 1)
+        #expect(seen.allSatisfy { $0 > 0 })
     }
 
     @Test func modeControlFadesWhileTheSheetIsTall() {

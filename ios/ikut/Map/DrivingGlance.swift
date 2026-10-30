@@ -3,12 +3,14 @@ import SwiftUI
 /// The small rules that keep the driving map readable at a glance (D34 piece 2a): where the Apple logo and
 /// Legal link sit, what fades or moves, how long information stays, and what stays until it is dealt with.
 enum DrivingGlance {
-    /// The map's bottom safe area for the folded sheet: from the screen's bottom edge to the sheet's top (its detent
-    /// height and what a floating sheet adds, `BottomSheet.detentExtra`), so MapKit's own 10 pt between the logo
-    /// and the edge of that area is Apple's 10 pt above the sheet. Nothing before the sheet is up. Only the folded
-    /// sheet: following the unfolded one would move the convoy fit (Q15 report).
-    static func legalInset(foldedSheetHeight: CGFloat) -> CGFloat {
-        foldedSheetHeight > 0 ? foldedSheetHeight + BottomSheet.detentExtra : 0
+    /// The map's one bottom safe area for the lobby and for driving (D101): from the screen's bottom edge to the top of
+    /// the lobby's medium sheet, so MapKit's logo and Legal ride 10 pt above that line in both. It is the same value
+    /// before, during and after Start trip: MapKit refits at once to a changed safe area, which cut the paced flight
+    /// from the lobby's whole-route view to my car into one frame. It never follows the driving sheet as it measures
+    /// or folds; what covers the map beyond it goes into the camera (`MapCameraRoom`), where it animates.
+    /// `scaledMedium` is the lobby sheet's medium height at the current text size.
+    static func mapPadding(mode: TripScreenMode, scaledMedium: CGFloat) -> CGFloat {
+        LobbySheet.legalInset(compact: LobbySheet.compact(scaled: scaledMedium))
     }
 
     /// Follow / Fit fades out while the sheet is tall (the sheet would cut through it) and returns when folded.
