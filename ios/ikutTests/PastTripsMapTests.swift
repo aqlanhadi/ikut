@@ -131,8 +131,10 @@ struct HomeSheetTests {
     }
 
     @Test func reachIsTheTopOfTheRealListSheet() {
-        // Measured on an iPhone 17 (874 pt): the 300 pt detent is a sheet 320.7 pt tall, its top at 545.3.
-        #expect(abs(HomeSheet.defaultReach - (874 - 545.3)) < 2)
+        // Measured on an iPhone 17 (874 pt): a detent is a sheet 20.7 pt taller than it and the reach adds the
+        // gap (28.7 over the detent), so the 282 pt one (D115; the
+        // 300 pt one measured 320.7 pt tall, its top at 545.3) has its top at 874 - 310.7.
+        #expect(abs(HomeSheet.defaultReach - (874 - 563.3)) < 2)
         #expect(HomeSheet.reach(.list, compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
         #expect(HomeSheet.reach(.list, compact: 390) == 420)
         #expect(HomeSheet.reach(.list, compact: -5) == HomeSheet.detentExtra)
@@ -162,9 +164,9 @@ struct HomeSheetTests {
         // replaces the detent.
         let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight)
         #expect(compact == HomeSheet.compactHeight)
-        #expect(HomeSheet.detent(expanded: false, compact: compact) == .height(300))
+        #expect(HomeSheet.detent(expanded: false, compact: compact) == .height(282))
         #expect(HomeSheet.detent(expanded: true, compact: compact) == .large)
-        #expect(HomeSheet.detents(compact: compact) == [.height(300), .large])
+        #expect(HomeSheet.detents(compact: compact) == [.height(282), .large])
     }
 
     @Test func theShortHeightGrowsWithTheTextSizeWithinALimit() {

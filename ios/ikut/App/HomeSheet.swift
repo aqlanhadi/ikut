@@ -6,8 +6,10 @@ import SwiftUI
 /// one sheet's size (`TripSheet`, through `HomeModel.expanded`) is what the detent selection reads and writes.
 enum HomeSheet {
     /// Height of the sheet when short (at the default text size): the list shows its title row, the two pills and the first
-    /// past trips; a picked trip its header (back, name, date, Share, stats line) and the top of its recap card.
-    static let compactHeight: CGFloat = 300
+    /// past trips; a picked trip its header (back, name, date, Share, stats line) and the top of its recap card. It is the
+    /// convoy's resting folded sheet (`PanelSheet`'s folded content plus its bar), one number from the same constants, so
+    /// Home and the drive rest at the same height (D115; the owner liked the convoy's).
+    static let compactHeight: CGFloat = PanelSheet.foldedEstimate + PanelSheet.barEstimate
     /// Room the drag indicator takes above the content.
     static let indicatorRoom = BottomSheet.indicatorRoom
 
