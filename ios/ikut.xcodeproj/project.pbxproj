@@ -196,6 +196,7 @@
 		9390CA75D748EB1F49145BB4 /* DocumentID+Sendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16FA1B25A7565ED6310E01DB /* DocumentID+Sendable.swift */; };
 		93BB893037046A99E4340FE6 /* TextContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77791F51A29C0865B5076CFD /* TextContrastTests.swift */; };
 		941BE30C2A87EF38E26515B6 /* RouteGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A494FD1381005F8FB454B39 /* RouteGeometry.swift */; };
+		951121969EF5A902CF0DD942 /* HandOverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80CB5B7D4DB737C2F8E47883 /* HandOverTests.swift */; };
 		95EC198723C3BA9E48C96F02 /* ConvoyFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EB8DC03DE6CE40C04670411 /* ConvoyFormat.swift */; };
 		961714A83150F17EEE627CDA /* DesignInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC037B2B119969C5EA87597F /* DesignInventoryTests.swift */; };
 		965FDD2E1064F3BFA30E3A02 /* MapMarkersDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E32B7A73296BE953B6A5F8B1 /* MapMarkersDemo.swift */; };
@@ -251,6 +252,7 @@
 		BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56D59AA9467F430D986EC9F /* HomeSheet.swift */; };
 		BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E803C8C9331D07C56F506F44 /* LobbyContent.swift */; };
 		BD7E88ECB8682BC0306D9A50 /* AuthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34759F3D28A64C5908B2C7D /* AuthTests.swift */; };
+		BEC716040DF79682A9F04800 /* HandOverService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979D572109A77047D92C3232 /* HandOverService.swift */; };
 		BEFD37A841FAEB09281F0EDB /* JoinModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DD0AB1BDC90D15EA18EE2B /* JoinModel.swift */; };
 		BF856415E97C93CCF1248A8E /* MapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D7948AC8E4880C3065A836 /* MapTests.swift */; };
 		C1209D9DE92A621C3831B15A /* IkutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B75C6121526709B8E55645F /* IkutButton.swift */; };
@@ -516,6 +518,7 @@
 		7F7DC3EDEBB7871FAFC1771F /* TripAsks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAsks.swift; sourceTree = "<group>"; };
 		7F7E06B398795C1AC5DEE699 /* PlacesKLIpohTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesKLIpohTests.swift; sourceTree = "<group>"; };
 		7FE148B8C110122AD858B9D2 /* PlaceRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceRules.swift; sourceTree = "<group>"; };
+		80CB5B7D4DB737C2F8E47883 /* HandOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverTests.swift; sourceTree = "<group>"; };
 		81A21A541DABA60F6378B1D9 /* PastTripsMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastTripsMapTests.swift; sourceTree = "<group>"; };
 		82641AA014018A19F3AFFE90 /* StopRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopRouting.swift; sourceTree = "<group>"; };
 		826E906EBFED99C4A6DED1F4 /* DarkBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkBanner.swift; sourceTree = "<group>"; };
@@ -544,6 +547,7 @@
 		96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		969AB41D53300836956F03B0 /* LobbySheetSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbySheetSections.swift; sourceTree = "<group>"; };
 		9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopSkipAll.swift; sourceTree = "<group>"; };
+		979D572109A77047D92C3232 /* HandOverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverService.swift; sourceTree = "<group>"; };
 		97CE0ED3AF98906EDF665CB4 /* ApproachPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachPill.swift; sourceTree = "<group>"; };
 		991414E381145C07351D7F20 /* LocationDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationDeniedView.swift; sourceTree = "<group>"; };
 		99320F601C724896FA7271D4 /* DemoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUITests.swift; sourceTree = "<group>"; };
@@ -1081,6 +1085,7 @@
 				28F201EC357C45D84BC4395C /* EventTests.swift */,
 				67AFFBFAC1C3D2860AD68B4D /* FarAheadTests.swift */,
 				ED21589D476E823056C68F4D /* FollowGlideTests.swift */,
+				80CB5B7D4DB737C2F8E47883 /* HandOverTests.swift */,
 				3444E323182FDDB4B67D7428 /* HazardTests.swift */,
 				C13762732CB0A06A44CC3F55 /* HomeCameraTests.swift */,
 				C91D939C4B6B3F841C81E964 /* HomeModelTests.swift */,
@@ -1171,6 +1176,7 @@
 				031322A39B18B3872843D671 /* AddStopSheet.swift */,
 				D34924ABFFA93014C880E890 /* CreateTripModel.swift */,
 				CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */,
+				979D572109A77047D92C3232 /* HandOverService.swift */,
 				99C9353808E19095E6015DC1 /* MapPickView.swift */,
 				512EAC722395229E43BEB36F /* NewCodeService.swift */,
 				23FCA90E7E8D9F5A2A28D42C /* NewTripFlow.swift */,
@@ -1478,6 +1484,7 @@
 				1B5E51CBAB488831512B471C /* FollowGlide.swift in Sources */,
 				1376BA65DF4FC86D5ACBBA84 /* GeoPoint+Coordinate.swift in Sources */,
 				4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */,
+				BEC716040DF79682A9F04800 /* HandOverService.swift in Sources */,
 				514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */,
 				BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */,
 				27C68A69CA3817307BE72D21 /* HazardModel.swift in Sources */,
@@ -1673,6 +1680,7 @@
 				934D513F0C9E2DFAE1B60D1C /* Fixtures.swift in Sources */,
 				497D57D6894689A82B8664C6 /* FollowGlideTests.swift in Sources */,
 				92645091B22B66E6182B8677 /* Geometry.swift in Sources */,
+				951121969EF5A902CF0DD942 /* HandOverTests.swift in Sources */,
 				079075CB6B156BCB6CBF0CEA /* HazardTests.swift in Sources */,
 				D4001445E5CE74D71F3D5092 /* HomeCameraTests.swift in Sources */,
 				B653006A61ACC89FFD7094C8 /* HomeModelTests.swift in Sources */,

@@ -340,8 +340,10 @@ service cloud.firestore {
         // positions during the 7 days before the purge. Removing someone else stays with the organizer of an active trip.
         // The organizer's removal of someone else must leave the removed/{userId} record in the same batch (D104), so a
         // removed person cannot rejoin with the old code; leaving, one's own delete, records nothing.
+        // The organizer of an active trip cannot leave (D106): they hand the trip over (handOverTrip, after which they
+        // are an ordinary member) or end it, so a trip is never left without one. On an ended trip anyone may leave.
         allow delete: if isMember(tripId)
-          && (userId == request.auth.uid
+          && ((userId == request.auth.uid && (!tripActive(tripId) || !isOrganizer(tripId)))
               || (tripActive(tripId) && isOrganizer(tripId) && existsAfter(removedPath(tripId, userId))));
       }
 

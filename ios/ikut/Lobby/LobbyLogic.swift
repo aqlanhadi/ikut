@@ -77,10 +77,32 @@ enum LobbyLogic {
         return isOrganizer ? .startTrip : .waiting(organizerName: organizerName)
     }
 
-    /// Leave trip is for participants always, and for the organizer only once the trip has started: before that they can
-    /// only End it, or the participants would wait on the lobby for a start that never comes (D39).
+    /// Leave trip is for participants always. The organizer of a live trip never just leaves (D106): they hand it over
+    /// (`canHandOver`) or end it, so a trip is never left without one.
     static func canLeaveTrip(isOrganizer: Bool, started: Bool, isLiveMember: Bool) -> Bool {
-        isLiveMember && (!isOrganizer || started)
+        isLiveMember && !isOrganizer
+    }
+
+    /// "Hand over and leave" is the organizer's Leave trip, when there is someone to hand the trip to.
+    static func canHandOver(isOrganizer: Bool, isLiveMember: Bool, candidates: Int) -> Bool {
+        isOrganizer && isLiveMember && candidates > 0
+    }
+
+    /// One person the organizer could hand the trip to: a member other than themselves, with the car they ride in.
+    struct HandOverCandidate: Equatable, Identifiable {
+        var id: String
+        var name: String
+        var carName: String?
+    }
+
+    /// The other members, by name (case-insensitive), each with their car's name.
+    static func handOverCandidates(members: [Member], cars: [Car], me: String) -> [HandOverCandidate] {
+        members
+            .compactMap { member -> HandOverCandidate? in
+                guard let id = member.id, id != me else { return nil }
+                return HandOverCandidate(id: id, name: member.displayName, carName: cars.first { $0.id == member.carId }?.name)
+            }
+            .sorted { ($0.name.lowercased(), $0.id) < ($1.name.lowercased(), $1.id) }
     }
 
     /// The organizer's display name from the loaded members (their member id is their user id); nil if not loaded or blank.

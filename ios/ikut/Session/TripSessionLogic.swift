@@ -38,10 +38,17 @@ extension CarRouteService: CarRouteControlling {}
 /// Writes (a date) or clears (nil) `pausedAt` on the car doc; tests substitute a fake.
 typealias PauseWriter = @MainActor (_ carId: String, _ pausedAt: Date?) async throws -> Void
 
-/// One write of Leave trip: give up sharing for the car, then delete this phone's member doc.
+/// The steps of Leave trip. First (D106) the server says whether this phone is the live trip's organiser, who cannot
+/// leave: `StillInTrip` before anything is written. Then one batch: give up sharing for the car (when this phone is its
+/// tracker) and delete this phone's member doc, together, so a refused delete leaves the car's tracker as it was.
 enum LeaveStep: Equatable {
-    case releaseTracker(carId: String)
-    case deleteMember
+    /// Throws `StillInTrip` when the server's trip says this phone is its organiser and it is active. Anything else
+    /// (offline, unreadable) returns: the rules decide at the delete.
+    case checkNotOrganizer
+    case deleteMember(releasingCar: String?)
+    /// After a refused member delete (D106): the server says whether this phone is still a member. Returns when it is
+    /// not (it has left); throws `StillInTrip` when it is (the refusal was the organiser's rule, not a lost reply).
+    case confirmGone
 }
 
 /// Does one Leave step against the server; tests substitute a fake.
@@ -50,6 +57,12 @@ typealias LeaveWriter = @MainActor (LeaveStep) async throws -> Void
 /// Leave trip couldn't reach the server: the person stays in the trip and can try again.
 struct LeaveFailed: LocalizedError, Equatable {
     var errorDescription: String? { "Couldn’t leave the trip. Check your signal and try again." }
+}
+
+/// The member delete was refused and this phone is still in the trip: the organiser of a live trip cannot leave
+/// (D106), e.g. it was handed to them a moment ago and the phone has not heard yet.
+struct StillInTrip: LocalizedError, Equatable {
+    var errorDescription: String? { "You’re the organiser now. Hand the trip over or end it." }
 }
 
 extension TripSessionLogic {

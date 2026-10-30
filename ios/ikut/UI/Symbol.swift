@@ -43,6 +43,7 @@ enum Symbol {
     static let removedFromTrip = "person.fill.xmark"
     static let leaveTrip = "rectangle.portrait.and.arrow.right"
     static let newCode = "arrow.triangle.2.circlepath"
+    static let handOver = "person.badge.key"
     static let soundOn = "speaker.wave.2.fill"
     static let soundOff = "speaker.slash.fill"
     static let duringTrip = "clock"
@@ -126,6 +127,7 @@ enum Symbol {
         removedFromTrip,
         leaveTrip,
         newCode,
+        handOver,
         soundOn,
         soundOff,
         duringTrip,

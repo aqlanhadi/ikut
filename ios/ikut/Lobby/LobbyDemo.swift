@@ -31,6 +31,8 @@ enum LobbyStopsDemo {
         case organizer, organizerEmpty, member, meetAndFailure, turnBack, suggestAdded, started
         /// The organiser pulled up to the tall height (B5).
         case tall
+        /// D106: the organiser tall with nobody else in the trip, so only End trip is offered.
+        case tallAlone
         /// B4: a meeting point, five cars, the last one not sharing yet.
         case notReady
         /// The organiser's lobby before the start with this phone sharing: "Sharing" leads the subtitle (#394).
@@ -90,6 +92,12 @@ enum LobbyStopsDemo {
         case .tall:
             planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
             return LobbyView(sample: model(stopsOnRoute), planner: planner, organizer: true, tall: true)
+        case .tallAlone:
+            planner.showForDemo(items: stopsOnRoute.map(StopDraft.init))
+            let base = model(stopsOnRoute)
+            let alone = LobbyModel(
+                sampleTrip: base.trip!, cars: Array(base.cars.prefix(1)), members: Array(base.members.prefix(1)), stops: base.stops)
+            return LobbyView(sample: alone, planner: planner, organizer: true, tall: true)
         case .notReady:
             let meet = StopDraft(
                 id: "m", name: "Petronas Jalan Duta", coordinate: .init(latitude: 3.17, longitude: 101.68), kind: .meet,
@@ -409,6 +417,12 @@ enum DemoScreens {
         // D104: the organiser's New code ask, and its row while the call is out ("Making a new code…").
         case "lobby-new-code-ask": return trip(lobbyAsking(.organizer, "new-code"))
         case "lobby-new-code-working": return trip(lobbyAsking(.organizer, "new-code-working"))
+        // D106: the organiser's Hand over and leave: the list of who takes over, the alert naming Wyna, the working row, and the
+        // organiser alone in the trip (only End trip, with the line saying why).
+        case "lobby-handover-pick": return trip(lobbyAsking(.tall, "handover-pick"))
+        case "lobby-handover-ask": return trip(lobbyAsking(.tall, "handover-ask"))
+        case "lobby-handover-working": return trip(lobbyAsking(.tall, "handover-working"))
+        case "lobby-organiser-alone": return trip(LobbyStopsDemo.lobby(.tallAlone))
         case "lobby-rename": return trip(lobbyAsking(.organizer, "rename"))
         case "lobby-qr": return trip(lobbyAsking(.organizer, "qr"))
         case "lobby-action-error": return trip(lobbyAsking(.organizer, "action-error"))

@@ -64,6 +64,10 @@ enum AXID {
         static let copyCode = "lobby.copyCode"
         static let destination = "lobby.destination"
         static let endTrip = "lobby.endTrip"
+        static let handOver = "lobby.handOver"
+        static let handOverCancel = "lobby.handOver.cancel"
+        static let handOverNote = "lobby.handOverNote"
+        static func handOverPick(_ id: String) -> String { "lobby.handOver.\(id)" }
         static let keepAwake = "lobby.keepAwake"
         static let leaveTrip = "lobby.leaveTrip"
         static let newCode = "lobby.newCode"
@@ -224,6 +228,9 @@ enum AXID {
         Lobby.copyCode,
         Lobby.destination,
         Lobby.endTrip,
+        Lobby.handOver,
+        Lobby.handOverCancel,
+        Lobby.handOverNote,
         Lobby.keepAwake,
         Lobby.leaveTrip,
         Lobby.newCode,

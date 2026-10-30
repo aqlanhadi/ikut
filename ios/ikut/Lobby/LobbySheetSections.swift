@@ -123,7 +123,9 @@ extension LobbyView {
 
     /// End trip (the organiser) and Leave trip as destructive rows, each behind its confirmation.
     @ViewBuilder var exitSection: some View {
-        if canEnd || canLeaveTrip {
+        if exit.flow.picking && !handOverCandidates.isEmpty {
+            handOverPicker
+        } else if canEnd || canLeaveTrip || canHandOver {
             Section {
                 if canEnd {
                     listOption("New code", systemImage: Symbol.newCode, id: AXID.Lobby.newCode,
@@ -131,13 +133,48 @@ extension LobbyView {
                     listOption("End trip", systemImage: Symbol.finish, id: AXID.Lobby.endTrip, destructive: true,
                                working: exit.flow.progress == .end ? "Ending…" : nil) { confirmEnd = true }
                 }
+                if canHandOver {
+                    listOption("Hand over and leave", systemImage: Symbol.handOver, id: AXID.Lobby.handOver, destructive: true,
+                               working: exit.flow.progress == .handOver ? "Handing over…" : nil) { exit.flow.startPicking() }
+                }
                 if canLeaveTrip {
                     listOption("Leave trip", systemImage: Symbol.leaveTrip, id: AXID.Lobby.leaveTrip, destructive: true,
                                working: exit.flow.progress == .leave ? "Leaving…" : nil) {
                         confirmLeave = true
                     }
                 }
+            } footer: {
+                // The organiser alone has no one to hand the trip to: End trip is the only way out.
+                // Only once the members have loaded: before that "nobody else" is just not known yet.
+                if canEnd && !canHandOver && !model.members.isEmpty {
+                    Text("You’re the only one in the trip. To leave it, end it for everyone.")
+                        .accessibilityIdentifier(AXID.Lobby.handOverNote)
+                }
             }
+        }
+    }
+
+    /// Hand over and leave, first step (D106): the other members by name with their car, and Cancel. Picking one asks.
+    var handOverPicker: some View {
+        Section {
+            ForEach(handOverCandidates) { person in
+                Button { exit.flow.choose(id: person.id, name: person.name) } label: {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(verbatim: person.name)
+                        if let car = person.carName {
+                            Text(verbatim: car).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .foregroundStyle(Color.primary)
+                .accessibilityIdentifier(AXID.Lobby.handOverPick(person.id))
+            }
+            Button("Cancel", role: .cancel) { exit.flow.stopPicking() }
+                .accessibilityIdentifier(AXID.Lobby.handOverCancel)
+        } header: {
+            Text("Who takes over?")
+        } footer: {
+            Text("They become the organiser. You leave the trip.")
         }
     }
 
@@ -336,6 +373,9 @@ extension LobbyView {
                     confirmLeave: Binding(get: { confirmLeave }, set: { confirmLeave = $0 }),
                     confirmEnd: Binding(get: { confirmEnd }, set: { confirmEnd = $0 }), leave: leaveTrip, end: endTrip)
                 .tripNewCodeDialog(isPresented: Binding(get: { confirmNewCode }, set: { confirmNewCode = $0 }), make: makeNewCode)
+                .tripHandOverDialog(
+                    name: exit.flow.target?.name ?? "", isPresented: Binding(get: { confirmHandOver }, set: { confirmHandOver = $0 }),
+                    hand: handOverAndLeave)
                 .alert("Trip name", isPresented: $renaming) { renameActions })
     }
 
