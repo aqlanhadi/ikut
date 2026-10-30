@@ -261,12 +261,12 @@ final class TripSheet {
     }
 }
 
-/// What a layer asks the one map to draw: the content, and the bottom safe area the logo and Legal ride above.
+/// What a layer asks the one map to draw: the content. The bottom safe area the logo and Legal ride above is the host's,
+/// one constant for every layer (`LobbySheet.mapPadding`, D109).
 struct TripMapSpec {
     var input = TripMapInput()
     /// The hazard pinging and the candidate taps; the host adds the heading and width it measures itself.
     var style = TripMapStyle()
-    var bottomPadding: CGFloat = 0
     var hidesControls = false
     /// A tap on the map away from its annotations (Home: back from a picked trip to the list); nil, the map keeps it.
     var onTap: (() -> Void)?
@@ -593,6 +593,8 @@ final class TripScreenModel {
 struct TripScreenHost<Content: View>: View {
     @State private var stage: TripScreenModel
     private let content: Content
+    /// The lobby's medium height at the text size: all the map's one bottom padding depends on (D109).
+    @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
 
     init(mode: TripScreenMode = .lobby, makeTrip: (@MainActor (String) -> OpenTrip)? = nil,
          @ViewBuilder content: () -> Content) {
@@ -644,7 +646,7 @@ struct TripScreenHost<Content: View>: View {
             Map(position: $stage.camera) {
                 TripMapContent(input: spec.input, style: style.converting { proxy.convert($0.clCoordinate, to: .global) })
             }
-            .modifier(TripMapBehaviour(spec: spec, stage: stage))
+            .modifier(TripMapBehaviour(spec: spec, stage: stage, bottomPadding: LobbySheet.mapPadding(scaledMedium: mediumHeight)))
         }
     }
 }
@@ -653,6 +655,7 @@ struct TripScreenHost<Content: View>: View {
 private struct TripMapBehaviour: ViewModifier {
     let spec: TripMapSpec
     @Bindable var stage: TripScreenModel
+    let bottomPadding: CGFloat
 
     func body(content: Content) -> some View {
         content
@@ -665,8 +668,9 @@ private struct TripMapBehaviour: ViewModifier {
                 KeyframeTrack(\MapCamera.centerCoordinate) { LinearKeyframe(to.centerCoordinate, duration: time) }
                 KeyframeTrack(\MapCamera.distance) { LinearKeyframe(to.distance, duration: time) }
             }
-            // MapKit fits and centres inside the safe area: the logo and Legal ride above what the layer keeps clear.
-            .safeAreaPadding(.bottom, spec.bottomPadding)
+            // MapKit fits and centres inside the safe area: the logo and Legal ride above it. One constant for every
+            // layer, so a hand-over (Leave, Back to trips, Start trip) never changes it and cuts the flight (D109).
+            .safeAreaPadding(.bottom, bottomPadding)
             .onMapCameraChange(frequency: .continuous) { context in
                 stage.cameraBox.record(context.camera, latitudeDelta: context.region.span.latitudeDelta)
                 stage.noteScale(context.region.span.latitudeDelta)

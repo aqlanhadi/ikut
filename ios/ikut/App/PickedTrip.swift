@@ -58,7 +58,7 @@ enum PickedTripLogic {
     /// A close view of one spot, with the spot centred in the part of the map above the short sheet.
     static func focus(on coordinate: CLLocationCoordinate2D, span: Double = 0.15,
                       bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion {
-        let bottom = max(0, min(bottomObscured, 0.7)), top = max(0, min(topObscured, 0.7))
+        let bottom = max(-1, min(bottomObscured, 0.7)), top = max(0, min(topObscured, 0.7))
         let centerLat = coordinate.latitude + span * (top - bottom) / 2
         return MKCoordinateRegion(center: .init(latitude: max(-85, min(85, centerLat)), longitude: coordinate.longitude),
                                   span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span))

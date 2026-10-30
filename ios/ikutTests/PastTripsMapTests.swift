@@ -54,8 +54,9 @@ struct PastTripsMapTests {
         // Every height the map can report, including 0 before its first layout.
         for height: CGFloat in [0, 1, 300, 672, 778, 874] {
             let insets = TripsHomeView.obscured(mapHeight: height)
-            #expect(insets.bottom == 0, "height \(height)")  // the compact sheet is the map's padding
-            #expect(insets.top > 0 && insets.top < 0.2, "height \(height)")
+            // The list's sheet is lower than the map's one constant padding: the strip reaches below the frame.
+            #expect(insets.bottom < 0, "height \(height)")
+            #expect(insets.top > 0 && insets.top < 0.7, "height \(height)")
             let r = try #require(PastTripsMapLogic.region(fitting: [a, b], bottomObscured: insets.bottom,
                                                           topObscured: insets.top))
             let mapTop = r.center.latitude + r.span.latitudeDelta / 2
@@ -64,8 +65,6 @@ struct PastTripsMapTests {
             #expect(visibleBottom < minLat && visibleTop > maxLat, "height \(height)")
             // Centred in the visible band.
             #expect(abs((visibleBottom + visibleTop) / 2 - (minLat + maxLat) / 2) < 1e-9)
-            // The centre moves south only by the sheet's share, never out of the routes' latitudes.
-            #expect(r.center.latitude >= minLat && r.center.latitude <= maxLat, "height \(height)")
             // Modest margin: within 2.5x the routes' span (1.1 padding / ~50% visible band) once
             // settled; 672 is a brief first layout with a smaller band.
             let limit = height == 672 ? 3.0 : 2.5
@@ -78,6 +77,19 @@ struct PastTripsMapTests {
         let a = route("a", [(4.0, 101.0)], dest: (4.6, 101.2))
         let r = try #require(PastTripsMapLogic.region(fitting: [a], padding: 1, bottomObscured: 300, topObscured: 1))
         #expect(r.span.latitudeDelta <= 0.6 / 0.3 + 1e-9)
+    }
+
+    @Test func aBottomBandBelowTheFrameKeepsTheContentWhereTheStripPutsIt() throws {
+        // A strip that reaches 0.2 of the frame below its bottom edge: the content is centred in it, so the frame's
+        // centre is north of the content's, and the fit is smaller than with no band below.
+        let a = route("a", [(4.0, 101.0)], dest: (4.6, 101.2))
+        let flush = try #require(PastTripsMapLogic.region(fitting: [a], padding: 1, bottomObscured: 0, topObscured: 0.1))
+        let below = try #require(PastTripsMapLogic.region(fitting: [a], padding: 1, bottomObscured: -0.2, topObscured: 0.1))
+        #expect(below.span.latitudeDelta < flush.span.latitudeDelta)
+        let mapTop = below.center.latitude + below.span.latitudeDelta / 2
+        let visibleTop = mapTop - below.span.latitudeDelta * 0.1
+        let visibleBottom = mapTop - below.span.latitudeDelta * (1 + 0.2)
+        #expect(abs(visibleTop - 4.6) < 1e-9 && abs(visibleBottom - 4.0) < 1e-9)
     }
 
     @Test func thinKeepsEndsAndCaps() {
@@ -110,19 +122,20 @@ struct PastTripsMapTests {
 
 struct HomeSheetTests {
     @Test func aTallerPickedSheetLeavesOnlyTheDifferenceToTheCamera() {
-        let padding = HomeSheet.legalInset(compact: HomeSheet.compactHeight)
+        let padding = LobbySheet.defaultMapPadding
         let taller = TripsHomeView.obscured(mapHeight: 800, sheet: padding + 80)
-        #expect(abs(taller.bottom - 80.0 / 800) < 1e-9)
-        #expect(TripsHomeView.obscured(mapHeight: 800, sheet: HomeSheet.compactHeight).bottom == 0)
+        #expect(abs(taller.bottom - 80.0 / Double(800 - padding)) < 1e-9)
+        // The list's sheet is lower than the one padding by exactly the difference: its strip is that far below the frame.
+        let list = TripsHomeView.obscured(mapHeight: 800, sheet: HomeSheet.compactHeight)
+        #expect(abs(list.bottom - Double(HomeSheet.defaultReach - padding) / Double(800 - padding)) < 1e-9)
     }
 
-    @Test func legalInsetReachesTheTopOfTheRealListSheet() {
+    @Test func reachIsTheTopOfTheRealListSheet() {
         // Measured on an iPhone 17 (874 pt): the 300 pt detent is a sheet 320.7 pt tall, its top at 545.3.
         #expect(abs(HomeSheet.defaultReach - (874 - 545.3)) < 2)
-        #expect(HomeSheet.legalInset(compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
-        #expect(HomeSheet.legalInset(compact: 390) == 420)
-        #expect(HomeSheet.legalInset(compact: -5) == HomeSheet.detentExtra)
-        // The short list sheet never reaches above the map's safe area, so the camera keeps no room of its own.
+        #expect(HomeSheet.reach(.list, compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
+        #expect(HomeSheet.reach(.list, compact: 390) == 420)
+        #expect(HomeSheet.reach(.list, compact: -5) == HomeSheet.detentExtra)
         #expect(HomeSheet.compactHeight <= HomeSheet.defaultReach)
     }
 
@@ -218,10 +231,8 @@ struct PastTripsCacheTests {
         for compact in stride(from: HomeSheet.compactHeight, through: HomeSheet.compactHeight * 1.5, by: 25) {
             let left = HomeSheet.height(.leftTrip, compact: compact)
             #expect(left < compact)
-            #expect(HomeSheet.legalInset(compact: compact) > left)
+            #expect(HomeSheet.reach(.list, compact: compact) > left)
         }
-        // The map's bottom padding follows the list's height, so a left trip never moves it.
-        #expect(HomeSheet.legalInset(compact: 300) == HomeSheet.defaultReach)
     }
 
     @Test func itGrowsWithTheTextSizeAndOtherHeightsStay() {

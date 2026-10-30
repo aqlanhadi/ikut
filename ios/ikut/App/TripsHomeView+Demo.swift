@@ -8,7 +8,8 @@ extension TripsHomeView {
     /// The camera `init(demo:)` opens on, worked out for the join sheet, the create sheet and a picked trip (or the routes).
     static func demoJoinCamera(_ joinStepper: JoinStepper) -> MapCameraPosition? {
         let insets = HomeSheet.createInsets(
-            mapHeight: 0, sheet: HomeSheet.joinHeight, compact: HomeSheet.compactHeight)
+            mapHeight: 0, sheet: HomeSheet.joinHeight, compact: HomeSheet.compactHeight,
+            padding: LobbySheet.defaultMapPadding)
         guard let region = JoinSteps.region(for: joinStepper.model.preview, bottomObscured: insets.bottom, topObscured: insets.top) else { return nil }
         return .region(region)
     }
@@ -16,7 +17,7 @@ extension TripsHomeView {
     static func demoCreateCamera(_ createFlow: NewTripFlow) -> MapCameraPosition? {
         let insets = HomeSheet.createInsets(
             mapHeight: 0, sheet: HomeSheet.height(HomeSheet.mode(flow: createFlow), compact: HomeSheet.compactHeight),
-            compact: HomeSheet.compactHeight)
+            compact: HomeSheet.compactHeight, padding: LobbySheet.defaultMapPadding)
         guard let region = createFlow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { return nil }
         return .region(region)
     }

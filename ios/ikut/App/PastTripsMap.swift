@@ -46,7 +46,7 @@ enum PastTripsMapLogic {
 
     /// A region showing every route and destination with some margin, with the content centred in
     /// the part of the map between `topObscured` and `bottomObscured` (fractions of its height, e.g.
-    /// the status bar and the sheet; together clamped to 0.7). Nil when there is nothing to show.
+    /// the status bar and the sheet; together clamped to 0.7; a negative bottom lets the band reach below the frame). Nil when there is nothing to show.
     static func region(fitting routes: [PastTripRoute], padding: Double = 1.1, minSpan: Double = 0.05,
                        bottomObscured: Double = 0, topObscured: Double = 0) -> MKCoordinateRegion? {
         let all = routes.flatMap { $0.coordinates + [$0.destination] }
@@ -58,7 +58,7 @@ enum PastTripsMapLogic {
             minLat = min(minLat, c.latitude); maxLat = max(maxLat, c.latitude)
             minLng = min(minLng, c.longitude); maxLng = max(maxLng, c.longitude)
         }
-        var bottom = max(bottomObscured, 0), top = max(topObscured, 0)
+        var bottom = max(bottomObscured, -1), top = max(topObscured, 0)
         if bottom + top > 0.7 { let scale = 0.7 / (bottom + top); bottom *= scale; top *= scale }
         let visibleLat = max((maxLat - minLat) * padding, minSpan)
         let latDelta = min(visibleLat / (1 - bottom - top), 170)

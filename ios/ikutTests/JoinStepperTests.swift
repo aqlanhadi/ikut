@@ -196,10 +196,13 @@ struct JoinStepperTests {
     }
 
     @Test func theCameraKeepsTheEndAboveTheSheet() throws {
-        let insets = HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.joinHeight, compact: HomeSheet.compactHeight)
+        let insets = HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.joinHeight, compact: HomeSheet.compactHeight,
+                                           padding: LobbySheet.defaultMapPadding)
         let region = try #require(JoinSteps.region(for: trip(), bottomObscured: insets.bottom, topObscured: insets.top))
-        // The centre sits south of the end, so the end shows in the part of the map above the sheet.
-        #expect(region.center.latitude < 4.5975)
+        // The end shows in the part of the map above the sheet (the frame is the map less the one bottom padding).
+        let area = Double(874 - LobbySheet.defaultMapPadding)
+        let y = (region.center.latitude + region.span.latitudeDelta / 2 - 4.5975) / region.span.latitudeDelta * area
+        #expect(y >= Double(HomeSheet.createTopRoom) && y <= 874 - Double(HomeSheet.joinHeight) - 10, "end at \(y)")
         #expect(JoinSteps.region(for: nil, bottomObscured: 0, topObscured: 0) == nil)
     }
 

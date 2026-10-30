@@ -74,7 +74,7 @@ struct TripMapView: View {
     @State private var inputsWatch = CameraInputsWatch()
     /// The lobby sheet's medium height at this text size: the map's one bottom padding is the lobby's (D101).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
-    /// The bottom inset the map keeps as safe area, the same as the lobby's and constant (`LobbySheet.mapPadding`).
+    /// The bottom inset the host keeps the map's safe area at, the same on every screen (`LobbySheet.mapPadding`, D109).
     /// What covers the map is put into the camera (`cameraRoom`), not into this.
     private var legalInset: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
     /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
@@ -288,14 +288,13 @@ struct TripMapView: View {
     }
 
     /// What the host's map draws for driving. MapKit centers the camera, and fits regions, inside the map's safe area
-    /// (`legalInset`); `cameraRoom` does the same for the rest of what covers the map, so my car is in the middle of
+    /// (the host's one constant padding, `legalInset`); `cameraRoom` does the same for the rest of what covers the map, so my car is in the middle of
     /// what can be seen.
     private var mapSpec: TripMapSpec {
         TripMapSpec(
             input: .driving(route: model.mainRouteCoordinates, overlays: model.overlays,
                             hazards: model.hazards.markers, cars: model.markers),
-            style: TripMapStyle(pingingEventId: approach?.eventId),
-            bottomPadding: legalInset)
+            style: TripMapStyle(pingingEventId: approach?.eventId))
     }
 
     /// The map's height down to the screen's bottom edge, from the one map (D63 C4).

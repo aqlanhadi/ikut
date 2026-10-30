@@ -24,6 +24,28 @@ struct MapPaddingTests {
         }
     }
 
+    // MARK: one constant for every screen (D109)
+
+    /// The padding is a function of the text size alone (`TripMapSpec` has no padding field, no layer sets one), so a
+    /// mode switch (Leave, Back to trips, End, Start trip) can never change it. At each text size the lobby's cover is
+    /// that line, and every Home mode's sheet is read relative to it: the room is the cover less the padding.
+    @Test(arguments: [CGFloat(470), 560, 658, 900])
+    func everyScreenSharesOnePaddingAndReadsItsCoverRelativeToIt(scaledMedium: CGFloat) {
+        let padding = LobbySheet.mapPadding(scaledMedium: scaledMedium)
+        let scale = LobbySheet.compact(scaled: scaledMedium) / LobbySheet.compactHeight
+        let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight * scale)
+        #expect(LobbySheet.cover(compact: LobbySheet.compact(scaled: scaledMedium)).bottom == padding)
+        for mode in [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join] {
+            let cover = HomeSheet.cover(mode, compact: compact)
+            let insets = TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom,
+                                                reach: HomeSheet.reach(mode, compact: compact), padding: padding)
+            #expect(abs(insets.bottom * Double(874 - padding)
+                        - Double(max(cover.bottom, HomeSheet.reach(mode, compact: compact)) - padding)) < 1e-9)
+        }
+        // The same value however it is asked for: from the raw scaled height or the sheet's capped one.
+        #expect(padding == LobbySheet.mapPadding(scaledMedium: LobbySheet.compact(scaled: scaledMedium)))
+    }
+
     // MARK: the scale read off the map
 
     /// What MapKit reports for a camera `distance` away over a map `mapHeight` tall with `padding` at the bottom: the
