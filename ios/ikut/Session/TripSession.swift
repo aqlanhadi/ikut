@@ -334,10 +334,16 @@ final class TripSession {
             case .confirmGone:
                 // A phone that is no longer a member cannot read the doc (permission denied): that, or no doc, is left.
                 let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
-                do {
-                    if try await memberRef.getDocument(source: .server).exists { throw StillInTrip() }
-                } catch where TripSessionLogic.leaveCountsAsLeft(error) {
-                    return
+                let listed: Bool
+                do { listed = try await memberRef.getDocument(source: .server).exists } catch where TripSessionLogic.leaveCountsAsLeft(error) { return }
+                guard listed else { return }
+                // Still listed: either the live organiser, whom the rules keep in (D106), or a refusal that was not about
+                // that (the rules could not be evaluated for a moment): then one more delete, alone; if that is refused
+                // too the person stays with the plain "check your signal" words, never told they are the organiser.
+                let live = try? await db.document(FirestorePaths.trip(tripId)).getDocument(source: .server).data(as: Trip.self)
+                if let live, live.status == .active, live.organizerId == userId { throw StillInTrip() }
+                do { try await ServerWrite.commit { try await memberRef.delete() } } catch where TripSessionLogic.leaveCountsAsLeft(error) {
+                    throw LeaveFailed()
                 }
             }
         } catch where TripSessionLogic.leaveCountsAsLeft(error) {

@@ -773,11 +773,18 @@ struct SessionEmulatorTests {
         session.start()
         defer { session.stop() }
         await waitUntil(.seconds(10)) { tracker.isTracking }
-        // The phone has not heard the trip ended yet: end it from the organiser's account, then leave at once.
+        // The phone has not heard the trip ended yet: end it from the organiser's account, then leave at once. Its
+        // listeners rest meanwhile (the SDK reconnects its streams at every account switch, and a write sent into that
+        // gap is evaluated without its user); what it last saw (an active trip, its car) stays.
+        session.stop()
         try await Auth.auth().updateCurrentUser(organizerUser)
         try await Firestore.firestore().document(FirestorePaths.trip(s.tripId))
             .updateData(["status": "ended", "endedAt": FieldValue.serverTimestamp()])
         try await Auth.auth().updateCurrentUser(memberUser)
+        // Firestore takes the new user's token a moment after the switch; a write sent before it carries no auth.
+        _ = try await Auth.auth().currentUser?.getIDTokenResult(forcingRefresh: true)
+        try await Task.sleep(for: .seconds(1))
+        #expect(Auth.auth().currentUser?.uid == uid2)
         let memberGone = Flag()
         let watch = Firestore.firestore().document(FirestorePaths.member(tripId: s.tripId, userId: uid2))
             .addSnapshotListener { snapshot, _ in if let snapshot, !snapshot.exists { memberGone.set() } }
