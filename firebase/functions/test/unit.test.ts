@@ -3,7 +3,8 @@ import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
 import { Timestamp } from "firebase-admin/firestore";
 import { compareKeys, cursorFromState, cursorToState, runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
-import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
+import { EVENT_GRACE_MS, POSITION_RETENTION_MS, TRIP_RETENTION_MS, eventExpiryCutoff, shouldDeleteTrip, shouldPurgeTripData } from "../src/retention.ts";
+import { routeDistanceMeters, summaryDurationSeconds } from "../src/summaryMath.ts";
 import { MAX_SIMPLIFY_POINTS, decodePolyline, encodePolyline, routeFrom, simplifiedRoute, thin } from "../src/previewRoute.ts";
 import { DAY_MS, recentMisses, tooManyTries, waitMs } from "../src/guessLimit.ts";
 import { CODE_ALPHABET, CODE_LENGTH, generateCode, parseCreateInput } from "../src/createTrip.ts";
@@ -527,5 +528,64 @@ describe("create limit (D108)", () => {
     assert.equal(e.code, "resource-exhausted");
     assert.match(e.message, /^Too many new trips\. Wait 4 minutes and try again\.$/);
     assert.deepEqual(e.details, { reason: "too-many-trips", retryAfterSeconds: 181 });
+  });
+});
+
+// The same fixture and numbers are in ios/ikutTests/RecapTests.swift (RecapLogic.routeDistance): change both or neither.
+const KL_IPOH_ROUTE = "wadRcvskRgthBbr_@_urDn~rA";
+const KL_IPOH_METERS = 175813.34114927656;
+const ANTIMERIDIAN_ROUTE = "?_v_ia@?~l`scA";
+const ANTIMERIDIAN_METERS = 22239.016046705317;
+
+describe("routeDistanceMeters (mirrors RecapLogic.routeDistance)", () => {
+  it("gives the Swift number for the same route", () => {
+    assert.ok(Math.abs(routeDistanceMeters(KL_IPOH_ROUTE)! - KL_IPOH_METERS) < 1e-6);
+  });
+  it("wraps longitude across 180 like the Swift haversine", () => {
+    assert.ok(Math.abs(routeDistanceMeters(ANTIMERIDIAN_ROUTE)! - ANTIMERIDIAN_METERS) < 1e-6);
+  });
+  it("is null for no route, one point, or a truncated string (never a partial distance)", () => {
+    assert.equal(routeDistanceMeters(""), null);
+    assert.equal(routeDistanceMeters("_p~iF~ps|U"), null);
+    assert.equal(routeDistanceMeters(KL_IPOH_ROUTE.slice(0, -1)), null);
+    assert.equal(routeDistanceMeters("\u0001bad"), null);
+  });
+});
+
+describe("summaryDurationSeconds", () => {
+  const t = (s: number) => ({ toMillis: () => s * 1000 }) as never;
+  it("counts from the first Start Trip when there was one, else from creation", () => {
+    assert.equal(summaryDurationSeconds({ createdAt: t(0), startedAt: t(1000), endedAt: t(4600) }), 3600);
+    assert.equal(summaryDurationSeconds({ createdAt: t(0), endedAt: t(4600) }), 4600);
+  });
+  it("a trip ended for being idle ends at its last sign of life; a recent one is not cut", () => {
+    const idle = 12 * 3600 * 1000;
+    const trip = { createdAt: t(0), startedAt: t(100), endedAt: t(100 + 20 * 3600) };
+    assert.equal(summaryDurationSeconds(trip, (100 + 2 * 3600) * 1000, idle), 2 * 3600);
+    assert.equal(summaryDurationSeconds(trip, (100 + 10 * 3600) * 1000, idle), 20 * 3600);
+    assert.equal(summaryDurationSeconds(trip, null, idle), 20 * 3600);
+  });
+  it("a trip created and forgotten (idle end, no activity after creation) has no duration, not zero", () => {
+    const trip = { createdAt: t(0), endedAt: t(40 * 3600) };
+    assert.equal(summaryDurationSeconds(trip, 0, 12 * 3600 * 1000), null);
+  });
+  it("is null when the end is not after the start, or there is no end", () => {
+    assert.equal(summaryDurationSeconds({ createdAt: t(10), endedAt: t(10) }), null);
+    assert.equal(summaryDurationSeconds({ createdAt: t(10) }), null);
+  });
+});
+
+describe("shouldDeleteTrip", () => {
+  const now = new Date("2026-12-01T00:00:00Z");
+  const ended = (ms: number) => ({ status: "ended" as const, endedAt: { toMillis: () => now.getTime() - ms } });
+  it("is 90 days, not 7", () => {
+    assert.equal(TRIP_RETENTION_MS, 90 * 24 * 3600 * 1000);
+    assert.equal(shouldDeleteTrip(ended(TRIP_RETENTION_MS + 1), now), true);
+    assert.equal(shouldDeleteTrip(ended(89 * 24 * 3600 * 1000), now), false);
+    assert.equal(shouldDeleteTrip(ended(POSITION_RETENTION_MS + 1), now), false);
+  });
+  it("never an active trip or an ended trip without endedAt", () => {
+    assert.equal(shouldDeleteTrip({ status: "active", endedAt: { toMillis: () => 0 } }, now), false);
+    assert.equal(shouldDeleteTrip({ status: "ended" }, now), false);
   });
 });

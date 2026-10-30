@@ -140,6 +140,22 @@ describe('trips', () => {
     assertSucceeds(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp() })));
   it('ending without server endedAt fails', () =>
     assertFails(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: ts() })));
+
+  // D107: `summary` is written only by the server (onTripEnded). A client planting one while ending the trip would make
+  // the trigger skip the real count, so every route to it is closed.
+  const planted = { distanceMeters: 1, durationSeconds: 1, peopleCount: 1, carCount: 1, stopCount: 0, roadReportCount: 0 };
+  it('the organizer cannot plant a summary while ending the trip', () =>
+    assertFails(updateDoc(doc(db('org'), `trips/${T}`), { status: 'ended', endedAt: serverTimestamp(), summary: planted })));
+  it('the organizer cannot write a summary on an active trip', () =>
+    assertFails(updateDoc(doc(db('org'), `trips/${T}`), { summary: planted })));
+  it('a summary cannot ride along with Start Trip', () =>
+    assertFails(updateDoc(doc(db('org'), `trips/${T}`), { startedAt: serverTimestamp(), summary: planted })));
+  it('nobody can write a summary on an ended trip', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), `trips/${T}`), { status: 'ended', endedAt: Timestamp.now() }));
+    await assertFails(updateDoc(doc(db('org'), `trips/${T}`), { summary: planted }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { summary: planted }));
+  });
   it('non-organizer member cannot update', () => assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { name: 'Hax' })));
   it('organizerId is immutable', () => assertFails(updateDoc(doc(db('org'), `trips/${T}`), { organizerId: 'mem' })));
   it('organizerId cannot be changed by the organizer together with an allowed field, nor by a member (D106: only handOverTrip moves it)', async () => {

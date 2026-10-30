@@ -13,6 +13,16 @@ struct RecapLogicTests {
         #expect(RecapLogic.stepMove(from: a, to: nil) == .jump)
     }
 
+    /// The same routes and numbers as `routeDistanceMeters` in firebase/functions/test/unit.test.ts (the server's
+    /// trip summary): change both or neither.
+    @Test func routeDistanceMatchesTheServersSummary() {
+        #expect(abs(RecapLogic.routeDistance("wadRcvskRgthBbr_@_urDn~rA")! - 175_813.34114927656) < 1e-6)
+        #expect(abs(RecapLogic.routeDistance("?_v_ia@?~l`scA")! - 22_239.016046705317) < 1e-6)
+        #expect(RecapLogic.routeDistance("") == nil)
+        #expect(RecapLogic.routeDistance("_p~iF~ps|U") == nil)
+        #expect(RecapLogic.routeDistance(String("wadRcvskRgthBbr_@_urDn~rA".dropLast())) == nil)
+    }
+
     private let t0 = Fixtures.t0
     private let dest = CLLocationCoordinate2D(latitude: 4.6, longitude: 101.09)
 

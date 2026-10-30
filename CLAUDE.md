@@ -25,7 +25,9 @@ for the cars behind. SwiftUI app (iOS 17+) in `ios/`, Firebase (Firestore rules,
 - **Swift and TypeScript models mirror each other.** `firebase/functions/src/model.ts` and `ios/ikut/Model/` change
   together.
 - **Location data is kept 7 days after a trip ends, no longer.** `purgeTripDataJob`
-  (`firebase/functions/src/purgeTripDataJob.ts`) enforces it; don't add code paths that keep positions longer.
+  (`firebase/functions/src/purgeTripDataJob.ts`) enforces it; don't add code paths that keep positions longer. What
+  stays after 7 days (the trip's planned route, names, cars, members and the small `summary`) holds no positions, and
+  `purgeTripsFullJob` deletes the whole trip 90 days after it ended (`TRIP_RETENTION_MS`); nothing is kept longer.
 - **Identifiers and symbol names are constants.** Accessibility identifiers live in `AXID` (`ios/ikut/UI/AXID.swift`) and
   SF Symbol names in `Symbol` (`ios/ikut/UI/Symbol.swift`). The UI tests find controls by identifier, so never change a
   value without updating the tests; `AXIDTests` checks that every identifier a UI test uses exists.

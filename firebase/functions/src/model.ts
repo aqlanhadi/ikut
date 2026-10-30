@@ -46,6 +46,24 @@ export interface Trip {
   /** First Start Trip by any member; absent until the trip is underway. */
   startedAt?: Timestamp;
   endedAt?: Timestamp;
+  /** Written by the server when the trip ends (summary.ts); clients never write it. Kept until the trip is deleted 90 days after it ended. */
+  summary?: TripSummary;
+}
+
+/** The small record of a finished trip (D107): no names, no coordinates. A number is null when it could not be worked out. */
+export interface TripSummary {
+  /** Meters along the planned main route. */
+  distanceMeters: number | null;
+  /** Seconds from the first Start Trip (createdAt if it never started) to the end. */
+  durationSeconds: number | null;
+  /** Member docs when the trip ended. */
+  peopleCount: number;
+  carCount: number;
+  /** Planned stops the lead car reached. */
+  stopCount: number;
+  /** Hazard and condition events still stored when the trip ended. */
+  roadReportCount: number;
+  summarisedAt: Timestamp;
 }
 
 export type PlannedStopKind = "meet" | "fuel" | "food" | "rest" | "toilet" | "sight";

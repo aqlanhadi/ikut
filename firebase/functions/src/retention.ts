@@ -13,6 +13,9 @@ export const BATCH_SIZE = 500;
 /** Location data of an ended trip is deleted this long after the trip ended. */
 export const POSITION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** An ended trip is deleted completely (trip, cars, members, stops and the rest) this long after it ended (D107). Raw positions go at POSITION_RETENTION_MS. */
+export const TRIP_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
 /** An event is removed only once it has been past its expiresAt for this long. */
 export const EVENT_GRACE_MS = 60 * 60 * 1000;
 
@@ -23,6 +26,15 @@ export function shouldPurgeTripData(
 ): boolean {
   if (trip.status !== "ended" || !trip.endedAt) return false;
   return now.getTime() - trip.endedAt.toMillis() > POSITION_RETENTION_MS;
+}
+
+/** True when an ended trip is past TRIP_RETENTION_MS. An ended trip without endedAt is never deleted (the caller logs it). */
+export function shouldDeleteTrip(
+  trip: Pick<Trip, "status"> & { endedAt?: TimestampLike | null },
+  now: Date,
+): boolean {
+  if (trip.status !== "ended" || !trip.endedAt) return false;
+  return now.getTime() - trip.endedAt.toMillis() > TRIP_RETENTION_MS;
 }
 
 /** Events with expiresAt before this instant are past the grace period. */

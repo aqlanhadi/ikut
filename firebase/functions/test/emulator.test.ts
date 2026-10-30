@@ -10,6 +10,8 @@ import { createTripForUser } from "../lib/createTripCall.js";
 import { createTripWithFreeCode, generateCode, type CreateTripInput } from "../lib/createTrip.js";
 import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
 import { MAX_RETRY, emptyPurgeResult, purgeTripData, sweepExpiredEvents } from "../lib/purge.js";
+import { purgeOldTrips } from "../lib/fullPurge.js";
+import { summariseTrip } from "../lib/summary.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { ROTATE_LIMITS } from "../lib/createLimit.js";
 import { findActiveTripId, joinTripTransaction, parseJoinInput, REMOVED_FROM_TRIP } from "../lib/joinTrip.js";
@@ -1674,5 +1676,264 @@ describe("handing the trip to another member (emulator, D106)", () => {
     await sweepExpiredEvents(db, new Date(now), emptyPurgeResult());
     assert.equal((await old.get()).exists, false);
     assert.equal((await fresh.get()).exists, true);
+  });
+});
+
+describe("trip summary and 90-day delete (emulator, D107)", () => {
+  beforeEach(() => resetJobState("purgeTripsFull"));
+  const NOW = new Date();
+  const H = 3_600_000;
+  const at = (hours: number) => Timestamp.fromMillis(NOW.getTime() - hours * H);
+  const point = new GeoPoint(1, 1);
+  const ROUTE = "wadRcvskRgthBbr_@_urDn~rA";
+  const ROUTE_METERS = 175813.34114927656;
+
+  /** A trip with 2 cars, 3 members, 3 stops (two reached), and hazard x2, condition, stop request and message events. */
+  async function seedFull(opts: { status: "active" | "ended"; endedH?: number; startedH?: number; lastActivityH?: number; summary?: object } = { status: "active" }) {
+    const code = freshCode();
+    const ref = db.collection("trips").doc();
+    await ref.set({
+      name: "Balik", code, organizerId: "org-" + code, route: ROUTE,
+      destination: { name: "Ipoh", coordinate: point }, status: opts.status, createdAt: at(24 * 200),
+      ...(opts.startedH !== undefined ? { startedAt: at(opts.startedH) } : {}),
+      ...(opts.lastActivityH !== undefined ? { lastActivityAt: at(opts.lastActivityH) } : {}),
+      ...(opts.endedH !== undefined ? { endedAt: at(opts.endedH) } : {}),
+      ...(opts.summary ? { summary: opts.summary } : {}),
+    });
+    await db.collection("codes").doc(code).set({ tripId: ref.id, organizerId: "org-" + code, createdAt: at(24 * 200) });
+    for (const c of ["c1", "c2"]) await ref.collection("cars").doc(c).set({ name: c, color: "#000", isLead: c === "c1", state: "convoy", route: "x", mergeOffset: 1 });
+    for (const [u, c] of [["u1", "c1"], ["u2", "c1"], ["u3", "c2"]]) await ref.collection("members").doc(u!).set({ displayName: u, carId: c, role: "member" });
+    await ref.collection("removed").doc("u9").set({ userId: "u9", removedAt: at(5), removedBy: "u1" });
+    const stop = (order: number, extra: object = {}) => ({ name: "S" + order, kind: "fuel", coordinate: point, routeOffset: 1, order, ...extra });
+    await ref.collection("stops").doc("a").set(stop(0, { arrivedAt: at(30), leftAt: at(29) }));
+    await ref.collection("stops").doc("b").set(stop(1, { arrivedAt: at(20) }));
+    await ref.collection("stops").doc("c").set(stop(2, { skipped: true, skippedBy: "u1", skippedAt: at(21) }));
+    await ref.collection("stops/c/answers").doc("c2").set({ answer: "skip", userId: "u3", at: at(21) });
+    const ev = (id: string, category: string) => ref.collection("events").doc(id).set({
+      type: "message", category, severity: "low", location: point, heading: 0, routeOffset: 0, authorId: "u1", carId: "c1", createdAt: at(2),
+    });
+    await ev("h1", "hazard"); await ev("h2", "hazard"); await ev("w1", "condition"); await ev("s1", "stopRequest"); await ev("m1", "message");
+    await ref.collection("events/s1/votes").doc("c2").set({ userId: "u3", at: at(1) });
+    await ref.collection("positions").doc("c1").set({ location: point, speed: 0, heading: 0, routeOffset: 0, updatedAt: at(1) });
+    await db.collection("rotateLimits").doc(ref.id).set({ n: 1 });
+    await db.collection("handOverLimits").doc(ref.id).set({ n: 1 });
+    return { ref, code };
+  }
+
+  async function waitForSummary(ref: FirebaseFirestore.DocumentReference): Promise<any> {
+    for (let i = 0; i < 60; i++) {
+      const s = (await ref.get()).get("summary");
+      if (s) return s;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return undefined;
+  }
+  const endNow = (ref: FirebaseFirestore.DocumentReference) =>
+    ref.update({ status: "ended", endedAt: Timestamp.fromMillis(NOW.getTime()) });
+
+  function checkCounts(s: any, durationSeconds: number | null) {
+    assert.ok(Math.abs(s.distanceMeters - ROUTE_METERS) < 1e-6);
+    assert.equal(s.durationSeconds, durationSeconds);
+    assert.equal(s.peopleCount, 3);
+    assert.equal(s.carCount, 2);
+    assert.equal(s.stopCount, 2);
+    assert.equal(s.roadReportCount, 3);
+    assert.ok(s.summarisedAt instanceof Timestamp);
+    assert.deepEqual(Object.keys(s).sort(), ["carCount", "distanceMeters", "durationSeconds", "peopleCount", "roadReportCount", "stopCount", "summarisedAt"]);
+  }
+
+  it("ending a trip (active to ended) writes one summary from the trigger; a later update does not rewrite it", async () => {
+    const { ref } = await seedFull({ status: "active", startedH: 24 * 200 - 2 });
+    await endNow(ref);
+    const s = await waitForSummary(ref);
+    assert.ok(s, "no summary written");
+    checkCounts(s, (24 * 200 - 2) * 3600);
+    await ref.update({ name: "Renamed" });
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.ok((await ref.get()).get("summary").summarisedAt.isEqual(s.summarisedAt));
+    assert.equal(await summariseTrip(db, ref.id), false);
+  });
+
+  it("a trip that never started counts its duration from creation", async () => {
+    const { ref } = await seedFull({ status: "active" });
+    await endNow(ref);
+    checkCounts(await waitForSummary(ref), 24 * 200 * 3600);
+  });
+
+  it("a trip ended by endIdleTrips gets its summary too", async () => {
+    const { ref } = await seedFull({ status: "active", startedH: 30, lastActivityH: 20 });
+    // Idle means nothing written for 12 hours: drop the fresh positions and events the fixture has.
+    await db.recursiveDelete(ref.collection("positions"));
+    await db.recursiveDelete(ref.collection("events"));
+    await resetJobState("endIdleTrips");
+    await endIdleTrips(db, NOW);
+    assert.equal((await ref.get()).get("status"), "ended");
+    const s = await waitForSummary(ref);
+    assert.ok(s, "no summary after the idle end");
+    assert.equal(s.carCount, 2);
+    assert.equal(s.stopCount, 2);
+    assert.equal(s.roadReportCount, 0);
+    // The drive ended at the last sign of life (10 hours after Start Trip), not at the idle end 20 hours later.
+    assert.equal(s.durationSeconds, 10 * 3600);
+  });
+
+  it("a created-and-forgotten trip ended by the idle job gets a null duration, not the whole wait", async () => {
+    const { ref } = await seedFull({ status: "active" });
+    await db.recursiveDelete(ref.collection("positions"));
+    await db.recursiveDelete(ref.collection("events"));
+    await resetJobState("endIdleTrips");
+    await endIdleTrips(db, NOW);
+    const s = await waitForSummary(ref);
+    assert.ok(s, "no summary after the idle end");
+    assert.equal(s.durationSeconds, null);
+  });
+
+  it("an organiser's end counts Start Trip to the end, and recent activity does not cut it short", async () => {
+    const { ref } = await seedFull({ status: "active", startedH: 5, lastActivityH: 2 });
+    await endNow(ref);
+    assert.equal((await waitForSummary(ref)).durationSeconds, 5 * 3600);
+  });
+
+  it("a summary already on the trip is kept, not recomputed", async () => {
+    const { ref } = await seedFull({ status: "active" });
+    await ref.update({ summary: { carCount: 99 } });
+    await endNow(ref);
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal((await ref.get()).get("summary").carCount, 99);
+  });
+
+  it("an active trip is never summarised", async () => {
+    const { ref } = await seedFull({ status: "active" });
+    assert.equal(await summariseTrip(db, ref.id), false);
+    assert.equal((await ref.get()).get("summary"), undefined);
+  });
+
+  it("backfills an ended trip inside its 7 days; one past 7 days is left without", async () => {
+    const recent = await seedFull({ status: "ended", endedH: 48 });
+    const older = await seedFull({ status: "ended", endedH: 24 * 20 });
+    const r = await purgeOldTrips(db, NOW);
+    assert.ok(r.summarised >= 1);
+    checkCounts((await recent.ref.get()).get("summary"), (24 * 200 - 48) * 3600);
+    assert.equal((await older.ref.get()).get("summary"), undefined);
+    assert.equal((await purgeOldTrips(db, NOW)).summarised, 0);
+  });
+
+  it("deletes a trip ended 91 days ago with every subcollection, its claim and its limit docs; keeps 89 days and active", async () => {
+    const old = await seedFull({ status: "ended", endedH: 24 * 91 });
+    const young = await seedFull({ status: "ended", endedH: 24 * 89 });
+    const active = await seedFull({ status: "active" });
+    const noEnd = await seedFull({ status: "ended" });
+    const r = await purgeOldTrips(db, NOW);
+    assert.ok(r.deleted >= 1);
+    assert.equal((await old.ref.get()).exists, false);
+    for (const sub of ["cars", "members", "removed", "stops", "events", "positions", "stops/c/answers", "events/s1/votes"]) {
+      assert.equal((await old.ref.collection(sub).get()).size, 0, sub);
+    }
+    assert.equal((await db.collection("codes").doc(old.code).get()).exists, false);
+    assert.equal((await db.collection("rotateLimits").doc(old.ref.id).get()).exists, false);
+    assert.equal((await db.collection("handOverLimits").doc(old.ref.id).get()).exists, false);
+    for (const keep of [young, active, noEnd]) {
+      assert.equal((await keep.ref.get()).exists, true);
+      assert.equal((await keep.ref.collection("cars").get()).size, 2);
+      assert.equal((await db.collection("codes").doc(keep.code).get()).exists, true);
+    }
+  });
+
+  it("leaves a code claim that names another trip", async () => {
+    const old = await seedFull({ status: "ended", endedH: 24 * 91 });
+    await db.collection("codes").doc(old.code).set({ tripId: "someone-else" });
+    await purgeOldTrips(db, NOW);
+    assert.equal((await old.ref.get()).exists, false);
+    assert.equal((await db.collection("codes").doc(old.code).get()).exists, true);
+  });
+
+  it("a retried trip whose doc is already gone still has its subtree, claim and limits cleaned, then leaves the list", async () => {
+    const orphan = await seedFull({ status: "ended", endedH: 24 * 100 });
+    await orphan.ref.delete();
+    assert.equal((await orphan.ref.collection("members").get()).size, 3);
+    await db.collection("jobState").doc("purgeTripsFull").set({ retry: [orphan.ref.id] });
+    await purgeOldTrips(db, NOW);
+    for (const sub of ["cars", "members", "removed", "stops", "events", "positions", "stops/c/answers", "events/s1/votes"]) {
+      assert.equal((await orphan.ref.collection(sub).get()).size, 0, sub);
+    }
+    assert.equal((await db.collection("codes").doc(orphan.code).get()).exists, false);
+    assert.equal((await db.collection("rotateLimits").doc(orphan.ref.id).get()).exists, false);
+    assert.equal((await db.collection("handOverLimits").doc(orphan.ref.id).get()).exists, false);
+    assert.deepEqual((await db.collection("jobState").doc("purgeTripsFull").get()).data()!.retry, []);
+  });
+
+  it("a gone trip whose cleanup fails stays on the retry list", async () => {
+    const orphan = await seedFull({ status: "ended", endedH: 24 * 100 });
+    await orphan.ref.delete();
+    await db.collection("jobState").doc("purgeTripsFull").set({ retry: [orphan.ref.id] });
+    const broken = new Proxy(db, {
+      get(target, prop) {
+        if (prop === "recursiveDelete") return async () => { throw new Error("boom"); };
+        const v = (target as any)[prop];
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    const r = await purgeOldTrips(broken, NOW);
+    assert.equal(r.failed, 1);
+    assert.deepEqual((await db.collection("jobState").doc("purgeTripsFull").get()).data()!.retry, [orphan.ref.id]);
+    assert.equal((await orphan.ref.collection("members").get()).size, 3);
+    await purgeOldTrips(db, NOW);
+    assert.equal((await orphan.ref.collection("members").get()).size, 0);
+  });
+
+  it("is bounded and resumable, and keeps its own cursor apart from the 7-day purge", async () => {
+    await resetJobState("purgeTripData");
+    const trips = [];
+    for (let i = 0; i < 3; i++) trips.push(await seedFull({ status: "ended", endedH: 24 * (100 + i) }));
+    const first = await purgeOldTrips(db, NOW, { maxTrips: 1 });
+    assert.equal(first.deleted, 1);
+    assert.equal(first.more, true);
+    let left = 0;
+    for (const t of trips) if ((await t.ref.get()).exists) left++;
+    assert.ok(left <= 2);
+    const state = (await db.collection("jobState").doc("purgeTripsFull").get()).data()!;
+    assert.equal(typeof state.cursorId, "string");
+    assert.equal((await db.collection("jobState").doc("purgeTripData").get()).exists, false);
+    for (let i = 0; i < 10; i++) if (!(await purgeOldTrips(db, NOW, { maxTrips: 1 })).more) break;
+    for (const t of trips) assert.equal((await t.ref.get()).exists, false);
+    const done = await purgeOldTrips(db, NOW);
+    assert.equal(done.deleted, 0);
+    assert.equal(done.more, false);
+  });
+
+  it("stops at its time budget with the rest waiting", async () => {
+    const t = await seedFull({ status: "ended", endedH: 24 * 100 });
+    const late = await purgeOldTrips(db, NOW, { budgetMs: -1 });
+    assert.equal(late.deleted, 0);
+    assert.equal((await t.ref.get()).exists, true);
+    await purgeOldTrips(db, NOW);
+    assert.equal((await t.ref.get()).exists, false);
+  });
+
+  it("a trip whose delete fails stays and is retried next run", async () => {
+    const t = await seedFull({ status: "ended", endedH: 24 * 100 });
+    const broken = new Proxy(db, {
+      get(target, prop) {
+        if (prop === "recursiveDelete") return async () => { throw new Error("boom"); };
+        const v = (target as any)[prop];
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    const r = await purgeOldTrips(broken, NOW);
+    assert.equal(r.failed, 1);
+    assert.equal((await t.ref.get()).exists, true);
+    const again = await purgeOldTrips(db, NOW);
+    assert.equal(again.deleted, 1);
+    assert.equal((await t.ref.get()).exists, false);
+  });
+
+  it("the 7-day job still keeps the trip doc, cars and members of a trip ended 8 days ago", async () => {
+    await resetJobState("purgeTripData");
+    const t = await seedFull({ status: "ended", endedH: 24 * 8 });
+    await purgeTripData(db, NOW);
+    assert.equal((await t.ref.collection("positions").get()).size, 0);
+    assert.equal((await t.ref.get()).exists, true);
+    assert.equal((await t.ref.collection("members").get()).size, 3);
+    assert.equal((await t.ref.collection("cars").get()).size, 2);
   });
 });
