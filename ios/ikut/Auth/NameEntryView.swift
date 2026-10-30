@@ -61,7 +61,7 @@ struct NameEntryView: View {
                     .onChange(of: name) { errorMessage = nil }
 
                 if let errorMessage {
-                    InlineNote(errorMessage, tone: .alert)
+                    InlineNote(.verbatim(errorMessage), tone: .alert)
                         .padding(.top, Spacing.s)
                         .accessibilityIdentifier(AXID.Name.error)
                 }

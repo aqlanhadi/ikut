@@ -126,7 +126,7 @@ struct AddStopContent: View {
             .lobbyRow()
         }
         if let message = model.search.errorMessage {
-            Section { InlineNote(message, tone: .alert).lobbyRow() }
+            Section { InlineNote(.verbatim(message), tone: .alert).lobbyRow() }
         }
         if model.search.showsList || searchFocused {
             PlaceSearchResults(model: model.search, distance: .alongRoute, showsKind: true, onPick: { place in

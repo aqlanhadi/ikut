@@ -6,8 +6,8 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
     /// How tall the card body grows before it scrolls.
     static var maxBodyHeight: CGFloat { 220 }
 
-    var title: String
-    var subtitle: String?
+    var title: LocalizedStringKey
+    var subtitle: LocalizedStringKey?
     /// The body scrolls past this height (default `maxBodyHeight`).
     var bodyCap: CGFloat = CardSheetFrame.maxBodyHeight
     /// The close button's accessibility identifier, and the container's.
@@ -87,7 +87,7 @@ struct CardSheetFrame<Content: View, Actions: View>: View {
 
 extension CardSheetFrame where Actions == EmptyView {
     init(
-        title: String, subtitle: String? = nil, bodyCap: CGFloat = CardSheetFrame.maxBodyHeight,
+        title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, bodyCap: CGFloat = CardSheetFrame.maxBodyHeight,
         closeIdentifier: String = AXID.Stop.cardClose, containerIdentifier: String = AXID.Stop.card,
         onClose: @escaping () -> Void, @ViewBuilder content: () -> Content
     ) {

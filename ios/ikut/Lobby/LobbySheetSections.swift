@@ -22,7 +22,7 @@ extension LobbyView {
         }
     }
 
-    func bannerSection(_ title: String, systemImage: String) -> some View {
+    func bannerSection(_ title: LocalizedStringKey, systemImage: String) -> some View {
         Section {
             HStack(spacing: Spacing.m) {
                 Image(systemName: systemImage).accessibilityHidden(true)
@@ -35,7 +35,7 @@ extension LobbyView {
     }
 
     /// The same two rows with nothing to touch or find: for laying out, out of sight, what the banner takes.
-    func bannerMeasure(_ title: String, systemImage: String) -> some View {
+    func bannerMeasure(_ title: LocalizedStringKey, systemImage: String) -> some View {
         Section {
             HStack(spacing: Spacing.m) {
                 Image(systemName: systemImage)
@@ -136,7 +136,7 @@ extension LobbyView {
         }
     }
 
-    func listOption(_ title: String, systemImage: String, id: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+    func listOption(_ title: LocalizedStringKey, systemImage: String, id: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(role: destructive ? .destructive : nil, action: action) {
             HStack(spacing: Spacing.m) {
                 Image(systemName: systemImage).accessibilityHidden(true)
@@ -166,7 +166,7 @@ extension LobbyView {
         }
     }
 
-    @ViewBuilder func systemTripRow(_ title: String, value: String, tappable: Bool, id: String, hint: String = "", action: @escaping () -> Void) -> some View {
+    @ViewBuilder func systemTripRow(_ title: LocalizedStringKey, value: String, tappable: Bool, id: String, hint: String = "", action: @escaping () -> Void) -> some View {
         if tappable {
             Button(action: action) {
                 LabeledContent(title) {
@@ -261,7 +261,7 @@ extension LobbyView {
         .animation(Motion.quick(reduceMotion: reduceMotion), value: stops.count > 1)
     }
 
-    func stopAction(_ title: String, systemImage: String, caption: String?, id: String, action: @escaping () -> Void) -> some View {
+    func stopAction(_ title: LocalizedStringKey, systemImage: String, caption: String?, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Spacing.m) {
                 Image(systemName: systemImage)
@@ -285,7 +285,7 @@ extension LobbyView {
     @ViewBuilder var actionErrorSection: some View {
         if let actionError {
             Section {
-                InlineNote(actionError, tone: .alert).lobbyRow(top: Spacing.m)
+                InlineNote(.verbatim(actionError), tone: .alert).lobbyRow(top: Spacing.m)
             }
         }
     }

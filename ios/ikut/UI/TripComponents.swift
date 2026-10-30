@@ -26,11 +26,12 @@ enum ScaledSize {
 
 /// Small uppercase caption above a value: "FROM", "DISTANCE", "JOIN CODE".
 struct StatCaption: View {
-    var text: String
-    init(_ text: String) { self.text = text }
+    var text: Text
+    init(_ text: LocalizedStringKey) { self.text = Text(text) }
+    init(resource: LocalizedStringResource) { self.text = Text(resource) }
 
     var body: some View {
-        Text(text)
+        text
             .textCase(.uppercase)
             .font(.caption.weight(.semibold))
             .kerning(0.6)
@@ -66,7 +67,8 @@ struct RouteEnds: View {
 /// Three (or so) captioned values side by side, divided by hairlines: DISTANCE | DRIVE | VIA.
 struct StatGrid: View {
     struct Item: Identifiable {
-        var caption: String
+        /// A literal at the call site; `caption.key` is the English words as written, which the identifiers use.
+        var caption: LocalizedStringResource
         /// Nil shows a dash.
         var value: String?
         var color: Color?
@@ -74,9 +76,9 @@ struct StatGrid: View {
         var detail: String?
         /// Makes the cell a button.
         var action: (() -> Void)?
-        var id: String { caption }
+        var id: String { caption.key }
 
-        init(_ caption: String, _ value: String?, color: Color? = nil, detail: String? = nil, action: (() -> Void)? = nil) {
+        init(_ caption: LocalizedStringResource, _ value: String?, color: Color? = nil, detail: String? = nil, action: (() -> Void)? = nil) {
             self.action = action
             self.caption = caption
             self.value = value
@@ -116,7 +118,7 @@ struct StatGrid: View {
         if let action = item.action {
             Button(action: action) { content(item) }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier(AXID.Trip.stat(item.caption))
+                .accessibilityIdentifier(AXID.Trip.stat(item.caption.key))
                 .accessibilityAddTraits(.isButton)
         } else {
             content(item)
@@ -125,7 +127,7 @@ struct StatGrid: View {
 
     private func content(_ item: Item) -> some View {
         VStack(spacing: 0) {
-            StatCaption(item.caption)
+            StatCaption(resource: item.caption)
             Text(item.value ?? "–")
                 .font(.system(size: scaledValueSize, weight: .bold, design: .rounded))
                 .monospacedDigit()
@@ -182,7 +184,7 @@ struct Chip: View {
 
     enum Fill { case tint, material }
 
-    var text: String
+    var text: LocalizedStringKey
     var tone: Tone = .neutral
     var lead: Lead = .none
     var fill: Fill = .tint
@@ -268,4 +270,10 @@ struct DashedDivider: View {
         }
     }
     .padding(Spacing.l)
+}
+
+extension LocalizedStringKey {
+    /// A runtime string (a name, an address, a formatted number) shown exactly as it is. The key is the format `%@`
+    /// with the string as its argument, so the words themselves are never looked up in the String Catalog.
+    static func verbatim(_ string: String) -> LocalizedStringKey { "\(string)" }
 }

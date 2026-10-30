@@ -194,7 +194,7 @@ struct SuggestStopsSheet: View {
             Text(SuggestStopsModel.along(pick)).font(.subheadline).foregroundStyle(.secondary)
             HStack(spacing: Spacing.s) {
                 ForEach(SuggestStopsModel.chips(pick.place), id: \.self) { chip in
-                    Chip(text: chip, tone: .accent)
+                    Chip(text: .verbatim(chip), tone: .accent)
                 }
             }
             HStack(spacing: Spacing.s) {

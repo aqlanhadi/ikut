@@ -35,7 +35,7 @@ struct JoinSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetTopRow(title: stepper.title, subtitle: stepper.indicator, subtitleIdentifier: AXID.Join.step) {
+            SheetTopRow(title: .verbatim(stepper.title), subtitle: .verbatim(stepper.indicator), subtitleIdentifier: AXID.Join.step) {
                 if stepper.canGoBack {
                     RoundGlassIconButton(systemImage: Symbol.back, label: "Back", action: back)
                         .accessibilityIdentifier(AXID.Join.back).disabled(model.isJoining)
@@ -245,7 +245,7 @@ struct JoinSheet: View {
         }
         if let nameError {
             Section {
-                InlineNote(nameError, tone: .alert, inset: 0)
+                InlineNote(.verbatim(nameError), tone: .alert, inset: 0)
                     .lobbyRow()
                     .accessibilityIdentifier(AXID.Name.error)
             }
@@ -329,7 +329,7 @@ struct JoinSheet: View {
             .accessibilityElement(children: .combine)
         } else if let message = model.errorMessage {
             VStack(alignment: .leading, spacing: Spacing.s) {
-                InlineNote(message, tone: .alert, inset: 0)
+                InlineNote(.verbatim(message), tone: .alert, inset: 0)
                     .accessibilityIdentifier(AXID.Join.error)
                 if JoinService.isCompleteCode(model.code) {
                     Button("Try again") { model.retryPreview() }
@@ -449,7 +449,7 @@ struct JoinSheet: View {
         if model.errorMessage != nil || model.trackerTakenResult != nil {
             Section {
                 if let message = model.errorMessage {
-                    InlineNote(message, tone: .alert, inset: 0)
+                    InlineNote(.verbatim(message), tone: .alert, inset: 0)
                         .accessibilityIdentifier(AXID.Join.error)
                 }
                 if model.trackerTakenResult != nil {
