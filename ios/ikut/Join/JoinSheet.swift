@@ -421,7 +421,7 @@ struct JoinSheet: View {
                 carRow(
                     name: car.name,
                     badge: CarBadge(number: car.number ?? index + 1, colorHex: car.color, size: IconSize.small.base),
-                    detail: car.hasTracker ? "Location shared" : "No one sharing yet",
+                    detail: car.hasTracker ? "Location shared" : car.isLead ? "Shared by the organiser" : "No one sharing yet",
                     selected: model.selectedCar?.id == car.id
                 ) { model.select(car) }
             }
@@ -454,7 +454,9 @@ struct JoinSheet: View {
                 }
                 if model.trackerTakenResult != nil {
                     InlineNote(
-                        "You’re in. Someone else is already sharing that car’s location, so your phone won’t.",
+                        model.trackerTakenForLead
+                            ? "You’re in. Only the organiser’s phone shares the lead car’s location."
+                            : "You’re in. Someone else is already sharing that car’s location, so your phone won’t.",
                         systemImage: Symbol.info, inset: 0)
                 }
             }
@@ -494,6 +496,12 @@ struct JoinSheet: View {
             EmptyView()
         case .ownCar:
             Label("Your phone shares this car’s location, even with the screen off.", systemImage: Symbol.location)
+                .font(.footnote).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, Spacing.s)
+                .accessibilityIdentifier(AXID.Join.shareNote)
+        case .leadCar:
+            Label("The organiser’s phone shares this car’s location.", systemImage: Symbol.location)
                 .font(.footnote).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, Spacing.s)

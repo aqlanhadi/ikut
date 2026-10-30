@@ -239,6 +239,54 @@ struct JoinModelTests {
         #expect(!model.tracks)
     }
 
+    // The lead car (D97): only the organiser's phone shares it, so the sheet never asks to share it.
+    private let leadCar = PreviewCar(id: "c0", name: "Lead", color: TripService.palette[0], hasTracker: false, number: 1, isLead: true)
+
+    private final class SentTracker: @unchecked Sendable { var value: Bool? }
+    private struct RecordingAPI: JoinAPI {
+        var preview: TripPreview
+        var sent: SentTracker
+        var taken: Bool
+        func preview(code: String) async throws -> TripPreview { preview }
+        func join(code: String, displayName: String, car: JoinCarChoice, tracker: Bool) async throws -> JoinResult {
+            sent.value = tracker
+            return JoinResult(tripId: "t1", carId: "c0", trackerTaken: taken)
+        }
+    }
+
+    @Test func pickingTheLeadCarLeavesSharingOffAndSaysWhoShares() async {
+        #expect(JoinSteps.sharing(selectedCar: leadCar, ownCar: false) == .leadCar)
+        let sent = SentTracker()
+        let preview = TripPreview(tripId: "t1", name: "Raya", destinationName: "Ipoh", cars: [leadCar, x70])
+        let model = JoinModel(displayName: "Sam", api: RecordingAPI(preview: preview, sent: sent, taken: true))
+        model.codeChanged("ABC234")
+        await waitUntil(.milliseconds(500)) { model.preview != nil }
+        model.select(leadCar)
+        #expect(!model.tracker)
+        // Even a stale switch left on never asks the server to make this phone the lead car's tracker.
+        model.tracker = true
+        _ = await model.join(sharing: true)
+        #expect(sent.value == false)
+        #expect(model.trackerTakenResult != nil)
+        #expect(model.trackerTakenForLead)
+        #expect(!model.tracks)
+    }
+
+    @Test func otherCarsStillOfferTheSwitchAndKeepTheirNote() async {
+        #expect(JoinSteps.sharing(selectedCar: x70, ownCar: false) == .switchRow)
+        let model = await joined({ $0.select(self.x70) }, trackerTaken: true)
+        #expect(!model.trackerTakenForLead)
+    }
+
+    @Test func theLeadFlagComesFromThePreview() throws {
+        let preview = try JoinService.parsePreview([
+            "tripId": "t1", "name": "Raya", "destinationName": "Ipoh",
+            "cars": [["id": "c1", "name": "Myvi", "color": "#2563EB", "hasTracker": false, "isLead": true],
+                     ["id": "c2", "name": "X70", "color": "#D9480F", "hasTracker": false]],
+        ] as [String: Any])
+        #expect(preview.cars.map(\.isLead) == [true, false])
+    }
+
     @Test func locationRefusedOnTheTapJoinsAsCoPilotAndDoesNotTrack() async {
         #expect(await !joined({ $0.selectNewCar() }, authorization: .denied).tracks)
         #expect(!JoinSteps.tracks(asked: true, sharing: false, trackerTaken: false))

@@ -10,6 +10,8 @@ struct PreviewCar: Sendable, Equatable, Identifiable {
     var hasTracker: Bool
     /// Badge number; nil for cars created before numbering.
     var number: Int? = nil
+    /// The lead car (the one the organiser designates): only the organiser's phone shares it.
+    var isLead: Bool = false
 }
 
 /// A planned stop as a non-member sees it: name, kind, planned length, place and (meeting point only) time.
@@ -189,7 +191,7 @@ enum JoinService {
             else { throw JoinError(message: "That didn’t go through. Try again.") }
             return PreviewCar(
                 id: id, name: name, color: color, hasTracker: raw["hasTracker"] as? Bool ?? false,
-                number: (raw["number"] as? NSNumber)?.intValue)
+                number: (raw["number"] as? NSNumber)?.intValue, isLead: raw["isLead"] as? Bool ?? false)
         }
         // A stop the app can't read is left out rather than hiding the whole ticket.
         let stops = (root["stops"] as? [[String: Any]] ?? []).compactMap { raw -> PreviewStop? in

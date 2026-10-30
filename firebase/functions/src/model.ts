@@ -174,6 +174,8 @@ export interface PreviewCar {
   color: string;
   hasTracker: boolean;
   number?: number;
+  /** The lead car: only the organiser's phone shares it. */
+  isLead: boolean;
 }
 
 /** One planned stop on the ticket: only what a stranger with the code needs. Never ids, offsets, notes or skipped fields. */

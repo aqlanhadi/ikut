@@ -339,12 +339,18 @@ service cloud.firestore {
           && (userId == request.auth.uid || isOrganizer(tripId));
       }
 
-      // Cars: members create; tracker/organizer/claimers update narrowly; organizer deletes.
+      // Cars: a member creates only the car their own member doc names (carId), so one member makes at most
+      // one car at a time. That keeps cars close to members (<= 20), not exactly: the organizer can delete and
+      // re-create their own member doc to add cars (only hurts their own trip), and a member whose car the
+      // organizer deleted can re-create it. A non-lead car may not take badge number 1 (the lead car's); other
+      // badge numbers can still repeat (known gap, cosmetic). Joiners get their car from joinTrip (admin SDK).
+      // A free car is claimed only by joinTrip too; the tracker/organizer update narrowly; organizer deletes.
       match /cars/{carId} {
         allow read: if isMember(tripId);
 
         allow create: if isMember(tripId)
           && tripActive(tripId)
+          && get(memberPath(tripId, request.auth.uid)).data.carId == carId
           && request.resource.data.keys().hasOnly(['name', 'color', 'trackerUserId',
                                                    'isLead', 'route', 'mergeOffset', 'state',
                                                    'number'])
@@ -352,6 +358,7 @@ service cloud.firestore {
           && validCarFields(request.resource.data)
           && request.resource.data.isLead is bool
           && (request.resource.data.isLead == false || isOrganizer(tripId))
+          && (request.resource.data.isLead == true || optionalOf(request.resource.data, 'number') != 1)
           && (optionalOf(request.resource.data, 'trackerUserId') == null
               || request.resource.data.trackerUserId == request.auth.uid);
 
@@ -360,13 +367,9 @@ service cloud.firestore {
           && validCarFields(request.resource.data)
           && request.resource.data.isLead is bool
           && (
-            // Claim a free car.
-            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId'])
-              && optionalOf(resource.data, 'trackerUserId') == null
-              && request.resource.data.trackerUserId == request.auth.uid)
             // Release as the current tracker.
             // Releasing also clears a pause, so the next tracker does not inherit it.
-            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId', 'pausedAt'])
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId', 'pausedAt'])
               && optionalOf(resource.data, 'trackerUserId') == request.auth.uid
               && optionalOf(request.resource.data, 'trackerUserId') == null
               && optionalOf(request.resource.data, 'pausedAt') == null)

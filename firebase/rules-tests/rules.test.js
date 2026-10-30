@@ -84,6 +84,8 @@ async function seed({ ended = false } = {}) {
     await setDoc(doc(f, `trips/${T}/members/org`), memberDoc({ displayName: 'Org', carId: 'carO', role: 'organizer' }));
     await setDoc(doc(f, `trips/${T}/members/mem`), memberDoc());
     await setDoc(doc(f, `trips/${T}/members/other`), memberDoc({ displayName: 'Oth', carId: 'carB' }));
+    // 'solo' names a car (carS) that has no doc yet: the only car a member may create (D97).
+    await setDoc(doc(f, `trips/${T}/members/solo`), memberDoc({ displayName: 'Solo', carId: 'carS' }));
     await setDoc(doc(f, `trips/${T}/cars/carA`), carDoc({ trackerUserId: 'mem' }));
     await setDoc(doc(f, `trips/${T}/cars/carB`), carDoc({ name: 'Car B' }));
     await setDoc(doc(f, `trips/${T}/cars/carO`), carDoc({ name: 'Car O', isLead: true }));
@@ -251,17 +253,43 @@ describe('members', () => {
 describe('cars', () => {
   beforeEach(() => seed());
   const car = (id) => doc(db('mem'), `trips/${T}/cars/${id}`);
-  it('member can create a car', () => assertSucceeds(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ state: 'convoy' }))));
-  it('non-member cannot create a car', () => assertFails(setDoc(doc(db('stranger'), `trips/${T}/cars/new`), carDoc())));
-  it('member cannot create a lead car', () => assertFails(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ isLead: true }))));
-  it('organizer can create a lead car', () => assertSucceeds(setDoc(doc(db('org'), `trips/${T}/cars/new`), carDoc({ isLead: true }))));
-  it('bad state fails', () => assertFails(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ state: 'flying' }))));
-  it('non-string color fails', () => assertFails(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ color: 5 }))));
-  it('car with a badge number succeeds', () => assertSucceeds(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ number: 3 }))));
-  it('badge number 0 fails', () => assertFails(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ number: 0 }))));
-  it('non-integer badge number fails', () => assertFails(setDoc(doc(db('mem'), `trips/${T}/cars/new`), carDoc({ number: 1.5 }))));
+  const mine = (over = {}, uid = 'solo', id = 'carS') => setDoc(doc(db(uid), `trips/${T}/cars/${id}`), carDoc(over));
+  it('member can create the car their member doc names', () => assertSucceeds(mine({ state: 'convoy' })));
+  it('member can create their own car as its tracker', () => assertSucceeds(mine({ trackerUserId: 'solo' })));
+  it('non-member cannot create a car', () => assertFails(setDoc(doc(db('stranger'), `trips/${T}/cars/carS`), carDoc())));
+  it('member cannot create a second car', () => assertFails(mine({}, 'solo', 'ghost')));
+  it('member cannot create twelve ghost cars', async () => {
+    for (let i = 0; i < 12; i++) await assertFails(mine({}, 'mem', `ghost${i}`));
+  });
+  it('member cannot create a car for another member', () => assertFails(mine({}, 'mem', 'carS')));
+  it('member cannot create a car for another member and track it', () =>
+    assertFails(mine({ trackerUserId: 'mem' }, 'mem', 'carS')));
+  it('member cannot re-create the lead car', () => assertFails(mine({ isLead: true }, 'solo', 'carO')));
+  it('member cannot create a lead car', () => assertFails(mine({ isLead: true })));
+  it('organizer can create the car their member doc names, as lead', async () => {
+    await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), `trips/${T}/cars/carO`)));
+    await assertSucceeds(mine({ isLead: true, trackerUserId: 'org' }, 'org', 'carO'));
+  });
+  it('organizer cannot create a car for another member', () => assertFails(mine({}, 'org', 'carS')));
+  it('organizer cannot create a second car', () => assertFails(mine({}, 'org', 'ghost')));
+  it('a non-lead car cannot take badge number 1, the lead car\'s', () => assertFails(mine({ number: 1 })));
+  it('the organizer\'s lead car can have badge number 1', async () => {
+    await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), `trips/${T}/cars/carO`)));
+    await assertSucceeds(mine({ isLead: true, number: 1 }, 'org', 'carO'));
+  });
+  it('bad state fails', () => assertFails(mine({ state: 'flying' })));
+  it('non-string color fails', () => assertFails(mine({ color: 5 })));
+  it('car with a badge number succeeds', () => assertSucceeds(mine({ number: 3 })));
+  it('badge number 0 fails', () => assertFails(mine({ number: 0 })));
+  it('non-integer badge number fails', () => assertFails(mine({ number: 1.5 })));
   it('badge number cannot be changed', () => assertFails(updateDoc(doc(db('org'), `trips/${T}/cars/carB`), { number: 7 })));
-  it('claim tracker when free succeeds', () => assertSucceeds(updateDoc(car('carB'), { trackerUserId: 'mem' })));
+  it('claiming a free car directly is denied (only joinTrip does that)', () => assertFails(updateDoc(car('carB'), { trackerUserId: 'mem' })));
+  it('claiming the untracked lead car directly is denied', () =>
+    assertFails(updateDoc(doc(db('mem'), `trips/${T}/cars/carO`), { trackerUserId: 'mem' })));
+  it('claiming the untracked lead car and writing its position is denied', async () => {
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/cars/carO`), { trackerUserId: 'mem' }));
+    await assertFails(setDoc(doc(db('mem'), `trips/${T}/positions/carO`), position()));
+  });
   it('steal tracker when taken fails', () =>
     assertFails(updateDoc(doc(db('other'), `trips/${T}/cars/carA`), { trackerUserId: 'other' })));
   it('claim tracker for someone else fails', () => assertFails(updateDoc(car('carB'), { trackerUserId: 'other' })));
