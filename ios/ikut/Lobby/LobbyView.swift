@@ -306,7 +306,7 @@ struct LobbyView: View {
     func setExpanded(_ tall: Bool) {
         stage.sheetChange(in: .lobby, { stage.sheet.resize(to: .lobby(tall: tall)) }, cover: { LobbySheet.cover(compact: compact) })
     }
-    var compact: CGFloat { LobbySheet.compact(scaled: mediumHeight) }
+    var compact: CGFloat { LobbySheet.compact(scaled: mediumHeight, screenHeight: SheetStops.screenHeight) }
 
     /// What the sheet's content change runs on, and what a stop tap's camera flight uses.
     func flyTo(_ stopId: String) {

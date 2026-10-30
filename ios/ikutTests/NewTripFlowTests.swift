@@ -75,7 +75,7 @@ struct NewTripFlowTests {
         #expect(!HomeSheet.drawsPastRoutes(.whereTo) && !HomeSheet.drawsPastRoutes(.newTrip))
         #expect(HomeSheet.height(.list, compact: 300) == 300)
         #expect(HomeSheet.height(.whereTo, compact: 300) == 560)
-        #expect(HomeSheet.height(.newTrip, compact: 300) == 420)
+        #expect(HomeSheet.height(.newTrip, compact: 300) == SheetStops.mid(scale: 1))
     }
 
     @Test func aRouteThatFailsStaysOnTheSearchWithTheMessage() async {
@@ -218,7 +218,7 @@ struct NewTripFlowTests {
         #expect(HomeSheet.expanded(true, from: .whereTo, to: .newTrip) == false)
         #expect(HomeSheet.expanded(true, from: .newTrip, to: .whereTo) == false)
         #expect(HomeSheet.expanded(true, from: .whereTo, to: .whereTo) == true)
-        #expect(HomeSheet.detent(expanded: false, mode: .newTrip, compact: 300) == .height(420))
+        #expect(HomeSheet.detent(expanded: false, mode: .newTrip, compact: 300) == .height(SheetStops.mid(scale: 1)))
     }
 
     @MainActor final class Gate { var open = false }
@@ -233,9 +233,9 @@ struct NewTripFlowTests {
         let (flow, _) = makeFlow()
         let far = DestinationResult(name: "Alor Setar", subtitle: "Kedah", coordinate: .init(latitude: 6.12, longitude: 100.37))
         await flow.pick(far)
-        let insets = HomeSheet.createInsets(mapHeight: 874, sheet: HomeSheet.newTripHeight, compact: HomeSheet.compactHeight, padding: LobbySheet.defaultMapPadding)
+        let insets = HomeSheet.createInsets(mapHeight: 874, sheet: SheetStops.mid(scale: 1), compact: HomeSheet.compactHeight, padding: LobbySheet.defaultMapPadding)
         guard let r = flow.region(bottomObscured: insets.bottom, topObscured: insets.top) else { Issue.record("no region"); return }
-        let sheetTop = 874 - Double(HomeSheet.newTripHeight)
+        let sheetTop = 874 - Double(SheetStops.mid(scale: 1))
         for lat in [kl.latitude, far.coordinate.latitude] {
             let at = y(lat, r)
             #expect(at >= Double(HomeSheet.createTopRoom) && at <= sheetTop - 10, "latitude \(lat) at \(at)")

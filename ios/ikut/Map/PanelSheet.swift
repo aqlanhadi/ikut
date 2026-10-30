@@ -23,8 +23,10 @@ enum PanelSheet {
         }
     }
 
-    /// The panel's content heights before they are measured (folded, then unfolded), without the bar.
-    static let foldedEstimate: CGFloat = 220
+    /// The panel's content heights before they are measured (folded, then unfolded), without the bar. Folded is the real
+    /// measured height with From and To each on one line (193; 227 when a name wraps), and the bar's measured 46, so
+    /// together they are the collapsed stop (`SheetStops`, D116).
+    static let foldedEstimate: CGFloat = 193
     static let unfoldedEstimate: CGFloat = 450
     /// A card's content height before it is measured.
     static let cardEstimate: CGFloat = 330
@@ -61,21 +63,26 @@ enum PanelSheet {
     static let bannerProbeRoom: CGFloat = 1200
 
     /// The bar's height before it is measured (Report and Pit stop with the space above them).
-    static let barEstimate: CGFloat = 62
+    static let barEstimate: CGFloat = 46
 
     /// The detent heights: each panel content height (nil until seen) plus the pinned bar's (nil until seen), capped
     /// at `room`, the map's height under the pills and banners (nil before the map is measured). No home-indicator strip is added: a presented sheet already keeps its content out of the bottom safe
     /// area, so adding it again (as Home's formula does for its own header) left about 34 pt of empty space.
-    /// When the content is taller than the cap, the list scrolls under the bar and the bar stays in view.
+    /// When the content is taller than the cap, the list scrolls under the bar and the bar stays in view. `collapsed`: the folded sheet's floor (0: none). `mid`: the unfolded
+    /// sheet's own cap, the mid stop at this text size (`SheetStops`; none by default); the folded one is its measured size, never capped by it.
     /// `top`: what sits above the panel at every height (the "no longer in this trip" banner), measured.
-    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, top: CGFloat = 0, room: CGFloat?) -> Heights {
+    static func heights(folded: CGFloat?, unfolded: CGFloat?, bar: CGFloat? = nil, top: CGFloat = 0, room: CGFloat?,
+                        mid: CGFloat = .greatestFiniteMagnitude, collapsed: CGFloat = 0) -> Heights {
         let cap = max(room ?? .greatestFiniteMagnitude, minimumHeight)
         let barHeight = bar ?? barEstimate
         func fit(_ content: CGFloat?, _ estimate: CGFloat, bar: CGFloat = 0) -> CGFloat {
             min((content ?? estimate) + top + bar, cap).rounded()
         }
-        let short = fit(folded, foldedEstimate, bar: barHeight)
-        let tall = max(short, fit(unfolded, unfoldedEstimate, bar: barHeight))
+        // Never lower than the collapsed stop (D116), so the usual folded content rests exactly at it; a wrapped name or a
+        // banner that needs more makes it taller, and the room caps it.
+        let short = max(fit(folded, foldedEstimate, bar: barHeight), min(collapsed.rounded(), cap.rounded()))
+        // The unfolded sheet is never taller than the mid stop (D116): a bigger convoy scrolls inside it.
+        let tall = max(short, min(fit(unfolded, unfoldedEstimate, bar: barHeight), mid.isFinite ? mid.rounded() : .greatestFiniteMagnitude))
         let full = room == nil ? tall + continuationEstimate : cap.rounded()
         return Heights(short: short, tall: tall, full: full)
     }

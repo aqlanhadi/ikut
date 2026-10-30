@@ -7,13 +7,13 @@ import SwiftUI
 /// at the medium height: medium shows the top of the content and the cars (canvas B4), tall the rest (B5).
 enum LobbySheet {
     /// The medium detent's height at the default text size (B4's 470 pt).
-    static let compactHeight: CGFloat = 470
+    static let compactHeight: CGFloat = SheetStops.midBase
     static let indicatorRoom = BottomSheet.indicatorRoom
     static let detentExtra = BottomSheet.detentExtra
 
-    /// `scaled` is `compactHeight` scaled with the text size, capped so the tall detent stays well above it.
-    static func compact(scaled: CGFloat) -> CGFloat {
-        min(max(scaled, compactHeight), compactHeight * 1.4)
+    /// `scaled` is `compactHeight` scaled with the text size; the mid stop caps it (`SheetStops.mid`).
+    static func compact(scaled: CGFloat, screenHeight: CGFloat = SheetStops.referenceScreen) -> CGFloat {
+        SheetStops.mid(scale: SheetStops.scale(of: scaled, base: compactHeight), screenHeight: screenHeight)
     }
 
     /// From the screen's bottom edge to the top of the medium sheet (what the lobby's camera keeps clear; the map's
@@ -29,12 +29,14 @@ enum LobbySheet {
     /// it goes into the camera (`MapCameraRoom`, `HomeSheet.createInsets`), where it animates. `scaledMedium` is this
     /// screen's `@ScaledMetric` of `compactHeight` (the text-size scale; the lobby's own cap is not applied, so every
     /// layer gets the same value).
-    static func mapPadding(scaledMedium: CGFloat) -> CGFloat { HomeSheet.reach(.list, compact: homeShort(scaledMedium: scaledMedium)) }
+    static func mapPadding(scaledMedium: CGFloat, screenHeight: CGFloat = SheetStops.referenceScreen) -> CGFloat {
+        HomeSheet.reach(.list, compact: homeShort(scaledMedium: scaledMedium, screenHeight: screenHeight))
+    }
 
     /// Home's short sheet's height at the text size `scaledMedium` stands for. At the default size it is the convoy's
     /// resting folded height (`HomeSheet.compactHeight`, D115), so the logo and Legal sit just above both.
-    static func homeShort(scaledMedium: CGFloat) -> CGFloat {
-        HomeSheet.compact(scaled: HomeSheet.compactHeight * max(scaledMedium, 0) / compactHeight)
+    static func homeShort(scaledMedium: CGFloat, screenHeight: CGFloat = SheetStops.referenceScreen) -> CGFloat {
+        HomeSheet.compact(scaled: HomeSheet.compactHeight * max(scaledMedium, 0) / compactHeight, screenHeight: screenHeight)
     }
     /// `mapPadding` at the default text size.
     static let defaultMapPadding = mapPadding(scaledMedium: compactHeight)
@@ -47,7 +49,7 @@ enum LobbySheet {
     }
 
     static func medium(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
-    static let tall = PresentationDetent.large
+    static let tall = SheetStops.tall
     static func detents(compact: CGFloat) -> Set<PresentationDetent> { [medium(compact), tall] }
     static func detent(expanded: Bool, compact: CGFloat) -> PresentationDetent { expanded ? tall : medium(compact) }
     static func isExpanded(_ detent: PresentationDetent) -> Bool { BottomSheet.isTall(detent, tall: tall) }
@@ -265,7 +267,7 @@ struct LobbyMapLayer: View {
         // The one cover, written first so a fit made in the sheet's transaction reads the lobby's own (D63 C4).
         stage.cover(LobbySheet.cover(compact: sheetCompact), from: .lobby)
         let cover = stage.space.cover(in: .lobby) ?? LobbySheet.cover(compact: sheetCompact)
-        let padding = LobbySheet.mapPadding(scaledMedium: mediumHeight)
+        let padding = LobbySheet.mapPadding(scaledMedium: mediumHeight, screenHeight: SheetStops.screenHeight)
         let height = stage.space.frame.height, safeTop = stage.space.safeTop
         guard let region = LobbyMapLogic.region(
             for: target, route: route, pins: pins,

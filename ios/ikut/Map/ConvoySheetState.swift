@@ -22,6 +22,10 @@ struct ConvoySheetState: Equatable {
     var cardContent: CGFloat?
     var barContent: CGFloat?
     var topContent: CGFloat = 0
+    /// The mid stop at the current text size and screen: the unfolded sheet's cap (D116), set by the screen; no cap before.
+    var mid: CGFloat = .greatestFiniteMagnitude
+    /// The collapsed stop at the current text size and screen: the folded sheet's floor (D116); no floor before.
+    var collapsed: CGFloat = 0
     /// One sheet motion at a time (D42): while a fold or a drag's release runs, the heights hold (`PanelSheet.settled`).
     private(set) var moving = false
     private(set) var motion = 0
@@ -49,7 +53,7 @@ struct ConvoySheetState: Equatable {
     /// measured); `hasTopBanner`: the banner on top of the panel is there.
     func measuredHeights(room: CGFloat?, hasTopBanner: Bool) -> PanelSheet.Heights {
         PanelSheet.heights(folded: foldedContent, unfolded: unfoldedContent, bar: barContent,
-                           top: hasTopBanner ? topContent : 0, room: room)
+                           top: hasTopBanner ? topContent : 0, room: room, mid: mid, collapsed: collapsed)
     }
 
     /// What the sheet uses: the measured heights, held while it moves (`PanelSheet.settled`).
