@@ -47,7 +47,7 @@ struct RouteFitTests {
         let safeTop: CGFloat = screen > 800 ? 62 : 20
         let cover = SheetStops.mid(scale: scale, screenHeight: screen)
         return (LobbyMapLogic.topFraction(mapHeight: screen, safeTop: safeTop, bottomPadding: padding),
-                LobbyMapLogic.bottomFraction(mapHeight: screen, safeTop: safeTop, cover: cover, bottomPadding: padding),
+                LobbyMapLogic.bottomFraction(mapHeight: screen, safeTop: safeTop, cover: cover + LobbyMapLogic.startRoom, bottomPadding: padding),
                 MapFit.aspect(width: width, height: screen, padding: padding), Double(screen - padding))
     }
 

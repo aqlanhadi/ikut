@@ -170,6 +170,9 @@ enum LobbyMapLogic {
     static let buttonBand: CGFloat = CornerButton.top + 56 + Spacing.xs
     /// The destination flag: its pin and name above the coordinate, with a margin.
     static let flagRoom: CGFloat = 50
+    /// Kept clear above the sheet for what hangs below the southern end of the route: the position dot's lower half and the
+    /// name under a stop's pin, so the route's start is not cut by the sheet's edge (D118).
+    static let startRoom: CGFloat = 24
     /// Degrees of latitude shown when the camera flies to one stop.
     static let stopSpan = 0.12
 
@@ -274,7 +277,7 @@ struct LobbyMapLayer: View {
         let height = stage.space.screenHeight, safeTop = stage.space.safeTop
         guard let region = LobbyMapLogic.region(
             for: target, route: route, pins: pins,
-            bottomObscured: LobbyMapLogic.bottomFraction(mapHeight: height, safeTop: safeTop, cover: cover.bottom, bottomPadding: padding),
+            bottomObscured: LobbyMapLogic.bottomFraction(mapHeight: height, safeTop: safeTop, cover: cover.bottom + LobbyMapLogic.startRoom, bottomPadding: padding),
             topObscured: LobbyMapLogic.topFraction(mapHeight: height, safeTop: safeTop, bottomPadding: padding),
             aspect: MapFit.aspect(width: stage.space.screenWidth, height: height > 0 ? height : SheetStops.referenceScreen, padding: padding)) else { return }
         onStop = target != .wholeTrip
