@@ -253,7 +253,8 @@ class ConvoyUITestCase: XCTestCase {
         let sheetName = app.textFields["Your name"]
         // Where to? asks in Home's sheet with the join step's "Get started" (D112); the standalone sheet says "Continue".
         let inSheet = app.buttons["joinNameContinue"]
-        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists || inSheet.exists {
+        if sheetName.waitForExistence(timeout: 3) {
+            XCTAssertTrue(app.buttons["Continue"].exists || inSheet.exists, "The name step showed no Continue button")
             sheetName.tap()
             sheetName.typeText(name)
             let continueButton = inSheet.exists ? inSheet : app.buttons["Continue"]

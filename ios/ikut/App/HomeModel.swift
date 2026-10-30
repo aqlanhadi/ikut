@@ -259,7 +259,7 @@ final class HomeModel {
     /// first, and `goBack` runs its camera return.
     func beginCreate(camera: MapCameraPosition, flow newFlow: @autoclosure () -> NewTripFlow = NewTripFlow(),
                      goBack: (CameraReturn) -> Void) {
-        guard flow == nil else { return }
+        guard flow == nil, joinFlow == nil else { return }
         // Coming from the name step, the camera was saved there.
         if nameStep == nil { cameraBeforeCreate = camera }
         if let back = closePicked(camera: camera) { goBack(back) }
@@ -292,6 +292,21 @@ final class HomeModel {
         }
         askingName = false
         cameraBeforeCreate = nil
+    }
+
+    /// The name was signed in: Where to? is asked for, but only while the name step is still the sheet. A join link that
+    /// took it over meanwhile (D112) is not followed by a Where to? hidden under the join steps.
+    @discardableResult
+    func creatingAfterName() -> Bool {
+        guard nameStep != nil else { return false }
+        creating = true
+        return true
+    }
+
+    /// The hand-off from the name step ended: if Where to? wasn't asked for (a location answer stopped the trip), the list
+    /// comes back; if a link took the sheet over, it is left alone.
+    func endNameHandOff() {
+        if nameStep != nil, !creating { closeNaming() }
     }
 
     /// Back to Home's list. Nothing was written.

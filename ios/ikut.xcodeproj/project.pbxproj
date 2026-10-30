@@ -261,6 +261,7 @@
 		C9EBB30503561CC0D3A77FD9 /* PickedTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322ED2F251FFDF594FC7D83E /* PickedTrip.swift */; };
 		CC753D5CE3CE3D2B64E15D04 /* LaunchRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78AF9425F9F284ADFB93DDEA /* LaunchRoute.swift */; };
 		CCC5101BA47FF40760B211AC /* TripMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F849A1145EA5F7AF5598EF32 /* TripMapContent.swift */; };
+		CEA364A231B116BCE2EE412D /* TripsHomeView+NameStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = B99A329AB05243FDDBF7FAA0 /* TripsHomeView+NameStep.swift */; };
 		CFE152E246774143B9AB0A7C /* NameStepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E911AEA9AA314FC69BD2BA54 /* NameStepTests.swift */; };
 		CFE1B7D60FB52C4DF0BB850A /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8926F402B88A4AB4B63842 /* Palette.swift */; };
 		D14B804609A04974BCC472BF /* BannerSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59B3CC045531B01304008A /* BannerSlot.swift */; };
@@ -577,6 +578,7 @@
 		B6117F5F8B2493D250C4083B /* AlertSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettings.swift; sourceTree = "<group>"; };
 		B77B691B643EBE1FA3B334FE /* StopCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCard.swift; sourceTree = "<group>"; };
 		B8874DCFA37C43892F53DB83 /* StopCardDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCardDemo.swift; sourceTree = "<group>"; };
+		B99A329AB05243FDDBF7FAA0 /* TripsHomeView+NameStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TripsHomeView+NameStep.swift"; sourceTree = "<group>"; };
 		BCD4FAF0956DC812EFB12371 /* OwnWayDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnWayDemo.swift; sourceTree = "<group>"; };
 		BCE6A468C2B522F5226FFC78 /* Position.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Position.swift; sourceTree = "<group>"; };
 		BEA9EED0F6538FAD356A6D9F /* sungai-buloh-north.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sungai-buloh-north.json"; sourceTree = "<group>"; };
@@ -695,6 +697,7 @@
 				56BDE68F366CE545C453468B /* ServerWrite.swift */,
 				AEE04CAB318A6B9B03A2BE04 /* TripsHomeView.swift */,
 				DC0271B715040D99DB4103D4 /* TripsHomeView+Demo.swift */,
+				B99A329AB05243FDDBF7FAA0 /* TripsHomeView+NameStep.swift */,
 				2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */,
 			);
 			path = App;
@@ -1606,6 +1609,7 @@
 				1DBF5A11C11CA256FEF45763 /* TripSession.swift in Sources */,
 				7296DE8EDE46EEF454129D03 /* TripSessionLogic.swift in Sources */,
 				8CB57967F325C9B9457E3983 /* TripsHomeView+Demo.swift in Sources */,
+				CEA364A231B116BCE2EE412D /* TripsHomeView+NameStep.swift in Sources */,
 				57F8B464EC89FCDCF61E28B2 /* TripsHomeView.swift in Sources */,
 				7F240A0DA3CBFE7964486BA4 /* TypeRoles.swift in Sources */,
 				519A8EFE7DB25FA48F9DD13D /* WelcomeView.swift in Sources */,

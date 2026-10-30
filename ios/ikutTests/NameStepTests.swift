@@ -92,4 +92,42 @@ struct NameStepTests {
         #expect(await NameStepState.attempt(name: "Nurul", signIn: { _ in }) == nil)
         #expect(await NameStepState.attempt(name: "Nurul", signIn: { _ in throw Down() }) == "No signal")
     }
+
+    @Test func aLinkWhileNamingMeansNoWhereToUnderTheJoinSteps() {
+        let model = HomeModel()
+        model.askingName = true
+        model.beginNaming(camera: camera(3), goBack: { _ in })
+        model.beginJoin(JoinStart(code: "K7M2QX"), camera: camera(0.1), displayName: nil, signedIn: false, location: .notDetermined,
+                        api: JoinDemo.api())
+        // The sign-in task that was in flight comes back and asks for Where to?
+        #expect(!model.creatingAfterName())
+        #expect(!model.creating)
+        model.beginCreate(camera: camera(3), goBack: { _ in })
+        #expect(model.flow == nil)
+        model.endNameHandOff()
+        #expect(model.joinFlow != nil)
+    }
+
+    @Test func afterSignInWhereToIsAskedForAndTheHandOffLeavesItBe() {
+        let model = HomeModel()
+        model.askingName = true
+        model.beginNaming(camera: camera(3), goBack: { _ in })
+        #expect(model.creatingAfterName())
+        #expect(model.creating)
+        model.endNameHandOff()
+        #expect(model.nameStep != nil)
+        model.beginCreate(camera: camera(3), goBack: { _ in })
+        #expect(model.flow != nil)
+    }
+
+    @Test func aLocationAnswerThatStopsTheTripPutsTheListBack() {
+        let model = HomeModel()
+        model.askingName = true
+        model.beginNaming(camera: camera(3), goBack: { _ in })
+        // Signed in, but the location check ended without Where to?.
+        model.endNameHandOff()
+        #expect(model.nameStep == nil)
+        #expect(!model.askingName)
+        #expect(model.mode == .list)
+    }
 }

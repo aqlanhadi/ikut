@@ -8,9 +8,11 @@ import SwiftUI
 /// and the one sheet its content (`TripSheetSpec`), and moves the shared camera, so opening a trip is a camera move and
 /// a sheet change on the same map.
 struct TripsHomeView: View {
-    @Environment(AuthModel.self) private var auth
+    @Environment(AuthModel.self) var auth
     @Environment(TripScreenModel.self) private var stage
     @Environment(LocationPermission.self) private var location
+    /// The name step's field (`nameStepSheet`).
+    @FocusState var nameFocused: Bool
     /// Home's flows and what they remember (`HomeModel`); HomeView makes it and hands it in.
     let given: HomeModel
     /// A demo's own model, kept across redraws of its parent (which makes a new view, and so a new seeded model, each time).
@@ -488,7 +490,7 @@ struct TripsHomeView: View {
                 JoinSheet(stepper: joinFlow, onClose: closeJoin, onJoined: { joined($0, tracks: $1) })
                     .transition(.opacity)
             } else if let nameStep = model.nameStep {
-                NameStepSheet(step: nameStep, onClose: { model.closeNaming() }, onSignedIn: onNamed)
+                nameStepSheet(nameStep)
                     .transition(.opacity)
             } else if let flow = model.flow {
                 Group {

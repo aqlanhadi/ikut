@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 /// The name step's state and rows, shared by joining (`JoinSheet`, D58) and by Where to? for someone signed out
-/// (`NameStepSheet`, D112), so the typing, the sign-in spinner and the error line behave the same in both.
+/// (`TripsHomeView.nameStepSheet`, D112), so the typing, the sign-in spinner and the error line behave the same in both.
 @MainActor @Observable
 final class NameStepState {
     var name: String
@@ -102,56 +102,5 @@ struct NameStepButton: View {
         .accessibilityIdentifier(AXID.Join.nameContinue)
         .sheetActionBar(sides: false)
         .padding(.bottom, PanelSheet.sideGap)
-    }
-}
-
-/// The name as the first step of Where to? in Home's one sheet (D112): the same step joining opens with, with Close
-/// back to the list. `onSignedIn` runs once the name is signed in; the caller carries on to Where to?.
-struct NameStepSheet: View {
-    @Environment(AuthModel.self) private var auth
-    @Bindable var step: NameStepState
-    var onClose: () -> Void
-    var onSignedIn: () -> Void
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SheetTopRow(title: "Welcome to ikut") {
-                EmptyView()
-            } trailing: {
-                RoundGlassIconButton(systemImage: Symbol.close, label: "Close", action: onClose)
-                    .accessibilityIdentifier(AXID.Sheet.close).disabled(step.isWorking)
-            }
-            .padding(.top, Spacing.xs)
-            .padding(.horizontal, Spacing.l)
-
-            List {
-                NameStepSections(name: $step.name, isWorking: step.isWorking, error: step.error,
-                                 footer: "What the convoy sees in new trips. Starting a trip needs only a name, no account.",
-                                 focused: $focused, onSubmit: submit)
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.interactively)
-            .contentMargins(.bottom, Spacing.l, for: .scrollContent)
-            .onChange(of: step.name) { step.error = nil }
-
-            NameStepButton(isWorking: step.isWorking, enabled: step.isValid, action: submit)
-                .padding(.horizontal, Spacing.l)
-        }
-        .ignoresSafeArea(.container, edges: .bottom)
-        .environment(\.inPanelSheet, true)
-        .buttonSurface(.glass)
-        .task {
-            if step.name.isEmpty { step.name = auth.displayName ?? "" }
-            focused = true
-        }
-    }
-
-    private func submit() {
-        Task {
-            if await step.submit(signIn: { try await auth.signInAsGuest(name: $0) }) { onSignedIn() }
-        }
     }
 }

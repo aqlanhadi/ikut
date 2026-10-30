@@ -79,9 +79,9 @@ MarkerGlide|ViewModifier|Map/TripMapContent.swift|4
 PlaceResultRow|View|Trip/PlaceResultRow.swift|4
 RecapContent|View|Recap/RecapContent.swift|4
 StopNote|View|Lobby/LobbyStopsViews.swift|4
-TripsHomeView|View|App/TripsHomeView.swift|4
 RecapEventDot|View|Recap/RecapView.swift|5
 RouteTotalLine|View|Lobby/LobbyStopsViews.swift|5
+TripsHomeView|View|App/TripsHomeView.swift|5
 DarkBanner|View|Alerts/DarkBanner.swift|11
 StopActionButton|View|Stops/StopCardParts.swift|18
 """
