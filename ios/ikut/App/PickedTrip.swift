@@ -218,6 +218,11 @@ enum HomePickedDemo {
                 place: ipoh, route: BuiltRoute(distance: 205_000, travelTime: 9_600, name: "E1", polyline: Polyline.encode(LobbyStopsDemo.route)))
             flow.showCreateStateForDemo(creating: name == "new-trip-creating")
             return TripsHomeView(demo: past, routes: [thin], creating: flow)
+        case "new-trip-name", "new-trip-name-typed", "new-trip-name-signing-in", "new-trip-name-error":
+            let step = NameStepState(name: name == "new-trip-name" ? "" : "Nurul")
+            step.isWorking = name == "new-trip-name-signing-in"
+            if name == "new-trip-name-error" { step.error = "Couldn’t sign you in. Check your signal and try again." }
+            return TripsHomeView(demo: past, routes: [thin], naming: step)
         case "list-tall": return TripsHomeView(demo: past, routes: [thin], expanded: true)
         default: return TripsHomeView(demo: past, routes: [thin])
         }

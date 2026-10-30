@@ -251,10 +251,12 @@ class ConvoyUITestCase: XCTestCase {
     /// monitor can answer a permission prompt.
     func enterNameIfAsked(_ name: String) {
         let sheetName = app.textFields["Your name"]
-        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists {
+        // Where to? asks in Home's sheet with the join step's "Get started" (D112); the standalone sheet says "Continue".
+        let inSheet = app.buttons["joinNameContinue"]
+        if sheetName.waitForExistence(timeout: 3), app.buttons["Continue"].exists || inSheet.exists {
             sheetName.tap()
             sheetName.typeText(name)
-            let continueButton = app.buttons["Continue"]
+            let continueButton = inSheet.exists ? inSheet : app.buttons["Continue"]
             continueButton.tap()
             // The keyboard going down can move the sheet under that tap: tap again if it's still there.
             if !sheetName.waitForNonExistence(timeout: 5), continueButton.isHittable { continueButton.tap() }

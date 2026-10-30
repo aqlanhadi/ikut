@@ -50,8 +50,9 @@ enum HomeSheet {
     /// up or down, so going on or back never resizes the sheet.
     static let joinHeight: CGFloat = 560
 
-    @MainActor static func mode(flow: NewTripFlow?, leftTripPicked: Bool = false, joining: Bool = false) -> Mode {
-        if joining { return .join }
+    @MainActor static func mode(flow: NewTripFlow?, leftTripPicked: Bool = false, joining: Bool = false, naming: Bool = false) -> Mode {
+        // The name step before Where to? is the join steps' height, so it doesn't resize before Where to? takes over (D112).
+        if joining || naming { return .join }
         guard let flow else { return leftTripPicked ? .leftTrip : .list }
         return flow.ready == nil ? .whereTo : .newTrip
     }

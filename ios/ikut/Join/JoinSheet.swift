@@ -115,17 +115,7 @@ struct JoinSheet: View {
     @ViewBuilder private var bottomBar: some View {
         switch stepper.step {
         case .name:
-            Button(action: submitName) {
-                Group {
-                    if isWorking { ProgressView().accessibilityLabel("Signing in") } else { Text("Get started") }
-                }
-                .font(.headline).frame(maxWidth: .infinity)
-            }
-            .ikutButton(.primary, tint: .ikutAccentFill)
-            .disabled(!stepper.canContinue || isWorking)
-            .accessibilityIdentifier(AXID.Join.nameContinue)
-            .sheetActionBar(sides: false)
-            .padding(.bottom, PanelSheet.sideGap)
+            NameStepButton(isWorking: isWorking, enabled: stepper.canContinue, action: submitName)
         case .location:
             Button(action: askLocation) {
                 Group {
@@ -196,14 +186,9 @@ struct JoinSheet: View {
         isWorking = true
         nameError = nil
         Task {
-            do {
-                try await auth.signInAsGuest(name: model.displayName)
-                isWorking = false
-                goNext()
-            } catch {
-                nameError = error.localizedDescription
-                isWorking = false
-            }
+            nameError = await NameStepState.attempt(name: model.displayName) { try await auth.signInAsGuest(name: $0) }
+            isWorking = false
+            if nameError == nil { goNext() }
         }
     }
 
@@ -223,33 +208,9 @@ struct JoinSheet: View {
 
     @ViewBuilder private var nameStep: some View {
         @Bindable var model = model
-        Section {
-            TextField("Your name", text: $model.displayName)
-                .textContentType(.givenName)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.continue)
-                .focused($nameFocused)
-                .disabled(isWorking)
-                .accessibilityLabel("Your name")
-                .accessibilityIdentifier(AXID.Name.field)
-                .onSubmit(submitName)
-        } header: {
-            // The line and the caption share the header, so the field stays as high as it was above the keyboard.
-            VStack(alignment: .leading, spacing: Spacing.m) {
-                Text("Drive together. Arrive together.")
-                    .font(.title3).foregroundStyle(.secondary).textCase(nil)
-                Text("Your name").accessibilityHidden(true)
-            }
-        } footer: {
-            Text("What the convoy sees in new trips. Joining needs only a name, no account.")
-        }
-        if let nameError {
-            Section {
-                InlineNote(.verbatim(nameError), tone: .alert, inset: 0)
-                    .lobbyRow()
-                    .accessibilityIdentifier(AXID.Name.error)
-            }
-        }
+        NameStepSections(name: $model.displayName, isWorking: isWorking, error: nameError,
+                         footer: "What the convoy sees in new trips. Joining needs only a name, no account.",
+                         focused: $nameFocused, onSubmit: submitName)
     }
 
     private var firstName: String { (try? DisplayName.validate(model.displayName).get()) ?? model.displayName }

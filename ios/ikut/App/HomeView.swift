@@ -231,7 +231,9 @@ struct HomeView: View {
                 onOpenTrip: { entry, started in begin(.trip(tripId: entry.id, started: started)) },
                 // The organiser tracks their own car; a joiner when they share theirs.
                 onCreated: { tripId in openTrip(tripId, started: false, tracks: true) },
-                onJoined: { tripId, tracks in openTrip(tripId, started: false, tracks: tracks) }
+                onJoined: { tripId, tracks in openTrip(tripId, started: false, tracks: tracks) },
+                // The name step in Home's sheet signed the person in: location, then Where to? in the same sheet (D112).
+                onNamed: { Task { await open(.create, keepingSheet: true) } }
             )
         }
     }
@@ -292,7 +294,10 @@ struct HomeView: View {
             home.joining = JoinStart(code: code)
             return
         }
-        if auth.state == .signedIn {
+        if case .create = route, HomeModel.newTripStart(signedIn: auth.state == .signedIn) == .name {
+            // The name is the first step of Where to?, in Home's one sheet (D112): no separate name sheet.
+            home.askingName = true
+        } else if auth.state == .signedIn {
             Task { await open(route) }
         } else {
             afterName = route
@@ -300,11 +305,16 @@ struct HomeView: View {
         }
     }
 
-    private func open(_ route: Route, replacing: Bool = false) async {
+    /// `keepingSheet`: Home's sheet is showing the name step and stays up (the spinner on it) through iOS's location
+    /// prompt, until Where to? replaces it; any other end puts the list back.
+    private func open(_ route: Route, replacing: Bool = false, keepingSheet: Bool = false) async {
         // A join link (or code) opened during Where to? or New trip leaves that flow: Home is not left on it afterwards.
         if case .join = route { home.creating = false }
-        opening = true
-        defer { opening = false }
+        opening = !keepingSheet
+        defer {
+            opening = false
+            if keepingSheet, !home.creating { home.closeNaming() }
+        }
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
