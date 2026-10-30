@@ -572,6 +572,15 @@ final class TripScreenModel {
         withTransaction(Transaction(animation: nil)) { camera = position }
     }
 
+    /// A refit that waits for the flight in the air to land (`CameraFlight.hold`), then glides. What it waits to show is
+    /// what the camera is aimed at from now, so a later fit of the same view as the flight's is not mistaken for "already
+    /// aimed" and dropped while this stale one is still pending (D118: the lobby's first measure of a tall navigation bar
+    /// held one region, the corrected fit equalled the flight's own and was skipped, and the stale one landed).
+    func hold(nudgeTo position: MapCameraPosition, reduceMotion: Bool) {
+        aimed = position
+        flight.hold { [weak self] in self?.nudge(to: position, reduceMotion: reduceMotion) }
+    }
+
     /// Every camera move on Home and the lobby's held refit (D57): a near move glides, a far one pulls out, travels and
     /// settles, and with Reduce Motion each is one short ease. A placed refit while a flight is in the air waits for it
     /// to land; a tiny change keeps the shortest glide. The view already aimed at, with the map not moved since, is no
@@ -583,7 +592,7 @@ final class TripScreenModel {
         switch HomeCamera.step(animated: animated, flyingTo: flight.destination, seen: seenView, to: view) {
         case .place: place(position)
         case .nudge: glide()
-        case .hold: flight.hold(glide)
+        case .hold: hold(nudgeTo: position, reduceMotion: reduceMotion)
         case .fly: if let view { fly(to: position, view: view, reduceMotion: reduceMotion) }
         }
     }

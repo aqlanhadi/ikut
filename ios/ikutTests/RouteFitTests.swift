@@ -1,6 +1,7 @@
 import CoreLocation
 import MapKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import ikut
 
@@ -115,5 +116,23 @@ struct RouteFitTests {
         #expect(CornerButton.edge == 16)
         #expect(CornerButton.top == Spacing.s)
         #expect(LobbyMapLogic.buttonBand == CornerButton.top + 56 + Spacing.xs)
+    }
+
+    /// D118: a refit held for a flight in the air is what the camera is aimed at from then on, so a later fit equal to the
+    /// flight's own is a real move back, not "already aimed": the stale held region no longer lands last.
+    @MainActor @Test func aHeldRefitIsTheAimSoALaterFitIsNotDropped() {
+        let stage = TripScreenModel()
+        func position(_ lat: Double) -> MapCameraPosition {
+            .region(MKCoordinateRegion(center: .init(latitude: lat, longitude: 101.4), span: .init(latitudeDelta: 5, longitudeDelta: 3)))
+        }
+        let flying = position(3.65)
+        stage.fly(to: flying, view: CameraView(latitude: 3.65, longitude: 101.4, latitudeSpan: 5), reduceMotion: false)
+        #expect(stage.flight.isFlying)
+        stage.hold(nudgeTo: position(4.07), reduceMotion: false)
+        #expect(stage.aimed == position(4.07))
+        #expect(stage.aimed != flying)
+        stage.hold(nudgeTo: flying, reduceMotion: false)
+        #expect(stage.aimed == flying)
+        stage.flight.cancel()
     }
 }
