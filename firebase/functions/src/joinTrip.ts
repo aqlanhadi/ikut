@@ -169,8 +169,13 @@ export async function joinTripTransaction(
     // Writes.
     let trackerTaken = false;
     let carTracker: string | undefined = existingCar?.trackerUserId;
+    // D97: only the organizer can become the lead car's tracker. Anyone else joins it as a passenger
+    // (trackerTaken, like a car with a tracker), so a joiner cannot close stop requests or Leave stops.
+    const leadNotYours = existingCar?.isLead === true && trip.organizerId !== uid;
     if (input.tracker) {
-      if (carTracker === undefined || carTracker === null || carTracker === uid) {
+      if (leadNotYours) {
+        trackerTaken = true;
+      } else if (carTracker === undefined || carTracker === null || carTracker === uid) {
         carTracker = uid;
       } else {
         trackerTaken = true;

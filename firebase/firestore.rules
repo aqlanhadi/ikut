@@ -339,12 +339,16 @@ service cloud.firestore {
           && (userId == request.auth.uid || isOrganizer(tripId));
       }
 
-      // Cars: members create; tracker/organizer/claimers update narrowly; organizer deletes.
+      // Cars: a member creates only the car their own member doc names (carId), so a member has at most one
+      // car and cars <= members (<= MAX_MEMBERS, 20); nobody can add ghost cars or fill a trip with cars.
+      // Joiners get their car from joinTrip (admin SDK). A free car is claimed only by joinTrip too; the
+      // tracker/organizer update narrowly; organizer deletes.
       match /cars/{carId} {
         allow read: if isMember(tripId);
 
         allow create: if isMember(tripId)
           && tripActive(tripId)
+          && get(memberPath(tripId, request.auth.uid)).data.carId == carId
           && request.resource.data.keys().hasOnly(['name', 'color', 'trackerUserId',
                                                    'isLead', 'route', 'mergeOffset', 'state',
                                                    'number'])
@@ -360,13 +364,9 @@ service cloud.firestore {
           && validCarFields(request.resource.data)
           && request.resource.data.isLead is bool
           && (
-            // Claim a free car.
-            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId'])
-              && optionalOf(resource.data, 'trackerUserId') == null
-              && request.resource.data.trackerUserId == request.auth.uid)
             // Release as the current tracker.
             // Releasing also clears a pause, so the next tracker does not inherit it.
-            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId', 'pausedAt'])
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trackerUserId', 'pausedAt'])
               && optionalOf(resource.data, 'trackerUserId') == request.auth.uid
               && optionalOf(request.resource.data, 'trackerUserId') == null
               && optionalOf(request.resource.data, 'pausedAt') == null)

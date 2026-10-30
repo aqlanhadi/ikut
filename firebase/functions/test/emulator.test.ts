@@ -118,6 +118,30 @@ describe("joinTrip (emulator)", () => {
     assert.equal((await tripRef.collection("members").doc(user.uid).get()).data()!.carId, "lead");
   });
 
+  // D97: a joiner cannot become the lead car's tracker; only the organizer can.
+  it("a joiner cannot take the tracker of an untracked lead car", async () => {
+    const { code, tripRef } = await seedTrip();
+    await tripRef.collection("cars").doc("lead").update({ trackerUserId: FieldValue.delete() });
+    const r = await call({ code, displayName: "Sam", car: { existingCarId: "lead" }, tracker: true }, user.token);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.result.trackerTaken, true);
+    assert.equal((await tripRef.collection("cars").doc("lead").get()).data()!.trackerUserId, undefined);
+    assert.equal((await tripRef.collection("members").doc(user.uid).get()).data()!.carId, "lead");
+  });
+
+  it("the organizer can track the lead car again", async () => {
+    const { code, tripRef, organizerId } = await seedTrip();
+    await tripRef.collection("cars").doc("lead").update({ trackerUserId: FieldValue.delete() });
+    const org = await newUser();
+    await tripRef.update({ organizerId: org.uid });
+    await tripRef.collection("members").doc(org.uid).set({ displayName: "Org", carId: "lead", role: "organizer" });
+    await tripRef.collection("members").doc(organizerId).delete();
+    const r = await call({ code, displayName: "Org", car: { existingCarId: "lead" }, tracker: true }, org.token);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.result.trackerTaken, false);
+    assert.equal((await tripRef.collection("cars").doc("lead").get()).data()!.trackerUserId, org.uid);
+  });
+
   it("existing car must belong to the trip", async () => {
     const { code } = await seedTrip();
     const r = await call({ code, displayName: "Sam", car: { existingCarId: "nope" }, tracker: false }, user.token);
