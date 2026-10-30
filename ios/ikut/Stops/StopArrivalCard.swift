@@ -63,7 +63,7 @@ struct StopArrivalCard: View {
                 target: target, convoy: model.convoy.convoy, joining: model.convoy.joining, pace: model.stopPace(), now: now,
                 skipping: skippers, cars: model.cars)
             let mine = tally.rows.first { $0.id == model.myCarId }
-            CardSheetFrame(title: stop.name, subtitle: subtitle(stop), onClose: onClose) {
+            CardSheetFrame(title: .verbatim(stop.name), subtitle: .verbatim(subtitle(stop)), onClose: onClose) {
                 if let mine { me(mine.status, stop: stop) }
                 progress(tally)
                 VStack(spacing: 0) {
@@ -264,7 +264,7 @@ struct StopArrivalCard: View {
                         confirming = false
                     }
                 } else {
-                    StopActionButton(title: "Leave", subtitle: waiting, style: .primary, id: AXID.Stop.leave) {
+                    StopActionButton(title: "Leave", subtitle: waiting.map { .verbatim($0) }, style: .primary, id: AXID.Stop.leave) {
                         couldNotLeave = false
                         confirming = true
                     }

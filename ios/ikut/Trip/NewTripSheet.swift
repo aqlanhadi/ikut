@@ -21,7 +21,7 @@ struct WhereToSheet: View {
             List {
                 if let message = model.errorMessage {
                     Section {
-                        InlineNote(message, tone: .alert)
+                        InlineNote(.verbatim(message), tone: .alert)
                             .accessibilityIdentifier(AXID.Trip.createError)
                             .lobbyRow(top: Spacing.m)
                     }
@@ -68,7 +68,7 @@ struct WhereToSheet: View {
     }
 
     /// Cancel: a glass capsule on the sheet (iOS 26), plain accent text otherwise.
-    @ViewBuilder private func glassCapsule(_ title: String, action: @escaping () -> Void) -> some View {
+    @ViewBuilder private func glassCapsule(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         if GlassSurface.useGlass, #available(iOS 26, *) {
             Button(action: action) { Text(title) }
                 .ikutButton(.secondary, tint: .primary)
@@ -91,7 +91,7 @@ struct NewTripSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTopRow(
-                title: ready.place.name, subtitle: NewTripFlow.detailLine(place: ready.place, route: ready.route),
+                title: .verbatim(ready.place.name), subtitle: .verbatim(NewTripFlow.detailLine(place: ready.place, route: ready.route)),
                 titleLabel: "New trip to \(ready.place.name)"
             ) {
                 backButton
@@ -117,7 +117,7 @@ struct NewTripSheet: View {
                 }
                 if let message = flow.createError {
                     Section {
-                        InlineNote(message, tone: .alert)
+                        InlineNote(.verbatim(message), tone: .alert)
                             .accessibilityIdentifier(AXID.Trip.createError)
                             .lobbyRow()
                     }

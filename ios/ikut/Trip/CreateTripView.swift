@@ -47,7 +47,7 @@ struct CreateTripView: View {
 
             if let message = model.errorMessage {
                 Section {
-                    InlineNote(message, tone: .alert)
+                    InlineNote(.verbatim(message), tone: .alert)
                         .accessibilityIdentifier(AXID.Trip.createError)
                         .lobbyRow()
                 }

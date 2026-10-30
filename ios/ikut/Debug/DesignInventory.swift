@@ -155,8 +155,8 @@ color|#BE185D|BE185D|Trip/TripService.swift:18
 color|#A16207|A16207|Trip/TripService.swift:18
 opacity|0.25||UI/GlassSurface.swift:86
 frame|minHeight 58||UI/Theme.swift:198
-frame|height 28||UI/TripComponents.swift:106
-frame|width 2||UI/TripComponents.swift:228
+frame|height 28||UI/TripComponents.swift:108
+frame|width 2||UI/TripComponents.swift:230
 """
 
     /// group | token name, for the token ratchet

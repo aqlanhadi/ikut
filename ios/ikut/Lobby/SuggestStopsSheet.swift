@@ -166,7 +166,7 @@ struct SuggestStopsSheet: View {
         }
     }
 
-    private func note(_ text: String) -> some View {
+    private func note(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.body).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier(AXID.Suggest.note)
     }
@@ -194,7 +194,7 @@ struct SuggestStopsSheet: View {
             Text(SuggestStopsModel.along(pick)).font(.subheadline).foregroundStyle(.secondary)
             HStack(spacing: Spacing.s) {
                 ForEach(SuggestStopsModel.chips(pick.place), id: \.self) { chip in
-                    Chip(text: chip, tone: .accent)
+                    Chip(text: .verbatim(chip), tone: .accent)
                 }
             }
             HStack(spacing: Spacing.s) {

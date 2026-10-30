@@ -168,7 +168,7 @@ struct StopCard: View {
     /// same screen with a bigger button.
     private func askScreen(_ reason: StopReason) -> some View {
         let ask = model.ask
-        return CardSheetFrame(title: reason.label, subtitle: "Ask the convoy to stop", onClose: onClose) {
+        return CardSheetFrame(title: .verbatim(reason.label), subtitle: "Ask the convoy to stop", onClose: onClose) {
             if let text = StopLogic.cleanedMessage(ask.message) { StopMessageTile(text: text) }
         } actions: {
             if case .failed(let message) = ask.sending {
@@ -270,7 +270,7 @@ struct StopCard: View {
     /// The one screen for every role: the message in full, a row per car, and the buttons this
     /// viewer may press.
     private func requestScreen(_ state: StopRequestState) -> some View {
-        CardSheetFrame(title: state.title, subtitle: subtitle(state), onClose: onClose) {
+        CardSheetFrame(title: .verbatim(state.title), subtitle: .verbatim(subtitle(state)), onClose: onClose) {
             if let message = state.message { StopMessageTile(text: message) }
             ForEach(state.rows) { StopVoterRow(row: $0) }
             StopPlaceRows(places: model.places.places)

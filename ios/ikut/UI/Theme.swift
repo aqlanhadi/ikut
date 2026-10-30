@@ -63,14 +63,14 @@ extension View {
 /// Small uppercase caption above a card, or above a group of tiles (`inset: Spacing.xs`).
 /// `content` sits after the title, e.g. the lobby's progress bar and "3 of 4 ready".
 struct CardHeader<Content: View>: View {
-    var title: String
+    var title: LocalizedStringKey
     var inset: CGFloat
     var top: CGFloat
     var bottom: CGFloat
     var content: Content
 
     init(
-        _ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.s,
+        _ title: LocalizedStringKey, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.s,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -95,7 +95,7 @@ struct CardHeader<Content: View>: View {
 }
 
 extension CardHeader where Content == EmptyView {
-    init(_ title: String, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.s) {
+    init(_ title: LocalizedStringKey, inset: CGFloat = Spacing.l, top: CGFloat = Spacing.l, bottom: CGFloat = Spacing.s) {
         self.init(title, inset: inset, top: top, bottom: bottom) { EmptyView() }
     }
 }
@@ -132,8 +132,8 @@ struct MapCloseButton: View {
 
 /// Sheet title with its one-line explanation and the close button.
 struct SheetHeader: View {
-    var title: String
-    var subtitle: String?
+    var title: LocalizedStringKey
+    var subtitle: LocalizedStringKey?
     var subtitleFont: Font = .footnote
     /// Moves the close button, for a card whose corners are rounder than a sheet's.
     var closeOffset: CGSize = .zero
@@ -162,12 +162,12 @@ struct SheetHeader: View {
 /// Inset to line up with the text inside cards.
 struct InlineNote: View {
     enum Tone { case hint, alert }
-    var text: String
+    var text: LocalizedStringKey
     var systemImage: String?
     var tone: Tone
     var inset: CGFloat
 
-    init(_ text: String, systemImage: String? = nil, tone: Tone = .hint, inset: CGFloat = Spacing.l) {
+    init(_ text: LocalizedStringKey, systemImage: String? = nil, tone: Tone = .hint, inset: CGFloat = Spacing.l) {
         self.text = text
         self.systemImage = systemImage
         self.tone = tone
@@ -187,9 +187,9 @@ struct InlineNote: View {
 
 /// Centered one-line message in place of a card's rows: "No cars yet".
 struct EmptyRow: View {
-    var text: String
+    var text: LocalizedStringKey
 
-    init(_ text: String) { self.text = text }
+    init(_ text: LocalizedStringKey) { self.text = text }
 
     var body: some View {
         Text(text)

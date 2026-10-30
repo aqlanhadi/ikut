@@ -126,7 +126,7 @@ struct AddStopContent: View {
             .lobbyRow()
         }
         if let message = model.search.errorMessage {
-            Section { InlineNote(message, tone: .alert).lobbyRow() }
+            Section { InlineNote(.verbatim(message), tone: .alert).lobbyRow() }
         }
         if model.search.showsList || searchFocused {
             PlaceSearchResults(model: model.search, distance: .alongRoute, showsKind: true, onPick: { place in
@@ -261,7 +261,7 @@ struct AddStopContent: View {
                 HStack(spacing: Spacing.s) {
                     chip("None", selected: model.searchedMinutes == nil) { model.searchedMinutes = nil }
                     ForEach(PlannedStop.allowedMinutes, id: \.self) { value in
-                        chip(StopFormat.length(minutes: value), selected: model.searchedMinutes == value) { model.searchedMinutes = value }
+                        chip(.verbatim(StopFormat.length(minutes: value)), selected: model.searchedMinutes == value) { model.searchedMinutes = value }
                     }
                 }
                 .lobbyRow()
@@ -297,7 +297,7 @@ struct AddStopContent: View {
         .accessibilityIdentifier(AXID.AddStop.kind(option.rawValue))
     }
 
-    private func chip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func chip(_ label: LocalizedStringKey, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
                 .font(.subheadline.weight(.semibold))

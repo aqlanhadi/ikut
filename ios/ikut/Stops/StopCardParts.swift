@@ -6,9 +6,9 @@ import SwiftUI
 struct StopActionButton: View {
     enum Style { case primary, secondary, positive, ghost, destructive }
 
-    var title: String
+    var title: LocalizedStringKey
     /// A small second line under the title ("Hafiz is 3 min away").
-    var subtitle: String?
+    var subtitle: LocalizedStringKey?
     var style: Style = .secondary
     /// Nil: the size `ikutButton` gives (the driving screen's big mode passes the button's total height).
     var height: CGFloat?

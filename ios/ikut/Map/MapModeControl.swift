@@ -20,7 +20,7 @@ struct MapModeControl: View {
         .sensoryFeedback(.selection, trigger: taps)
     }
 
-    private func button(_ target: MapMode, symbol: String, label: String) -> some View {
+    private func button(_ target: MapMode, symbol: String, label: LocalizedStringKey) -> some View {
         Button { mode = target; taps += 1 } label: {
             Image(systemName: symbol)
                 .ikutGlyph(17, weight: .semibold)

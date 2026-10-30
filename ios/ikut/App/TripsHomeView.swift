@@ -151,7 +151,7 @@ struct TripsHomeView: View {
         .task(id: cameraTour) { if cameraTour { await playCameraTour() } }
         .overlay(alignment: .top) {
             if cameraTour {
-                Chip(text: tourCaption, tone: .neutral, fill: .material)
+                Chip(text: .verbatim(tourCaption), tone: .neutral, fill: .material)
                     .padding(.top, 70)
                     .accessibilityIdentifier(AXID.Map.cameraTourCaption)
                     .allowsHitTesting(false)

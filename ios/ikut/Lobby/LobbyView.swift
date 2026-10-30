@@ -585,7 +585,7 @@ struct LobbyView: View {
                     carsSection
                     if let actionError {
                         Section {
-                            InlineNote(actionError, tone: .alert)
+                            InlineNote(.verbatim(actionError), tone: .alert)
                                 .lobbyRow(top: Spacing.m)
                         }
                     }
@@ -631,8 +631,8 @@ struct LobbyView: View {
         let sharing = LobbyContent.subtitleSharing(
             tracking: isSample ? sampleSharing : session.isTracking, paused: session.isPaused, started: isStarted, ended: ended)
         return SheetTopRow(
-            title: trip.map { LobbyContent.headerTitle(tripName: $0.name, started: isStarted, ended: ended) } ?? "",
-            subtitle: LobbyContent.subtitleWords(subtitle, sharing: sharing), subtitleIdentifier: AXID.Lobby.subtitle,
+            title: .verbatim(trip.map { LobbyContent.headerTitle(tripName: $0.name, started: isStarted, ended: ended) } ?? ""),
+            subtitle: LobbyContent.subtitleWords(subtitle, sharing: sharing).map { .verbatim($0) }, subtitleIdentifier: AXID.Lobby.subtitle,
             styledSubtitle: sharing ? sharingSubtitle(subtitle) : nil
         ) {
             RoundGlassIconButton(systemImage: Symbol.backTrailing, label: "Back to trips", action: backToTrips)

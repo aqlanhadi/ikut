@@ -120,7 +120,7 @@ struct RoundGlassIconButton: View {
     enum Style { case glass, quiet, bare }
     private enum Face { case symbol(String), text(String) }
     private var face: Face
-    var label: String
+    var label: LocalizedStringKey
     /// Only with `exact`: the final side.
     var size: CGFloat?
     var style = Style.glass
@@ -133,7 +133,7 @@ struct RoundGlassIconButton: View {
     /// What Apple's large circle style adds around its label, measured (46 pt for a 17 pt "xmark").
     private static let systemPadding: CGFloat = 27
 
-    init(systemImage: String, label: String, size: CGFloat? = nil, style: Style = .glass, glyph: Font? = nil, exact: Bool = false, action: @escaping () -> Void) {
+    init(systemImage: String, label: LocalizedStringKey, size: CGFloat? = nil, style: Style = .glass, glyph: Font? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .symbol(systemImage)
         self.label = label
         self.size = size
@@ -144,7 +144,7 @@ struct RoundGlassIconButton: View {
     }
 
     /// A text face, such as the person's initial: semibold, shrinking to fit the circle.
-    init(text: String, label: String, size: CGFloat? = nil, exact: Bool = false, action: @escaping () -> Void) {
+    init(text: String, label: LocalizedStringKey, size: CGFloat? = nil, exact: Bool = false, action: @escaping () -> Void) {
         face = .text(text)
         self.label = label
         self.size = size
@@ -217,10 +217,10 @@ struct RoundIconSymbol: View {
 /// (semibold title3; two at accessibility sizes), the subtitle up to two (footnote), truncating in the middle. Give it
 /// the sheet's side insets (`Spacing.l`) where it is used.
 struct SheetTopRow<Leading: View, Trailing: View>: View {
-    var title: String
-    var subtitle: String?
+    var title: LocalizedStringKey
+    var subtitle: LocalizedStringKey?
     /// What VoiceOver reads for the title when it should say more than the title.
-    var titleLabel: String?
+    var titleLabel: LocalizedStringKey?
     var subtitleIdentifier: String?
     /// A subtitle with parts in colour (the lobby's "Sharing", #394), drawn instead of `subtitle`'s plain words.
     var styledSubtitle: Text?
@@ -261,7 +261,7 @@ struct SheetTopRow<Leading: View, Trailing: View>: View {
 /// The same round button for the system share sheet (a `ShareLink`, which isn't a `Button` to wrap).
 struct RoundGlassShareLink: View {
     var item: String
-    var label = "Share invite"
+    var label: LocalizedStringKey = "Share invite"
 
     var body: some View {
         ShareLink(item: item) { Image(systemName: Symbol.share) }
@@ -326,7 +326,7 @@ struct SheetSearchField<Field: View>: View {
 
 /// The button form: the same bar with a placeholder, tapped to start the search.
 struct SheetSearchButton: View {
-    var placeholder: String
+    var placeholder: LocalizedStringKey
     var action: () -> Void
 
     var body: some View {
