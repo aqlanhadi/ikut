@@ -74,10 +74,10 @@ struct TripMapView: View {
     @State private var inputsWatch = CameraInputsWatch()
     /// The text-size scale for the map's one bottom padding, the minimum resting sheet's line (D101, D114).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
-    /// The bottom inset the host keeps the map's safe area at, the same on every screen (`LobbySheet.mapPadding`, D109).
-    /// What covers the map is put into the camera (`cameraRoom`), not into this.
     /// Home's short sheet at this text size: the folded convoy sheet is never lower (D114).
     private var homeShort: CGFloat { LobbySheet.homeShort(scaledMedium: mediumHeight) }
+    /// The bottom inset the host keeps the map's safe area at, the same on every screen (`LobbySheet.mapPadding`, D109).
+    /// What covers the map is put into the camera (`cameraRoom`), not into this.
     private var legalInset: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
     /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
     @State private var latitudePerPointPerMeter = 0.0

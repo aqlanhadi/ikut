@@ -208,7 +208,7 @@ struct LobbyMapTests {
             == Double(LobbyMapLogic.typicalBar + band + LobbyMapLogic.flagRoom) / 874)
         #expect(LobbyMapLogic.topFraction(mapHeight: 1000, safeTop: 62)
             == Double(62 + band + LobbyMapLogic.flagRoom) / 1000)
-        // The map's bottom padding (the medium sheet) is not part of what the region is fitted into.
+        // The map's bottom padding (Home's short sheet) is not part of what the region is fitted into.
         #expect(LobbyMapLogic.topFraction(mapHeight: 874, safeTop: 62, bottomPadding: 500)
             == Double(62 + band + LobbyMapLogic.flagRoom) / 374)
     }
