@@ -9,6 +9,9 @@ struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(LocationPermission.self) private var location
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The list's short sheet and the lobby's medium one at the text size: the list's reach and the map's one padding.
+    @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
+    @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
 
     private enum Route: Hashable {
         case create
@@ -264,7 +267,9 @@ struct HomeView: View {
     /// appears an update later: the routes, where you are and the map's height are all known here.
     private func enterHome() {
         if home.here == nil, home.routes.isEmpty { home.here = TripsHomeView.lastKnownLocation() }
-        if let camera = home.entryCamera(mapHeight: stage.space.frame.height) {
+        if let camera = home.entryCamera(
+            mapHeight: stage.space.frame.height, reach: HomeSheet.reach(.list, compact: HomeSheet.compact(scaled: shortHeight)),
+            padding: LobbySheet.mapPadding(scaledMedium: mediumHeight)) {
             stage.move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera), reduceMotion: reduceMotion)
         }
         stage.enteredWithCamera()

@@ -288,8 +288,8 @@ struct TripMapView: View {
     }
 
     /// What the host's map draws for driving. MapKit centers the camera, and fits regions, inside the map's safe area
-    /// (the host's one constant padding, `legalInset`); `cameraRoom` does the same for the rest of what covers the map, so my car is in the middle of
-    /// what can be seen.
+    /// (the host's one constant padding, `legalInset`); `cameraRoom` does the same for the rest of what covers the
+    /// map, so my car is in the middle of what can be seen.
     private var mapSpec: TripMapSpec {
         TripMapSpec(
             input: .driving(route: model.mainRouteCoordinates, overlays: model.overlays,
@@ -357,7 +357,8 @@ struct TripMapView: View {
         move(to: model.cameraTarget, animated: true, plan: plan, step: step)
     }
 
-    /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`); its `bottom` is negative when the cover is lower than the padding.
+    /// The visible strip the camera aims at, inside the frame MapKit fits to (the map less `legalInset`); its
+    /// `bottom` is negative when the cover is lower than the padding.
     private var cameraRoom: MapCameraRoom {
         let inputs = cameraInputs
         return MapCameraRoom(

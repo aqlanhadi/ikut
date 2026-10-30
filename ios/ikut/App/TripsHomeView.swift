@@ -44,7 +44,7 @@ struct TripsHomeView: View {
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
     /// The lobby's medium height at the text size, for the map's one constant bottom padding (the host's, D109).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
-    private var mapPadding: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
+    var mapPadding: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if DEBUG
     /// Demo that can be tapped through: picking a trip gives it this recap (no server). `tour` also picks the
@@ -134,7 +134,7 @@ struct TripsHomeView: View {
                 // Once per appearance (Home is new after a trip): where the phone last knew you were.
                 if model.here == nil, !model.isDemo, model.routes.isEmpty { model.here = Self.lastKnownLocation() }
                 // The app's first frame (back from a trip, HomeView flies it with the switch, `enteredWithCamera`).
-                if let camera = model.entryCamera(mapHeight: mapHeight) {
+                if let camera = model.entryCamera(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding) {
                     move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
                 }
             }
@@ -327,7 +327,7 @@ struct TripsHomeView: View {
     /// Points the camera at every drawn route, above the compact sheet.
     func fit(animated: Bool) {
         guard model.flow == nil, model.joinFlow == nil else { return }
-        let insets = Self.obscured(mapHeight: mapHeight)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         guard let region = PastTripsMapLogic.region(fitting: model.routes, bottomObscured: insets.bottom,
                                                     topObscured: insets.top) else { return }
         move(to: .region(region), animated: animated)
@@ -424,7 +424,7 @@ struct TripsHomeView: View {
     /// The list's view of you above its short sheet, when it has no routes to show.
     private func showHere(animated: Bool) {
         guard let here = model.here, model.flow == nil, model.joinFlow == nil, model.picked == nil, model.routes.isEmpty else { return }
-        let insets = Self.obscured(mapHeight: mapHeight)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         move(to: .region(HomeCamera.around(here, bottomObscured: insets.bottom, topObscured: insets.top)), animated: animated)
     }
 
@@ -467,7 +467,7 @@ struct TripsHomeView: View {
     // MARK: Sheet
 
     /// The short detent's height: one for the list and a picked trip.
-    private var compact: CGFloat { HomeSheet.compact(scaled: shortHeight) }
+    var compact: CGFloat { HomeSheet.compact(scaled: shortHeight) }
 
     /// Apple's own sheet over the map: drag it between a short and a tall detent, as in Apple Maps. It is
     /// always up (no dismiss), and the map behind it takes touches while it is short. The name alerts are

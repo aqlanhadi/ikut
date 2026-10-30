@@ -46,7 +46,8 @@ enum PastTripsMapLogic {
 
     /// A region showing every route and destination with some margin, with the content centred in
     /// the part of the map between `topObscured` and `bottomObscured` (fractions of its height, e.g.
-    /// the status bar and the sheet; together clamped to 0.7; a negative bottom lets the band reach below the frame). Nil when there is nothing to show.
+    /// the status bar and the sheet; together clamped to 0.7; a negative bottom lets the band reach below the
+    /// frame). Nil when there is nothing to show.
     static func region(fitting routes: [PastTripRoute], padding: Double = 1.1, minSpan: Double = 0.05,
                        bottomObscured: Double = 0, topObscured: Double = 0) -> MKCoordinateRegion? {
         let all = routes.flatMap { $0.coordinates + [$0.destination] }

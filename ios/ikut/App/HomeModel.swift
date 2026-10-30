@@ -149,8 +149,9 @@ final class HomeModel {
     /// has a height, else the view around you when there are no routes, else the list's camera (worked out before, for a
     /// typical phone). Nil, no move: a flow (Where to?, joining) or a picked trip keeps its own camera, or the routes make
     /// no region.
-    func entryCamera(mapHeight: CGFloat) -> MapCameraPosition? {
-        let insets = TripsHomeView.obscured(mapHeight: mapHeight)
+    func entryCamera(mapHeight: CGFloat, reach: CGFloat = HomeSheet.defaultReach,
+                     padding: CGFloat = LobbySheet.defaultMapPadding) -> MapCameraPosition? {
+        let insets = TripsHomeView.obscured(mapHeight: mapHeight, reach: reach, padding: padding)
         if mapHeight > 0, !routes.isEmpty {
             guard flow == nil, joinFlow == nil else { return nil }
             return PastTripsMapLogic.region(fitting: routes, bottomObscured: insets.bottom, topObscured: insets.top).map { .region($0) }

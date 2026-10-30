@@ -58,7 +58,7 @@ extension TripsHomeView {
     /// trip, a pick, a stop on it, the whole trip, back to trips, and a far hop to Johor Bahru and back.
     func playCameraTour() async {
         func pause(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
-        let insets = Self.obscured(mapHeight: mapHeight)
+        let insets = Self.obscured(mapHeight: mapHeight, reach: HomeSheet.reach(.list, compact: compact), padding: mapPadding)
         let kl = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.687)
         let country = MKCoordinateRegion(center: .init(latitude: 4.2, longitude: 102.0), span: .init(latitudeDelta: 8, longitudeDelta: 6))
         let johor = HomeCamera.around(.init(latitude: 1.4927, longitude: 103.7414), bottomObscured: insets.bottom, topObscured: insets.top)
