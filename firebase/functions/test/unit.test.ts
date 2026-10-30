@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isIdle } from "../src/idle.ts";
-import { runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
+import { Timestamp } from "firebase-admin/firestore";
+import { compareKeys, cursorFromState, cursorToState, runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
 import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
 import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
@@ -219,16 +220,17 @@ describe("App Check options", () => {
   });
 });
 
-// A sorted fake list standing in for the trips query: (ms, id) order, "strictly after the cursor".
+// A sorted fake list standing in for the trips query: (seconds, nanos, id) order, "strictly after the cursor". The
+// times carry microseconds, as real Firestore keeps them (the emulator rounds to milliseconds and hid a bug).
 function fakeList(items: SweepItem<string>[], reads: string[]) {
-  const sorted = [...items].sort((a, b) => a.ms - b.ms || a.id.localeCompare(b.id));
+  const sorted = [...items].sort(compareKeys);
   return async (after: SweepCursor | null, limit: number) => {
-    const rest = sorted.filter((i) => !after || i.ms > after.ms || (i.ms === after.ms && i.id > after.id)).slice(0, limit);
+    const rest = sorted.filter((i) => !after || compareKeys(i, after) > 0).slice(0, limit);
     for (const r of rest) reads.push(r.id);
     return rest;
   };
 }
-const trips = (n: number): SweepItem<string>[] => Array.from({ length: n }, (_, i) => ({ id: `t${String(i).padStart(2, "0")}`, ms: 1000 + i, item: "x" }));
+const trips = (n: number): SweepItem<string>[] => Array.from({ length: n }, (_, i) => ({ id: `t${String(i).padStart(2, "0")}`, seconds: 1000, nanos: 123_456_000 + i * 1000, item: "x" }));
 
 describe("runSweep", () => {
   const base = { pageSize: 3, outOfTime: () => false };
@@ -289,7 +291,7 @@ describe("runSweep", () => {
   });
 
   it("items that share a sort time are each handled once", async () => {
-    const same = ["a", "b", "c", "d"].map((id) => ({ id, ms: 5, item: "x" }));
+    const same = ["a", "b", "c", "d"].map((id) => ({ id, seconds: 5, nanos: 123_456_789, item: "x" }));
     const handled: string[] = [];
     let cursor: SweepCursor | null = null;
     for (let i = 0; i < 4; i++) {
@@ -321,5 +323,46 @@ describe("runSweep", () => {
       cursor = o.cursor;
     }
     assert.equal(seen.size, 4);
+  });
+});
+
+describe("runSweep: a failure that cannot be kept", () => {
+  const base = { pageSize: 3, outOfTime: () => false };
+  it("holds the cursor before the item and stops, so the next run meets it again", async () => {
+    const handled: string[] = [];
+    let full = false;
+    const run = (cursor: SweepCursor | null, boom: boolean) => runSweep<string>({ ...base, list: fakeList(trips(6), []), cursor, maxItems: 100,
+      handle: async (i) => { if (boom && i.id === "t02") throw new Error("boom"); handled.push(i.id); },
+      onFailure: () => { full = true; }, holdOnFailure: () => full });
+    const first = await run(null, true);
+    assert.equal(first.more, true);
+    assert.equal(first.failed, 1);
+    assert.equal(first.cursor?.id, "t01");
+    full = false;
+    const second = await run(first.cursor, false);
+    assert.deepEqual(handled, ["t00", "t01", "t02", "t03", "t04", "t05"]);
+    assert.equal(second.failed, 0);
+  });
+});
+
+describe("cursors", () => {
+  const bound = new Timestamp(2000, 500_000_000);
+  it("keep microseconds: a trip is strictly after its own cursor and before the next", () => {
+    const [a, b] = trips(2);
+    const saved = cursorToState({ seconds: a!.seconds, nanos: a!.nanos, id: a!.id });
+    const back = cursorFromState(saved as any, "job", bound)!;
+    assert.equal(compareKeys(a!, back), 0);
+    assert.ok(compareKeys(b!, back) > 0);
+    assert.equal(back.nanos, 123_456_000);
+  });
+  it("a saved place later than the query's bound is ignored", () => {
+    assert.equal(cursorFromState({ cursorSeconds: 2001, cursorNanos: 0, cursorId: "x" }, "job", bound), null);
+    assert.ok(cursorFromState({ cursorSeconds: 2000, cursorNanos: 499_999_000, cursorId: "x" }, "job", bound));
+  });
+  it("a missing, old or malformed place starts from the beginning", () => {
+    assert.equal(cursorFromState({}, "job", bound), null);
+    assert.equal(cursorFromState({ cursorMs: 5, cursorId: "x" } as any, "job", bound), null);
+    assert.equal(cursorFromState({ cursorSeconds: 5, cursorNanos: -1, cursorId: "x" }, "job", bound), null);
+    assert.equal(cursorFromState({ cursorSeconds: 5, cursorNanos: 1.5, cursorId: "x" }, "job", bound), null);
   });
 });

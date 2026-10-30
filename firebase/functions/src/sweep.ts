@@ -1,15 +1,27 @@
-import { FieldPath, Timestamp, type Firestore, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp, type Firestore, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { logger } from "firebase-functions/v2";
 
-/** Where a sweep stopped: the sort key (milliseconds) of the last trip it handled, and that trip's id to break ties. */
+/**
+ * Where a sweep stopped: the sort key of the last trip it handled, in whole seconds and nanoseconds (Firestore keeps
+ * microseconds, so milliseconds would round a trip's time down and sort the trip after its own cursor), and that
+ * trip's id to break ties.
+ */
 export interface SweepCursor {
-  ms: number;
+  seconds: number;
+  nanos: number;
   id: string;
 }
 
 export interface SweepItem<T> {
   id: string;
-  ms: number;
+  seconds: number;
+  nanos: number;
   item: T;
+}
+
+/** Orders (seconds, nanos, id) keys. */
+export function compareKeys(a: { seconds: number; nanos: number; id: string }, b: { seconds: number; nanos: number; id: string }): number {
+  return a.seconds - b.seconds || a.nanos - b.nanos || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
 export interface SweepOptions<T> {
@@ -30,6 +42,11 @@ export interface SweepOptions<T> {
   wrap?: boolean;
   /** Called with the id of each item that threw. */
   onFailure?: (id: string, err: unknown) => void;
+  /**
+   * Asked after `onFailure`: true means the failure could not be kept for a retry, so the sweep stops with the cursor
+   * still before that item and the next run meets it again, instead of moving past it for good.
+   */
+  holdOnFailure?: () => boolean;
 }
 
 export interface SweepOutcome {
@@ -70,9 +87,13 @@ export async function runSweep<T>(o: SweepOptions<T>): Promise<SweepOutcome> {
       } catch (err) {
         failed++;
         o.onFailure?.(it.id, err);
+        if (o.holdOnFailure?.()) {
+          await o.save?.(cursor);
+          return { cursor, handled, failed, more: true, wrapped: false };
+        }
       }
       handled++;
-      cursor = { ms: it.ms, id: it.id };
+      cursor = { seconds: it.seconds, nanos: it.nanos, id: it.id };
     }
     await o.save?.(cursor);
   }
@@ -82,9 +103,12 @@ export async function runSweep<T>(o: SweepOptions<T>): Promise<SweepOutcome> {
 export function tripsList(base: Query, field: string): (after: SweepCursor | null, limit: number) => Promise<SweepItem<QueryDocumentSnapshot>[]> {
   return async (after, limit) => {
     let q = base.orderBy(field).orderBy(FieldPath.documentId()).limit(limit);
-    if (after) q = q.startAfter(Timestamp.fromMillis(after.ms), after.id);
+    if (after) q = q.startAfter(new Timestamp(after.seconds, after.nanos), after.id);
     const snap = await q.get();
-    return snap.docs.map((d) => ({ id: d.id, ms: (d.get(field) as Timestamp).toMillis(), item: d }));
+    return snap.docs.map((d) => {
+      const at = d.get(field) as Timestamp;
+      return { id: d.id, seconds: at.seconds, nanos: at.nanoseconds, item: d };
+    });
   };
 }
 
@@ -98,7 +122,34 @@ export async function saveState(db: Firestore, job: string, state: object): Prom
   await db.collection("jobState").doc(job).set(state, { merge: true });
 }
 
-export const cursorFromState = (s: { cursorMs?: number | null; cursorId?: string | null }): SweepCursor | null =>
-  typeof s.cursorMs === "number" && typeof s.cursorId === "string" ? { ms: s.cursorMs, id: s.cursorId } : null;
+/**
+ * The saved place, or null to start from the beginning. A place later than `notAfter` (the query's own bound) cannot
+ * have come from this query, so it is ignored, as is anything that is not a seconds/nanos/id triple. Starting from the
+ * beginning because the place is missing or unusable is logged; an explicit null is a finished walk that wrapped.
+ */
+export function cursorFromState(
+  s: { cursorSeconds?: number | null; cursorNanos?: number | null; cursorId?: string | null },
+  job: string,
+  notAfter: Timestamp,
+): SweepCursor | null {
+  if (s.cursorSeconds === null && s.cursorNanos === null && s.cursorId === null) return null;
+  const valid =
+    Number.isInteger(s.cursorSeconds) && Number.isInteger(s.cursorNanos) && typeof s.cursorId === "string"
+    && s.cursorNanos! >= 0 && s.cursorNanos! < 1e9;
+  if (valid) {
+    const c = { seconds: s.cursorSeconds!, nanos: s.cursorNanos!, id: s.cursorId! };
+    if (compareKeys(c, { seconds: notAfter.seconds, nanos: notAfter.nanoseconds, id: "\uffff" }) <= 0) return c;
+    logger.warn(`${job}: saved place is later than the query's bound; starting from the beginning`, { cursor: c });
+    return null;
+  }
+  logger.warn(`${job}: no usable saved place; starting from the beginning`, { saved: s });
+  return null;
+}
 
-export const cursorToState = (c: SweepCursor | null) => ({ cursorMs: c?.ms ?? null, cursorId: c?.id ?? null });
+export const cursorToState = (c: SweepCursor | null) => ({
+  cursorSeconds: c?.seconds ?? null,
+  cursorNanos: c ? c.nanos : null,
+  cursorId: c?.id ?? null,
+  // The old millisecond place, from before the timestamps were exact.
+  cursorMs: FieldValue.delete(),
+});

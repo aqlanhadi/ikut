@@ -67,8 +67,9 @@ export async function purgeEndedTrips(db: Firestore, now: Date, result: PurgeRes
   const deadline = clock() + (opts.tripBudgetMs ?? TRIP_BUDGET_MS);
   const outOfTime = () => clock() >= deadline;
   const endedBefore = Timestamp.fromMillis(now.getTime() - POSITION_RETENTION_MS);
-  const state = await loadState<{ cursorMs: number; cursorId: string; retry: string[] }>(db, PURGE_STATE);
+  const state = await loadState<{ cursorSeconds: number | null; cursorNanos: number | null; cursorId: string | null; retry: string[] }>(db, PURGE_STATE);
   const stillFailing: string[] = [];
+  let retryFull = false;
 
   // Trips that failed last time first.
   for (const id of state.retry ?? []) {
@@ -93,16 +94,20 @@ export async function purgeEndedTrips(db: Firestore, now: Date, result: PurgeRes
       if (!shouldPurgeTripData(item.data() as Trip, now)) return;
       addCounts(result, await purgeOneTrip(db, item.ref));
     },
-    cursor: cursorFromState(state),
+    cursor: cursorFromState(state, PURGE_STATE, endedBefore),
     maxItems: opts.maxTrips ?? MAX_TRIPS_PER_RUN,
     pageSize: TRIP_PAGE_SIZE,
     outOfTime,
     save: (c) => saveState(db, PURGE_STATE, { ...cursorToState(c), retry: stillFailing.slice(0, MAX_RETRY) }),
     onFailure: (id, err) => {
-      stillFailing.push(id);
       result.failed++;
       logger.error("purgeTripData: trip purge failed", { tripId: id, err: String(err) });
+      // With the retry list full this trip cannot be remembered: hold the cursor before it (below) so the next run
+      // meets it again, instead of moving past it for good.
+      if (stillFailing.length >= MAX_RETRY) retryFull = true;
+      else stillFailing.push(id);
     },
+    holdOnFailure: () => retryFull,
   });
   result.examined = outcome.handled;
   result.more = outcome.more;

@@ -5,12 +5,13 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, GeoPoint, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { endIdleTrips } from "../lib/endIdleTrips.js";
-import { purgeTripData } from "../lib/purge.js";
+import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { previewTripData } from "../lib/previewTrip.js";
 import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
 
-const PROJECT = "ikut-b1083";
+// A scratch project for a private emulator (`IKUT_TEST_PROJECT=demo-ikut-d95`); the default is the shared one.
+const PROJECT = process.env.IKUT_TEST_PROJECT ?? "ikut-b1083";
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 const app = initializeApp({ projectId: PROJECT }, "test");
 const db = getFirestore(app);
@@ -776,6 +777,41 @@ describe("member cleanup (emulator)", () => {
   });
 });
 
+/** A time with microseconds, as real Firestore stores them (serverTimestamp() and the emulator's own writes keep whole milliseconds). */
+const subMsTimestamp = (ms: number, subMs: boolean) =>
+  subMs ? new Timestamp(Math.floor(ms / 1000), (ms % 1000) * 1_000_000 + 456_000) : Timestamp.fromMillis(ms);
+
+/** `db` whose batches containing a delete under one of `paths` throw on commit, `times` times each (Infinity: always). */
+function flaky(real: FirebaseFirestore.Firestore, paths: string[], times: number): FirebaseFirestore.Firestore {
+  const left = new Map(paths.map((p) => [p, times]));
+  return new Proxy(real, {
+    get(target, prop) {
+      if (prop !== "batch") {
+        const v = (target as any)[prop];
+        return typeof v === "function" ? v.bind(target) : v;
+      }
+      return () => {
+        const batch = target.batch();
+        let hit: string | undefined;
+        return new Proxy(batch, {
+          get(b, p) {
+            if (p === "delete") return (ref: FirebaseFirestore.DocumentReference, ...rest: any[]) => {
+              hit ??= paths.find((x) => ref.path.startsWith(x + "/") && (left.get(x) ?? 0) > 0);
+              return (b as any).delete(ref, ...rest);
+            };
+            if (p === "commit") return async () => {
+              if (hit) { left.set(hit, left.get(hit)! - 1); throw new Error("flaky: commit refused"); }
+              return b.commit();
+            };
+            const v = (b as any)[p];
+            return typeof v === "function" ? v.bind(b) : v;
+          },
+        });
+      };
+    },
+  });
+}
+
 describe("retention progress (emulator)", () => {
   const NOW = new Date();
   const at = (hours: number) => Timestamp.fromMillis(NOW.getTime() - hours * 3_600_000);
@@ -783,7 +819,7 @@ describe("retention progress (emulator)", () => {
   beforeEach(() => resetJobState("purgeTripData"));
 
   // endedAt 100 days back, `step` minutes apart, so these sort before trips the other tests seed.
-  async function seedOld(n: number) {
+  async function seedOld(n: number, subMs = false) {
     const refs: FirebaseFirestore.DocumentReference[] = [];
     for (let i = 0; i < n; i++) {
       const code = freshCode();
@@ -791,7 +827,7 @@ describe("retention progress (emulator)", () => {
       await ref.set({
         name: "T", code, organizerId: "org-" + code, route: "", destination: { name: "D", coordinate: point },
         status: "ended", createdAt: at(24 * 101),
-        endedAt: Timestamp.fromMillis(NOW.getTime() - 100 * 86_400_000 - (n - i) * 60_000 - Math.floor(Math.random() * 1000)),
+        endedAt: subMsTimestamp(NOW.getTime() - 100 * 86_400_000 - (n - i) * 60_000 - Math.floor(Math.random() * 1000), subMs),
       });
       await ref.collection("positions").doc("lead").set({ location: point, speed: 0, heading: 0, routeOffset: 0, updatedAt: at(1) });
       refs.push(ref);
@@ -827,7 +863,44 @@ describe("retention progress (emulator)", () => {
     assert.equal(again.examined, 0);
     assert.equal(again.more, false);
     const state = (await db.collection("jobState").doc("purgeTripData").get()).data()!;
-    assert.equal(typeof state.cursorMs, "number");
+    assert.equal(typeof state.cursorSeconds, "number");
+    assert.equal(typeof state.cursorNanos, "number");
+  });
+
+  // Real Firestore keeps microseconds; a cursor of whole milliseconds sorts the last trip after itself and reads it again.
+  it("trips ended at a time with microseconds are read once: the next run examines none", async () => {
+    const refs = await seedOld(3, true);
+    for (let i = 0; i < 20; i++) if (!(await purgeTripData(db, NOW)).more) break;
+    assert.deepEqual(await positionsLeft(refs), [false, false, false]);
+    const again = await purgeTripData(db, NOW);
+    assert.equal(again.examined, 0);
+    assert.equal(again.more, false);
+  });
+
+  it("a trip whose purge threw once is purged on the next run", async () => {
+    const refs = await seedOld(3, true);
+    const bad = refs[1]!;
+    const first = await purgeTripData(flaky(db, [bad.path], 1), NOW);
+    assert.equal(first.failed, 1);
+    assert.deepEqual(await positionsLeft(refs), [false, true, false]);
+    const second = await purgeTripData(db, NOW);
+    assert.equal(second.failed, 0);
+    assert.deepEqual(await positionsLeft(refs), [false, false, false]);
+  });
+
+  it("with the retry list full the walk stops at the failure instead of passing it for good", async () => {
+    const refs = await seedOld(MAX_RETRY + 1, true);
+    const always = flaky(db, refs.map((r) => r.path), Infinity);
+    const first = await purgeTripData(always, NOW);
+    assert.equal(first.failed, MAX_RETRY + 1);
+    assert.equal(first.more, true, "stopped with the rest left for the next run");
+    const state = (await db.collection("jobState").doc("purgeTripData").get()).data()!;
+    assert.equal(state.retry.length, MAX_RETRY);
+    assert.ok(!state.retry.includes(refs[MAX_RETRY]!.id), "the one that did not fit is not on the list");
+    assert.notEqual(state.cursorId, refs[MAX_RETRY]!.id, "the cursor has not moved past it");
+    // Healthy again: the 100 on the list are retried and the walk reaches the 101st.
+    for (let i = 0; i < 5; i++) if (!(await purgeTripData(db, NOW)).more) break;
+    assert.ok((await positionsLeft(refs)).every((left) => !left), "every trip purged, none lost");
   });
 
   it("the expired-events sweep runs when the trip loop is out of cap or out of time", async () => {
@@ -870,5 +943,30 @@ describe("endIdleTrips progress (emulator)", () => {
     assert.equal((await idle.get()).data()!.status, "ended");
     assert.equal((await busy1.get()).data()!.status, "active");
     assert.equal((await busy2.get()).data()!.status, "active");
+  });
+  const subMs = (ms: number) => new Timestamp(Math.floor(ms / 1000), (ms % 1000) * 1_000_000 + 456_000);
+  const stateOf = async () => (await db.collection("jobState").doc("endIdleTrips").get()).data()!;
+  const mkSub = async (createdH: number, lastActivityH: number) => {
+    const ref = db.collection("trips").doc();
+    await ref.set({ name: "T", code: freshCode(), organizerId: "o", route: "", destination: { name: "D", coordinate: new GeoPoint(1, 1) },
+      status: "active", createdAt: subMs(NOW.getTime() - createdH * 3_600_000), lastActivityAt: hoursAgo(lastActivityH) });
+    return ref;
+  };
+
+  it("trips created at a time with microseconds: the walk wraps, and a trip that goes idle after being passed is ended", async () => {
+    // Older than the trips of the other tests, busy now.
+    const early = await mkSub(50_300, 1);
+    await mkSub(50_200, 1);
+    let wrapped = false;
+    for (let run = 0; run < 10 && !wrapped; run++) {
+      await endIdleTrips(db, NOW);
+      wrapped = (await stateOf()).cursorSeconds === null;
+    }
+    assert.equal(wrapped, true, "the walk reached the end and went back to the start");
+    assert.equal((await early.get()).data()!.status, "active");
+    // It goes quiet only after the walk passed it; the next round finds it.
+    await early.update({ lastActivityAt: hoursAgo(30) });
+    for (let run = 0; run < 10 && (await early.get()).data()!.status !== "ended"; run++) await endIdleTrips(db, NOW);
+    assert.equal((await early.get()).data()!.status, "ended");
   });
 });

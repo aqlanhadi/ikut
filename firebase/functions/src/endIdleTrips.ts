@@ -68,7 +68,7 @@ export async function endIdleTrips(db: Firestore, now: Date = new Date(), opts: 
   const clock = opts.clock ?? Date.now;
   const deadline = clock() + (opts.budgetMs ?? IDLE_BUDGET_MS);
   const cutoff = Timestamp.fromMillis(now.getTime() - IDLE_MS);
-  const state = await loadState<{ cursorMs: number; cursorId: string }>(db, IDLE_STATE);
+  const state = await loadState<{ cursorSeconds: number | null; cursorNanos: number | null; cursorId: string | null }>(db, IDLE_STATE);
   let ended = 0;
   const idle: DocumentSnapshot[] = [];
   const flush = async () => {
@@ -89,7 +89,7 @@ export async function endIdleTrips(db: Firestore, now: Date = new Date(), opts: 
       ]);
       if (isIdle(trip, position, event, now)) idle.push(doc);
     },
-    cursor: cursorFromState(state),
+    cursor: cursorFromState(state, IDLE_STATE, cutoff),
     maxItems: opts.maxTrips ?? MAX_TRIPS_PER_RUN,
     pageSize: BATCH_SIZE,
     outOfTime: () => clock() >= deadline,
