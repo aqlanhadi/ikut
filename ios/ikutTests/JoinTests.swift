@@ -349,7 +349,7 @@ struct JoinEmulatorTests {
         #expect(preview.tripId == ids.tripId)
         #expect(preview.destinationName == "Ipoh")
         #expect(preview.cars == [
-            PreviewCar(id: ids.carId, name: "Aqlan's Myvi", color: TripService.palette[0], hasTracker: true, number: 1)
+            PreviewCar(id: ids.carId, name: "Aqlan's Myvi", color: TripService.palette[0], hasTracker: true, number: 1, isLead: true)
         ])
 
         let result = try await api.join(
