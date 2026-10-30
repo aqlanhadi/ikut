@@ -26,7 +26,7 @@ extension View {
         confirmationDialog("Make a new code?", isPresented: isPresented, titleVisibility: .visible) {
             Button("Make a new code", action: make)
         } message: {
-            Text("The old code stops working. People already in the trip stay in.")
+            Text("The old code stops working. People already in the trip stay in. Share the new code with anyone still to join.")
         }
     }
 

@@ -60,8 +60,10 @@ struct JoinServiceTests {
         #expect(JoinService.message(code: .unavailable, serverMessage: "").contains("signal"))
         #expect(JoinService.message(code: .unauthenticated, serverMessage: "").contains("signed out"))
         // D104: a removed person is told so, in plain words; other permission failures still read as signed out.
-        #expect(JoinService.message(code: .permissionDenied, serverMessage: "You were removed from this trip. Ask the organiser for a new code.")
+        #expect(JoinService.message(code: .permissionDenied, serverMessage: "", reason: "removed")
             == "You were removed from this trip. Ask the organiser for a new code.")
+        // The words of the server's message don't matter, only the reason it sends.
+        #expect(JoinService.message(code: .permissionDenied, serverMessage: "You were removed", reason: nil).contains("signed out"))
         #expect(JoinService.message(code: .permissionDenied, serverMessage: "").contains("signed out"))
         #expect(JoinService.message(code: nil, serverMessage: "").contains("That didn’t go through"))
     }

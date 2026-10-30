@@ -124,6 +124,36 @@ struct TripServiceEmulatorTests {
         try Auth.auth().signOut()
     }
 
+    /// D104: the organiser's removal is one batch (member delete and the `removed` record); the rules refuse the delete
+    /// without the record, and no client can read the record. Needs this branch's rules (`tools/with-rules.mjs`).
+    @Test func theOrganiserRemovesAMemberOnlyWithTheRemovalRecord() async throws {
+        let trip = try await EmulatorTrip.make(name: "Remove")
+        nonisolated(unsafe) let organiser = try #require(Auth.auth().currentUser)
+        let code = try await trip.code()
+        // Signed out first: signing in anonymously while signed in would hand back the organiser again.
+        try Auth.auth().signOut()
+        try await Auth.auth().signInAnonymously()
+        let joiner = try #require(Auth.auth().currentUser?.uid)
+        try #require(joiner != trip.uid)
+        try await LiveJoinAPI().join(code: code, displayName: "Wyna", car: .new(name: "X70", color: TripService.palette[1]), tracker: false)
+        try await Auth.auth().updateCurrentUser(organiser)
+        try #require(Auth.auth().currentUser?.uid == trip.uid)
+        // Firestore picks the new user up from the token, so make sure it has the organiser's.
+        _ = try await organiser.getIDToken(forcingRefresh: true)
+
+        let db = Firestore.firestore()
+        let member = db.document(FirestorePaths.member(tripId: trip.tripId, userId: joiner))
+        await #expect(throws: (any Error).self) { try await member.delete() }
+        #expect(try await member.getDocument(source: .server).exists)
+
+        try await TripService.removeMember(tripId: trip.tripId, userId: joiner, by: trip.uid)
+        #expect(try await !member.getDocument().exists)
+        await #expect(throws: (any Error).self) {
+            _ = try await db.document(FirestorePaths.removed(tripId: trip.tripId, userId: joiner)).getDocument()
+        }
+        try Auth.auth().signOut()
+    }
+
     @Test func savingStopsWritesTheRouteAndTheStopsTogetherAndRemovesTheOnesLeftOut() async throws {
         let trip = try await EmulatorTrip.make(name: "Stops", route: Fixtures.longRoute)
         let db = Firestore.firestore()
