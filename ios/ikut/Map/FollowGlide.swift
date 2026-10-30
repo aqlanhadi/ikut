@@ -82,3 +82,16 @@ enum MapLocationStream {
         !isTracker || phase != .background
     }
 }
+
+/// What the follow camera does for a step of `points` on screen with a glide of `step` seconds asked for (D71).
+enum FollowStep {
+    enum Action: Equatable { case glide, place, ignore }
+
+    /// Under this many points nothing has moved: a parked car.
+    nonisolated static let standing = 0.05
+
+    nonisolated static func decide(points: Double, step: TimeInterval) -> Action {
+        if step > 0, points >= Double(MarkerGlide.placeUnder) { return .glide }
+        return points > standing ? .place : .ignore
+    }
+}

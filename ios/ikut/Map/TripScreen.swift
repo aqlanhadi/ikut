@@ -384,7 +384,7 @@ final class TripScreenModel {
     /// Bumped when the cars' running slides (`MarkerGlide`) must be placed at once: a flight starts, or the map's
     /// scale moved by more than a tenth, so a slide's start in points would no longer be where the car was.
     private(set) var placeSlides = 0
-    @ObservationIgnored private var slideScale: Double?
+    @ObservationIgnored private var zoom = MarkerGlide.ZoomWatch()
 
     /// Glides the camera to `camera` linearly over `duration` seconds, from wherever it is drawn now.
     func glide(to camera: MapCamera, duration: TimeInterval) {
@@ -403,13 +403,14 @@ final class TripScreenModel {
         glideEnds = .distantPast
     }
 
-    /// The map's scale as it moves (`onMapCameraChange` continuous): places the slides once it moved a tenth.
+    /// The map's scale as it moves (`onMapCameraChange` continuous): places the slides once when a zoom starts (D71).
     func noteScale(_ latitudeDelta: Double) {
-        guard let was = slideScale else { slideScale = latitudeDelta; return }
-        if MarkerGlide.scaleMoved(from: was, to: latitudeDelta) {
-            slideScale = latitudeDelta
-            placeSlides &+= 1
-        }
+        if zoom.moved(to: latitudeDelta) { placeSlides &+= 1 }
+    }
+
+    /// The camera came to rest: places the slides once more if a zoom just ended.
+    func noteSettled(_ latitudeDelta: Double) {
+        if zoom.settled(at: latitudeDelta) { placeSlides &+= 1 }
     }
 
     init(mode: TripScreenMode = .lobby, defaults: UserDefaults = .standard,
@@ -671,6 +672,7 @@ private struct TripMapBehaviour: ViewModifier {
                 stage.noteScale(context.region.span.latitudeDelta)
             }
             .onMapCameraChange { context in
+                stage.noteSettled(context.region.span.latitudeDelta)
                 stage.read(heading: context.camera.heading, reading: TripCameraReading(
                     distance: context.camera.distance, pitch: context.camera.pitch,
                     latitudeDelta: context.region.span.latitudeDelta))

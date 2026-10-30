@@ -110,8 +110,66 @@ struct FollowGlideTests {
         #expect(!MarkerGlide.scaleMoved(from: 0.01, to: 0.0105))
         #expect(!MarkerGlide.scaleMoved(from: 0, to: 0.01))
         // A standing car, or one moving under a point a second at Fit zoom: placed.
-        #expect(!MarkerGlide.worthGliding(CGSize(width: 1, height: 1)))
-        #expect(MarkerGlide.worthGliding(CGSize(width: 0, height: 28)))
+        #expect(!MarkerGlide.worthGliding(CGSize(width: 1, height: 1), isMine: true))
+        #expect(MarkerGlide.worthGliding(CGSize(width: 0, height: 28), isMine: true))
+    }
+
+    @Test func anotherCarsStepOfAFewPointsIsPlacedButMineStillGlides() {
+        let few = CGSize(width: 0, height: 4)
+        #expect(MarkerGlide.worthGliding(few, isMine: true))
+        #expect(!MarkerGlide.worthGliding(few, isMine: false))
+        #expect(MarkerGlide.worthGliding(CGSize(width: 0, height: 14), isMine: false))
+    }
+
+    /// The wiring: the modifier reads its own `isMine` (a 3 pt step slides for my car, is placed for another).
+    @MainActor @Test func theMarkerModifierAppliesTheCarsOwnThreshold() {
+        func modifier(isMine: Bool, duration: TimeInterval = 4) -> MarkerGlide {
+            MarkerGlide(coordinate: start, duration: duration, place: 0, point: nil, isMine: isMine)
+        }
+        let old = CGPoint(x: 100, y: 100)
+        let new = CGPoint(x: 100, y: 103)
+        #expect(modifier(isMine: true).slideStart(old: old, new: new, left: .zero, reduceMotion: false) == CGSize(width: 0, height: -3))
+        #expect(modifier(isMine: false).slideStart(old: old, new: new, left: .zero, reduceMotion: false) == nil)
+        // 8 pt slides for both; placed with Reduce Motion or no glide asked for.
+        let far = CGPoint(x: 100, y: 108)
+        #expect(modifier(isMine: false).slideStart(old: old, new: far, left: .zero, reduceMotion: false) != nil)
+        #expect(modifier(isMine: true).slideStart(old: old, new: far, left: .zero, reduceMotion: true) == nil)
+        #expect(modifier(isMine: true, duration: 0).slideStart(old: old, new: far, left: .zero, reduceMotion: false) == nil)
+    }
+
+    @Test func aFollowStepGlidesPlacesOrIsLeftAlone() {
+        #expect(FollowStep.decide(points: 40, step: 0.9) == .glide)
+        #expect(FollowStep.decide(points: 1.5, step: 0.9) == .glide)
+        #expect(FollowStep.decide(points: 1.4, step: 0.9) == .place)
+        #expect(FollowStep.decide(points: 0.06, step: 0.9) == .place)
+        #expect(FollowStep.decide(points: 0.05, step: 0.9) == .ignore)
+        #expect(FollowStep.decide(points: 0, step: 0.9) == .ignore)
+        // No glide asked for (a placed fix): placed, however far.
+        #expect(FollowStep.decide(points: 40, step: 0) == .place)
+        #expect(FollowStep.decide(points: 0, step: 0) == .ignore)
+    }
+
+    @Test func aZoomPlacesTheSlidesOnceAtItsStartAndOnceWhenItSettles() {
+        var watch = MarkerGlide.ZoomWatch()
+        let first = watch.moved(to: 0.01)  // first reading only sets the scale
+        let drift = watch.moved(to: 0.0102)
+        #expect(!first && !drift)
+        // A Follow to Fit flight: 40 readings over a 20x zoom out place once, not at every tenth.
+        var places = 0
+        var scale = 0.01
+        for _ in 0..<40 {
+            scale *= 1.08
+            if watch.moved(to: scale) { places += 1 }
+        }
+        #expect(places == 1)
+        let ended = watch.settled(at: scale)
+        // Settled: read afresh, so the next small drift places nothing, and a settle with no zoom places nothing.
+        let after = watch.moved(to: scale * 1.02)
+        let idle = watch.settled(at: scale * 1.02)
+        #expect(ended && !after && !idle)
+        // A second zoom places again.
+        let second = watch.moved(to: scale * 2)
+        #expect(second)
     }
 
     @Test func theGlideIsLinearWithoutReduceMotionAndAStepWithIt() {
