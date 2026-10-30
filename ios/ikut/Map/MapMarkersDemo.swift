@@ -49,14 +49,14 @@ struct MapMarkersDemo: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 64)
                     .background(Color.ikutOK, in: Capsule())
-                Image(systemName: "fuelpump.fill")
+                Image(systemName: Symbol.fuel)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.black)
                     .frame(width: 40, height: 40)
                     .background(Color.ikutPillBlue, in: Circle())
                     .padding(Spacing.s)
                     .background(Color(white: 0.11), in: Capsule())
-                StopReasonIcon(symbol: "fork.knife", size: 40)
+                StopReasonIcon(symbol: Symbol.food, size: 40)
             }
             .padding(Spacing.xl)
         }

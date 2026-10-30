@@ -264,7 +264,7 @@ struct RoundGlassShareLink: View {
     var label = "Share invite"
 
     var body: some View {
-        ShareLink(item: item) { Image(systemName: "square.and.arrow.up") }
+        ShareLink(item: item) { Image(systemName: Symbol.share) }
             .roundGlassStyle()
             .accessibilityLabel(label)
     }
@@ -311,7 +311,7 @@ struct SheetSearchField<Field: View>: View {
 
     var body: some View {
         HStack(spacing: Spacing.s) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.primary).accessibilityHidden(true)
+            Image(systemName: Symbol.search).foregroundStyle(.primary).accessibilityHidden(true)
             field.font(.body)
             if let clear {
                 ClearFieldButton(action: clear)
@@ -332,7 +332,7 @@ struct SheetSearchButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.s) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.primary).accessibilityHidden(true)
+                Image(systemName: Symbol.search).foregroundStyle(.primary).accessibilityHidden(true)
                 Text(placeholder).font(.body).foregroundStyle(Color.surfaceSecondary)
                 Spacer(minLength: 0)
             }

@@ -24,7 +24,7 @@ struct ReportToastView: View {
                 }
                 .modifier(Placement(edge: edge, inSlot: inSlot))
             case .reported(let label, _):
-                DarkBanner(title: "Reported \(label)", symbol: "checkmark", circle: .green) {
+                DarkBanner(title: "Reported \(label)", symbol: Symbol.tick, circle: .green) {
                     Button("Undo") { Task { await model.undo() } }
                         .font(.body.weight(.semibold))
                         .padding(.horizontal, Spacing.l)
@@ -37,9 +37,9 @@ struct ReportToastView: View {
                 .announces("Reported \(label). You can undo it.")
                 .accessibilityAction(named: "Close") { model.dismiss() }
             case .failed(let message):
-                DarkBanner(title: message, symbol: "exclamationmark.triangle.fill", circle: .orange) {
+                DarkBanner(title: message, symbol: Symbol.warning, circle: .orange) {
                     Button { model.dismiss() } label: {
-                        RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
+                        RoundIconSymbol(systemImage: Symbol.close, glyph: .body.weight(.semibold), style: .bare, color: .white)
                     }
                     .accessibilityLabel("Close")
                 }

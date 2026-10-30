@@ -260,8 +260,8 @@ struct PlaceSearchResults: View {
         } else {
             suggestionRows
         }
-        PlaceResultRow(action: "Choose on map", symbol: "map.fill", color: .blue, disabled: busy, action: { choosingOnMap = true }) {
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        PlaceResultRow(action: "Choose on map", symbol: Symbol.mapFilled, color: .blue, disabled: busy, action: { choosingOnMap = true }) {
+            Image(systemName: Symbol.forward).font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
         .fullScreenCover(isPresented: $choosingOnMap) {
             MapPickView(origin: model.origin, along: model.along, geocoder: model.geocoder) { place in

@@ -31,13 +31,13 @@ struct StopNote: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Label(title, systemImage: "exclamationmark.triangle")
+            Label(title, systemImage: Symbol.warningOutline)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(titleColor)
             Text(detail).font(.footnote).foregroundStyle(Color.surfaceSecondary)
             if let retry {
                 Button(action: retry) {
-                    Label("Try again", systemImage: "arrow.clockwise")
+                    Label("Try again", systemImage: Symbol.retry)
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, Spacing.l)
                         .frame(minHeight: 36)
@@ -86,7 +86,7 @@ struct StopRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if editable {
-                    Image(systemName: "line.3.horizontal")
+                    Image(systemName: Symbol.reorder)
                         .foregroundStyle(Color.surfaceSecondary)
                         .padding(.horizontal, Spacing.s)
                         .accessibilityHidden(true)

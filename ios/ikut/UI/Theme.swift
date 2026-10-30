@@ -114,7 +114,7 @@ struct SheetCloseButton: View {
     @Environment(\.buttonSurface) private var surface
 
     var body: some View {
-        RoundGlassIconButton(systemImage: "xmark", label: "Close", style: surface == .glass ? .glass : .quiet, action: action)
+        RoundGlassIconButton(systemImage: Symbol.close, label: "Close", style: surface == .glass ? .glass : .quiet, action: action)
     }
 }
 
@@ -123,7 +123,7 @@ struct MapCloseButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) { Image(systemName: "xmark") }
+        Button(action: action) { Image(systemName: Symbol.close) }
             .buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(.primary)
             .background(.regularMaterial, in: Circle())
             .accessibilityLabel("Close")
@@ -276,7 +276,7 @@ struct IconTile: View {
                 Text("3 of 4 ready")
             }
             EmptyRow("No cars yet").ikutCard()
-            InlineNote("Couldn't reach the server.", systemImage: "exclamationmark.triangle.fill", tone: .alert)
+            InlineNote("Couldn't reach the server.", systemImage: Symbol.warning, tone: .alert)
                 .padding(.top, Spacing.s)
             CardHeader("Tiles", inset: Spacing.xs)
             Text("A tile on a sheet").frame(maxWidth: .infinity, minHeight: 80).ikutTile()
@@ -301,9 +301,9 @@ struct IconTile: View {
 
 #Preview("Icon tiles") {
     HStack(spacing: Spacing.s) {
-        IconTile(symbol: "mappin", color: .red, size: .small, font: .footnote.weight(.bold))
-        IconTile(symbol: "steeringwheel", color: .ikutAccent, size: .small)
-        IconTile(symbol: "fuelpump.fill", color: .orange, size: .regular, radius: Radius.icon)
+        IconTile(symbol: Symbol.pin, color: .red, size: .small, font: .footnote.weight(.bold))
+        IconTile(symbol: Symbol.steering, color: .ikutAccent, size: .small)
+        IconTile(symbol: Symbol.fuel, color: .orange, size: .regular, radius: Radius.icon)
     }
     .padding(Spacing.l)
 }

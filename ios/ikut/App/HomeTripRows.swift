@@ -11,7 +11,7 @@ struct HomeNowRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.m) {
-            Image(systemName: "flag.checkered")
+            Image(systemName: Symbol.finish)
                 .ikutGlyph(14, weight: .semibold, cap: 1.3)
                 .foregroundStyle(.white)
                 .iconFrame(.small)
@@ -23,7 +23,7 @@ struct HomeNowRow: View {
                     .font(.footnote).foregroundStyle(Color.surfaceSecondary).wrapsAtAccessibilitySizes(lines: 2)
             }
             Spacer(minLength: Spacing.s)
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
+            Image(systemName: Symbol.forward).font(.footnote.weight(.semibold)).foregroundStyle(Color.surfaceSecondary)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

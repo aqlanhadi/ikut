@@ -14,7 +14,7 @@ struct ApproachPill: View {
                 DarkBanner(
                     title: alert.title,
                     subtitle: model.secondsToCover(distance).map { "In about \(Int($0.rounded())) s" },
-                    symbol: "exclamationmark.triangle.fill", circle: .yellow
+                    symbol: Symbol.warning, circle: .yellow
                 ) {
                     Text(ConvoyFormat.distance(distance))
                         .font(.system(.title3, design: .rounded).weight(.bold))
@@ -67,7 +67,7 @@ struct CatchUpPill: View {
             let distance = max(0, model.catchUpDistance(alert, now: context.date) ?? alert.distance ?? 0)
             let title = alert.title
             let subtitle = model.catchUpSeconds(alert, distance: distance).map { "About \(ConvoyFormat.duration($0)) away" }
-            DarkBanner(title: title, subtitle: subtitle, symbol: "car.2.fill", circle: .green) {
+            DarkBanner(title: title, subtitle: subtitle, symbol: Symbol.cars, circle: .green) {
                 Text(ConvoyFormat.distance(distance))
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .monospacedDigit()
@@ -89,7 +89,7 @@ struct PassedBanner: View {
     var onClose: () -> Void = {}
 
     var body: some View {
-        DarkBanner(title: text, symbol: "checkmark", circle: .green)
+        DarkBanner(title: text, symbol: Symbol.tick, circle: .green)
             .accessibilityAction(named: "Close", onClose)
             .accessibilityAddTraits(.updatesFrequently)
             .announces(text)
@@ -103,7 +103,7 @@ struct RouteNoticeBanner: View {
 
     var body: some View {
         DarkBanner(
-            title: notice.text, symbol: notice.waiting ? "antenna.radiowaves.left.and.right.slash" : "arrow.triangle.turn.up.right.diamond.fill",
+            title: notice.text, symbol: notice.waiting ? Symbol.offline : Symbol.routeStart,
             circle: notice.waiting ? Color.white.dimmed(.faded) : .green)
             .announces(notice.text)
             .accessibilityIdentifier(AXID.Alerts.routeNotice)

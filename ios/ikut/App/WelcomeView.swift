@@ -14,13 +14,13 @@ struct WelcomeView: View {
 
     private let features = [
         Feature(
-            symbol: "map", title: "Every car on one map",
+            symbol: Symbol.map, title: "Every car on one map",
             detail: "See the whole convoy live, and how far each car is behind the lead."),
         Feature(
-            symbol: "fuelpump", title: "Call a stop in one tap",
+            symbol: Symbol.fuelPlain, title: "Call a stop in one tap",
             detail: "Ask for fuel, food or a rest, and every car taps OK."),
         Feature(
-            symbol: "exclamationmark.triangle", title: "Warn the cars behind you",
+            symbol: Symbol.warningOutline, title: "Warn the cars behind you",
             detail: "Hazards you report are read aloud to the cars following."),
     ]
 
@@ -84,7 +84,7 @@ struct WelcomeView: View {
                 Button(action: onGetStarted) { Text("Get started").frame(maxWidth: .infinity) }
                     .ikutButton(.primary)
                 Button(action: onJoin) {
-                    Label("Join with a code", systemImage: "qrcode").frame(maxWidth: .infinity)
+                    Label("Join with a code", systemImage: Symbol.qrCode).frame(maxWidth: .infinity)
                 }
                 .ikutButton(.link)
                 .accessibilityIdentifier(AXID.Welcome.join)

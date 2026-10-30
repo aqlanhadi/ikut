@@ -29,7 +29,7 @@ struct AXIDTests {
 
     // MARK: Scanning the UI tests
 
-    private static var sourceFolder: URL {
+    static var sourceFolder: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
     }
 

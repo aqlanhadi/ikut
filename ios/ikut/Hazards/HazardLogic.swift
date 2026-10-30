@@ -107,7 +107,7 @@ struct HazardMarker: Identifiable, Equatable, Sendable {
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
     var accessibilityLabel: String { "Hazard: \(chipText)" }
 
-    static let fallbackSymbol = "exclamationmark.triangle.fill"
+    static let fallbackSymbol = Symbol.warning
 
     /// Symbol and name come from the report sheet's options, so the map matches what was tapped.
     static func presentation(for type: EventType) -> (symbol: String, label: String) {

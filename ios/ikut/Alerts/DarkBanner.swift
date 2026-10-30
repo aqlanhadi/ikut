@@ -60,15 +60,15 @@ extension DarkBanner where Icon == Image, Trailing == EmptyView {
 
 #Preview {
     VStack(spacing: Spacing.m) {
-        DarkBanner(title: "Passed the debris", symbol: "checkmark", circle: .green)
+        DarkBanner(title: "Passed the debris", symbol: Symbol.tick, circle: .green)
         DarkBanner(title: "Debris ahead in 500 m", subtitle: "Reported by Wyna’s car · 4 min ago",
-                   symbol: "exclamationmark.triangle.fill", circle: .orange)
+                   symbol: Symbol.warning, circle: .orange)
         DarkBanner(
             title: "Message from Wyna’s car",
             subtitle: "We'll wait at the Tapah R&R, the one after the toll, near the surau. Take your time.",
-            symbol: "text.bubble.fill", circle: .white)
-        DarkBanner(title: "Heavy rain reported", symbol: "cloud.rain.fill", circle: .yellow) {
-            Button {} label: { RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white) }
+            symbol: Symbol.message, circle: .white)
+        DarkBanner(title: "Heavy rain reported", symbol: Symbol.rain, circle: .yellow) {
+            Button {} label: { RoundIconSymbol(systemImage: Symbol.close, glyph: .body.weight(.semibold), style: .bare, color: .white) }
                 .accessibilityLabel("Close")
         }
         DarkBanner(title: "Sending debris…", circle: .white.fill(.tint)) {

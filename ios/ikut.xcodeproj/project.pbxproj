@@ -28,6 +28,7 @@
 		13AB18A30D92618B0F633AF8 /* PositionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B0DDAF1194DD5CA4B0A112 /* PositionBuilder.swift */; };
 		16629DCC4D4B160A6BB6095A /* ServerWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2392E5A1D08103853E77C151 /* ServerWriteTests.swift */; };
 		16C46AF24C556E0808E837F4 /* Polyline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89911FBE6E40CB98D46C337F /* Polyline.swift */; };
+		173EBAB26CACA9FC97787DDD /* Symbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EB7D8F7B36CE100D1B0BECC /* Symbol.swift */; };
 		178973148E0EE42B411C79AC /* TripAskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66FF5396649ED8B58EC123A7 /* TripAskTests.swift */; };
 		17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB0B6EE647875B8999B3F6F /* BackendTests.swift */; };
 		182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56BDE68F366CE545C453468B /* ServerWrite.swift */; };
@@ -99,6 +100,7 @@
 		4EDC16B825285A145AFE88C1 /* StopDelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01E0F9C4A3658B6AB1A4B07F /* StopDelayTests.swift */; };
 		5120D81232DF1D6218DB0AF9 /* SheetChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30345C006D29E7B55E755058 /* SheetChrome.swift */; };
 		514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */; };
+		5154B6F0F7D17F6C6A153092 /* SymbolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 384006EAE2516E1932D44513 /* SymbolTests.swift */; };
 		517060709B8037A3160EDCC1 /* ReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11DE0CC85044E36B54C8C0F /* ReportSheet.swift */; };
 		519A8EFE7DB25FA48F9DD13D /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A19176B3DA31DC55F68E9DB /* WelcomeView.swift */; };
 		51CFCAB78FFA18C207850A59 /* StopDriving.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30373103D4B59BAB60C163E5 /* StopDriving.swift */; };
@@ -411,6 +413,7 @@
 		33BBF4A42770388A0C41B7DB /* DesignLanguageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignLanguageView.swift; sourceTree = "<group>"; };
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
 		3460F253525E62DCFA34217E /* CameraInsetMove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraInsetMove.swift; sourceTree = "<group>"; };
+		384006EAE2516E1932D44513 /* SymbolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolTests.swift; sourceTree = "<group>"; };
 		385EEAB04673E246156A8065 /* BannerSlotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerSlotTests.swift; sourceTree = "<group>"; };
 		39526CD2EA29FFB748D3F25D /* TypeSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeSizeTests.swift; sourceTree = "<group>"; };
 		3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalTests.swift; sourceTree = "<group>"; };
@@ -530,6 +533,7 @@
 		9B8ECEB1452E465155C7324B /* TripSessionLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSessionLogic.swift; sourceTree = "<group>"; };
 		9D2E4BF4114AA13DDD4A818E /* RequestPlacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestPlacesTests.swift; sourceTree = "<group>"; };
 		9D45DA699F813FF1311703EC /* PanelHeaderDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelHeaderDemo.swift; sourceTree = "<group>"; };
+		9EB7D8F7B36CE100D1B0BECC /* Symbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Symbol.swift; sourceTree = "<group>"; };
 		9F6A312F64D63E711A33AAFF /* PlaceSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearchTests.swift; sourceTree = "<group>"; };
 		A00085429C2DE911F971AEAB /* DesignInventoryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignInventoryModel.swift; sourceTree = "<group>"; };
 		A009554BF15571D35F2DD64E /* ConvoySheetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoySheetState.swift; sourceTree = "<group>"; };
@@ -988,6 +992,7 @@
 				AE8926F402B88A4AB4B63842 /* Palette.swift */,
 				CBD00F611D39EEED53A2FA52 /* RowSize.swift */,
 				30345C006D29E7B55E755058 /* SheetChrome.swift */,
+				9EB7D8F7B36CE100D1B0BECC /* Symbol.swift */,
 				881F14A69E038A11FD750DD0 /* Theme.swift */,
 				091C79B7B0A90381F07CB73D /* TripComponents.swift */,
 				456F6193440599A0317F386C /* TripExitMenu.swift */,
@@ -1089,6 +1094,7 @@
 				2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */,
 				644401FB5F0CAB8C10EF3B3B /* StopTests.swift */,
 				99B57D9F42E46F04ABDC9F7C /* SuggestStopsSheetTests.swift */,
+				384006EAE2516E1932D44513 /* SymbolTests.swift */,
 				29D417D8CDD8A80CCF181936 /* TrackingTests.swift */,
 				66FF5396649ED8B58EC123A7 /* TripAskTests.swift */,
 				94110B44C36ABA8B33885499 /* TripMapContentTests.swift */,
@@ -1547,6 +1553,7 @@
 				E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */,
 				2978ECA93E41D961DDB2B7CD /* SuggestStops.swift in Sources */,
 				AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */,
+				173EBAB26CACA9FC97787DDD /* Symbol.swift in Sources */,
 				5FFD8F73ACE3DE89B65873CA /* Theme.swift in Sources */,
 				1D60D40F65E7155998DF0CAC /* TicketDrive.swift in Sources */,
 				5F78D28E96A03E0AABFC519B /* TrackingDuty.swift in Sources */,
@@ -1664,6 +1671,7 @@
 				3AD9AEB8B316FD22E3E27B49 /* StopSkipAllTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
 				40BC71734DC98A8BB57D4D52 /* SuggestStopsSheetTests.swift in Sources */,
+				5154B6F0F7D17F6C6A153092 /* SymbolTests.swift in Sources */,
 				D65AA67D228A83D113326C13 /* TrackingTests.swift in Sources */,
 				178973148E0EE42B411C79AC /* TripAskTests.swift in Sources */,
 				5A4D6B4B863E8EC2FA5727C3 /* TripMapContentTests.swift in Sources */,

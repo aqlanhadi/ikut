@@ -74,7 +74,7 @@ enum StopPillPlanner {
         distance: (String) -> Double? = { _ in nil }
     ) -> StopPill? {
         if let c = memory.confirmation, now.timeIntervalSince(c.at) < confirmWindow {
-            let symbol = requests.first.map { StopLogic.reasonSymbol($0.type) } ?? "checkmark"
+            let symbol = requests.first.map { StopLogic.reasonSymbol($0.type) } ?? Symbol.tick
             return .confirm(symbol: symbol, title: c.title, detail: c.detail)
         }
         for request in requests where StopLogic.needsAnswer(request) {

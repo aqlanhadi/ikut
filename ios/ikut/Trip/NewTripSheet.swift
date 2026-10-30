@@ -96,7 +96,7 @@ struct NewTripSheet: View {
             ) {
                 backButton
             } trailing: {
-                RoundGlassIconButton(systemImage: "xmark", label: "Close", action: onClose)
+                RoundGlassIconButton(systemImage: Symbol.close, label: "Close", action: onClose)
                     .accessibilityIdentifier(AXID.Sheet.close).disabled(flow.isCreating)
             }
             .padding(.top, Spacing.xs)
@@ -155,7 +155,7 @@ struct NewTripSheet: View {
     }
 
     private var backButton: some View {
-        RoundGlassIconButton(systemImage: "chevron.left", label: "Back to search", action: onBack)
+        RoundGlassIconButton(systemImage: Symbol.back, label: "Back to search", action: onBack)
             .disabled(flow.isCreating)
     }
 }

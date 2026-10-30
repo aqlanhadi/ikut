@@ -71,13 +71,13 @@ struct GlanceErrorBanner: View {
 
     var body: some View {
         HStack(spacing: Spacing.s) {
-            Label(message, systemImage: "exclamationmark.triangle.fill")
+            Label(message, systemImage: Symbol.warning)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .combine)
             Button(action: onClose) {
-                RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
+                RoundIconSymbol(systemImage: Symbol.close, glyph: .body.weight(.semibold), style: .bare, color: .white)
             }
             .accessibilityLabel("Close")
             .accessibilityIdentifier(AXID.Map.errorClose)

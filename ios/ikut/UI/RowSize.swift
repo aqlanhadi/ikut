@@ -60,7 +60,7 @@ struct ClearFieldButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark.circle.fill")
+            Image(systemName: Symbol.closeCircle)
                 .font(.body)
                 .foregroundStyle(.tertiary)
                 .frame(width: RowSize.minimum, height: RowSize.minimum)

@@ -11,8 +11,8 @@ extension LobbyView {
     /// our own tinted view in a clear row: a plain row would lose the warning colour and the Resume pill).
     @ViewBuilder var bannerSections: some View {
         switch LobbyContent.exitBanner(ended: session.isEnded, membershipLost: session.membershipLost || sampleLost, tripLoaded: model.trip != nil) {
-        case .ended: bannerSection("Trip ended", systemImage: "flag.checkered")
-        case .noLongerInTrip: bannerSection("You’re no longer in this trip", systemImage: "person.fill.xmark")
+        case .ended: bannerSection("Trip ended", systemImage: Symbol.finish)
+        case .noLongerInTrip: bannerSection("You’re no longer in this trip", systemImage: Symbol.removedFromTrip)
         case nil: EmptyView()
         }
         if session.isPaused && !session.isEnded && !session.membershipLost {
@@ -74,7 +74,7 @@ extension LobbyView {
                     }
                 } label: {
                     HStack(spacing: Spacing.s) {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc").accessibilityHidden(true)
+                        Image(systemName: copied ? Symbol.tick : Symbol.copy).accessibilityHidden(true)
                         Text(copied ? "Copied" : "Copy")
                     }
                     .font(.subheadline.weight(.semibold))
@@ -85,7 +85,7 @@ extension LobbyView {
                 .accessibilityIdentifier(AXID.Lobby.copyCode)
                 Button { showQR = true } label: {
                     HStack(spacing: Spacing.s) {
-                        Image(systemName: "qrcode").accessibilityHidden(true)
+                        Image(systemName: Symbol.qrCode).accessibilityHidden(true)
                         Text("QR code")
                     }
                     .font(.subheadline.weight(.semibold))
@@ -112,7 +112,7 @@ extension LobbyView {
                 }
                 if canPause {
                     listOption(
-                        session.isPaused ? "Resume sharing" : "Pause sharing", systemImage: session.isPaused ? "play.fill" : "pause.fill",
+                        session.isPaused ? "Resume sharing" : "Pause sharing", systemImage: session.isPaused ? Symbol.play : Symbol.pause,
                         id: session.isPaused ? AXID.Lobby.resume : AXID.Lobby.pause
                     ) { run { session.isPaused ? try await session.resumeSharing() : try await session.pauseSharing() } }
                 }
@@ -125,10 +125,10 @@ extension LobbyView {
         if canEnd || canLeaveTrip {
             Section {
                 if canEnd {
-                    listOption("End trip", systemImage: "flag.checkered", id: AXID.Lobby.endTrip, destructive: true) { confirmEnd = true }
+                    listOption("End trip", systemImage: Symbol.finish, id: AXID.Lobby.endTrip, destructive: true) { confirmEnd = true }
                 }
                 if canLeaveTrip {
-                    listOption("Leave trip", systemImage: "rectangle.portrait.and.arrow.right", id: AXID.Lobby.leaveTrip, destructive: true) {
+                    listOption("Leave trip", systemImage: Symbol.leaveTrip, id: AXID.Lobby.leaveTrip, destructive: true) {
                         confirmLeave = true
                     }
                 }
@@ -172,7 +172,7 @@ extension LobbyView {
                 LabeledContent(title) {
                     HStack(spacing: Spacing.s) {
                         Text(value)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).accessibilityHidden(true)
+                        Image(systemName: Symbol.forward).font(.footnote.weight(.semibold)).accessibilityHidden(true)
                     }
                 }
             }
@@ -228,10 +228,10 @@ extension LobbyView {
                     .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
             }
             if canEditStops {
-                stopAction("Add a stop", systemImage: "plus", caption: nil, id: AXID.Stops.add) { openAddStop() }
+                stopAction("Add a stop", systemImage: Symbol.add, caption: nil, id: AXID.Stops.add) { openAddStop() }
                     .disabled(!StopListLogic.canAdd(among: stops))
                 stopAction(
-                    "Suggest stops", systemImage: "sparkles",
+                    "Suggest stops", systemImage: Symbol.suggest,
                     caption: LobbyContent.suggestCaption(routeSeconds: trip.routeSeconds ?? routeInfo.travelTime), id: AXID.Stops.suggest
                 ) { showSuggestStops = true }
             }
@@ -332,7 +332,7 @@ extension LobbyView {
         let stops = model.stops.map(StopDraft.init)
         return Section {
             if let behind = journey.behind {
-                Label(behind, systemImage: "checkmark.circle")
+                Label(behind, systemImage: Symbol.tickCircle)
                     .font(.subheadline)
                     .foregroundStyle(Color.surfaceSecondary)
                     .accessibilityIdentifier(AXID.Trip.journeyBehind)
@@ -368,8 +368,8 @@ extension LobbyView {
             ended: session.isEnded, membershipLost: session.membershipLost || sampleLost, tripLoaded: model.trip != nil)
             .map { _ in
                 DrivingBanner(
-                    rows: AnyView(bannerSection("You’re no longer in this trip", systemImage: "person.fill.xmark")),
-                    measure: AnyView(bannerMeasure("You’re no longer in this trip", systemImage: "person.fill.xmark")))
+                    rows: AnyView(bannerSection("You’re no longer in this trip", systemImage: Symbol.removedFromTrip)),
+                    measure: AnyView(bannerMeasure("You’re no longer in this trip", systemImage: Symbol.removedFromTrip)))
             }
     }
 
@@ -387,7 +387,7 @@ extension LobbyView {
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if canEditStops {
                     Button(role: .destructive) { removeStop(stop.id) } label: {
-                        Label("Remove", systemImage: "trash")
+                        Label("Remove", systemImage: Symbol.delete)
                     }
                 }
             }

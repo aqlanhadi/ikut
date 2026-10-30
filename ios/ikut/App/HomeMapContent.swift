@@ -92,7 +92,7 @@ struct HomeMapContent: MapContent {
         }
         Annotation(name, coordinate: route.destination, anchor: .center) {
             Button { style.onPastTripTap(route.id) } label: {
-                Image(systemName: "flag.checkered")
+                Image(systemName: Symbol.finish)
                     .ikutGlyph(latest ? 13 : 10, weight: .bold, cap: 1.3)
                     .foregroundStyle(latest ? .white : Color.ikutAccent)
                     .frame(width: latest ? 30 : 22, height: latest ? 30 : 22)
@@ -128,7 +128,7 @@ struct HomeMapContent: MapContent {
             .annotationTitles(.hidden)
         }
         Annotation(route.destinationName, coordinate: route.destination, anchor: .center) {
-            Image(systemName: "flag.checkered")
+            Image(systemName: Symbol.finish)
                 .ikutGlyph(13, weight: .bold, cap: 1.3)
                 .foregroundStyle(.white)
                 .frame(width: 30, height: 30)
@@ -142,7 +142,7 @@ struct HomeMapContent: MapContent {
 
     private static func placePin(focused: Bool, color: Color) -> some View {
         let size: CGFloat = focused ? 36 : 28
-        return Image(systemName: "mappin")
+        return Image(systemName: Symbol.pin)
             .ikutGlyph(focused ? 16 : 13, weight: .bold, cap: 1.3)
             .foregroundStyle(.white)
             .frame(width: size, height: size)

@@ -78,7 +78,7 @@ struct ConvoyRowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.hasArrived {
-                Chip(text: row.trailingPrimary, tone: .positive, lead: .symbol("checkmark"))
+                Chip(text: row.trailingPrimary, tone: .positive, lead: .symbol(Symbol.tick))
                     .accessibilityIdentifier(AXID.Convoy.rowArrived)
             } else {
                 VStack(alignment: .trailing, spacing: 0) {

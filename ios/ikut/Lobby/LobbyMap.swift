@@ -206,7 +206,7 @@ struct LobbyMapLayer: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                RoundGlassIconButton(systemImage: "arrow.up.left.and.arrow.down.right", label: "Show the whole trip") { command = command.asking(.wholeTrip) }
+                RoundGlassIconButton(systemImage: Symbol.wholeTrip, label: "Show the whole trip") { command = command.asking(.wholeTrip) }
                 .padding(.trailing, Spacing.m)
                 .padding(.top, stage.space.safeTop + Spacing.xs)
                 .accessibilityIdentifier(AXID.Lobby.wholeTrip)
@@ -313,7 +313,7 @@ struct LobbyPinView: View {
         case .meeting:
             Image(systemName: PlannedStopKind.meet.symbol).font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
         case .destination:
-            Image(systemName: "flag.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+            Image(systemName: Symbol.flag).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
         case .join:
             Circle().fill(.white).frame(width: 8, height: 8)
         }

@@ -50,11 +50,11 @@ struct AlwaysLocationExplainerView: View {
 
     private var illustration: some View {
         HStack(spacing: 20) {
-            Image(systemName: "car.fill")
+            Image(systemName: Symbol.car)
                 .foregroundStyle(.tint)
-            Image(systemName: "location.fill")
+            Image(systemName: Symbol.location)
                 .foregroundStyle(.secondary)
-            Image(systemName: "iphone.gen3.slash")
+            Image(systemName: Symbol.phoneOff)
                 .foregroundStyle(.secondary)
         }
         .ikutGlyph(44, cap: 1.3)

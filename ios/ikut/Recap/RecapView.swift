@@ -45,7 +45,7 @@ struct RecapView: View {
             if let recap = model.recap {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: RecapContent.shareText(recap)) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: Symbol.share)
                     }
                     .accessibilityLabel("Share recap")
                 }
@@ -140,7 +140,7 @@ struct RecapRouteMap: View {
                     .annotationTitles(interactive ? .automatic : .hidden)
                 }
             }
-            Marker(snapshot.destinationName, systemImage: "mappin", coordinate: snapshot.destination)
+            Marker(snapshot.destinationName, systemImage: Symbol.pin, coordinate: snapshot.destination)
                 .tint(Color.ikutAccent)
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
@@ -199,16 +199,16 @@ extension RecapSnapshot {
 
 #Preview("Event dots") {
     let dots: [(RecapTimelineItem.Kind, String)] = [
-        (.trip, "flag.fill"), (.stop, "fuelpump.fill"), (.hazard, "exclamationmark.triangle.fill"),
-        (.hazard, "cloud.rain.fill"), (.car, "car.fill"), (.trip, "mappin.circle.fill"),
+        (.trip, Symbol.flag), (.stop, Symbol.fuel), (.hazard, Symbol.warning),
+        (.hazard, Symbol.rain), (.car, Symbol.car), (.trip, Symbol.pinCircle),
     ]
     VStack(spacing: Spacing.l) {
         HStack(spacing: Spacing.m) {
             ForEach(dots.indices, id: \.self) { RecapEventDot(kind: dots[$0].0, symbol: dots[$0].1, size: 28) }
         }
         HStack(spacing: Spacing.l) {
-            RecapEventDot(kind: .stop, symbol: "fuelpump.fill", size: 36)
-            RecapEventDot(kind: .stop, symbol: "fuelpump.fill", size: 36, selected: true)
+            RecapEventDot(kind: .stop, symbol: Symbol.fuel, size: 36)
+            RecapEventDot(kind: .stop, symbol: Symbol.fuel, size: 36, selected: true)
         }
     }
     .padding(Spacing.l)

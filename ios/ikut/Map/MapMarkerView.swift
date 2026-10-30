@@ -41,13 +41,13 @@ struct MapMarkerView: View {
                     .elevation(.marker)
                     .overlay(alignment: .bottomTrailing) {
                         if marker.hasArrived {
-                            glyph("checkmark", weight: .heavy, size: 15, fill: Color.ikutPositive, ring: 1.5)
+                            glyph(Symbol.tick, weight: .heavy, size: 15, fill: Color.ikutPositive, ring: 1.5)
                                 .offset(x: 5 * scale, y: 5 * scale)
                         }
                     }
                     .overlay(alignment: .topTrailing) {
                         if marker.isLead {
-                            Image(systemName: "star.fill")
+                            Image(systemName: Symbol.awardDefault)
                                 .font(.system(size: 8 * scale, weight: .bold))
                                 .foregroundStyle(Color.yellow)
                                 .frame(width: 14 * scale, height: 14 * scale)
@@ -60,7 +60,7 @@ struct MapMarkerView: View {
             // A small clock on a car that has gone quiet, at full strength, so stale reads without the fade.
             .overlay(alignment: .bottomLeading) {
                 if MarkerMetrics.showsStaleBadge(marker) {
-                    glyph("clock.fill", weight: .bold, size: 15, fill: Color.neutralFill, ring: 1.5)
+                    glyph(Symbol.time, weight: .bold, size: 15, fill: Color.neutralFill, ring: 1.5)
                         .padding(.leading, (frameSize - badge) / 2 - 5 * scale)
                         .padding(.bottom, (frameSize - badge) / 2 - 5 * scale)
                 }

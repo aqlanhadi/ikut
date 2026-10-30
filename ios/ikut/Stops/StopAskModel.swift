@@ -10,10 +10,10 @@ struct StopReason: Identifiable, Equatable, Sendable {
 
     /// Fuel, Toilet, Food, Rest, in the design's order. (The design's "Detour" has no event type.)
     static let all: [StopReason] = [
-        StopReason(type: .stopFuel, label: "Fuel", symbol: "fuelpump.fill"),
-        StopReason(type: .stopToilet, label: "Toilet", symbol: "toilet.fill"),
-        StopReason(type: .stopFood, label: "Food", symbol: "fork.knife"),
-        StopReason(type: .stopRest, label: "Rest", symbol: "cup.and.saucer.fill"),
+        StopReason(type: .stopFuel, label: "Fuel", symbol: Symbol.fuel),
+        StopReason(type: .stopToilet, label: "Toilet", symbol: Symbol.toilet),
+        StopReason(type: .stopFood, label: "Food", symbol: Symbol.food),
+        StopReason(type: .stopRest, label: "Rest", symbol: Symbol.rest),
     ]
 }
 

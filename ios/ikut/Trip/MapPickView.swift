@@ -109,7 +109,7 @@ struct MapPickView: View {
 
     /// The fixed pin, with its label above; the pin's tip sits on the centre of the map.
     private var pin: some View {
-        Image(systemName: "mappin")
+        Image(systemName: Symbol.pin)
             .font(.system(size: 34, weight: .bold))
             .foregroundStyle(.red)
             .accessibilityHidden(true)

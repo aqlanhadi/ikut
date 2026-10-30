@@ -100,7 +100,7 @@ struct StopArrivalCard: View {
     @ViewBuilder private func leavingRow(_ stop: PlannedStop) -> some View {
         if let line = StopLeave.leavingLine(stop) {
             HStack(spacing: Spacing.m) {
-                Image(systemName: "clock").foregroundStyle(Color.surfaceSecondary).accessibilityHidden(true)
+                Image(systemName: Symbol.duringTrip).foregroundStyle(Color.surfaceSecondary).accessibilityHidden(true)
                 Text(line).font(.body.weight(.semibold)).monospacedDigit()
                 Spacer(minLength: 0)
                 Text(stop.isMeeting ? "Meeting point" : "Planned stop").font(.footnote).foregroundStyle(Color.surfaceSecondary)
@@ -118,7 +118,7 @@ struct StopArrivalCard: View {
         if !lines.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 ForEach(lines, id: \.self) { line in
-                    Label(line, systemImage: "arrow.turn.up.right")
+                    Label(line, systemImage: Symbol.turnRight)
                         .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
                 }
             }
@@ -359,7 +359,7 @@ struct StopArrivalCard: View {
             if row.skipping || row.notSharing {
                 Text(StopArrival.words(row)).font(.subheadline).foregroundStyle(Color.surfaceSecondary)
             } else if row.isHere {
-                Label("Here", systemImage: "checkmark")
+                Label("Here", systemImage: Symbol.tick)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.ikutPositive)
             } else {

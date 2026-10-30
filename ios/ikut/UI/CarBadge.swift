@@ -59,7 +59,7 @@ struct CarBadge: View {
     HStack {
         CarBadge(number: 1, colorHex: "#2563EB")
         CarBadge(number: 4, colorHex: "#7C3AED", size: IconSize.small.base)
-        CarBadge(symbol: "plus", colorHex: "#8E8E93", size: IconSize.small.base)
+        CarBadge(symbol: Symbol.add, colorHex: "#8E8E93", size: IconSize.small.base)
     }
     .padding()
 }

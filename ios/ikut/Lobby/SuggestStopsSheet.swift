@@ -175,10 +175,10 @@ struct SuggestStopsSheet: View {
         HStack(spacing: Spacing.m) {
             Text(SuggestStopsModel.stepperText(model.after)).font(.body).accessibilityIdentifier(AXID.Suggest.after)
             Spacer(minLength: Spacing.s)
-            Button { model.step(-1) } label: { Image(systemName: "minus").inlineRoundLabel() }
+            Button { model.step(-1) } label: { Image(systemName: Symbol.remove).inlineRoundLabel() }
                 .disabled(!SuggestAfter.canStep(model.after, by: -1))
                 .accessibilityLabel("Earlier").accessibilityIdentifier(AXID.Suggest.earlier)
-            Button { model.step(1) } label: { Image(systemName: "plus").inlineRoundLabel() }
+            Button { model.step(1) } label: { Image(systemName: Symbol.add).inlineRoundLabel() }
                 .disabled(!SuggestAfter.canStep(model.after, by: 1))
                 .accessibilityLabel("Later").accessibilityIdentifier(AXID.Suggest.later)
         }

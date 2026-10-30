@@ -13,9 +13,9 @@ struct LocationAskContent: View {
     }
 
     private let promises = [
-        Promise(symbol: "clock", title: "Only during a trip", detail: "From Start until you arrive or leave the trip"),
-        Promise(symbol: "person.2", title: "Only to this convoy", detail: "They see your first name and how far away you are"),
-        Promise(symbol: "pause.circle", title: "Pause any time", detail: "From the lobby, for 30 min"),
+        Promise(symbol: Symbol.duringTrip, title: "Only during a trip", detail: "From Start until you arrive or leave the trip"),
+        Promise(symbol: Symbol.convoyMembers, title: "Only to this convoy", detail: "They see your first name and how far away you are"),
+        Promise(symbol: Symbol.pauseAnytime, title: "Pause any time", detail: "From the lobby, for 30 min"),
     ]
 
     var body: some View {

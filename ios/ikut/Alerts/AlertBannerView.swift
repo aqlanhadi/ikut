@@ -35,7 +35,7 @@ struct AlertBannerView: View {
             title: alert.title, subtitle: alert.body, symbol: symbol(alert.category), circle: tint(alert.severity)
         ) {
             Button { center.dismiss() } label: {
-                RoundIconSymbol(systemImage: "xmark", glyph: .body.weight(.semibold), style: .bare, color: .white)
+                RoundIconSymbol(systemImage: Symbol.close, glyph: .body.weight(.semibold), style: .bare, color: .white)
             }
             .accessibilityLabel("Close")
         }
@@ -45,11 +45,11 @@ struct AlertBannerView: View {
 
     private func symbol(_ category: EventCategory) -> String {
         switch category {
-        case .hazard: "exclamationmark.triangle.fill"
-        case .condition: "cloud.rain.fill"
-        case .stopRequest: "pause.circle.fill"
-        case .status: "car.fill"
-        case .message: "text.bubble.fill"
+        case .hazard: Symbol.warning
+        case .condition: Symbol.rain
+        case .stopRequest: Symbol.paused
+        case .status: Symbol.car
+        case .message: Symbol.message
         }
     }
 
