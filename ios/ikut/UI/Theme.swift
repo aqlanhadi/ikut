@@ -25,6 +25,14 @@ enum Spacing {
     static let hero: CGFloat = 32
 }
 
+/// Where a round button on a screen's top corner sits (D118): `edge` in from the screen's side, as Apple's own bars
+/// keep their buttons (16 pt), and `top` below the top safe area (the status bar). The lobby's "Show the whole trip" and
+/// the recap map's close button both read it, and the lobby's camera keeps the same band clear (`LobbyMapLogic.buttonBand`).
+enum CornerButton {
+    static let edge: CGFloat = Spacing.l
+    static let top: CGFloat = Spacing.s
+}
+
 /// Continuous corner radii from the design canvas.
 enum Radius {
     /// Small icon square (a role icon, a stop's flag, an icon in a list row).

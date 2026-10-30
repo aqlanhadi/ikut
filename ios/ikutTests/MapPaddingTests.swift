@@ -46,7 +46,7 @@ struct MapPaddingTests {
             let reach = HomeSheet.reach(mode, compact: compact)
             let insets = TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, reach: reach, padding: padding)
             #expect(abs(Double(padding) + insets.bottom * frame - Double(max(cover.bottom, reach))) < 1e-9, "\(mode)")
-            #expect(abs(insets.top * frame - 110) < 1e-9)
+            #expect(abs(insets.top * frame - 92) < 1e-9)
             let create = HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact, padding: padding)
             let cleared = max(HomeSheet.reach(.list, compact: compact), cover.bottom + HomeSheet.createMargin)
             #expect(abs(Double(padding) + create.bottom * frame - Double(cleared)) < 1e-9, "\(mode)")
@@ -70,7 +70,7 @@ struct MapPaddingTests {
         // Frame bottom is `padding` above the screen's bottom; the strip's bottom edge is `bottom * frame` above that.
         let edgeFromBottom = Double(padding) + insets.bottom * frame
         #expect(abs(edgeFromBottom - Double(reach)) < 1e-9)
-        #expect(abs(insets.top * frame - 110) < 1e-9)
+        #expect(abs(insets.top * frame - 92) < 1e-9)
         // The entry camera takes the same numbers.
         let route = PastTripRoute(id: "r", name: "R", destinationName: "D", destinationLatitude: 5, destinationLongitude: 101,
                                   points: [[3, 101.5], [5, 101]])

@@ -111,8 +111,9 @@ struct TripsHomeView: View {
     }
     #endif
 
-    /// The map's height on screen (it runs under the status bar and the home indicator), from the one map (D63 C4).
-    var mapHeight: CGFloat { stage.space.frame.height }
+    /// The map's height on screen (it runs under the status bar and the home indicator, so it is the screen's), from the
+    /// one map (D63 C4, D118).
+    var mapHeight: CGFloat { stage.space.screenHeight }
 
     /// What Home's sheet covers now, as the one cover holds it (written here first, so a camera move made in the same
     /// transaction as a sheet change reads the new one).
@@ -355,8 +356,9 @@ struct TripsHomeView: View {
         return (Double(Self.topObscured / area), Double((max(sheet, reach) - padding) / area))
     }
 
-    /// Status bar (about 62 pt) plus a destination flag drawn above its coordinate.
-    nonisolated private static let topObscured: CGFloat = 110
+    /// Status bar (about 62 pt) plus the half of a destination marker (30 pt) drawn above its coordinate and a breath, so a
+    /// route's top has about the room its bottom has above the sheet.
+    nonisolated private static let topObscured: CGFloat = 92
 
     // MARK: Create flow
 

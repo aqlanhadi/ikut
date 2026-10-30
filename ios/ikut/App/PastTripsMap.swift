@@ -17,6 +17,33 @@ struct PastTripRoute: Codable, Equatable, Identifiable, Sendable {
     var start: CLLocationCoordinate2D? { coordinates.first }
 }
 
+/// How a region sits in the map MapKit frames (D118). MapKit fits a region inside the map less its one bottom padding:
+/// the screen's width by the screen's height less the padding, from the screen's top edge. It zooms until BOTH spans fit,
+/// so for a route wider than the view is (long and thin, east to west) the longitude binds and the view shows more
+/// latitude than the region asked for; a vertical shift worked out from the requested latitude then lands the route off
+/// centre in the strip. `aspect` (that width over that height) tells which span binds.
+enum MapFit {
+    /// An iPhone 17 Pro's width.
+    static let referenceWidth: CGFloat = 402
+    /// The map's width over its framed height on the reference phone at the default text size.
+    static var referenceAspect: Double { aspect(width: referenceWidth, height: SheetStops.referenceScreen, padding: LobbySheet.defaultMapPadding) }
+
+    /// Width over height of what MapKit frames, from the screen's size and the one bottom padding. The reference
+    /// aspect for a map not measured yet.
+    static func aspect(width: CGFloat, height: CGFloat, padding: CGFloat) -> Double {
+        let framed = height - padding
+        guard width > 0, framed > 1 else { return referenceAspect }
+        return Double(width / framed)
+    }
+
+    /// Degrees of latitude the view really spans for a region of `latitudeDelta` by `longitudeDelta` at `latitude`:
+    /// the larger of what was asked and what the longitude needs (a degree of longitude is `cos(latitude)` as long as a
+    /// degree of latitude).
+    static func viewLatitudeSpan(latitudeDelta: Double, longitudeDelta: Double, latitude: Double, aspect: Double) -> Double {
+        max(latitudeDelta, longitudeDelta * cos(latitude * .pi / 180) / max(aspect, 0.05))
+    }
+}
+
 /// Pure helpers for Home's past-trips map.
 enum PastTripsMapLogic {
     /// At most this many past routes are drawn (newest first).
@@ -49,7 +76,8 @@ enum PastTripsMapLogic {
     /// the status bar and the sheet; together clamped to 0.7; a negative bottom lets the band reach below the
     /// frame). Nil when there is nothing to show.
     static func region(fitting routes: [PastTripRoute], padding: Double = 1.1, minSpan: Double = 0.05,
-                       bottomObscured: Double = 0, topObscured: Double = 0) -> MKCoordinateRegion? {
+                       bottomObscured: Double = 0, topObscured: Double = 0,
+                       aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion? {
         let all = routes.flatMap { $0.coordinates + [$0.destination] }
             .filter { CLLocationCoordinate2DIsValid($0) }
         guard let first = all.first else { return nil }
@@ -64,8 +92,11 @@ enum PastTripsMapLogic {
         let visibleLat = max((maxLat - minLat) * padding, minSpan)
         let latDelta = min(visibleLat / (1 - bottom - top), 170)
         let lngDelta = min(max((maxLng - minLng) * padding, minSpan), 350)
-        // Shift the map's centre so the content sits centred in the visible band.
-        let centerLat = (minLat + maxLat) / 2 + latDelta * (top - bottom) / 2
+        // Shift the map's centre so the content sits centred in the visible band, by the latitude the view really spans:
+        // a wide route binds on longitude and the view shows more than `latDelta`.
+        let midLat = (minLat + maxLat) / 2
+        let viewLat = MapFit.viewLatitudeSpan(latitudeDelta: latDelta, longitudeDelta: lngDelta, latitude: midLat, aspect: aspect)
+        let centerLat = midLat + viewLat * (top - bottom) / 2
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: max(-85, min(85, centerLat)), longitude: (minLng + maxLng) / 2),
             span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lngDelta))

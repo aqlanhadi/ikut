@@ -51,17 +51,22 @@ enum PickedTripLogic {
     }
 
     /// The whole route in the part of the map above the short sheet.
-    static func fit(_ route: PastTripRoute, bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion? {
-        PastTripsMapLogic.region(fitting: [route], bottomObscured: bottomObscured, topObscured: topObscured)
+    static func fit(_ route: PastTripRoute, bottomObscured: Double, topObscured: Double,
+                    aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion? {
+        PastTripsMapLogic.region(fitting: [route], bottomObscured: bottomObscured, topObscured: topObscured, aspect: aspect)
     }
 
     /// A close view of one spot, with the spot centred in the part of the map above the short sheet.
     static func focus(on coordinate: CLLocationCoordinate2D, span: Double = 0.15,
-                      bottomObscured: Double, topObscured: Double) -> MKCoordinateRegion {
+                      bottomObscured: Double, topObscured: Double,
+                      aspect: Double = MapFit.referenceAspect) -> MKCoordinateRegion {
         let bottom = max(-1, min(bottomObscured, 0.7)), top = max(0, min(topObscured, 0.7))
         let centerLat = coordinate.latitude + span * (top - bottom) / 2
+        // The longitude span is the one the view's shape asks for, so the latitude span is the one that binds and the
+        // spot sits centred in the strip (a square span would bind on the narrower width and show more latitude).
+        let lngSpan = span * aspect / max(cos(coordinate.latitude * .pi / 180), 0.05)
         return MKCoordinateRegion(center: .init(latitude: max(-85, min(85, centerLat)), longitude: coordinate.longitude),
-                                  span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span))
+                                  span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: min(lngSpan, 350)))
     }
 
     /// The label on a marked item's pin and its VoiceOver name: what it is and when, "Fuel stop · 13:16".

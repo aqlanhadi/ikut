@@ -54,8 +54,8 @@ struct RecapMapView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, Spacing.l)
-        .padding(.top, Spacing.s)
+        .padding(.horizontal, CornerButton.edge)
+        .padding(.top, CornerButton.top)
     }
 
     private var stepper: some View {
