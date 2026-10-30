@@ -9,6 +9,8 @@ enum FirestorePaths {
 
     static func members(tripId: String) -> String { "\(trip(tripId))/members" }
     static func member(tripId: String, userId: String) -> String { "\(members(tripId: tripId))/\(userId)" }
+    /// Who the organiser removed (D104); written only in the removal batch, never read by the app.
+    static func removed(tripId: String, userId: String) -> String { "\(trip(tripId))/removed/\(userId)" }
 
     static func stops(tripId: String) -> String { "\(trip(tripId))/stops" }
     static func stop(tripId: String, stopId: String) -> String { "\(stops(tripId: tripId))/\(stopId)" }

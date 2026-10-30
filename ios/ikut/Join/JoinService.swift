@@ -120,6 +120,9 @@ enum JoinService {
                 : "Trip codes are 6 letters or numbers. Check the code and try again."
         case .failedPrecondition:
             return "That code is shared by more than one trip. Ask the organiser for a new trip."
+        case .permissionDenied where serverMessage.localizedCaseInsensitiveContains("removed"):
+            // D104: the organiser removed this person; only a new code lets them back in (joinTrip.ts, REMOVED_FROM_TRIP).
+            return "You were removed from this trip. Ask the organiser for a new code."
         case .unauthenticated, .permissionDenied:
             return "You’re signed out. Close ikut, open it again and try again."
         case .unavailable, .deadlineExceeded:

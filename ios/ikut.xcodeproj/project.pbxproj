@@ -145,6 +145,7 @@
 		6DF4DBBFC2479CD85E53631F /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CAC79F1BB254D2FFA7FF24B /* QRScannerView.swift */; };
 		6E9EB28B2723AACAD74CD9FC /* TripMapModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AD7663BE4B472EA27B284CC /* TripMapModel.swift */; };
 		7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A17502ECF89C7385935BA5 /* StopRouteTests.swift */; };
+		70A31FF87FE75B741CE61E05 /* NewCodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 512EAC722395229E43BEB36F /* NewCodeService.swift */; };
 		7198C46FB019CDC9AE5ABEF5 /* HomeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B53A5B7C8FCD9F45B61013 /* HomeModel.swift */; };
 		72445B83188E679CC45FEFED /* BottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259104081FD2BD54F7BCE87D /* BottomSheet.swift */; };
 		72913577CD65DD10CE46D83D /* EventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F201EC357C45D84BC4395C /* EventTests.swift */; };
@@ -451,6 +452,7 @@
 		4ED5CFA3F41F99359E253930 /* StopApproachDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopApproachDemo.swift; sourceTree = "<group>"; };
 		5055B23595FC815A408187BC /* YouStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouStatus.swift; sourceTree = "<group>"; };
 		511C3C2D00712F5DF0E5FBDE /* TripScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripScreen.swift; sourceTree = "<group>"; };
+		512EAC722395229E43BEB36F /* NewCodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewCodeService.swift; sourceTree = "<group>"; };
 		52C0A56BCBBB39D114D5E659 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPillLogic.swift; sourceTree = "<group>"; };
 		55067EC070E1EB3342E091A2 /* StopPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPlanner.swift; sourceTree = "<group>"; };
@@ -1152,6 +1154,7 @@
 				D34924ABFFA93014C880E890 /* CreateTripModel.swift */,
 				CE1702D9D5702A8D8AFA1382 /* CreateTripView.swift */,
 				99C9353808E19095E6015DC1 /* MapPickView.swift */,
+				512EAC722395229E43BEB36F /* NewCodeService.swift */,
 				23FCA90E7E8D9F5A2A28D42C /* NewTripFlow.swift */,
 				FC2C70B230100C595E9CB0FD /* NewTripSheet.swift */,
 				1025A993964C9BD7063EFC61 /* PlacePin.swift */,
@@ -1504,6 +1507,7 @@
 				6C9407949E903A1B7BD7E03E /* Member.swift in Sources */,
 				FA11E30932B2E0A6C4C0F5F7 /* Motion.swift in Sources */,
 				7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */,
+				70A31FF87FE75B741CE61E05 /* NewCodeService.swift in Sources */,
 				315D376CEFE79F22BC03169D /* NewTripFlow.swift in Sources */,
 				2D8FE1BC7E69464B90967908 /* NewTripSheet.swift in Sources */,
 				7F0F1E9387E6DF47B36D0E2D /* NextStop.swift in Sources */,

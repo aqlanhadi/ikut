@@ -23,6 +23,15 @@ struct TripServiceTests {
         #expect(m(.resourceExhausted, nil) == "You’ve made a lot of trips lately. Try again in a little while.")
     }
 
+    @Test func aNewCodeFailureUsesPlainWordsAndSaysHowLongToWait() {
+        let m = TripService.newCodeFailureMessage
+        #expect(m(.resourceExhausted, 240) == "You’ve made a lot of new codes lately. Wait 4 minutes and try again.")
+        #expect(m(.resourceExhausted, 13 * 3600) == "You’ve made a lot of new codes today. Try again tomorrow.")
+        #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")
+        #expect(m(.failedPrecondition, nil) == "This trip has ended, so it can’t have a new code.")
+        #expect(m(.permissionDenied, nil) == "Couldn’t make a new code just now. Please try again.")
+    }
+
     @Test func otherCreateFailuresUsePlainWords() {
         let m = TripService.createFailureMessage
         #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")

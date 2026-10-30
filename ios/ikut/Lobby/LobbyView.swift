@@ -132,6 +132,10 @@ struct LobbyView: View {
         get { exit.flow.asking == .end }
         nonmutating set { if newValue { exit.flow.ask(.end) } else { exit.flow.cancel(.end) } }
     }
+    var confirmNewCode: Bool {
+        get { exit.flow.asking == .newCode }
+        nonmutating set { if newValue { exit.flow.ask(.newCode) } else { exit.flow.cancel(.newCode) } }
+    }
     /// A row's write is out: the others rest (the working row says so itself).
     var busy: Bool { isWorking || exit.flow.busy }
 
@@ -289,6 +293,7 @@ struct LobbyView: View {
         if session.alwaysExplainerShowing { covers.insert(.alwaysExplainer) }
         if confirmLeave { covers.insert(.confirmLeave) }
         if confirmEnd { covers.insert(.confirmEnd) }
+        if confirmNewCode { covers.insert(.confirmNewCode) }
         if isEnded { covers.insert(.tripEnded) }
         return covers
     }
@@ -365,10 +370,11 @@ struct LobbyView: View {
             // The asks inside the pulled-up sheet went with it (a fold, a stop request, a hazard): none comes back by
             // itself at the next pull-up.
             let asks = LobbySheet.pulledUpAsks(
-                .init(confirmLeave: confirmLeave, confirmEnd: confirmEnd, renaming: renaming, showQR: showQR),
+                .init(confirmLeave: confirmLeave, confirmEnd: confirmEnd, confirmNewCode: confirmNewCode, renaming: renaming, showQR: showQR),
                 continuationShown: pulledUp || stage.mode == .lobby)
             confirmLeave = asks.confirmLeave
             confirmEnd = asks.confirmEnd
+            confirmNewCode = asks.confirmNewCode
             renaming = asks.renaming
             showQR = asks.showQR
         }
@@ -428,6 +434,8 @@ struct LobbyView: View {
                     case "end": confirmEnd = true
                     case "leave-working": exit.flow.confirm(.leave)
                     case "end-working": exit.flow.confirm(.end)
+                    case "new-code": confirmNewCode = true
+                    case "new-code-working": exit.flow.confirm(.newCode)
                     case "rename": renameText = "Balik kampung raya"; renaming = true
                     case "qr": showQR = true
                     case "action-error": actionError = "Can’t reach the server. Check your signal and try again."
@@ -493,6 +501,8 @@ struct LobbyView: View {
         onExit()
     }
     func endTrip() { exitTrip(.end) { try await session.endTrip() } }
+    /// The organiser's New code (D104): the same working row as Leave and End; the trip's listener brings the new code to the screen.
+    func makeNewCode() { exitTrip(.newCode) { _ = try await TripService.newCode(tripId: model.tripId) } }
 
     /// Rename's field and buttons, in the lobby's alert and the pulled-up sheet's.
     @ViewBuilder var renameActions: some View {
@@ -586,6 +596,7 @@ struct LobbyView: View {
             confirmLeave: Binding(get: { confirmLeave }, set: { confirmLeave = $0 }),
             confirmEnd: Binding(get: { confirmEnd }, set: { confirmEnd = $0 }),
             leave: leaveTrip, end: endTrip)
+        .tripNewCodeDialog(isPresented: Binding(get: { confirmNewCode }, set: { confirmNewCode = $0 }), make: makeNewCode)
         .alert("Trip name", isPresented: $renaming) { renameActions }
         .presentationDetents(TripScreenLogic.Sheet.lobby(compact: compact).detents, selection: Binding(
             get: { LobbySheet.detent(expanded: expanded, compact: compact) },
