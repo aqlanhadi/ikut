@@ -48,7 +48,7 @@ struct TripsHomeView: View {
     @ScaledMetric(relativeTo: .body) private var shortHeight: CGFloat = HomeSheet.compactHeight
     /// The text-size scale for the map's one constant bottom padding (the host's, D109, D114).
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
-    var mapPadding: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
+    var mapPadding: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight, screenHeight: SheetStops.screenHeight) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if DEBUG
     /// Demo that can be tapped through: picking a trip gives it this recap (no server). `tour` also picks the
@@ -117,7 +117,7 @@ struct TripsHomeView: View {
     /// What Home's sheet covers now, as the one cover holds it (written here first, so a camera move made in the same
     /// transaction as a sheet change reads the new one).
     private func sheetCover() -> MapCover {
-        let cover = HomeSheet.cover(model.mode, compact: compact)
+        let cover = HomeSheet.cover(model.mode, compact: compact, medium: medium)
         stage.cover(cover, from: .home)
         return stage.space.cover(in: .home) ?? cover
     }
@@ -144,7 +144,7 @@ struct TripsHomeView: View {
                     move(to: camera, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))
                 }
             }
-            .onChange(of: HomeSheet.cover(model.mode, compact: compact), initial: true) { _, cover in stage.cover(cover, from: .home) }
+            .onChange(of: HomeSheet.cover(model.mode, compact: compact, medium: medium), initial: true) { _, cover in stage.cover(cover, from: .home) }
             .onChange(of: mapHeight) { _, _ in
                 // Refit for the real height while the camera is still ours.
                 if model.flow != nil { refocusCreate(animated: false) } else if model.joinFlow != nil { refocusJoin(animated: false) } else if model.nameStep != nil { /* the camera stays */ } else if model.picked != nil { refocus(animated: false) } else if !model.routes.isEmpty, !stage.camera.positionedByUser { fit(animated: false) } else if model.here != nil, !stage.camera.positionedByUser { showHere(animated: false) }
@@ -476,7 +476,9 @@ struct TripsHomeView: View {
     // MARK: Sheet
 
     /// The short detent's height: one for the list and a picked trip.
-    var compact: CGFloat { HomeSheet.compact(scaled: shortHeight) }
+    var compact: CGFloat { HomeSheet.compact(scaled: shortHeight, screenHeight: SheetStops.screenHeight) }
+    /// The mid stop at the text size: New trip's height (D116).
+    var medium: CGFloat { LobbySheet.compact(scaled: mediumHeight, screenHeight: SheetStops.screenHeight) }
 
     /// Apple's own sheet over the map: drag it between a short and a tall detent, as in Apple Maps. It is
     /// always up (no dismiss), and the map behind it takes touches while it is short. The name alerts are
@@ -539,11 +541,11 @@ struct TripsHomeView: View {
         .animation(sheetMotion, value: model.mode)
         .padding(.top, HomeSheet.indicatorRoom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .presentationDetents(HomeSheet.detents(model.mode, compact: compact), selection: Binding(
-            get: { HomeSheet.detent(expanded: model.expanded, mode: model.mode, compact: compact) },
+        .presentationDetents(HomeSheet.detents(model.mode, compact: compact, medium: medium), selection: Binding(
+            get: { HomeSheet.detent(expanded: model.expanded, mode: model.mode, compact: compact, medium: medium) },
             set: { model.expanded = HomeSheet.isExpanded($0) }))
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(model.mode, compact: compact))))
+        .presentationBackgroundInteraction(.enabled(upThrough: HomeSheet.short(HomeSheet.height(model.mode, compact: compact, medium: medium))))
         .interactiveDismissDisabled()
         .modifier(HomeRenameAlerts(renaming: $renaming, newName: $newName, renameError: $renameError))
         // The name button opens Settings (D72). Its own alerts, since this view's are blocked while it is up.

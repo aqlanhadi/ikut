@@ -19,8 +19,8 @@ struct MapPaddingTests {
 
     @Test func thePaddingAtTheDefaultAndExtremeSizes() {
         #expect(LobbySheet.defaultMapPadding == HomeSheet.compactHeight + BottomSheet.detentExtra)
-        // Capped like Home's sheet, and never 0.
-        #expect(LobbySheet.mapPadding(scaledMedium: 5000) == HomeSheet.compactHeight * 1.5 + BottomSheet.detentExtra)
+        // Capped like the collapsed stop (42% of the screen), and never 0.
+        #expect(LobbySheet.mapPadding(scaledMedium: 5000) == 874 * SheetStops.collapsedShare + BottomSheet.detentExtra)
         #expect(LobbySheet.mapPadding(scaledMedium: 0) > 0)
         // Never above the lobby's medium sheet, so the lobby's sheet always covers the logo.
         for scaled in [CGFloat(470), 560, 658, 900] {
@@ -140,9 +140,9 @@ struct MapPaddingTests {
 
     /// Driving at the default text size (D115): the folded sheet is the convoy's own 282 (220 content plus the 62 bar),
     /// which is Home's short sheet, a gap under the padding (292), so the room's bottom is slightly negative and the logo
-    /// shows above it; the unfolded one (about 512) is taller, so it is positive and covers the logo. Either way my car
+    /// shows above it; the unfolded one (capped at the mid stop, 470) is taller, so it is positive and covers the logo. Either way my car
     /// sits at the middle of the strip above the sheet.
-    @Test(arguments: [PanelSheet.foldedEstimate + PanelSheet.barEstimate, PanelSheet.unfoldedEstimate + PanelSheet.barEstimate])
+    @Test(arguments: [PanelSheet.foldedEstimate + PanelSheet.barEstimate, SheetStops.midBase])
     func drivingFollowsAboveItsSheetAtTheDefaultPadding(sheet: CGFloat) {
         let padding = LobbySheet.defaultMapPadding
         let room = room(padding: padding, coverBottom: sheet)

@@ -16,7 +16,9 @@ struct LobbyMapTests {
     @Test func mediumIsTheCanvasHeightAndGrowsWithTextButIsCapped() {
         #expect(LobbySheet.compact(scaled: 470) == 470)
         #expect(LobbySheet.compact(scaled: 300) == 470)
-        #expect(LobbySheet.compact(scaled: 5000) == 470 * 1.4)
+        // Capped at 55% of the screen (D116): 874 pt gives 480.7, a small phone's 667 gives 366.85.
+        #expect(LobbySheet.compact(scaled: 5000) == 874 * SheetStops.midShare)
+        #expect(abs(LobbySheet.compact(scaled: 470, screenHeight: 667) - 667 * SheetStops.midShare) < 1e-9)
     }
 
     @Test func twoDetentsMediumAndTall() {

@@ -55,10 +55,10 @@ struct PanelSheetTests {
         #expect(HomeSheet.compactHeight == PanelSheet.foldedEstimate + PanelSheet.barEstimate)
         #expect(HomeSheet.compactHeight == 282)
         #expect(heights(folded: nil, unfolded: nil, bar: nil).short == HomeSheet.compactHeight)
-        // Scales with the text size and caps as before.
+        // Scales with the text size; the collapsed stop caps it at 42% of the screen (D116).
         #expect(HomeSheet.compact(scaled: 0) == 282)
-        #expect(HomeSheet.compact(scaled: 400) == 400)
-        #expect(HomeSheet.compact(scaled: 5000) == 282 * 1.5)
+        #expect(HomeSheet.compact(scaled: 340) == 340)
+        #expect(HomeSheet.compact(scaled: 5000) == 874 * SheetStops.collapsedShare)
     }
 
     @Test func aSmallFoldedLayoutIsNotRaisedToHomesHeight() {
@@ -72,6 +72,8 @@ struct PanelSheetTests {
         let h = heights(folded: nil, unfolded: nil, bar: nil)
         #expect(h.short == PanelSheet.foldedEstimate + PanelSheet.barEstimate)
         #expect(h.tall == PanelSheet.unfoldedEstimate + PanelSheet.barEstimate)
+        // With the mid stop given (as the screen does), the unfolded estimate (512) is capped at it (D116).
+        #expect(PanelSheet.heights(folded: nil, unfolded: nil, bar: nil, room: nil, mid: SheetStops.midBase).tall == SheetStops.midBase)
     }
 
     @Test func neitherHeightPassesTheRoomUnderThePills() {

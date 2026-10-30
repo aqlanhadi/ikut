@@ -125,13 +125,11 @@ struct HomeCameraTests {
         #expect(HomeCamera.view(of: .userLocation(fallback: .automatic)) == nil)
     }
 
-    @Test func leftTripFramingFollowsItsShortSheet() {
+    @Test func leftTripFramingIsTheListsBecauseItRestsAtTheCollapsedStop() {
         let compact = HomeSheet.compactHeight
         let left = HomeSheet.reach(.leftTrip, compact: compact)
-        // The route is framed just above the left trip's short sheet, not the list's 110 pt higher.
+        // The route is framed just above the left trip's short sheet, which is the list's (D116).
         #expect(left == HomeSheet.height(.leftTrip, compact: compact) + HomeSheet.detentExtra)
-        #expect(left < HomeSheet.reach(.list, compact: compact))
-        // Every other mode keeps the list's (Where to? and New trip and Join frame by `createInsets`).
         for mode in [HomeSheet.Mode.list, .whereTo, .newTrip, .join] {
             #expect(HomeSheet.reach(mode, compact: compact) == HomeSheet.reach(.list, compact: compact))
         }
@@ -141,7 +139,7 @@ struct HomeCameraTests {
                                             reach: left, padding: padding)
         #expect(abs(insets.bottom - Double(left - padding) / Double(874 - padding)) < 1e-9)
         // It scales with the text size as the sheet does.
-        #expect(HomeSheet.reach(.leftTrip, compact: 390) == 390 * HomeSheet.leftTripFraction + HomeSheet.detentExtra)
+        #expect(HomeSheet.reach(.leftTrip, compact: 390) == 390 + HomeSheet.detentExtra)
     }
 
     /// Fresh install: the camera opened on the fallback, the first fix came in on Where to? and flew to you. Close

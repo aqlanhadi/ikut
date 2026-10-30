@@ -9,7 +9,7 @@ enum HomeSheet {
     /// past trips; a picked trip its header (back, name, date, Share, stats line) and the top of its recap card. It is the
     /// convoy's resting folded sheet (`PanelSheet`'s folded content plus its bar), one number from the same constants, so
     /// Home and the drive rest at the same height (D115; the owner liked the convoy's).
-    static let compactHeight: CGFloat = PanelSheet.foldedEstimate + PanelSheet.barEstimate
+    static let compactHeight: CGFloat = SheetStops.collapsedBase
     /// Room the drag indicator takes above the content.
     static let indicatorRoom = BottomSheet.indicatorRoom
 
@@ -18,34 +18,30 @@ enum HomeSheet {
     static func motion(reduceMotion: Bool) -> Animation? { Motion.sheet(reduceMotion: reduceMotion) }
 
     /// The short detent's height, the same for the list and a picked trip (so a pick never resizes the sheet).
-    /// `scaled` is `compactHeight` scaled with the text size; it is capped so the tall detent stays well above it.
-    static func compact(scaled: CGFloat) -> CGFloat {
-        min(max(scaled, compactHeight), compactHeight * 1.5)
+    /// `scaled` is `compactHeight` scaled with the text size; the collapsed stop caps it (`SheetStops.collapsed`).
+    static func compact(scaled: CGFloat, screenHeight: CGFloat = SheetStops.referenceScreen) -> CGFloat {
+        SheetStops.collapsed(scale: SheetStops.scale(of: scaled, base: compactHeight), screenHeight: screenHeight)
     }
 
     static let detentExtra = BottomSheet.detentExtra
     /// From the screen's bottom edge to the top of the list's short sheet and the gap above it, at the default text size.
     static let defaultReach: CGFloat = reach(.list, compact: compactHeight)
 
-    /// How far up from the screen's bottom edge the camera keeps the short sheet of `mode` and the gap above it
-    /// clear: the list's, except a left trip's short sheet (#437). Where to?, New trip and joining keep the list's
-    /// (`createInsets`). This used to be the map's bottom padding; the padding is now one constant for every screen
+    /// How far up from the screen's bottom edge the camera keeps the short sheet and the gap above it clear: the
+    /// collapsed stop's, which the list, a picked trip and a left trip all rest at (D116). Where to?, New trip and
+    /// joining keep it too (`createInsets`). `mode` stays for the callers. This used to be the map's bottom padding; the padding is now one constant for every screen
     /// (`LobbySheet.mapPadding`, D109) and the camera reads this relative to it (`obscured`, `createInsets`), so the
     /// tall sheet covers the map on purpose and moves nothing (#343).
     static func reach(_ mode: Mode, compact: CGFloat) -> CGFloat {
-        max(0, mode == .leftTrip ? height(.leftTrip, compact: compact) : compact) + detentExtra
+        max(0, compact) + detentExtra
     }
 
     /// What Home's sheet shows: its list, or one of the two steps of making a trip over the same map (MapFirst B2, B3).
     enum Mode: Equatable { case list, whereTo, newTrip, leftTrip, join }
 
-    /// A trip you left early picked on Home: its header and the two-line note, nothing below. Its short detent is this
-    /// fraction of the list's (so it scales with the text size, as the list's does).
-    static let leftTripFraction: CGFloat = 0.62
-
-    /// Where to? with the keyboard up (B2), and New trip with the route drawn (B3).
+    /// Where to? with the keyboard up (B2). A trip you left early picked on Home rests at the collapsed stop, as the
+    /// list does, and New trip (B3) at the mid stop (D116); neither has a number of its own.
     static let whereToHeight: CGFloat = 560
-    static let newTripHeight: CGFloat = 420
     /// Joining (D58): one height for every step (code, car, and the name and location steps in front), with the keyboard
     /// up or down, so going on or back never resizes the sheet.
     static let joinHeight: CGFloat = 560
@@ -59,25 +55,26 @@ enum HomeSheet {
 
     /// What Home's sheet covers of the map for its camera (D63 C4): the short sheet of `mode`. The
     /// tall one covers the map on purpose and moves nothing (#343), so it is not a parameter.
-    static func cover(_ mode: Mode, compact: CGFloat) -> MapCover { MapCover(top: 0, bottom: height(mode, compact: compact)) }
+    static func cover(_ mode: Mode, compact: CGFloat, medium: CGFloat = SheetStops.midBase) -> MapCover {
+        MapCover(top: 0, bottom: height(mode, compact: compact, medium: medium))
+    }
 
-    /// The short detent's height for `mode`.
-    static func height(_ mode: Mode, compact: CGFloat) -> CGFloat {
+    /// The short detent's height for `mode`. `compact` is the collapsed stop and `medium` the mid stop at this text size.
+    static func height(_ mode: Mode, compact: CGFloat, medium: CGFloat = SheetStops.midBase) -> CGFloat {
         switch mode {
-        case .list: compact
+        case .list, .leftTrip: compact
         case .whereTo: whereToHeight
-        case .newTrip: newTripHeight
+        case .newTrip: medium
         case .join: joinHeight
-        case .leftTrip: compact * leftTripFraction
         }
     }
 
-    static func detents(_ mode: Mode, compact: CGFloat) -> Set<PresentationDetent> {
-        [short(height(mode, compact: compact)), tall]
+    static func detents(_ mode: Mode, compact: CGFloat, medium: CGFloat = SheetStops.midBase) -> Set<PresentationDetent> {
+        [short(height(mode, compact: compact, medium: medium)), tall]
     }
 
-    static func detent(expanded: Bool, mode: Mode, compact: CGFloat) -> PresentationDetent {
-        expanded ? tall : short(height(mode, compact: compact))
+    static func detent(expanded: Bool, mode: Mode, compact: CGFloat, medium: CGFloat = SheetStops.midBase) -> PresentationDetent {
+        expanded ? tall : short(height(mode, compact: compact, medium: medium))
     }
 
     /// Room kept between the camera's content and the sheet's top edge when making a trip.
@@ -104,7 +101,7 @@ enum HomeSheet {
     static func drawsPastRoutes(_ mode: Mode) -> Bool { mode == .list }
 
     static func short(_ compact: CGFloat) -> PresentationDetent { .height(compact) }
-    static let tall = PresentationDetent.large
+    static let tall = SheetStops.tall
 
     static func detents(compact: CGFloat) -> Set<PresentationDetent> { [short(compact), tall] }
 

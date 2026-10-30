@@ -170,8 +170,8 @@ struct TripScreenTests {
         #expect(list.detents == [.height(300), .large])
         #expect(list.touchableUpThrough == .height(300))
         let newTrip = TripScreenLogic.Sheet.home(.newTrip, compact: 300)
-        #expect(newTrip.detents == [.height(HomeSheet.newTripHeight), .large])
-        #expect(newTrip.touchableUpThrough == .height(HomeSheet.newTripHeight))
+        #expect(newTrip.detents == [.height(SheetStops.mid(scale: 1)), .large])
+        #expect(newTrip.touchableUpThrough == .height(SheetStops.mid(scale: 1)))
     }
 
     @Test func homeAsksForPastRoutesAPickedTripOrTheNewTripsPins() {

@@ -76,7 +76,9 @@ struct TripMapView: View {
     @ScaledMetric(relativeTo: .body) private var mediumHeight: CGFloat = LobbySheet.compactHeight
     /// The bottom inset the host keeps the map's safe area at, the same on every screen (`LobbySheet.mapPadding`, D109).
     /// What covers the map is put into the camera (`cameraRoom`), not into this.
-    private var legalInset: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight) }
+    /// The mid stop at the text size and screen: the unfolded sheet's cap (`SheetStops`, D116).
+    private var sheetMid: CGFloat { LobbySheet.compact(scaled: mediumHeight, screenHeight: SheetStops.screenHeight) }
+    private var legalInset: CGFloat { LobbySheet.mapPadding(scaledMedium: mediumHeight, screenHeight: SheetStops.screenHeight) }
     /// From the map's own camera, for `MapCameraRoom.latitudePerPointPerMeter`.
     @State private var latitudePerPointPerMeter = 0.0
     /// The top cover (banner stack, from the map's top edge) the camera was last aimed with: where my car sits in the visible strip
@@ -188,6 +190,7 @@ struct TripMapView: View {
                 model.mode = MapCameraLogic.mode(afterUserGestureFrom: model.mode)
             }
             .onChange(of: typeSize) { _, _ in sheet.forgetMeasuredHeights() }
+            .onChange(of: sheetMid, initial: true) { _, mid in sheet.mid = mid }
             .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk() }
             .onChange(of: ask) { _, now in session.askShowing = now != nil }
             .onChange(of: keepAwakeOn) { _, _ in updateAwake() }

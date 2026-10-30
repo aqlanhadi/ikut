@@ -110,7 +110,7 @@ enum TripScreenLogic {
     /// The one sheet's sizes in each mode: Home's short (the list's, or Where to?'s and New trip's own) and tall, the
     /// lobby's medium and tall, or the convoy panel's short and tall.
     enum Sheet: Equatable {
-        case home(HomeSheet.Mode, compact: CGFloat)
+        case home(HomeSheet.Mode, compact: CGFloat, medium: CGFloat = SheetStops.midBase)
         case lobby(compact: CGFloat)
         case driving(PanelSheet.Heights)
 
@@ -124,7 +124,7 @@ enum TripScreenLogic {
 
         var detents: Set<PresentationDetent> {
             switch self {
-            case .home(let mode, let compact): HomeSheet.detents(mode, compact: compact)
+            case .home(let mode, let compact, let medium): HomeSheet.detents(mode, compact: compact, medium: medium)
             case .lobby(let compact): LobbySheet.detents(compact: compact)
             case .driving(let heights): PanelSheet.detents(in: heights)
             }
@@ -134,7 +134,7 @@ enum TripScreenLogic {
         /// tallest, so the map, the pill, the banners and the round buttons answer at every height (#402).
         var touchableUpThrough: PresentationDetent {
             switch self {
-            case .home(let mode, let compact): HomeSheet.short(HomeSheet.height(mode, compact: compact))
+            case .home(let mode, let compact, let medium): HomeSheet.short(HomeSheet.height(mode, compact: compact, medium: medium))
             case .lobby(let compact): LobbySheet.medium(compact)
             case .driving(let heights): .height(heights.full)
             }
@@ -647,7 +647,7 @@ struct TripScreenHost<Content: View>: View {
             Map(position: $stage.camera) {
                 TripMapContent(input: spec.input, style: style.converting { proxy.convert($0.clCoordinate, to: .global) })
             }
-            .modifier(TripMapBehaviour(spec: spec, stage: stage, bottomPadding: LobbySheet.mapPadding(scaledMedium: mediumHeight)))
+            .modifier(TripMapBehaviour(spec: spec, stage: stage, bottomPadding: LobbySheet.mapPadding(scaledMedium: mediumHeight, screenHeight: SheetStops.screenHeight)))
         }
     }
 }
