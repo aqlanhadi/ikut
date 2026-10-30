@@ -379,6 +379,8 @@ enum DemoScreens {
         case "lobby-confirm-start": return trip(lobbyAsking(.notReady, "start"))
         case "lobby-confirm-leave": return trip(lobbyAsking(.member, "leave"))
         case "lobby-confirm-end": return trip(lobbyAsking(.organizer, "end"))
+        case "lobby-leave-working": return trip(lobbyAsking(.member, "leave-working"))
+        case "lobby-end-working": return trip(lobbyAsking(.organizer, "end-working"))
         case "lobby-rename": return trip(lobbyAsking(.organizer, "rename"))
         case "lobby-qr": return trip(lobbyAsking(.organizer, "qr"))
         case "lobby-action-error": return trip(lobbyAsking(.organizer, "action-error"))

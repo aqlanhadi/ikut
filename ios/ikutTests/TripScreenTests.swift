@@ -507,7 +507,7 @@ struct TripSheetTests {
         screen.open(tripId: "t1", started: false)
         // The lobby going off screen as its trip closes writes after the exit.
         screen.exit()
-        screen.sheet.cover([.tripOffScreen, .suggestStops], among: TripSheetCover.trip)
+        screen.sheet.cover([.tripOffScreen, .changeDestination], among: TripSheetCover.trip)
         screen.open(tripId: "t2", started: false)
         #expect(screen.sheet.presented)
     }

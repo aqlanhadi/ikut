@@ -125,10 +125,12 @@ extension LobbyView {
         if canEnd || canLeaveTrip {
             Section {
                 if canEnd {
-                    listOption("End trip", systemImage: Symbol.finish, id: AXID.Lobby.endTrip, destructive: true) { confirmEnd = true }
+                    listOption("End trip", systemImage: Symbol.finish, id: AXID.Lobby.endTrip, destructive: true,
+                               working: exit.working == .end ? "Ending…" : nil) { confirmEnd = true }
                 }
                 if canLeaveTrip {
-                    listOption("Leave trip", systemImage: Symbol.leaveTrip, id: AXID.Lobby.leaveTrip, destructive: true) {
+                    listOption("Leave trip", systemImage: Symbol.leaveTrip, id: AXID.Lobby.leaveTrip, destructive: true,
+                               working: exit.working == .leave ? "Leaving…" : nil) {
                         confirmLeave = true
                     }
                 }
@@ -136,15 +138,23 @@ extension LobbyView {
         }
     }
 
-    func listOption(_ title: LocalizedStringKey, systemImage: String, id: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+    /// `working`: the row's write is out (Leaving…, Ending…); its icon gives way to a spinner and the row rests.
+    func listOption(
+        _ title: LocalizedStringKey, systemImage: String, id: String, destructive: Bool = false,
+        working: LocalizedStringKey? = nil, action: @escaping () -> Void
+    ) -> some View {
         Button(role: destructive ? .destructive : nil, action: action) {
             HStack(spacing: Spacing.m) {
-                Image(systemName: systemImage).accessibilityHidden(true)
-                Text(title)
+                if working != nil {
+                    ProgressView().accessibilityHidden(true)
+                } else {
+                    Image(systemName: systemImage).accessibilityHidden(true)
+                }
+                Text(working ?? title)
             }
         }
         .foregroundStyle(destructive ? Color.red : Color.primary)
-        .disabled(isWorking)
+        .disabled(busy)
         .accessibilityIdentifier(id)
     }
 
@@ -177,7 +187,7 @@ extension LobbyView {
                 }
             }
             .foregroundStyle(Color.primary)
-            .disabled(isWorking)
+            .disabled(busy)
             .accessibilityHint(hint)
             .accessibilityIdentifier(id)
         } else {
@@ -319,7 +329,9 @@ extension LobbyView {
         AnyView(
             content
                 .sheet(isPresented: $showQR) { if let code = model.trip?.code { QRCodeSheet(code: code) } }
-                .tripExitDialogs(confirmLeave: $confirmLeave, confirmEnd: $confirmEnd, leave: leaveTrip, end: endTrip)
+                .tripExitDialogs(
+                    confirmLeave: Binding(get: { confirmLeave }, set: { confirmLeave = $0 }),
+                    confirmEnd: Binding(get: { confirmEnd }, set: { confirmEnd = $0 }), leave: leaveTrip, end: endTrip)
                 .alert("Trip name", isPresented: $renaming) { renameActions })
     }
 

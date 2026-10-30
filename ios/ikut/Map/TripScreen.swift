@@ -189,8 +189,9 @@ enum TripSheetCover: Hashable, CaseIterable {
     /// The trip's layer is not on screen (another screen pushed over the trip, or the trip closing).
     case tripOffScreen
     /// What the lobby pushes or presents over the whole screen.
-    case changeDestination, suggestStops, alwaysExplainer
-    /// The lobby's asks: presented over its sheet in the lobby, from inside the pulled-up convoy sheet while driving.
+    case changeDestination, alwaysExplainer
+    /// The lobby's asks: presented from inside the sheet, in the lobby (D110) and while driving (pulled up), so neither mode
+    /// steps aside for them.
     case renaming, confirmLeave, confirmEnd
     /// The trip ended: the recap is pushed.
     case tripEnded
@@ -200,12 +201,12 @@ enum TripSheetCover: Hashable, CaseIterable {
     /// The open trip's, written by its layers (`LobbyView`); cleared when a trip opens or closes.
     static let trip: Set<Self> = Set(allCases).subtracting(home)
 
-    /// What the sheet steps aside for in `mode`. Driving keeps it up for rename, Leave and End (they present from inside
-    /// the pulled-up sheet); the lobby keeps it up when the trip ends (the lobby going off screen takes it).
+    /// What the sheet steps aside for in `mode`. The lobby and driving keep it up for rename, Leave and End (they present
+    /// from inside the sheet); the lobby keeps it up when the trip ends (the lobby going off screen takes it).
     static func heeded(in mode: TripScreenMode) -> Set<Self> {
         switch mode {
         case .home: home
-        case .lobby: trip.subtracting([.tripEnded])
+        case .lobby: trip.subtracting([.tripEnded, .renaming, .confirmLeave, .confirmEnd])
         case .driving: trip.subtracting([.renaming, .confirmLeave, .confirmEnd])
         }
     }
