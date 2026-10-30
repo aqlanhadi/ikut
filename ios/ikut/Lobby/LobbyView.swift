@@ -42,7 +42,7 @@ struct LobbyView: View {
     @State var renameText = ""
     @State var showChangeDestination = false
     /// Leave trip and End trip: asked, working, done (`ExitFlow`); the asks present from inside the sheet.
-    @State var exit = ExitFlow()
+    @State var exit = ExitRunner()
     @State var isWorking = false
     @State var actionError: String?
     /// Start trip with a car not sharing yet asks first (#362).
@@ -125,15 +125,15 @@ struct LobbyView: View {
     #endif
 
     var confirmLeave: Bool {
-        get { exit.asking == .leave }
-        nonmutating set { if newValue { exit.ask(.leave) } else { exit.cancel(.leave) } }
+        get { exit.flow.asking == .leave }
+        nonmutating set { if newValue { exit.flow.ask(.leave) } else { exit.flow.cancel(.leave) } }
     }
     var confirmEnd: Bool {
-        get { exit.asking == .end }
-        nonmutating set { if newValue { exit.ask(.end) } else { exit.cancel(.end) } }
+        get { exit.flow.asking == .end }
+        nonmutating set { if newValue { exit.flow.ask(.end) } else { exit.flow.cancel(.end) } }
     }
     /// A row's write is out: the others rest (the working row says so itself).
-    var busy: Bool { isWorking || exit.busy }
+    var busy: Bool { isWorking || exit.flow.busy }
 
     var isOrganizer: Bool { isSample ? sampleOrganizer : session.isOrganizer }
 
@@ -413,6 +413,7 @@ struct LobbyView: View {
         }
         .onAppear {
             onScreen = true
+            exit.live = true
             stage.tripLayer(of: session, onScreen: true)
             if sampleTall { setExpanded(true) }
             #if DEBUG
@@ -425,8 +426,8 @@ struct LobbyView: View {
                     case "start": confirmStart = true
                     case "leave": confirmLeave = true
                     case "end": confirmEnd = true
-                    case "leave-working": exit.confirm(.leave)
-                    case "end-working": exit.confirm(.end)
+                    case "leave-working": exit.flow.confirm(.leave)
+                    case "end-working": exit.flow.confirm(.end)
                     case "rename": renameText = "Balik kampung raya"; renaming = true
                     case "qr": showQR = true
                     case "action-error": actionError = "Can’t reach the server. Check your signal and try again."
@@ -443,6 +444,7 @@ struct LobbyView: View {
         // screen's model closes the trip (`TripScreenModel.exit`).
         .onDisappear {
             onScreen = false
+            exit.live = false
             stage.tripLayer(of: session, onScreen: false)
             updateListening()
         }
@@ -461,17 +463,10 @@ struct LobbyView: View {
 
     /// Leaving and ending keep the sheet up with the row working, and only a write that landed moves on (`ExitFlow`).
     func exitTrip(_ kind: ExitFlow.Kind, _ write: @escaping () async throws -> Void) {
-        guard !exit.busy else { return }
-        exit.confirm(kind)
+        guard exit.flow.canStart else { return }
         actionError = nil
         Task {
-            do {
-                try await write()
-                if exit.land() { onExit() }
-            } catch {
-                exit.fail(error.localizedDescription)
-                actionError = error.localizedDescription
-            }
+            if let problem = await exit.run(kind, write: write, exit: onExit) { actionError = problem }
         }
     }
 
@@ -493,6 +488,8 @@ struct LobbyView: View {
     /// Back to trips: the trip keeps going without this screen. Its session stops as the screen's model closes the
     /// trip (`TripScreenModel.exit`), before Home takes the map, rather than whenever the view is released.
     func backToTrips() {
+        guard exit.flow.canGoBack else { return }
+        exit.live = false
         onExit()
     }
     func endTrip() { exitTrip(.end) { try await session.endTrip() } }
@@ -661,6 +658,7 @@ struct LobbyView: View {
             styledSubtitle: sharing ? sharingSubtitle(subtitle) : nil
         ) {
             RoundGlassIconButton(systemImage: Symbol.backTrailing, label: "Back to trips", action: backToTrips)
+                .disabled(!exit.flow.canGoBack)
                 .accessibilityIdentifier(AXID.Lobby.back)
         } trailing: {
             if let trip {

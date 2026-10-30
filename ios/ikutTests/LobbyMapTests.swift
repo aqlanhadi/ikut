@@ -96,11 +96,49 @@ struct LobbyMapTests {
         #expect(exit.working == .leave)
     }
 
-    @Test func endingSettlesBackToIdleSinceTheRecapTakesTheScreen() {
+    @Test func endingHoldsItsProgressUntilTheRecapTakesTheScreen() {
         var exit = ExitFlow()
         exit.confirm(.end)
         let exits = exit.land()
-        #expect(!exits && exit.phase == .idle)
+        #expect(!exits && exit.progress == .end && exit.busy)
+    }
+
+    @Test func backIsOffWhileAWriteIsOutOrLanded() {
+        var exit = ExitFlow()
+        #expect(exit.canGoBack)
+        exit.ask(.leave)
+        #expect(exit.canGoBack)
+        exit.confirm(.leave)
+        #expect(!exit.canGoBack)
+        exit.fail("x")
+        #expect(exit.canGoBack)
+    }
+
+    @MainActor @Test func aLandedLeaveExitsOnce() async {
+        let runner = ExitRunner()
+        var exits = 0
+        let problem = await runner.run(.leave, write: {}, exit: { exits += 1 })
+        #expect(problem == nil && exits == 1)
+        // A second try after it landed writes nothing and exits nothing.
+        var writes = 0
+        await runner.run(.leave, write: { writes += 1 }, exit: { exits += 1 })
+        #expect(writes == 0 && exits == 1)
+    }
+
+    @MainActor @Test func aFailedLeaveNeverExitsAndReturnsToIdle() async {
+        struct Down: LocalizedError { var errorDescription: String? { "Can’t reach the server." } }
+        let runner = ExitRunner()
+        var exits = 0
+        let problem = await runner.run(.leave, write: { throw Down() }, exit: { exits += 1 })
+        #expect(problem == "Can’t reach the server." && exits == 0)
+        #expect(runner.flow.phase == .idle && runner.flow.error == "Can’t reach the server.")
+    }
+
+    @MainActor @Test func aWriteLandingAfterTheScreenWentExitsNothing() async {
+        let runner = ExitRunner()
+        var exits = 0
+        await runner.run(.leave, write: { runner.live = false }, exit: { exits += 1 })
+        #expect(exits == 0)
     }
 
     @MainActor @Test func aPoppedLobbyTakesItsSheetWithIt() {

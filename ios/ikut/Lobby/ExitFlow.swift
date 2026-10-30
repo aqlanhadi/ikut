@@ -13,8 +13,18 @@ struct ExitFlow: Equatable {
 
     var asking: Kind? { if case .asking(let kind) = phase { kind } else { nil } }
     var working: Kind? { if case .working(let kind) = phase { kind } else { nil } }
-    /// A write is out: the other rows rest.
-    var busy: Bool { working != nil }
+    /// The kind whose row shows its progress: while the write is out, and once it landed until the screen changes.
+    var progress: Kind? {
+        switch phase {
+        case .working(let kind), .landed(let kind): kind
+        case .idle, .asking: nil
+        }
+    }
+    /// A write is out or has landed: the other rows rest, and so does Back to trips.
+    var busy: Bool { progress != nil }
+    var canGoBack: Bool { !busy }
+    /// A tap on a row's confirm may start a write.
+    var canStart: Bool { if case .idle = phase { true } else if case .asking = phase { true } else { false } }
 
     mutating func ask(_ kind: Kind) {
         guard phase == .idle else { return }
@@ -41,13 +51,36 @@ struct ExitFlow: Equatable {
         error = message
     }
 
-    /// The write landed. True once, for Leave: the screen exits now. End settles back to idle: the trip's end takes the
-    /// screen to the recap by itself.
+    /// The write landed. True once, for Leave: the screen exits now. End holds its "Ending…" until the trip's end takes
+    /// the screen to the recap by itself.
     mutating func land() -> Bool {
         guard let kind = working else { return false }
         switch kind {
         case .leave: phase = .landed(kind); return true
-        case .end: phase = .idle; return false
+        case .end: phase = .landed(kind); return false
+        }
+    }
+}
+
+/// Runs Leave and End for the lobby: the write, then land or fail, then exit once. The screen holds it in `@State`.
+@Observable @MainActor
+final class ExitRunner {
+    var flow = ExitFlow()
+    /// The screen is still the open trip's: a write landing after it went (Back, the trip closed) exits nothing.
+    var live = true
+
+    /// Returns the error's text when the write didn't land.
+    @discardableResult
+    func run(_ kind: ExitFlow.Kind, write: () async throws -> Void, exit: () -> Void) async -> String? {
+        guard flow.canStart else { return nil }
+        flow.confirm(kind)
+        do {
+            try await write()
+            if flow.land(), live { exit() }
+            return nil
+        } catch {
+            flow.fail(error.localizedDescription)
+            return error.localizedDescription
         }
     }
 }

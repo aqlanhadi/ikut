@@ -31,6 +31,7 @@ extension LobbyView {
             .font(.headline)
             .accessibilityElement(children: .combine)
             Button(action: backToTrips) { Text("Back to trips").frame(maxWidth: .infinity) }
+                .disabled(!exit.flow.canGoBack)
         }
     }
 
@@ -126,11 +127,11 @@ extension LobbyView {
             Section {
                 if canEnd {
                     listOption("End trip", systemImage: Symbol.finish, id: AXID.Lobby.endTrip, destructive: true,
-                               working: exit.working == .end ? "Ending…" : nil) { confirmEnd = true }
+                               working: exit.flow.progress == .end ? "Ending…" : nil) { confirmEnd = true }
                 }
                 if canLeaveTrip {
                     listOption("Leave trip", systemImage: Symbol.leaveTrip, id: AXID.Lobby.leaveTrip, destructive: true,
-                               working: exit.working == .leave ? "Leaving…" : nil) {
+                               working: exit.flow.progress == .leave ? "Leaving…" : nil) {
                         confirmLeave = true
                     }
                 }
