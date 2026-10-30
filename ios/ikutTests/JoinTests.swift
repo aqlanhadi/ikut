@@ -39,8 +39,22 @@ struct JoinServiceTests {
         #expect(JoinService.message(code: .notFound, serverMessage: "").contains("No trip has that code"))
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip is full (20 people).") == "This trip is full.")
         #expect(JoinService.message(code: .resourceExhausted, serverMessage: "This trip already has 10 cars.").contains("cars"))
-        #expect(JoinService.message(code: .resourceExhausted, serverMessage: "Too many tries with that code. Wait 4 minutes and try again.")
-            == "Too many tries. Wait a few minutes and try again.")
+        #expect(JoinService.message(code: .resourceExhausted, serverMessage: "Too many wrong codes. Wait 4 minutes and try again.")
+            == "Too many wrong codes. Wait a few minutes and try again.")
+    }
+
+    @Test func tooManyGuessesReadsTheServersWait() {
+        func mapped(_ details: [String: Any], text: String = "Too many wrong codes. Wait 18 hours and try again.") -> String {
+            let e = NSError(domain: FunctionsErrorDomain, code: FunctionsErrorCode.resourceExhausted.rawValue,
+                            userInfo: [NSLocalizedDescriptionKey: text, FunctionsErrorDetailsKey: details])
+            return JoinService.map(e).message
+        }
+        #expect(mapped(["reason": "too-many-guesses", "retryAfterSeconds": 181]) == "Too many wrong codes. Wait 4 minutes and try again.")
+        #expect(mapped(["reason": "too-many-guesses", "retryAfterSeconds": 30]) == "Too many wrong codes. Wait a minute and try again.")
+        #expect(mapped(["reason": "too-many-guesses", "retryAfterSeconds": 3 * 3600 + 5]) == "Too many wrong codes. Wait 4 hours and try again.")
+        #expect(mapped(["reason": "too-many-guesses", "retryAfterSeconds": 18 * 3600]) == "Too many wrong codes. Try again tomorrow.")
+        // Other resource-exhausted errors keep their own words even with details.
+        #expect(mapped(["reason": "other", "retryAfterSeconds": 60], text: "This trip is full (20 people).") == "This trip is full.")
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "That car is not part of this trip.").contains("no longer part"))
         #expect(JoinService.message(code: .invalidArgument, serverMessage: "x").contains("6 letters"))
         #expect(JoinService.message(code: .unavailable, serverMessage: "").contains("signal"))

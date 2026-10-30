@@ -57,7 +57,7 @@ enum JoinDemo {
     }
 
     /// Home with the join steps over its map, for the launch states `join-h1-name`, `join-h2-location`, `join-h3-empty`, `join-h3-found`, `join-h3-found-drive`,
-    /// `join-h3-not-found`, `join-h4-car`, `join-h4-copilot` and `join-h4-own` (D58). The found states look the trip up
+    /// `join-h3-not-found`, `join-h3-too-many-tries`, `join-h4-car`, `join-h4-copilot` and `join-h4-own` (D58). The found states look the trip up
     /// from the fixed-data API a moment after they open, as the real one does.
     static func home(_ state: String) -> TripsHomeView? {
         guard state.hasPrefix("join-h") || state == "join-location-off" else { return nil }
@@ -65,6 +65,7 @@ enum JoinDemo {
             ? TicketDrive(distance: 185_000, travelTime: 2 * 3600 + 10 * 60) : nil
         let code: String? = state == "join-h3-empty" ? nil : "K7M2QX"
         let failure = state == "join-h3-not-found" ? JoinService.message(code: .notFound, serverMessage: "")
+            : state == "join-h3-too-many-tries" ? JoinService.message(code: .resourceExhausted, serverMessage: "", retryAfterSeconds: 240)
             : state == "join-h3-no-signal" ? JoinService.message(code: .unavailable, serverMessage: "") : nil
         let model = JoinModel(
             displayName: "Nurul", initialCode: code,

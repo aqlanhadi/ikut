@@ -993,7 +993,7 @@ describe("wrong-code limit (emulator)", () => {
     const r = await join(wrong(), u.token);
     assert.equal(r.status, 429, JSON.stringify(r.body));
     assert.equal(r.body.error.status, "RESOURCE_EXHAUSTED");
-    assert.match(r.body.error.message, /^Too many tries with that code\. Wait \d+ minutes? and try again\.$/);
+    assert.match(r.body.error.message, /^Too many wrong codes\. Wait \d+ minutes? and try again\.$/);
     assert.equal(r.body.error.details.reason, "too-many-guesses");
     assert.ok(r.body.error.details.retryAfterSeconds > 0 && r.body.error.details.retryAfterSeconds <= 600);
     assert.equal((await missesOf(u.uid)).length, 10, "the blocked call is not counted");
@@ -1027,6 +1027,16 @@ describe("wrong-code limit (emulator)", () => {
     for (let i = 0; i < 5; i++) assert.equal((await join(wrong(), u.token)).body.error.status, "NOT_FOUND");
     assert.equal((await preview(wrong(), u.token)).body.error.status, "RESOURCE_EXHAUSTED");
     assert.equal((await join(wrong(), u.token)).body.error.status, "RESOURCE_EXHAUSTED");
+  });
+
+  it("an ambiguous code keeps its slot", async () => {
+    const u = await newUser();
+    const a = await seedTrip();
+    const b = await seedTrip();
+    await b.tripRef.update({ code: a.code });
+    const r = await preview(a.code, u.token);
+    assert.equal(r.body.error.status, "FAILED_PRECONDITION", JSON.stringify(r.body));
+    assert.equal((await missesOf(u.uid)).length, 1);
   });
 
   it("a malformed code is refused without counting", async () => {

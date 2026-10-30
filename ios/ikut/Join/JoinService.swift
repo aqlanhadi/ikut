@@ -98,14 +98,16 @@ enum JoinService {
     }
 
     /// Friendly text for a callable failure. `code` is nil for errors outside the Functions domain.
-    static func message(code: FunctionsErrorCode?, serverMessage: String) -> String {
+    static func message(code: FunctionsErrorCode?, serverMessage: String, retryAfterSeconds: Int? = nil) -> String {
         switch code {
         case .notFound:
             return "No trip has that code. Check it with the organiser; the trip may have ended."
         case .resourceExhausted:
-            // The wrong-code limit (functions/src/guessLimit.ts) shares this code with "trip full"; it starts "Too many tries".
-            if serverMessage.localizedCaseInsensitiveContains("too many tries") {
-                return "Too many tries. Wait a few minutes and try again."
+            // The wrong-code limit (functions/src/guessLimit.ts) shares this code with "trip full". It comes with
+            // details {reason: "too-many-guesses", retryAfterSeconds}; the message text "Too many wrong codes" is the fallback.
+            if let seconds = retryAfterSeconds { return tooManyGuesses(retryAfterSeconds: seconds) }
+            if serverMessage.localizedCaseInsensitiveContains("too many wrong codes") {
+                return "Too many wrong codes. Wait a few minutes and try again."
             }
             return serverMessage.localizedCaseInsensitiveContains("cars")
                 ? "This trip already has the most cars it can hold. Join one of the existing cars."
@@ -125,14 +127,28 @@ enum JoinService {
         }
     }
 
+    /// "Too many wrong codes. Wait 4 minutes and try again."; hours when long; past 12 hours it is the daily cap.
+    static func tooManyGuesses(retryAfterSeconds seconds: Int) -> String {
+        let minutes = max(1, Int((Double(seconds) / 60).rounded(.up)))
+        if seconds > 12 * 3600 { return "Too many wrong codes. Try again tomorrow." }
+        let wait: String
+        if minutes <= 1 { wait = "a minute" }
+        else if minutes < 90 { wait = "\(minutes) minutes" }
+        else { let h = Int((Double(minutes) / 60).rounded(.up)); wait = h == 1 ? "an hour" : "\(h) hours" }
+        return "Too many wrong codes. Wait \(wait) and try again."
+    }
+
     static func map(_ error: Error) -> JoinError {
         if let error = error as? JoinError { return error }
         let ns = error as NSError
         if ns.domain == FunctionsErrorDomain {
+            let details = ns.userInfo[FunctionsErrorDetailsKey] as? [String: Any]
+            let wait = details?["reason"] as? String == "too-many-guesses"
+                ? (details?["retryAfterSeconds"] as? NSNumber)?.intValue : nil
             return JoinError(
                 message: message(
                     code: FunctionsErrorCode(rawValue: ns.code),
-                    serverMessage: ns.localizedDescription))
+                    serverMessage: ns.localizedDescription, retryAfterSeconds: wait))
         }
         if ns.domain == NSURLErrorDomain {
             return JoinError(message: message(code: .unavailable, serverMessage: ""))

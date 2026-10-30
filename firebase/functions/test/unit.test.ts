@@ -399,7 +399,7 @@ describe("guess limit", () => {
   it("the error is resource-exhausted, plain, carries a retry hint and is not the trip-full text", () => {
     const e = tooManyTries(3 * MIN + 1);
     assert.equal(e.code, "resource-exhausted");
-    assert.match(e.message, /^Too many tries with that code\. Wait 4 minutes and try again\.$/);
+    assert.match(e.message, /^Too many wrong codes\. Wait 4 minutes and try again\.$/);
     assert.deepEqual(e.details, { reason: "too-many-guesses", retryAfterSeconds: 181 });
     assert.match(tooManyTries(1000).message, /Wait a minute/);
     assert.ok(!/full|cars/i.test(e.message));

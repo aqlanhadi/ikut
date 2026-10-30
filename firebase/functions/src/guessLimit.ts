@@ -12,7 +12,7 @@ import { HttpsError } from "firebase-functions/v2/https";
  * with a known good code does not help.
  *
  * Limits: MAX_MISSES_PER_WINDOW misses in any WINDOW_MS (sliding), and MAX_MISSES_PER_DAY in any DAY_MS. A
- * 6-character code has about 2 billion values, so 50 guesses a day per account is hopeless for guessing; 10 in
+ * 6-character code has about 887 million values (31 characters in the app's alphabet; the server accepts any of 36, about 2 billion), so 50 guesses a day per account is hopeless for guessing; 10 in
  * 10 minutes leaves room for a person mistyping a code and retrying. This does not stop someone who makes a new
  * anonymous account per few guesses: App Check (APPCHECK_ENFORCE) is what covers that.
  *
@@ -24,7 +24,7 @@ export const WINDOW_MS = 10 * 60_000;
 export const MAX_MISSES_PER_WINDOW = 10;
 export const DAY_MS = 24 * 60 * 60_000;
 export const MAX_MISSES_PER_DAY = 50;
-export const TOO_MANY_TRIES = "Too many tries";
+export const TOO_MANY_TRIES = "Too many wrong codes";
 
 interface LimitDoc {
   misses?: unknown;
@@ -59,7 +59,7 @@ export function tooManyTries(waitMilliseconds: number): HttpsError {
   const when = seconds <= 60 ? "a minute" : minutes < 90 ? `${minutes} minutes` : `${Math.ceil(minutes / 60)} hours`;
   return new HttpsError(
     "resource-exhausted",
-    `${TOO_MANY_TRIES} with that code. Wait ${when} and try again.`,
+    `${TOO_MANY_TRIES}. Wait ${when} and try again.`,
     { reason: "too-many-guesses", retryAfterSeconds: seconds },
   );
 }
