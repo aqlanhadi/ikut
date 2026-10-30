@@ -879,8 +879,31 @@ struct SessionLeaveTests {
             if step == .deleteMember { throw refused }
         }
         try await session.leave()
-        #expect(steps == [.releaseTracker(carId: "c1"), .deleteMember])
+        #expect(steps == [.releaseTracker(carId: "c1"), .deleteMember, .confirmGone])
         #expect(!tracker.isTracking)
+    }
+
+    /// D106: the same refusal while the server says this phone is still a member (the trip was handed to it a moment
+    /// ago) is not a leave: the person stays, with the plain words, and no tracking is lost.
+    @Test func aRefusedDeleteFromAStillMemberDoesNotLeave() async {
+        let refused = firestoreError(.permissionDenied)
+        let (session, _) = session { step in
+            if step == .deleteMember { throw refused }
+            if step == .confirmGone { throw StillInTrip() }
+        }
+        await #expect(throws: StillInTrip()) { try await session.leave() }
+        #expect(StillInTrip().localizedDescription == "You’re the organiser now. Hand the trip over or end it.")
+        #expect(!session.isClosing)
+    }
+
+    @Test func aFailedCheckAfterARefusedDeleteSaysCheckYourSignal() async {
+        let refused = firestoreError(.permissionDenied)
+        let offline = firestoreError(.unavailable)
+        let (session, _) = session { step in
+            if step == .deleteMember { throw refused }
+            if step == .confirmGone { throw offline }
+        }
+        await #expect(throws: LeaveFailed()) { try await session.leave() }
     }
 
     @Test func aRefusedTrackerReleaseStillLeaves() async throws {

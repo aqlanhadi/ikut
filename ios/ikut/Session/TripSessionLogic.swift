@@ -42,6 +42,9 @@ typealias PauseWriter = @MainActor (_ carId: String, _ pausedAt: Date?) async th
 enum LeaveStep: Equatable {
     case releaseTracker(carId: String)
     case deleteMember
+    /// After a refused member delete (D106): the server says whether this phone is still a member. Returns when it is
+    /// not (it has left); throws `StillInTrip` when it is (the refusal was the organiser's rule, not a lost reply).
+    case confirmGone
 }
 
 /// Does one Leave step against the server; tests substitute a fake.
@@ -50,6 +53,12 @@ typealias LeaveWriter = @MainActor (LeaveStep) async throws -> Void
 /// Leave trip couldn't reach the server: the person stays in the trip and can try again.
 struct LeaveFailed: LocalizedError, Equatable {
     var errorDescription: String? { "Couldn’t leave the trip. Check your signal and try again." }
+}
+
+/// The member delete was refused and this phone is still in the trip: the organiser of a live trip cannot leave
+/// (D106), e.g. it was handed to them a moment ago and the phone has not heard yet.
+struct StillInTrip: LocalizedError, Equatable {
+    var errorDescription: String? { "You’re the organiser now. Hand the trip over or end it." }
 }
 
 extension TripSessionLogic {

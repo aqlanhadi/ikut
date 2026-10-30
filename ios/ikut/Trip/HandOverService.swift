@@ -9,12 +9,14 @@ extension TripService {
         var errorDescription: String? { message }
     }
 
-    static func handOverFailureMessage(code: FunctionsErrorCode?) -> String {
+    static func handOverFailureMessage(code: FunctionsErrorCode?, retryAfterSeconds: Int? = nil) -> String {
         switch code {
-        case .permissionDenied: "Only the organiser can hand the trip over."
+        case .permissionDenied: "You’re not the organiser any more, so you can’t hand the trip over."
         case .failedPrecondition: "This trip has ended, so it can’t be handed over."
         case .invalidArgument: "That person isn’t in the trip any more. Pick someone else."
-        case .resourceExhausted: "You’ve handed this trip over a lot lately. Try again in a little while."
+        case .resourceExhausted:
+            retryAfterSeconds.map { "You’ve handed this trip over a lot lately. Try again in \(JoinService.waitPhrase(seconds: $0))." }
+                ?? "You’ve handed this trip over a lot lately. Try again in a little while."
         case .unavailable, .deadlineExceeded: "Can’t reach the server. Check your signal and try again."
         default: "Couldn’t hand the trip over just now. Please try again."
         }
@@ -25,7 +27,9 @@ extension TripService {
         guard ns.domain == FunctionsErrorDomain else {
             return ns.domain == NSURLErrorDomain ? HandOverFailure(message: handOverFailureMessage(code: .unavailable)) : error
         }
-        return HandOverFailure(message: handOverFailureMessage(code: FunctionsErrorCode(rawValue: ns.code)))
+        let details = ns.userInfo[FunctionsErrorDetailsKey] as? [String: Any]
+        let wait = details?["reason"] as? String == "too-many-handovers" ? (details?["retryAfterSeconds"] as? NSNumber)?.intValue : nil
+        return HandOverFailure(message: handOverFailureMessage(code: FunctionsErrorCode(rawValue: ns.code), retryAfterSeconds: wait))
     }
 
     /// Organiser only: makes `newOrganizerId` (another member) the trip's organiser (`handOverTrip`). The caller stays

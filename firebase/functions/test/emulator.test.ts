@@ -9,7 +9,7 @@ import { CREATE_LIMITS, PRODUCTION_LIMITS, sweepCreateLimits } from "../lib/crea
 import { createTripForUser } from "../lib/createTripCall.js";
 import { createTripWithFreeCode, generateCode, type CreateTripInput } from "../lib/createTrip.js";
 import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
-import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
+import { MAX_RETRY, emptyPurgeResult, purgeTripData, sweepExpiredEvents } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
 import { ROTATE_LIMITS } from "../lib/createLimit.js";
 import { findActiveTripId, joinTripTransaction, parseJoinInput, REMOVED_FROM_TRIP } from "../lib/joinTrip.js";
@@ -1581,7 +1581,7 @@ describe("handing the trip to another member (emulator, D106)", () => {
     const [gone, stay] = t.people as [string, string];
     await memberRef(t.tripId, gone).delete();
     const stranger = (await newUser()).uid;
-    for (const target of [t.organizer, stranger, gone, "", "a/b", 5 as unknown as string]) {
+    for (const target of [t.organizer, stranger, gone, "", "a/b", ".", "..", "__x__", 5 as unknown as string]) {
       await assert.rejects(handOverTripForUser(db, t.organizer, t.tripId, target), (e: any) =>
         e.code === "invalid-argument" && e.message === "Pick someone who is in the trip.", String(target));
     }
@@ -1620,5 +1620,57 @@ describe("handing the trip to another member (emulator, D106)", () => {
     const used = async () => ((await db.collection(HANDOVER_LIMITS).doc(u.tripId).get()).data()?.creates ?? []).length;
     await rejected(handOverTripForUser(db, u.organizer, u.tripId, "nobody", lim), "invalid-argument");
     assert.equal(await used(), 0);
+  });
+
+  const carRef = (id: string, carId: string) => tripRef(id).collection("cars").doc(carId);
+  const carOf = async (id: string, uid: string) => (await memberRef(id, uid).get()).data()!.carId as string;
+  const leadOf = async (id: string, carId: string) => (await carRef(id, carId).get()).data()?.isLead;
+
+  it("the lead label moves to the new organiser's car when the old organiser's car was the lead", async () => {
+    const t = await trip(2);
+    const [next, other] = t.people as [string, string];
+    const orgCar = await carOf(t.tripId, t.organizer);
+    await carRef(t.tripId, orgCar).set({ name: "Lead", color: "red", isLead: true, state: "convoy", trackerUserId: t.organizer });
+    const nextCar = await carOf(t.tripId, next);
+    await handOverTripForUser(db, t.organizer, t.tripId, next);
+    assert.equal(await leadOf(t.tripId, nextCar), true);
+    assert.equal(await leadOf(t.tripId, orgCar), false);
+    assert.equal(await leadOf(t.tripId, await carOf(t.tripId, other)), false, "no other car became lead");
+  });
+
+  it("no lead moves when the old organiser's car was not the lead, when the target has no car, or rides in the same car", async () => {
+    const a = await trip(1);
+    const aCar = await carOf(a.tripId, a.organizer);
+    await carRef(a.tripId, aCar).set({ name: "Mine", color: "red", isLead: false, state: "convoy" });
+    const aNext = await carOf(a.tripId, a.people[0]!);
+    await carRef(a.tripId, aNext).update({ isLead: true });
+    await handOverTripForUser(db, a.organizer, a.tripId, a.people[0]);
+    assert.equal(await leadOf(a.tripId, aCar), false);
+    assert.equal(await leadOf(a.tripId, aNext), true, "a lead car that was not the organiser's stays as it was");
+
+    const b = await trip(1);
+    const bCar = await carOf(b.tripId, b.organizer);
+    await carRef(b.tripId, bCar).set({ name: "Lead", color: "red", isLead: true, state: "convoy" });
+    await carRef(b.tripId, await carOf(b.tripId, b.people[0]!)).delete();
+    await handOverTripForUser(db, b.organizer, b.tripId, b.people[0]);
+    assert.equal(await leadOf(b.tripId, bCar), true, "target without a car: isLead stays");
+
+    const c = await trip(1);
+    const cCar = await carOf(c.tripId, c.organizer);
+    await carRef(c.tripId, cCar).set({ name: "Lead", color: "red", isLead: true, state: "convoy" });
+    await memberRef(c.tripId, c.people[0]!).update({ carId: cCar });
+    await handOverTripForUser(db, c.organizer, c.tripId, c.people[0]);
+    assert.equal(await leadOf(c.tripId, cCar), true, "the same car stays lead");
+  });
+
+  it("the sweep deletes an expired hand-over counter and keeps one that has not expired", async () => {
+    const old = db.collection(HANDOVER_LIMITS).doc("old-" + Math.random());
+    const fresh = db.collection(HANDOVER_LIMITS).doc("fresh-" + Math.random());
+    const now = Date.now();
+    await old.set({ creates: [now - 2 * 24 * 3600_000], expiresAt: Timestamp.fromMillis(now - 3600_000) });
+    await fresh.set({ creates: [now], expiresAt: Timestamp.fromMillis(now + 3600_000) });
+    await sweepExpiredEvents(db, new Date(now), emptyPurgeResult());
+    assert.equal((await old.get()).exists, false);
+    assert.equal((await fresh.get()).exists, true);
   });
 });

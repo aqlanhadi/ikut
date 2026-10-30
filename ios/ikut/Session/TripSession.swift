@@ -291,6 +291,11 @@ final class TripSession {
                 try await leaveStep(.releaseTracker(carId: carId))
             }
             try await leaveStep(.deleteMember)
+        } catch let still as StillInTrip {
+            // Still a member (and, as far as the server says, the organiser): nothing was left, so this phone goes on.
+            isClosing = false
+            reevaluate()
+            throw still
         } catch {
             isClosing = false
             reevaluate()
@@ -311,8 +316,19 @@ final class TripSession {
             case .deleteMember:
                 let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
                 try await ServerWrite.commit { try await memberRef.delete() }
+            case .confirmGone:
+                // A phone that is no longer a member cannot read the doc (permission denied): that, or no doc, is left.
+                let memberRef = db.document(FirestorePaths.member(tripId: tripId, userId: userId))
+                do {
+                    if try await memberRef.getDocument(source: .server).exists { throw StillInTrip() }
+                } catch where TripSessionLogic.leaveCountsAsLeft(error) {
+                    return
+                }
             }
         } catch where TripSessionLogic.leaveCountsAsLeft(error) {
+            // A refused member delete is a left phone only if the server agrees it is no longer a member: the rules also
+            // refuse the live organiser's own delete (D106).
+            if case .deleteMember = step { try await leaveStep(.confirmGone) }
             return
         }
     }

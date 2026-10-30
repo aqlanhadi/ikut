@@ -371,6 +371,8 @@ struct LobbyView: View {
         }
         // The trip started from another phone: no more stop edits.
         .onChange(of: canEditStops) { _, can in if !can { adding = nil } }
+        // The last other member left while the list of who takes over was open: nothing to pick, so back to the rows.
+        .onChange(of: handOverCandidates.isEmpty) { _, empty in if empty { exit.flow.stopPicking() } }
         // Rule #396 (`TripScreenLogic.lobbyReads`): driving, the lobby reads the session's cars and members only while
         // the convoy sheet is pulled up and shows the lobby below the convoy.
         .onChange(of: stage.mode) { _, _ in updateListening() }

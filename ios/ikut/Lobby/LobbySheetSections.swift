@@ -123,7 +123,7 @@ extension LobbyView {
 
     /// End trip (the organiser) and Leave trip as destructive rows, each behind its confirmation.
     @ViewBuilder var exitSection: some View {
-        if exit.flow.picking {
+        if exit.flow.picking && !handOverCandidates.isEmpty {
             handOverPicker
         } else if canEnd || canLeaveTrip || canHandOver {
             Section {
@@ -145,7 +145,8 @@ extension LobbyView {
                 }
             } footer: {
                 // The organiser alone has no one to hand the trip to: End trip is the only way out.
-                if canEnd && !canHandOver {
+                // Only once the members have loaded: before that "nobody else" is just not known yet.
+                if canEnd && !canHandOver && !model.members.isEmpty {
                     Text("You’re the only one in the trip. To leave it, end it for everyone.")
                         .accessibilityIdentifier(AXID.Lobby.handOverNote)
                 }

@@ -151,11 +151,13 @@ struct HandOverTests {
     }
 
     @Test func failuresUsePlainWords() {
-        let m = TripService.handOverFailureMessage
-        #expect(m(.unavailable) == "Can’t reach the server. Check your signal and try again.")
-        #expect(m(.invalidArgument) == "That person isn’t in the trip any more. Pick someone else.")
-        #expect(m(.failedPrecondition) == "This trip has ended, so it can’t be handed over.")
-        #expect(m(.permissionDenied) == "Only the organiser can hand the trip over.")
-        #expect(m(.internal) == "Couldn’t hand the trip over just now. Please try again.")
+        let m = { TripService.handOverFailureMessage(code: $0, retryAfterSeconds: $1) }
+        #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")
+        #expect(m(.invalidArgument, nil) == "That person isn’t in the trip any more. Pick someone else.")
+        #expect(m(.failedPrecondition, nil) == "This trip has ended, so it can’t be handed over.")
+        #expect(m(.permissionDenied, nil) == "You’re not the organiser any more, so you can’t hand the trip over.")
+        #expect(m(.resourceExhausted, 240) == "You’ve handed this trip over a lot lately. Try again in 4 minutes.")
+        #expect(m(.resourceExhausted, nil) == "You’ve handed this trip over a lot lately. Try again in a little while.")
+        #expect(m(.internal, nil) == "Couldn’t hand the trip over just now. Please try again.")
     }
 }
