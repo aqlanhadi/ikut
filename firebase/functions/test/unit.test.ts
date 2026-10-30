@@ -5,6 +5,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { compareKeys, cursorFromState, cursorToState, runSweep, type SweepCursor, type SweepItem } from "../src/sweep.ts";
 import { EVENT_GRACE_MS, POSITION_RETENTION_MS, eventExpiryCutoff, shouldPurgeTripData } from "../src/retention.ts";
 import { decodePolyline, encodePolyline, routeFrom, simplifiedRoute } from "../src/previewRoute.ts";
+import { DAY_MS, recentMisses, tooManyTries, waitMs } from "../src/guessLimit.ts";
 import { APPCHECK_ENFORCE, appCheckOptions, appCheckOptionsFor, normalizeCode, normalizeName, parseJoinInput, pickCarColor } from "../src/joinTrip.ts";
 
 const base = { code: "ab3-d9x", displayName: "  Aqlan   Z ", car: { newCar: { name: "Myvi", color: "red" } }, tracker: true };
@@ -364,5 +365,43 @@ describe("cursors", () => {
     assert.equal(cursorFromState({ cursorMs: 5, cursorId: "x" } as any, "job", bound), null);
     assert.equal(cursorFromState({ cursorSeconds: 5, cursorNanos: -1, cursorId: "x" }, "job", bound), null);
     assert.equal(cursorFromState({ cursorSeconds: 5, cursorNanos: 1.5, cursorId: "x" }, "job", bound), null);
+  });
+});
+
+describe("guess limit", () => {
+  const NOW = 1_000_000_000_000;
+  const MIN = 60_000;
+  const at = (...minsAgo: number[]) => minsAgo.map((m) => NOW - m * MIN).sort((a, b) => a - b);
+
+  it("allows up to 9 misses in 10 minutes, blocks the 10th try after 10", () => {
+    assert.equal(waitMs(at(1, 2, 3, 4, 5, 6, 7, 8, 9), NOW), 0);
+    assert.ok(waitMs(at(1, 2, 3, 4, 5, 6, 7, 8, 9, 9.5), NOW) > 0);
+  });
+  it("the wait is until the oldest relevant miss leaves the window", () => {
+    // 10 misses, the oldest 8 minutes ago: free again in 2 minutes.
+    assert.equal(waitMs(at(8, 7, 6, 5, 4, 3, 2, 1, 0.5, 0.2), NOW), 2 * MIN);
+  });
+  it("misses older than 10 minutes do not count toward the window", () => {
+    assert.equal(waitMs(at(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21), NOW), 0);
+  });
+  it("50 misses in a day block even when spread out, until the oldest is a day old", () => {
+    const spread = Array.from({ length: 50 }, (_, i) => NOW - (i * 25 + 1) * MIN).sort((a, b) => a - b);
+    assert.ok(spread.every((t) => t > NOW - DAY_MS));
+    const w = waitMs(spread, NOW);
+    assert.equal(w, spread[0]! + DAY_MS - NOW);
+    assert.equal(waitMs(spread.slice(1), NOW), 0);
+  });
+  it("misses a day old or older expire; malformed entries and future times are ignored", () => {
+    const data = { misses: [NOW - DAY_MS, NOW - DAY_MS - 5, NOW - 5, "x", null, NOW + 10 * MIN, NaN] };
+    assert.deepEqual(recentMisses(data, NOW), [NOW - 5]);
+    assert.deepEqual(recentMisses(undefined, NOW), []);
+  });
+  it("the error is resource-exhausted, plain, carries a retry hint and is not the trip-full text", () => {
+    const e = tooManyTries(3 * MIN + 1);
+    assert.equal(e.code, "resource-exhausted");
+    assert.match(e.message, /^Too many wrong codes\. Wait 4 minutes and try again\.$/);
+    assert.deepEqual(e.details, { reason: "too-many-guesses", retryAfterSeconds: 181 });
+    assert.match(tooManyTries(1000).message, /Wait a minute/);
+    assert.ok(!/full|cars/i.test(e.message));
   });
 });

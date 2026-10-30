@@ -1,6 +1,7 @@
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { NO_ACTIVE_TRIP, appCheckOptions, findActiveTripId, isRecord, normalizeCode } from "./joinTrip.js";
+import { countingMisses } from "./guessLimit.js";
 import { simplifiedRoute } from "./previewRoute.js";
 import type { Car, Member, PlannedStop, PreviewCar, PreviewStop, PreviewTripResult, Trip } from "./model.js";
 
@@ -92,10 +93,11 @@ async function firstNameOf(tripRef: FirebaseFirestore.DocumentReference, organiz
 }
 
 export const previewTrip = onCall(appCheckOptions, async (request): Promise<PreviewTripResult> => {
-  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
   if (!isRecord(request.data)) throw new HttpsError("invalid-argument", "Invalid request.");
   const code = normalizeCode(request.data.code);
   const db = getFirestore();
-  const tripId = await findActiveTripId(db, code);
+  const tripId = await countingMisses(db, uid, () => findActiveTripId(db, code));
   return previewTripData(db, tripId);
 });

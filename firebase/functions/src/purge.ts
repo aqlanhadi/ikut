@@ -1,6 +1,7 @@
 import { Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import type { Trip } from "./model.js";
+import { sweepGuessLimits } from "./guessLimit.js";
 import {
   POSITION_RETENTION_MS,
   deleteEventsWithVotes,
@@ -125,6 +126,12 @@ export async function sweepExpiredEvents(db: Firestore, now: Date, result: Purge
   );
   result.expiredEvents += expired.events;
   result.votes += expired.votes;
+  // Wrong-code counters older than a day; their failure must not hold back the event sweep's result.
+  try {
+    await sweepGuessLimits(db, now);
+  } catch (err) {
+    logger.error("sweepExpiredEvents: guess limit sweep failed", { err: String(err) });
+  }
 }
 
 export function emptyPurgeResult(): PurgeResult {

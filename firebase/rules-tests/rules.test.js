@@ -1117,3 +1117,28 @@ describe('a trip with stops keeps its route once it has started', () => {
       assertFails(updateDoc(doc(db('mem'), `trips/${T}`), { stopCount: 0 })));
   });
 });
+
+// The wrong-code counters (`guessLimits/<uid>`) are written by the callables only (admin SDK). A client must not
+// read its own or anyone's, nor write, reset or delete one: that would let a guesser clear its own limit.
+describe('guessLimits (server only)', () => {
+  beforeEach(async () => {
+    await env.clearFirestore();
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'guessLimits/mem'), { misses: [Date.now()], expiresAt: Timestamp.fromMillis(Date.now() + 86400000) }));
+  });
+  it('a user cannot read their own counter or another one', async () => {
+    await assertFails(getDoc(doc(db('mem'), 'guessLimits/mem')));
+    await assertFails(getDoc(doc(db('other'), 'guessLimits/mem')));
+    await assertFails(getDocs(collection(db('mem'), 'guessLimits')));
+  });
+  it('a user cannot reset, change, create or delete a counter', async () => {
+    await assertFails(setDoc(doc(db('mem'), 'guessLimits/mem'), { misses: [], expiresAt: ts(-1000) }));
+    await assertFails(updateDoc(doc(db('mem'), 'guessLimits/mem'), { misses: [] }));
+    await assertFails(deleteDoc(doc(db('mem'), 'guessLimits/mem')));
+    await assertFails(setDoc(doc(db('other'), 'guessLimits/other'), { misses: [] }));
+  });
+  it('signed-out clients cannot touch it either', async () => {
+    await assertFails(getDoc(doc(db(null), 'guessLimits/mem')));
+    await assertFails(deleteDoc(doc(db(null), 'guessLimits/mem')));
+  });
+});

@@ -1,8 +1,7 @@
 import { FieldValue, type CollectionReference, type Firestore, type Transaction } from "firebase-admin/firestore";
-import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { defineBoolean } from "firebase-functions/params";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { HttpsError } from "firebase-functions/v2/https";
 import type { Car, Member, Trip } from "./model.js";
 
 export const MAX_MEMBERS = 20;
@@ -263,12 +262,3 @@ export function appCheckOptionsFor(env: Record<string, string | undefined>) {
 
 /** Options for the callables the app reaches before it has joined a trip. */
 export const appCheckOptions = appCheckOptionsFor(process.env);
-
-export const joinTrip = onCall(appCheckOptions, async (request): Promise<JoinResult> => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in to join a trip.");
-  const input = parseJoinInput(request.data);
-  const db = getFirestore();
-  const tripId = await findActiveTripId(db, input.code);
-  return joinTripTransaction(db, uid, tripId, input);
-});
