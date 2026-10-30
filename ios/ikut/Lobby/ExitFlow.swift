@@ -4,7 +4,7 @@ import Foundation
 /// sheet stays up through all of it; the row shows "Leaving…" or "Ending…" while it works, and only a write that has
 /// landed lets the screen exit (leaving stops location sharing, so it is never claimed early).
 struct ExitFlow: Equatable {
-    enum Kind: Equatable { case leave, end }
+    enum Kind: Equatable { case leave, end, newCode }
     enum Phase: Equatable { case idle, asking(Kind), working(Kind), landed(Kind) }
 
     private(set) var phase = Phase.idle
@@ -52,17 +52,19 @@ struct ExitFlow: Equatable {
     }
 
     /// The write landed. True once, for Leave: the screen exits now. End holds its "Ending…" until the trip's end takes
-    /// the screen to the recap by itself.
+    /// the screen to the recap by itself. A new code (D104) has nowhere to go: the row returns and the trip's own listener
+    /// shows the new code wherever the code and QR are.
     mutating func land() -> Bool {
         guard let kind = working else { return false }
         switch kind {
         case .leave: phase = .landed(kind); return true
         case .end: phase = .landed(kind); return false
+        case .newCode: phase = .idle; return false
         }
     }
 }
 
-/// Runs Leave and End for the lobby: the write, then land or fail, then exit once. The screen holds it in `@State`.
+/// Runs Leave, End and New code for the lobby: the write, then land or fail, then exit once. The screen holds it in `@State`.
 @Observable @MainActor
 final class ExitRunner {
     var flow = ExitFlow()

@@ -126,6 +126,8 @@ extension LobbyView {
         if canEnd || canLeaveTrip {
             Section {
                 if canEnd {
+                    listOption("New code", systemImage: Symbol.newCode, id: AXID.Lobby.newCode,
+                               working: exit.flow.progress == .newCode ? "Making a new code…" : nil) { confirmNewCode = true }
                     listOption("End trip", systemImage: Symbol.finish, id: AXID.Lobby.endTrip, destructive: true,
                                working: exit.flow.progress == .end ? "Ending…" : nil) { confirmEnd = true }
                 }
@@ -333,6 +335,7 @@ extension LobbyView {
                 .tripExitDialogs(
                     confirmLeave: Binding(get: { confirmLeave }, set: { confirmLeave = $0 }),
                     confirmEnd: Binding(get: { confirmEnd }, set: { confirmEnd = $0 }), leave: leaveTrip, end: endTrip)
+                .tripNewCodeDialog(isPresented: Binding(get: { confirmNewCode }, set: { confirmNewCode = $0 }), make: makeNewCode)
                 .alert("Trip name", isPresented: $renaming) { renameActions })
     }
 

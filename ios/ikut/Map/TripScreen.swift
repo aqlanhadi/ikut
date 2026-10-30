@@ -192,7 +192,7 @@ enum TripSheetCover: Hashable, CaseIterable {
     case changeDestination, alwaysExplainer
     /// The lobby's asks: presented from inside the sheet, in the lobby (D110) and while driving (pulled up), so neither mode
     /// steps aside for them.
-    case renaming, confirmLeave, confirmEnd
+    case renaming, confirmLeave, confirmEnd, confirmNewCode
     /// The trip ended: the recap is pushed.
     case tripEnded
 
@@ -206,8 +206,8 @@ enum TripSheetCover: Hashable, CaseIterable {
     static func heeded(in mode: TripScreenMode) -> Set<Self> {
         switch mode {
         case .home: home
-        case .lobby: trip.subtracting([.tripEnded, .renaming, .confirmLeave, .confirmEnd])
-        case .driving: trip.subtracting([.renaming, .confirmLeave, .confirmEnd])
+        case .lobby: trip.subtracting([.tripEnded, .renaming, .confirmLeave, .confirmEnd, .confirmNewCode])
+        case .driving: trip.subtracting([.renaming, .confirmLeave, .confirmEnd, .confirmNewCode])
         }
     }
 }

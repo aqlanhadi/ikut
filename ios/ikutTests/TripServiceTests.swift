@@ -23,6 +23,15 @@ struct TripServiceTests {
         #expect(m(.resourceExhausted, nil) == "You’ve made a lot of trips lately. Try again in a little while.")
     }
 
+    @Test func aNewCodeFailureUsesPlainWordsAndSaysHowLongToWait() {
+        let m = TripService.newCodeFailureMessage
+        #expect(m(.resourceExhausted, 240) == "You’ve made a lot of new codes lately. Wait 4 minutes and try again.")
+        #expect(m(.resourceExhausted, 13 * 3600) == "You’ve made a lot of new codes today. Try again tomorrow.")
+        #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")
+        #expect(m(.failedPrecondition, nil) == "This trip has ended, so it can’t have a new code.")
+        #expect(m(.permissionDenied, nil) == "Couldn’t make a new code just now. Please try again.")
+    }
+
     @Test func otherCreateFailuresUsePlainWords() {
         let m = TripService.createFailureMessage
         #expect(m(.unavailable, nil) == "Can’t reach the server. Check your signal and try again.")
@@ -112,6 +121,36 @@ struct TripServiceTests {
 struct TripServiceEmulatorTests {
     init() throws {
         Backend.configure()
+        try Auth.auth().signOut()
+    }
+
+    /// D104: the organiser's removal is one batch (member delete and the `removed` record); the rules refuse the delete
+    /// without the record, and no client can read the record. Needs this branch's rules (`tools/with-rules.mjs`).
+    @Test func theOrganiserRemovesAMemberOnlyWithTheRemovalRecord() async throws {
+        let trip = try await EmulatorTrip.make(name: "Remove")
+        nonisolated(unsafe) let organiser = try #require(Auth.auth().currentUser)
+        let code = try await trip.code()
+        // Signed out first: signing in anonymously while signed in would hand back the organiser again.
+        try Auth.auth().signOut()
+        try await Auth.auth().signInAnonymously()
+        let joiner = try #require(Auth.auth().currentUser?.uid)
+        try #require(joiner != trip.uid)
+        try await LiveJoinAPI().join(code: code, displayName: "Wyna", car: .new(name: "X70", color: TripService.palette[1]), tracker: false)
+        try await Auth.auth().updateCurrentUser(organiser)
+        try #require(Auth.auth().currentUser?.uid == trip.uid)
+        // Firestore picks the new user up from the token, so make sure it has the organiser's.
+        _ = try await organiser.getIDToken(forcingRefresh: true)
+
+        let db = Firestore.firestore()
+        let member = db.document(FirestorePaths.member(tripId: trip.tripId, userId: joiner))
+        await #expect(throws: (any Error).self) { try await member.delete() }
+        #expect(try await member.getDocument(source: .server).exists)
+
+        try await TripService.removeMember(tripId: trip.tripId, userId: joiner, by: trip.uid)
+        #expect(try await !member.getDocument().exists)
+        await #expect(throws: (any Error).self) {
+            _ = try await db.document(FirestorePaths.removed(tripId: trip.tripId, userId: joiner)).getDocument()
+        }
         try Auth.auth().signOut()
     }
 

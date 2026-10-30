@@ -207,6 +207,56 @@ describe('D95: trip and event timestamps are server time or capped', () => {
   });
 });
 
+// The organizer's removal of someone (D104): the member doc goes and removed/{userId} is created, in one batch.
+function removeBatch(uid, target, { record = {}, del = true } = {}) {
+  const f = db(uid);
+  const b = writeBatch(f);
+  b.set(doc(f, `trips/${T}/removed/${target}`), { userId: target, removedAt: serverTimestamp(), removedBy: uid, ...record });
+  if (del) b.delete(doc(f, `trips/${T}/members/${target}`));
+  return b.commit();
+}
+
+describe('removed members (D104)', () => {
+  beforeEach(() => seed());
+  const removedPath = (u) => `trips/${T}/removed/${u}`;
+  it('the organizer removes a member: the record and the member delete in one batch', () => removeBatch('org', 'mem'));
+  it('the record alone, without deleting the member, is refused', () => assertFails(removeBatch('org', 'mem', { del: false })));
+  it('a member cannot record a removal, even in a batch with their own delete', () => assertFails(removeBatch('mem', 'other')));
+  it('a member cannot record their own leaving as a removal', () => assertFails(removeBatch('mem', 'mem')));
+  it('the organizer cannot record their own removal', () => assertFails(removeBatch('org', 'org')));
+  it('a stranger cannot record a removal', () => assertFails(removeBatch('stranger', 'mem')));
+  it('no record for someone who is not in the trip', () => assertFails(removeBatch('org', 'stranger', { del: false })));
+  it('the record must name the right person, the organizer and server time', async () => {
+    await assertFails(removeBatch('org', 'mem', { record: { userId: 'other' } }));
+    await assertFails(removeBatch('org', 'mem', { record: { removedBy: 'mem' } }));
+    await assertFails(removeBatch('org', 'mem', { record: { removedAt: ts() } }));
+    await assertFails(removeBatch('org', 'mem', { record: { extra: 1 } }));
+  });
+  it('an ended trip takes no removal', async () => {
+    await seed({ ended: true });
+    await assertFails(removeBatch('org', 'mem'));
+  });
+  it('a member who leaves records nothing, and the leave is not blocked by it', () =>
+    assertSucceeds(deleteDoc(doc(db('mem'), `trips/${T}/members/mem`))));
+  describe('once recorded', () => {
+    beforeEach(async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), removedPath('mem')), { userId: 'mem', removedAt: Timestamp.now(), removedBy: 'org' });
+        await deleteDoc(doc(ctx.firestore(), `trips/${T}/members/mem`));
+      });
+    });
+    for (const who of ['org', 'other', 'mem', 'stranger']) {
+      it(`${who} cannot read it`, () => assertFails(getDoc(doc(db(who), removedPath('mem')))));
+      it(`${who} cannot list the removed`, () => assertFails(getDocs(collection(db(who), `trips/${T}/removed`))));
+      it(`${who} cannot change it`, () => assertFails(updateDoc(doc(db(who), removedPath('mem')), { removedBy: who })));
+      it(`${who} cannot delete it`, () => assertFails(deleteDoc(doc(db(who), removedPath('mem')))));
+    }
+    it('the organizer cannot overwrite it with a new record', () => assertFails(removeBatch('org', 'mem', { del: false })));
+    it('the trip code stays unwritable by the organizer (D103)', () =>
+      assertFails(updateDoc(doc(db('org'), `trips/${T}`), { code: 'ZZZZZZ' })));
+  });
+});
+
 describe('members', () => {
   beforeEach(() => seed());
   it('user cannot create member doc for someone else\'s trip', () =>
@@ -256,7 +306,9 @@ describe('members', () => {
     await seed({ ended: true });
     await assertFails(deleteDoc(doc(db('stranger'), `trips/${T}/members/mem`)));
   });
-  it('organizer can remove a member', () => assertSucceeds(deleteDoc(doc(db('org'), `trips/${T}/members/mem`))));
+  it('organizer can remove a member, in a batch that also records the removal (D104)', () => removeBatch('org', 'mem'));
+  it('the organizer cannot delete another member without recording the removal', () =>
+    assertFails(deleteDoc(doc(db('org'), `trips/${T}/members/mem`))));
   it('member cannot remove another member', () => assertFails(deleteDoc(doc(db('mem'), `trips/${T}/members/other`))));
 });
 

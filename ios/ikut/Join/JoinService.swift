@@ -100,7 +100,7 @@ enum JoinService {
     }
 
     /// Friendly text for a callable failure. `code` is nil for errors outside the Functions domain.
-    static func message(code: FunctionsErrorCode?, serverMessage: String, retryAfterSeconds: Int? = nil) -> String {
+    static func message(code: FunctionsErrorCode?, serverMessage: String, retryAfterSeconds: Int? = nil, reason: String? = nil) -> String {
         switch code {
         case .notFound:
             return "No trip has that code. Check it with the organiser; the trip may have ended."
@@ -120,6 +120,9 @@ enum JoinService {
                 : "Trip codes are 6 letters or numbers. Check the code and try again."
         case .failedPrecondition:
             return "That code is shared by more than one trip. Ask the organiser for a new trip."
+        case .permissionDenied where reason == "removed":
+            // D104: the organiser removed this person; only a new code lets them back in (joinTrip.ts, removedError: details.reason "removed", from joinTrip and previewTrip).
+            return "You were removed from this trip. Ask the organiser for a new code."
         case .unauthenticated, .permissionDenied:
             return "You’re signed out. Close ikut, open it again and try again."
         case .unavailable, .deadlineExceeded:
@@ -154,7 +157,7 @@ enum JoinService {
             return JoinError(
                 message: message(
                     code: FunctionsErrorCode(rawValue: ns.code),
-                    serverMessage: ns.localizedDescription, retryAfterSeconds: wait))
+                    serverMessage: ns.localizedDescription, retryAfterSeconds: wait, reason: details?["reason"] as? String))
         }
         if ns.domain == NSURLErrorDomain {
             return JoinError(message: message(code: .unavailable, serverMessage: ""))

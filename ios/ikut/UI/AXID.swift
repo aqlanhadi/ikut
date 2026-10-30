@@ -66,6 +66,7 @@ enum AXID {
         static let endTrip = "lobby.endTrip"
         static let keepAwake = "lobby.keepAwake"
         static let leaveTrip = "lobby.leaveTrip"
+        static let newCode = "lobby.newCode"
         static let pause = "lobby.pause"
         static let rename = "lobby.rename"
         static let resume = "lobby.resume"
@@ -223,6 +224,7 @@ enum AXID {
         Lobby.endTrip,
         Lobby.keepAwake,
         Lobby.leaveTrip,
+        Lobby.newCode,
         Lobby.pause,
         Lobby.rename,
         Lobby.resume,

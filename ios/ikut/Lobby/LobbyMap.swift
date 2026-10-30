@@ -56,6 +56,7 @@ enum LobbySheet {
     struct PulledUpAsks: Equatable {
         var confirmLeave = false
         var confirmEnd = false
+        var confirmNewCode = false
         var renaming = false
         var showQR = false
     }

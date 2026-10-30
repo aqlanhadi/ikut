@@ -46,7 +46,7 @@ struct LobbyMapTests {
     }
 
     /// D110: Leave, End and Rename present from inside the lobby's sheet, as in driving: the sheet never leaves for them.
-    @MainActor @Test(arguments: [TripSheetCover.renaming, .confirmLeave, .confirmEnd])
+    @MainActor @Test(arguments: [TripSheetCover.renaming, .confirmLeave, .confirmEnd, .confirmNewCode])
     func theLobbysOwnAsksKeepTheSheetUp(cover: TripSheetCover) {
         let sheet = TripSheet(size: .lobby(tall: false))
         sheet.cover([cover], among: TripSheetCover.trip)
@@ -94,6 +94,43 @@ struct LobbyMapTests {
         exit.cancel(.leave)
         exit.confirm(.end)
         #expect(exit.working == .leave)
+    }
+
+    /// D104: New code goes through the same row as Leave and End: asked, working, then the row returns (the trip's own
+    /// listener shows the new code), and a failure returns it with the words. Nothing exits.
+    @Test func newCodeAsksWorksAndLandsBackOnIdleWithoutExiting() {
+        var exit = ExitFlow()
+        exit.ask(.newCode)
+        #expect(exit.asking == .newCode && !exit.busy)
+        exit.confirm(.newCode)
+        #expect(exit.working == .newCode && exit.progress == .newCode && exit.busy && !exit.canGoBack)
+        let exits = exit.land()
+        #expect(!exits && exit.phase == .idle && !exit.busy && exit.error == nil)
+    }
+
+    @Test func aFailedNewCodeReturnsTheRowWithTheError() {
+        var exit = ExitFlow()
+        exit.ask(.newCode)
+        exit.confirm(.newCode)
+        exit.fail("Can’t reach the server. Check your signal and try again.")
+        #expect(exit.phase == .idle && exit.error != nil)
+        exit.ask(.newCode)
+        exit.cancel(.newCode)
+        #expect(exit.phase == .idle)
+        // The other rows rest while it works, and no second ask starts over it.
+        exit.confirm(.newCode)
+        exit.ask(.leave)
+        #expect(exit.working == .newCode)
+    }
+
+    @MainActor @Test func theRunnerLandsANewCodeWithoutExitingAndFailsWithTheMessage() async {
+        let runner = ExitRunner()
+        var exits = 0
+        #expect(await runner.run(.newCode, write: {}, exit: { exits += 1 }) == nil)
+        #expect(exits == 0 && runner.flow.phase == .idle)
+        struct Down: LocalizedError { var errorDescription: String? { "Can’t reach the server. Check your signal and try again." } }
+        let problem = await runner.run(.newCode, write: { throw Down() }, exit: { exits += 1 })
+        #expect(problem == "Can’t reach the server. Check your signal and try again." && exits == 0 && runner.flow.phase == .idle)
     }
 
     @Test func endingHoldsItsProgressUntilTheRecapTakesTheScreen() {

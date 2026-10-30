@@ -15,6 +15,8 @@ import { HttpsError } from "firebase-functions/v2/https";
  * hourly retention job.
  */
 export const CREATE_LIMITS = "createLimits";
+/** Per-trip counters for new codes (rotateTrip.ts), the same shape as `createLimits`. */
+export const ROTATE_LIMITS = "rotateLimits";
 export const HOUR_MS = 60 * 60_000;
 export const DAY_MS = 24 * HOUR_MS;
 export const MAX_PER_HOUR = 20;
@@ -97,11 +99,13 @@ export async function releaseCreate(db: Firestore, uid: string, slot: number, no
   }
 }
 
-/** Deletes counter documents whose `expiresAt` has passed, up to `max`. Returns how many. */
-export async function sweepCreateLimits(db: Firestore, now: Date = new Date(), max = 1000): Promise<number> {
+/** Deletes counter documents (of `collection`, the create limits by default; rotateLimits.ts passes its own) whose `expiresAt` has passed, up to `max`. Returns how many. */
+export async function sweepCreateLimits(
+  db: Firestore, now: Date = new Date(), max = 1000, collection: string = CREATE_LIMITS,
+): Promise<number> {
   let deleted = 0;
   while (deleted < max) {
-    const snap = await db.collection(CREATE_LIMITS).where("expiresAt", "<", Timestamp.fromDate(now)).limit(Math.min(200, max - deleted)).get();
+    const snap = await db.collection(collection).where("expiresAt", "<", Timestamp.fromDate(now)).limit(Math.min(200, max - deleted)).get();
     if (snap.empty) break;
     const batch = db.batch();
     snap.docs.forEach((d) => batch.delete(d.ref));

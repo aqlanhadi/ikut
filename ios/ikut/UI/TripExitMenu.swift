@@ -21,6 +21,15 @@ struct TripExitMenu: View {
 }
 
 extension View {
+    /// The confirmation behind the lobby's New code row (D104), asked inside the sheet like Leave and End.
+    func tripNewCodeDialog(isPresented: Binding<Bool>, make: @escaping () -> Void) -> some View {
+        confirmationDialog("Make a new code?", isPresented: isPresented, titleVisibility: .visible) {
+            Button("Make a new code", action: make)
+        } message: {
+            Text("The old code stops working. People already in the trip stay in. Share the new code with anyone still to join.")
+        }
+    }
+
     /// The two confirmations behind `TripExitMenu`; each screen passes what leaving and ending do there.
     func tripExitDialogs(
         confirmLeave: Binding<Bool>, confirmEnd: Binding<Bool>,

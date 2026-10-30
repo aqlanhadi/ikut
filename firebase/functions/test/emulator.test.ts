@@ -11,6 +11,9 @@ import { createTripWithFreeCode, generateCode, type CreateTripInput } from "../l
 import { GUESS_LIMITS, sweepGuessLimits } from "../lib/guessLimit.js";
 import { MAX_RETRY, purgeTripData } from "../lib/purge.js";
 import { cleanupAfterMemberLeft } from "../lib/memberCleanup.js";
+import { ROTATE_LIMITS } from "../lib/createLimit.js";
+import { findActiveTripId, joinTripTransaction, parseJoinInput, REMOVED_FROM_TRIP } from "../lib/joinTrip.js";
+import { ROTATE_PRODUCTION_LIMITS, isValidTripId, rotateCodeForUser } from "../lib/rotateTrip.js";
 import { previewTripData } from "../lib/previewTrip.js";
 import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
 
@@ -1331,5 +1334,188 @@ describe("createTrip (emulator, D108)", () => {
 
   it("generateCode draws from the alphabet the app shows", () => {
     assert.match(generateCode(), /^[A-HJKMNP-Z2-9]{6}$/);
+  });
+});
+
+describe("removed members and new codes (emulator, D104)", () => {
+  const input = () => ({
+    name: "Trip", destination: { name: "Ipoh", latitude: 4.6, longitude: 101.1 }, route: "_p~iF~ps|U",
+    routeSeconds: 600, organizerName: "Sam", carId: "car-" + Math.random().toString(36).slice(2),
+  });
+  const join = (uid: string, tripId: string, code: string) =>
+    joinTripTransaction(db, uid, tripId, parseJoinInput({ code, displayName: "Ali", car: newCar(), tracker: false }));
+  const memberRef = (tripId: string, uid: string) => db.collection("trips").doc(tripId).collection("members").doc(uid);
+  const removedRef = (tripId: string, uid: string) => db.collection("trips").doc(tripId).collection("removed").doc(uid);
+  /** A trip made the real way, with `n` people joined. */
+  async function trip(n = 0) {
+    const organizer = (await newUser()).uid;
+    const { tripId, code } = await createTripForUser(db, organizer, input(), { limits: { perHour: 1000, perDay: 1000 } });
+    const people: string[] = [];
+    for (let i = 0; i < n; i++) { const u = (await newUser()).uid; await join(u, tripId, code); people.push(u); }
+    return { organizer, tripId, code, people };
+  }
+  /** What the organiser's removal batch leaves behind (the rules make the app write both; the cleanup trigger is not under test). */
+  async function remove(tripId: string, organizer: string, uid: string) {
+    await removedRef(tripId, uid).set({ userId: uid, removedAt: FieldValue.serverTimestamp(), removedBy: organizer });
+    await memberRef(tripId, uid).delete();
+  }
+  const rejected = (p: Promise<unknown>, code: string) => assert.rejects(p, (e: any) => e.code === code, code);
+
+  it("a removed person's join is refused with plain words and adds nothing; someone who left rejoins", async () => {
+    const t = await trip(2);
+    const [gone, left] = t.people as [string, string];
+    await remove(t.tripId, t.organizer, gone);
+    await memberRef(t.tripId, left).delete();
+    const carsBefore = (await db.collection("trips").doc(t.tripId).collection("cars").get()).size;
+
+    await assert.rejects(join(gone, t.tripId, t.code), (e: any) => e.code === "permission-denied" && e.message === REMOVED_FROM_TRIP);
+    assert.equal((await memberRef(t.tripId, gone).get()).exists, false);
+    const cars = await db.collection("trips").doc(t.tripId).collection("cars").get();
+    assert.equal(cars.size, carsBefore, "the refused call made no car");
+
+    const back = await join(left, t.tripId, t.code);
+    assert.equal(back.tripId, t.tripId);
+    assert.equal((await memberRef(t.tripId, left).get()).exists, true);
+  });
+
+  it("a new code moves the claim, the old code stops working, the new one works, and removed people may join", async () => {
+    const t = await trip(3);
+    const [gone, stay] = t.people as [string, string, string];
+    await remove(t.tripId, t.organizer, gone);
+    const before = await db.collection("trips").doc(t.tripId).collection("members").get();
+
+    const r = await rotateCodeForUser(db, t.organizer, t.tripId);
+    assert.deepEqual(Object.keys(r), ["code"]);
+    assert.match(r.code, /^[A-HJKMNP-Z2-9]{6}$/);
+    assert.notEqual(r.code, t.code);
+
+    assert.equal((await db.collection("trips").doc(t.tripId).get()).data()!.code, r.code);
+    assert.equal((await db.collection("codes").doc(t.code).get()).exists, false, "old claim gone");
+    const claim = (await db.collection("codes").doc(r.code).get()).data()!;
+    assert.equal(claim.tripId, t.tripId);
+    assert.equal(claim.organizerId, t.organizer);
+    assert.ok(claim.createdAt);
+
+    // Old code: a lookup finds no active trip (what joinTrip does first).
+    const old = await db.collection("trips").where("code", "==", t.code).where("status", "==", "active").get();
+    assert.equal(old.empty, true);
+    // The removed list is cleared and the removed person joins with the new code; people inside are untouched.
+    assert.equal((await removedRef(t.tripId, gone).get()).exists, false);
+    assert.equal((await join(gone, t.tripId, r.code)).tripId, t.tripId);
+    const after = await db.collection("trips").doc(t.tripId).collection("members").get();
+    for (const d of before.docs) assert.deepEqual(after.docs.find((a) => a.id === d.id)?.data(), d.data());
+    assert.equal((await memberRef(t.tripId, stay).get()).exists, true);
+  });
+
+  it("only the organiser of an active trip; a missing trip and someone else's say the same", async () => {
+    const t = await trip(1);
+    const stranger = (await newUser()).uid;
+    const a: any = await rotateCodeForUser(db, t.people[0]!, t.tripId).catch((e) => e);
+    const b: any = await rotateCodeForUser(db, stranger, "no-such-trip").catch((e) => e);
+    const c: any = await rotateCodeForUser(db, stranger, t.tripId).catch((e) => e);
+    for (const e of [a, b, c]) { assert.equal(e.code, "permission-denied"); assert.equal(e.message, a.message); }
+    await db.collection("trips").doc(t.tripId).update({ status: "ended", endedAt: FieldValue.serverTimestamp() });
+    await rejected(rotateCodeForUser(db, t.organizer, t.tripId), "failed-precondition");
+    assert.equal((await db.collection("trips").doc(t.tripId).get()).data()!.code, t.code, "an ended trip keeps its code");
+    assert.equal((await db.collection("codes").doc(t.code).get()).exists, true);
+  });
+
+  /** A draw that always gives `code`, to meet a claimed one. */
+  const always = (code: string) => { let i = 0; return () => ALPHABET.indexOf(code[i++ % 6]!) / 31 + 0.001; };
+  const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  async function claimed(): Promise<string> {
+    const code = generateCode();
+    await db.collection("codes").doc(code).set({ tripId: "someone-else", organizerId: "x", createdAt: FieldValue.serverTimestamp() });
+    return code;
+  }
+
+  it("a taken code is never reported: it draws again; with none free it says to try again and changes nothing", async () => {
+    const t = await trip();
+    const taken = await claimed();
+    const free = generateCode();
+    let i = 0;
+    const seq = [...taken, ...free].map((c) => ALPHABET.indexOf(c) / 31 + 0.001);
+    const r = await rotateCodeForUser(db, t.organizer, t.tripId, { random: () => seq[i++ % seq.length]! });
+    assert.equal(r.code, free);
+    assert.equal((await db.collection("codes").doc(taken).get()).data()!.tripId, "someone-else", "the other claim is untouched");
+
+    const u = await trip();
+    await assert.rejects(rotateCodeForUser(db, u.organizer, u.tripId, { random: always(taken), maxTries: 3 }), (e: any) => e.code === "aborted");
+    assert.equal((await db.collection("trips").doc(u.tripId).get()).data()!.code, u.code);
+    assert.equal((await db.collection("codes").doc(u.code).get()).exists, true);
+  });
+
+  it("two new codes at once leave one claim for the trip and no stray claim", async () => {
+    const t = await trip();
+    const results = await Promise.allSettled([rotateCodeForUser(db, t.organizer, t.tripId), rotateCodeForUser(db, t.organizer, t.tripId)]);
+    assert.ok(results.every((r) => r.status === "fulfilled"), JSON.stringify(results));
+    const code = (await db.collection("trips").doc(t.tripId).get()).data()!.code as string;
+    const claims = await db.collection("codes").where("tripId", "==", t.tripId).get();
+    assert.deepEqual(claims.docs.map((d) => d.id), [code]);
+  });
+
+  it("5 new codes an hour per trip, 10 a day, then resource-exhausted with the wait; another trip is not held up", async () => {
+    const t = await trip();
+    const other = await trip();
+    const now = Date.now();
+    for (let i = 0; i < ROTATE_PRODUCTION_LIMITS.perHour; i++) {
+      await rotateCodeForUser(db, t.organizer, t.tripId, { limits: ROTATE_PRODUCTION_LIMITS, now: now + i });
+    }
+    await assert.rejects(rotateCodeForUser(db, t.organizer, t.tripId, { limits: ROTATE_PRODUCTION_LIMITS, now: now + 10 }), (e: any) =>
+      e.code === "resource-exhausted" && e.details?.reason === "too-many-codes" && e.details.retryAfterSeconds > 0);
+    await rotateCodeForUser(db, other.organizer, other.tripId, { limits: ROTATE_PRODUCTION_LIMITS });
+    // An hour later there is room again.
+    await rotateCodeForUser(db, t.organizer, t.tripId, { limits: ROTATE_PRODUCTION_LIMITS, now: now + 61 * 60_000 });
+  });
+
+  it("a call that changes nothing gives its slot back", async () => {
+    const t = await trip();
+    const doc = db.collection(ROTATE_LIMITS).doc(t.tripId);
+    const taken = await claimed();
+    await rotateCodeForUser(db, t.organizer, t.tripId, { limits: ROTATE_PRODUCTION_LIMITS });
+    await assert.rejects(rotateCodeForUser(db, t.organizer, t.tripId, { random: always(taken), maxTries: 1, limits: ROTATE_PRODUCTION_LIMITS }));
+    assert.equal(((await doc.get()).data()!.creates as number[]).length, 1, "only the call that changed something stays counted");
+  });
+
+  it("a join that found the trip by the old code, and lands after a new code was made, is turned away like an unknown code", async () => {
+    const t = await trip();
+    const gone = (await newUser()).uid;
+    await remove(t.tripId, t.organizer, gone);
+    const id = await findActiveTripId(db, t.code);
+    await rotateCodeForUser(db, t.organizer, t.tripId);
+    const carsBefore = (await db.collection("trips").doc(t.tripId).collection("cars").get()).size;
+    await rejected(join(gone, id, t.code), "not-found");
+    assert.equal((await memberRef(t.tripId, gone).get()).exists, false);
+    assert.equal((await db.collection("trips").doc(t.tripId).collection("cars").get()).size, carsBefore);
+  });
+
+  it("previewTrip gives a removed person only the removed words, and nothing for an old code after a new one", async () => {
+    const t = await trip(1);
+    const [gone] = t.people as [string];
+    await remove(t.tripId, t.organizer, gone);
+    await assert.rejects(previewTripData(db, t.tripId, { uid: gone, code: t.code }), (e: any) =>
+      e.code === "permission-denied" && e.message === REMOVED_FROM_TRIP && e.details?.reason === "removed");
+    // Someone else still sees the preview, and the join says the same as the preview, with the reason the app reads.
+    assert.equal((await previewTripData(db, t.tripId, { uid: "someone", code: t.code })).tripId, t.tripId);
+    await assert.rejects(join(gone, t.tripId, t.code), (e: any) => e.details?.reason === "removed");
+    const r = await rotateCodeForUser(db, t.organizer, t.tripId);
+    await rejected(previewTripData(db, t.tripId, { uid: "someone", code: t.code }), "not-found");
+    assert.equal((await previewTripData(db, t.tripId, { uid: gone, code: r.code })).tripId, t.tripId);
+  });
+
+  it("refuses trip ids Firestore reserves", () => {
+    for (const bad of [".", "..", "__x__", "__name__", "a/b", "", 3, undefined]) assert.equal(isValidTripId(bad), false, String(bad));
+    assert.equal(isValidTripId("Abc123xyz"), true);
+  });
+
+  it("the sweep deletes an expired new-code counter and keeps one that has not expired", async () => {
+    const old = db.collection(ROTATE_LIMITS).doc("old-" + Math.random());
+    const fresh = db.collection(ROTATE_LIMITS).doc("fresh-" + Math.random());
+    const now = Date.now();
+    await old.set({ creates: [now - 2 * 24 * 3600_000], expiresAt: Timestamp.fromMillis(now - 3600_000) });
+    await fresh.set({ creates: [now], expiresAt: Timestamp.fromMillis(now + 3600_000) });
+    await sweepCreateLimits(db, new Date(now), 1000, ROTATE_LIMITS);
+    assert.equal((await old.get()).exists, false);
+    assert.equal((await fresh.get()).exists, true);
   });
 });

@@ -406,6 +406,9 @@ enum DemoScreens {
         case "lobby-confirm-end": return trip(lobbyAsking(.organizer, "end"))
         case "lobby-leave-working": return trip(lobbyAsking(.member, "leave-working"))
         case "lobby-end-working": return trip(lobbyAsking(.organizer, "end-working"))
+        // D104: the organiser's New code ask, and its row while the call is out ("Making a new code…").
+        case "lobby-new-code-ask": return trip(lobbyAsking(.organizer, "new-code"))
+        case "lobby-new-code-working": return trip(lobbyAsking(.organizer, "new-code-working"))
         case "lobby-rename": return trip(lobbyAsking(.organizer, "rename"))
         case "lobby-qr": return trip(lobbyAsking(.organizer, "qr"))
         case "lobby-action-error": return trip(lobbyAsking(.organizer, "action-error"))
