@@ -290,6 +290,31 @@ struct HomeCreateSwapDemo: View {
     }
 }
 
+/// `home-open-trip-late`: Home's map, then a trip opened with its data arriving 2 s later (a slow network): the lobby
+/// is empty first, and the first fit then flies from where Home's map was instead of being placed (D111).
+struct HomeOpenTripLateDemo: View {
+    @Environment(TripScreenModel.self) private var stage
+    @State private var arrived = false
+
+    var body: some View {
+        Group {
+            if stage.tripId == nil {
+                HomePickedDemo.view("new-trip")
+            } else if arrived {
+                LobbyStopsDemo.lobby(.organizer)
+            } else {
+                Color.clear
+            }
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(1))
+            stage.open(tripId: "demo", started: false)
+            try? await Task.sleep(for: .seconds(2))
+            arrived = true
+        }
+    }
+}
+
 /// Screens for screenshots and UI tests, opened by launching with `IKUT_SCREEN=<name>` (debug builds only).
 @MainActor
 enum DemoScreens {
@@ -540,6 +565,9 @@ enum DemoScreens {
         case "home-create-swap":
             // Its Create trip opens a sample trip: nothing is read, tracked or saved.
             return nav(TripScreenHost(mode: .home, makeTrip: { OpenTrip.sample(tripId: $0) }) { HomeCreateSwapDemo() })
+        // A trip opened from Home whose data arrives 2 s late: the first fit flies from Home's view (D111).
+        case "home-open-trip-late":
+            return nav(TripScreenHost(mode: .home, makeTrip: { OpenTrip.sample(tripId: $0) }) { HomeOpenTripLateDemo() })
         case "home-picked-failed": return home("failed")
         // A trip left early, picked: its route, and no recap (D54, #421).
         case "home-picked-left": return home("left")

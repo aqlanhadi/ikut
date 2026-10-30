@@ -185,6 +185,14 @@ enum LobbyMapLogic {
     /// Whether a new route (it arrived, or a stop changed it) or a new map height refits the whole trip: not once
     /// the person has moved the camera, nor while it is on a stop they asked for.
     static func shouldRefit(positionedByUser: Bool, onStop: Bool) -> Bool { !positionedByUser && !onStop }
+
+    /// Whether a fit of the whole trip flies or is placed. Once the lobby has fitted, later refits fly (the route or a
+    /// pin arriving). The first fit flies too when the map already shows somewhere (opened from Home, Create, Join or
+    /// a Now row, the trip data arrives after the lobby does), so it rides a paced flight from where the map was;
+    /// with no camera yet (a first launch straight into a trip) it is placed.
+    static func fitAnimates(fitted: Bool, mapHasCamera: Bool) -> Bool {
+        fitted || TripScreenLogic.animatesEntry(mapHasCamera: mapHasCamera)
+    }
 }
 
 /// The lobby's layer over the trip screen's one map (`TripScreenHost`): it asks the map for the route, the planned stops,
@@ -215,10 +223,11 @@ struct LobbyMapLayer: View {
             .onChange(of: stage.space.frame.height) { _, _ in refitIfOurs(animated: false) }
             .onChange(of: stage.space.safeTop) { _, _ in refitIfOurs(animated: false) }
             .onChange(of: LobbySheet.cover(compact: sheetCompact), initial: true) { _, cover in stage.cover(cover, from: .lobby) }
-            .onChange(of: route.count, initial: true) { _, _ in refitIfOurs(animated: fitted) }
-            .onChange(of: pins) { _, _ in refitIfOurs(animated: fitted) }
+            .onChange(of: route.count, initial: true) { _, _ in refitIfOurs(animated: LobbyMapLogic.fitAnimates(fitted: fitted, mapHasCamera: stage.hasCamera)) }
+            .onChange(of: pins) { _, _ in refitIfOurs(animated: LobbyMapLogic.fitAnimates(fitted: fitted, mapHasCamera: stage.hasCamera)) }
             .onChange(of: command) { _, new in go(new.target, animated: true) }
-            // Coming back from driving: the camera flies from your car back to the whole trip, wherever it was left.
+            // Coming back from driving, or opened onto a map that already has a camera: the whole trip's fit flies from
+            // wherever the camera was left.
             .onAppear {
                 if stage.entryCamera == .wholeTrip {
                     go(.wholeTrip, animated: TripScreenLogic.animatesEntry(mapHasCamera: stage.hasCamera))

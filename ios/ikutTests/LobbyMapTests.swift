@@ -231,6 +231,16 @@ struct LobbyMapTests {
         #expect(!LobbyMapLogic.shouldRefit(positionedByUser: false, onStop: true))
     }
 
+    @Test func theFirstFitFliesWhenTheMapHasACameraAndIsPlacedWhenItHasNone() {
+        #expect(LobbyMapLogic.fitAnimates(fitted: false, mapHasCamera: true))
+        #expect(!LobbyMapLogic.fitAnimates(fitted: false, mapHasCamera: false))
+    }
+
+    @Test func laterRefitsStillFly() {
+        #expect(LobbyMapLogic.fitAnimates(fitted: true, mapHasCamera: true))
+        #expect(LobbyMapLogic.fitAnimates(fitted: true, mapHasCamera: false))
+    }
+
     @Test func askingForTheSameTargetTwiceIsANewRequest() {
         let first = LobbyMapCommand().asking(.stop("a"))
         #expect(first.asking(.stop("a")) != first)
