@@ -5,8 +5,7 @@ you may read it and use it for noncommercial purposes, but not distribute it, ch
 
 Not covered by that licence, all rights reserved:
 
-- The ikut name, the app icon, the Welcome-screen logo and the other artwork in `ios/ikut/Assets.xcassets` and
-  `ios/ikut/Resources`.
+- The ikut name, the app icon, the Welcome-screen logo and the other artwork in `ios/ikut/Resources/Assets.xcassets`
 
 Third-party data keeps its own licence:
 
