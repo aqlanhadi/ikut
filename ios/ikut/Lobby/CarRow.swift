@@ -17,7 +17,7 @@ struct CarRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(text.trailing)
                 .font(.subheadline)
-                .foregroundStyle(text.ready ? Color.ikutPositive : Color.ikutWarning)
+                .foregroundStyle(text.ready ? Color.positiveText : Color.ikutWarning)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(AXID.Lobby.car(number))

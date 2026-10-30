@@ -650,7 +650,7 @@ struct LobbyView: View {
     /// "➤ Sharing · To Ipoh · code K7M 2QX": the arrow and Sharing in the positive green (#394).
     func sharingSubtitle(_ rest: String?) -> Text {
         let lead = Text("\(Image(systemName: Symbol.location)) \(LobbyContent.sharingWord)")
-            .foregroundStyle(Color.ikutPositive).fontWeight(.semibold)
+            .foregroundStyle(Color.positiveText).fontWeight(.semibold)
         guard let rest else { return lead }
         return lead + Text(" · \(rest)")
     }

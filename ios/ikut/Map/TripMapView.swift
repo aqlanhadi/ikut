@@ -673,7 +673,7 @@ struct TripMapView: View {
             if i > 0 { text = text + Text(" · ") }
             if i == 0, part == motionText {
                 text = text + Text(part).fontWeight(.semibold)
-                    .foregroundStyle(motion.isPositive ? Color.ikutPositive : Color.ikutWarning)
+                    .foregroundStyle(motion.isPositive ? Color.positiveText : Color.ikutWarning)
             } else {
                 text = text + Text(part)
             }

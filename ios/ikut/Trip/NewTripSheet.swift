@@ -75,7 +75,7 @@ struct WhereToSheet: View {
                 .buttonSurface(.glass)
                 .frame(height: barHeight)
         } else {
-            Button(title, action: action).foregroundStyle(Color.ikutAccent).frame(minHeight: barHeight)
+            Button(title, action: action).foregroundStyle(Color.accentText).frame(minHeight: barHeight)
         }
     }
 }

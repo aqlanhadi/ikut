@@ -26,7 +26,7 @@ struct PausedBanner: View {
                 Button(action: resume) {
                     Text("Resume")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.ikutAccent)
+                        .foregroundStyle(Color.accentText)
                         .padding(.horizontal, Spacing.l)
                         .ikutRow()
                         .background(Color.ikutAccent.fill(.tint), in: Capsule())

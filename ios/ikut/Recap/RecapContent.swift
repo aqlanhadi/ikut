@@ -49,7 +49,7 @@ struct RecapContent: View {
             Section {
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text("Trip complete")
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ikutAccent)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentText)
                     Text(recap.subtitle)
                         .font(.subheadline).foregroundStyle(.secondary)
                 }

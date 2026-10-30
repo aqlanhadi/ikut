@@ -342,7 +342,7 @@ struct StopArrivalCard: View {
             }
             Text(tally.title)
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                .foregroundStyle(tally.here == 0 ? Color.surfaceSecondary : Color.ikutPositive)
+                .foregroundStyle(tally.here == 0 ? Color.surfaceSecondary : Color.positiveText)
                 .monospacedDigit()
         }
         .padding(.horizontal, Spacing.xs)
@@ -361,7 +361,7 @@ struct StopArrivalCard: View {
             } else if row.isHere {
                 Label("Here", systemImage: Symbol.tick)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.ikutPositive)
+                    .foregroundStyle(Color.positiveText)
             } else {
                 Text(StopArrival.words(row.status))
                     .font(.subheadline)
