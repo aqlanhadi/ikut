@@ -45,7 +45,7 @@ struct AuthEmulatorTests {
         try await deleteUserFromAuthEmulator(uid)
 
         let model = AuthModel()
-        await waitUntil(.seconds(5)) { Auth.auth().currentUser == nil }
+        await waitUntil(.seconds(5)) { Auth.auth().currentUser == nil && model.state == .signedOut }
         #expect(Auth.auth().currentUser == nil)
         #expect(model.state == .signedOut)
     }
@@ -64,7 +64,7 @@ struct AuthEmulatorTests {
         // The emulator turns the write away (the old token is still valid, but the user has no membership);
         // a real hang needs an expired token. Either way the check runs and the user goes.
         _ = try? await ServerWrite.commit(within: .seconds(3)) { try await ref.setData(["name": "x"]) }
-        await waitUntil(.seconds(5)) { Auth.auth().currentUser == nil }
+        await waitUntil(.seconds(5)) { Auth.auth().currentUser == nil && model.state == .signedOut }
         #expect(Auth.auth().currentUser == nil)
         #expect(model.state == .signedOut)
     }

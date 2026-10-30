@@ -9,7 +9,7 @@ import DeviceCheck
 /// Which App Check provider the app uses, decided once at launch.
 enum AppCheckProviderChoice: Equatable {
     /// The local emulators don't check tokens, so the app sends none. Firebase then logs
-    /// "Cannot instantiate FIRAppCheck … without a provider factory" on every launch; it is harmless.
+    /// "Cannot instantiate FIRAppCheck … without an app check provider" on every launch; it is harmless.
     case none
     /// Debug token, registered by hand in the Firebase console. Simulator, Debug builds, unsupported devices.
     case debug
@@ -44,7 +44,10 @@ enum AppCheckProviderChoice: Equatable {
     /// Call before `FirebaseApp.configure()`.
     func install() {
         switch self {
-        case .none: break
+        // Firebase installs its own default factory when the library loads (the debug provider in the simulator,
+        // DeviceCheck on a device), so doing nothing would still send tokens. A factory that returns no provider
+        // leaves App Check off.
+        case .none: AppCheck.setAppCheckProviderFactory(NoAppCheckProviderFactory())
         case .debug: AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
         case .appAttest: AppCheck.setAppCheckProviderFactory(AppAttestProviderFactory())
         }
@@ -55,4 +58,9 @@ private final class AppAttestProviderFactory: NSObject, AppCheckProviderFactory 
     func createProvider(with app: FirebaseApp) -> (any AppCheckProvider)? {
         AppAttestProvider(app: app)
     }
+}
+
+/// Replaces Firebase's default factory (see `AppCheckProviderChoice.install`) with one that makes no provider.
+private final class NoAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
+    func createProvider(with app: FirebaseApp) -> (any AppCheckProvider)? { nil }
 }
