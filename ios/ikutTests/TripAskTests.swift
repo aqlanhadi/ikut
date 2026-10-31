@@ -10,6 +10,14 @@ struct TripAskTests {
         TripAskPlanner.next(notifications: n, asked: asked, explainerShowing: explainer)
     }
 
+    // Q30: the Always explainer plans "nothing"; that must not take back an ask that is already on screen.
+    @Test func aReplanNeverTakesBackAnAskOnScreen() {
+        #expect(TripAskPlanner.resolve(current: .roadAlerts, planned: nil) == .roadAlerts)
+        #expect(TripAskPlanner.resolve(current: .roadAlerts, planned: .roadAlertsOff) == .roadAlerts)
+        #expect(TripAskPlanner.resolve(current: nil, planned: .roadAlerts) == .roadAlerts)
+        #expect(TripAskPlanner.resolve(current: nil, planned: nil) == nil)
+    }
+
     @Test func notificationStatusMapping() {
         #expect(NotificationAccess(.notDetermined) == .notDetermined)
         #expect(NotificationAccess(.denied) == .denied)

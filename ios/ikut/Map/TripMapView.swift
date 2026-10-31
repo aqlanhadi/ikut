@@ -200,7 +200,7 @@ struct TripMapView: View {
             .onChange(of: typeSize) { _, _ in sheet.forgetMeasuredHeights() }
             .onChange(of: sheetMid, initial: true) { _, mid in sheet.mid = mid }
             .onChange(of: sheetCollapsed, initial: true) { _, collapsed in sheet.collapsed = collapsed }
-            .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk() }
+            .onChange(of: session.alwaysExplainerShowing) { _, _ in nextAsk(after: TripAskPlanner.settle) }
             .onChange(of: ask) { _, now in session.askShowing = now != nil }
             .onChange(of: keepAwakeOn) { _, _ in updateAwake() }
             .onChange(of: readAloud) { _, _ in alerts.readAloudChanged() }
@@ -1234,7 +1234,7 @@ struct TripMapView: View {
         alerts.start(tripId: session.tripId, myUserId: session.userId, myCarId: session.member?.carId)
         onScreen = true
         updateAwake()
-        nextAsk()
+        nextAsk(after: TripAskPlanner.settle)
     }
 
     /// Whether `kind` is the ask on screen; the alert closing by itself clears it (the buttons answer first).
@@ -1254,16 +1254,18 @@ struct TripMapView: View {
         }
     }
 
-    private func nextAsk() {
+    private func nextAsk(after settle: Duration = .zero) {
         guard liveServices, onScreen, ask == nil else { return }
         Task {
+            // Q30: not while a sheet or an alert is still moving.
+            if settle > .zero { try? await Task.sleep(for: settle) }
             let access = await NotificationAccess.current()
             guard ask == nil, onScreen else { return }
             let next = TripAskPlanner.next(
                 notifications: access,
                 asked: TripAskMemory.asked(in: askedTrip, tripId: session.tripId),
                 explainerShowing: session.alwaysExplainerShowing)
-            ask = next
+            ask = TripAskPlanner.resolve(current: ask, planned: next)
         }
     }
 
