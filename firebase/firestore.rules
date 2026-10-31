@@ -420,7 +420,8 @@ service cloud.firestore {
       //  - leftAt, leftBy: the lead car's tracker or the organizer taps Leave (a stop skipped for everyone is
       //    not left, a stop that was left is not skipped),
       //  - arrivedAt: the lead car's tracker, or the organizer, marks when the lead car first counted itself at
-      //    the stop; the start of "Leaving at 12:40", so every phone shows the same time.
+      //    the stop; the start of "Leaving at 12:40", so every phone shows the same time,
+//  - minutes: the organizer changes the planned length of a stop still ahead (D121).
       match /stops/{stopId} {
         allow read: if isMember(tripId);
 
@@ -441,6 +442,17 @@ service cloud.firestore {
               && request.resource.data.skipped == true
               && request.resource.data.skippedBy == request.auth.uid
               && request.resource.data.skippedAt == request.time)
+            // D121: the organizer changes how long a stop still ahead lasts: only `minutes`, a whole number of minutes,
+            // never on the meeting point (it has no length), a skipped stop or one the convoy has left. "Leaving at"
+            // moves for everyone, since it counts `minutes` from `arrivedAt`.
+            || (!tripNotStarted(tripId)
+              && resource.data.get('skipped', null) != true
+              && resource.data.get('leftAt', null) == null
+              && resource.data.kind != 'meet'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['minutes'])
+              && request.resource.data.minutes is int
+              && request.resource.data.minutes >= 1
+              && request.resource.data.minutes <= 720)
             // D25 4d: the route rebuilt mid-trip. A stop still ahead (open, not reached, not the meeting point the
             // route starts from) moves to its place on the new route: only routeOffset, and only in the batch that
             // writes the new route (getAfter sees the trip as the batch leaves it).
