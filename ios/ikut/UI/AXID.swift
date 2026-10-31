@@ -182,6 +182,9 @@ enum AXID {
         static let pulledUp = "trip.pulledUp"
         static let renameNameField = "renameNameField"
         static let renameTripField = "renameTripField"
+        /// The convoy's stopped banner (D122) and its Continue button.
+        static let stopped = "trip.stopped"
+        static let stoppedContinue = "trip.stopped.continue"
         static func stat(_ caption: String) -> String { "stat.\(caption)" }
     }
     enum Welcome {
@@ -321,6 +324,8 @@ enum AXID {
         Trip.pulledUp,
         Trip.renameNameField,
         Trip.renameTripField,
+        Trip.stopped,
+        Trip.stoppedContinue,
         Welcome.join,
     ]
 

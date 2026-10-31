@@ -53,6 +53,14 @@ final class TripMapModel {
     var tripStarted = false
     /// The trip's organizer (user id), for naming who can skip a stop for everyone.
     private(set) var organizerId: String?
+    /// The convoy's stopped phase (D122), from the session (the demos set it). While it is on, the gap warning and the
+    /// stale-car warning colour are held, and so are hazard and planned-stop approach alerts beyond the stop point.
+    var convoyStop: ConvoyStop? { didSet { convoy.holdsStaleWarning = convoyStop != nil } }
+    /// Where the convoy stopped along the main route: the lead car (else the front car) while stopped; nil otherwise.
+    var stopPointOffset: Double? {
+        guard convoyStop != nil else { return nil }
+        return (convoy.snapshot.lead ?? convoy.snapshot.front)?.convoyOffset
+    }
 
     @ObservationIgnored private let session: TripSession?
     /// The map reads the session's cars (`start()` to `stop()`).
@@ -140,6 +148,7 @@ final class TripMapModel {
     /// Reads trip, my car, every car and positions from the session. Call when any of them changes.
     func sync() {
         guard let session else { return }
+        if convoyStop != session.convoyStop { convoyStop = session.convoyStop }
         setStops(session.stops)
         skipsMeetingPoint = session.skipsMeetingPoint
         apply(
@@ -232,11 +241,17 @@ final class TripMapModel {
         // A fix that is not fresh says nothing about where I am now: no pill and no speech from it.
         guard !isEnded, let announcer = alertAnnouncer, let tripId = alertTripId, let myCarId,
               let mine = positions[myCarId], HazardLogic.isFresh(mine, now: Date(), config: .default),
-              let due = stopWatch.check(stops: stops, myOffset: myOffsetNow()).first else { return }
+              let due = stopWatch.check(stops: approachableStops, myOffset: myOffsetNow()).first else { return }
         let alert = AlertWording.stopApproach(tripId: tripId, due: due)
         stopApproach = alert
         stopApproachAt = Date()
         announcer.announce(alert: alert)
+    }
+
+    /// While stopped, a planned stop beyond the stop point waits: it fires once the convoy moves on (D122).
+    private var approachableStops: [PlannedStop] {
+        let point = stopPointOffset
+        return stops.filter { !ConvoyStop.holds(offset: $0.routeOffset, stopOffset: point) }
     }
 
     private func stopApproachShowing(_ alert: TripAlert) -> Bool {
@@ -422,7 +437,8 @@ final class TripMapModel {
     /// The latest position written for a car, if any.
     func carPosition(_ carId: String) -> Position? { positions[carId] }
 
-    var separationWarning: String? { SeparationWarning.text(convoy.snapshot.driftedGaps) }
+    /// Held while the convoy is stopped: cars spread out in a car park, and the ones still coming in are expected.
+    var separationWarning: String? { convoyStop == nil ? SeparationWarning.text(convoy.snapshot.driftedGaps) : nil }
 
     // MARK: Hazards
 
@@ -503,6 +519,7 @@ final class TripMapModel {
         }
         // A fix that is not fresh (the tracker paused or lost signal) says nothing about where I am now.
         guard let position = positions[carId], HazardLogic.isFresh(position, now: now, config: .default) else { return }
+        approach?.holdBeyond = stopPointOffset
         approach?.update(position: position, now: now)
         updateRegions(position: position, carId: carId, now: now)
     }

@@ -33,6 +33,7 @@
 		17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB0B6EE647875B8999B3F6F /* BackendTests.swift */; };
 		182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56BDE68F366CE545C453468B /* ServerWrite.swift */; };
 		184B3EE1BD29EBACF2156E84 /* StayMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8C676DFC86FE54FB7A604B /* StayMenu.swift */; };
+		18A6B7543C97C840B73D7114 /* ConvoyStopService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83F012012E0A2AD63EE9ECD /* ConvoyStopService.swift */; };
 		1940A6D8FC37BFF48FFF1F6C /* RouteRebuildTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */; };
 		19EFCDBD9C810050CAC5F065 /* StopPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55067EC070E1EB3342E091A2 /* StopPlanner.swift */; };
 		1A45BEC679CB0662408243D8 /* PositionPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BB58A9FD28B315E822A8F2 /* PositionPublisher.swift */; };
@@ -238,6 +239,7 @@
 		A9BF97E2558B40399D9290F7 /* DesignInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A35DDA4D1E6725F5C83A49A /* DesignInventory.swift */; };
 		AB001DF51B13F800F9ECF236 /* TripPullUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1EF632A7EAF8695CD5EF78 /* TripPullUpTests.swift */; };
 		AB256D3E1F0754FA098EBBDD /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4BB920043D7D18297D5A3B81 /* FirebaseFirestore */; };
+		AB6B8DB5F9B0D4D9D9B109E2 /* StoppedBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE902E507BA6B47FA1F5B014 /* StoppedBanner.swift */; };
 		AB8A909F3543CF0F72F7B3BE /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD43B7DF7793A412F23CD58 /* Trip.swift */; };
 		ABBE74F1269488DABBAE4BAD /* MapTypeColourTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E42A483FA023EFB82518B91 /* MapTypeColourTests.swift */; };
 		AC852917E2B33237A9ED6448 /* PlacesRefresher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCC8291CDD3C3F118813710 /* PlacesRefresher.swift */; };
@@ -614,6 +616,7 @@
 		C456C99B4E7723AFF06FB58C /* StopCardParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCardParts.swift; sourceTree = "<group>"; };
 		C46CA4198406B579655640C1 /* FirestoreDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDecoding.swift; sourceTree = "<group>"; };
 		C46D1C04BC5842435C33213A /* TripSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSession.swift; sourceTree = "<group>"; };
+		C83F012012E0A2AD63EE9ECD /* ConvoyStopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyStopService.swift; sourceTree = "<group>"; };
 		C91D939C4B6B3F841C81E964 /* HomeModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeModelTests.swift; sourceTree = "<group>"; };
 		C963869E69413A0E655BFED4 /* SpeechQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueue.swift; sourceTree = "<group>"; };
 		CA192F79FB2F9166FBD454E4 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -662,6 +665,7 @@
 		ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalCard.swift; sourceTree = "<group>"; };
 		EE201340B66BBA2B55C320CD /* ConvoyStop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyStop.swift; sourceTree = "<group>"; };
 		EE50F5D10052B6F1F9BB3997 /* MapMarkerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapMarkerView.swift; sourceTree = "<group>"; };
+		EE902E507BA6B47FA1F5B014 /* StoppedBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoppedBanner.swift; sourceTree = "<group>"; };
 		EF0803549353B1CD91367C85 /* LobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyView.swift; sourceTree = "<group>"; };
 		EF960678563AF80F4392D216 /* PlaceResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceResultRow.swift; sourceTree = "<group>"; };
 		F0322844C0F9486635E0DB1C /* AddStopModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStopModel.swift; sourceTree = "<group>"; };
@@ -1064,6 +1068,7 @@
 			isa = PBXGroup;
 			children = (
 				EE201340B66BBA2B55C320CD /* ConvoyStop.swift */,
+				C83F012012E0A2AD63EE9ECD /* ConvoyStopService.swift */,
 				DE8C676DFC86FE54FB7A604B /* StayMenu.swift */,
 				7EB09C76879DEECF2EC83A0D /* StopAnswerService.swift */,
 				ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */,
@@ -1075,6 +1080,7 @@
 				30373103D4B59BAB60C163E5 /* StopDriving.swift */,
 				C04CCEA528ABC4C37CC45074 /* StopLeaveService.swift */,
 				C3E80CE011C8490310C42F29 /* StopLogic.swift */,
+				EE902E507BA6B47FA1F5B014 /* StoppedBanner.swift */,
 				53F6437D6EDBE8F9D1033C38 /* StopPillLogic.swift */,
 				1DE38EDF4446EB6024A65E6A /* StopPillView.swift */,
 				6E9FECDF460E58D501376FA8 /* StopPlaces.swift */,
@@ -1490,6 +1496,7 @@
 				2904C5ADC6004EBD4FF990DA /* ConvoyRows.swift in Sources */,
 				7E468C2DFE8FEF4989DF4049 /* ConvoySheetState.swift in Sources */,
 				C120E7923D65C78F54F522B1 /* ConvoyStop.swift in Sources */,
+				18A6B7543C97C840B73D7114 /* ConvoyStopService.swift in Sources */,
 				D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */,
 				E033FC8BB50C1A84A455E66D /* CreateTripModel.swift in Sources */,
 				A73AAE0FC74B7C166FC40A05 /* CreateTripView.swift in Sources */,
@@ -1639,6 +1646,7 @@
 				303337D10340B4EF477BB00E /* StopService.swift in Sources */,
 				E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */,
 				2FD7F4C95863E826E4007407 /* StopStay.swift in Sources */,
+				AB6B8DB5F9B0D4D9D9B109E2 /* StoppedBanner.swift in Sources */,
 				2978ECA93E41D961DDB2B7CD /* SuggestStops.swift in Sources */,
 				AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */,
 				173EBAB26CACA9FC97787DDD /* Symbol.swift in Sources */,

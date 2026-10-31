@@ -278,13 +278,15 @@ enum MapDemo {
 
 /// `IKUT_SCREEN=slot-*`: one state of the banner slot each (MapBannerSlot.dc.html), on the demo map. Nothing speaks.
 /// `slot-hazard-stop-waiting` (frame a: the hazard shows, the stop approach waits), `slot-stop-approach` (b),
-/// `slot-stop-request` (b2), `slot-paused` (c), `slot-catchup` (d), `slot-route-notice` (d2), `slot-passed` (e),
+/// `slot-stop-request` (b2), `slot-paused` (c), `slot-stopped` (D122: the convoy stopped, as a passenger sees it),
+/// `slot-stopped-lead` (the same on the lead car or the organizer's phone, with Continue), `slot-catchup` (d), `slot-route-notice` (d2), `slot-passed` (e),
 /// `slot-undo-toast` (f), `slot-toast-over-pill` (D60), `slot-error` (g), `slot-error-held` (i: the hazard shows, a red dot on the trip pill),
 /// `camera-sheet-tour` (D67: following my car, then the whole convoy: the sheet unfolds and folds, a banner and an error come and go, looping).
 @MainActor
 enum BannerSlotDemo {
     static let names = [
-        "slot-hazard-stop-waiting", "slot-stop-approach", "slot-stop-request", "slot-paused", "slot-catchup",
+        "slot-hazard-stop-waiting", "slot-stop-approach", "slot-stop-request", "slot-paused", "slot-stopped",
+        "slot-stopped-lead", "slot-catchup",
         "slot-route-notice", "slot-passed", "slot-undo-toast", "slot-toast-failed", "slot-toast-sending", "slot-toast-over-pill", "slot-error", "slot-error-held",
         "camera-sheet-tour",
     ]
@@ -297,6 +299,8 @@ enum BannerSlotDemo {
         case "slot-stop-approach": return AnyView(StopApproachDemo.view())
         case "slot-stop-request": return AnyView(map(board: MapDemo.stopBoard("lead")))
         case "slot-paused": return AnyView(map(paused: true))
+        case "slot-stopped": return AnyView(map(stopped: false))
+        case "slot-stopped-lead": return AnyView(map(stopped: true))
         case "slot-catchup": return AnyView(map(parked: "catchup"))
         case "slot-route-notice": return AnyView(StopApproachDemo.routeNotice(waiting: false))
         case "slot-passed": return AnyView(map(passed: "Passed the debris"))
@@ -328,7 +332,7 @@ enum BannerSlotDemo {
 
     private static func map(
         approach: Bool = false, plannedStop: Bool = false, board: StopBoard = .empty, paused: Bool = false,
-        parked: String? = nil, passed: String? = nil, toast: ReportToastModel? = nil, error: String? = nil,
+        stopped lead: Bool? = nil, parked: String? = nil, passed: String? = nil, toast: ReportToastModel? = nil, error: String? = nil,
         tour: Bool = false
     ) -> some View {
         Backend.configure()
@@ -348,6 +352,10 @@ enum BannerSlotDemo {
         model.setCars(model.cars)
         let session = TripSession(tripId: "demo", userId: "u-c1")
         if paused { session.pauseForDemo() }
+        if let lead {
+            session.stopConvoyForDemo(lead: lead)
+            model.convoyStop = session.convoyStop
+        }
         return NavigationStack {
             TripScreenHost(mode: .driving) { TripMapView(
                 session: session, model: model, stopBoard: board, demoError: error,

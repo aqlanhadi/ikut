@@ -337,6 +337,21 @@ struct ApproachTests {
         #expect(abs(distance - 480) < 15) // 4,520 is the first fix inside 500 m
     }
 
+    /// D122: while the convoy is stopped, a hazard beyond the stop point waits (a parked car is not approaching it) and
+    /// fires once the convoy moves on; one before the stop point still warns a car coming in.
+    @Test func monitorHoldsHazardsBeyondTheStopPointWhileStopped() async {
+        let announcer = FakeAnnouncer()
+        let m = monitor(announcer, events: [F.event(id: "past", at: 5_200), F.event(id: "before", at: 4_900)])
+        m.holdBeyond = 5_000
+        fix(m, 4_800)
+        await m.waitForAnnouncements()
+        #expect(announcer.calls.map(\.id) == ["before"])
+        m.holdBeyond = nil   // Continue
+        fix(m, 4_810)
+        await m.waitForAnnouncements()
+        #expect(announcer.calls.map(\.id) == ["before", "past"])
+    }
+
     @Test func monitorSkipsEventsBehind() async {
         let announcer = FakeAnnouncer()
         let m = monitor(announcer, events: [F.event(at: 2_000)])

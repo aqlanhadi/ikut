@@ -39,20 +39,25 @@ struct StopService: StopServing {
     func close(
         tripId: String, eventId: String, reason: StopClosedReason, userId: String, now: Date = Date()
     ) async throws {
-        nonisolated(unsafe) let data: [String: Any] = [
-            "status": StopStatus.closed.rawValue, "closedReason": reason.rawValue, "closedBy": userId,
-            "expiresAt": Timestamp(date: now),
-        ]
+        nonisolated(unsafe) let data = Self.closeData(reason: reason, userId: userId, now: now)
         let ref = Firestore.firestore().document(FirestorePaths.event(tripId: tripId, eventId: eventId))
         try await ServerWrite.commit { try await ref.updateData(data) }
     }
 
+    /// What a close writes on the request (also part of We’ve stopped's batch, `ConvoyStopService.stopped`).
+    static func closeData(reason: StopClosedReason, userId: String, now: Date) -> [String: Any] {
+        ["status": StopStatus.closed.rawValue, "closedReason": reason.rawValue, "closedBy": userId,
+         "expiresAt": Timestamp(date: now)]
+    }
+
     // MARK: Actions for the card and the pill
 
-    /// Live actions. Failures are reported to `onError`.
+    /// Live actions. Failures are reported to `onError`. `startsConvoyStop` says whether a close also starts the
+    /// convoy's stopped phase (`ConvoyStop.startsWith`); then the close and the phase go in one batch.
     @MainActor
     static func actions(
         context: StopContext, service: StopService = StopService(),
+        startsConvoyStop: @escaping @MainActor @Sendable (StopClosedReason) -> Bool = { _ in false },
         onError: @escaping @MainActor @Sendable (Error) -> Void = { _ in },
         onSuccess: @escaping @MainActor @Sendable () -> Void = {}
     ) -> StopRequestActions {
@@ -67,8 +72,15 @@ struct StopService: StopServing {
                 }
             },
             close: { eventId, reason in
+                let starts = startsConvoyStop(reason)
                 Task {
                     do {
+                        if starts {
+                            try await ConvoyStopService.stopped(
+                                tripId: context.tripId, eventId: eventId, userId: context.userId)
+                            onSuccess()
+                            return
+                        }
                         try await service.close(
                             tripId: context.tripId, eventId: eventId, reason: reason, userId: context.userId)
                         onSuccess()

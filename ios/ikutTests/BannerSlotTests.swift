@@ -18,8 +18,8 @@ struct BannerSlotTests {
         for message in M.allCases { #expect(shown([message]) == message) }
     }
 
-    @Test func theRankingIsHazardStopToastStopApproachPassedErrorPausedThenTheRest() {
-        let order: [M] = [.hazardApproach, .stopPill, .toast, .stopApproach, .passed, .error, .paused]
+    @Test func theRankingIsHazardStopToastStopApproachPassedErrorPausedStoppedThenTheRest() {
+        let order: [M] = [.hazardApproach, .stopPill, .toast, .stopApproach, .passed, .error, .paused, .stopped]
         for (i, higher) in order.enumerated() {
             for lower in order[(i + 1)...] + [.catchUp, .alertBanner, .routeNotice] {
                 #expect(shown([higher, lower]) == higher, "\(higher) over \(lower)")

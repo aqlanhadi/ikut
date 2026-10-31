@@ -53,6 +53,9 @@ struct ConvoyStop: Equatable, Sendable {
 
         init() {}
 
+        /// No phase, or not the lead car's phone: forget the anchor.
+        mutating func reset() { self = MoveOff() }
+
         /// True once, the first time `here` is more than `moveOffDistance` from the first fix seen in this phase.
         mutating func check(phase since: Date?, here: CLLocationCoordinate2D) -> Bool {
             guard let since else {

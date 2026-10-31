@@ -99,6 +99,8 @@ final class ConvoyModel {
     @ObservationIgnored private var mainRoute: RouteLine?
     /// The trip's planned stops (D25): each one still ahead adds its planned length to the arrival times.
     private(set) var stops: [PlannedStop] = []
+    /// While the convoy is stopped (D122) a car's "Last seen" line is not a warning: cars quiet in a car park are expected.
+    var holdsStaleWarning = false
     @ObservationIgnored private var smoother = SpeedSmoother()
     @ObservationIgnored private var mergeOffsets: [String: Double] = [:]
     @ObservationIgnored private var lastRequest: (at: Date, from: CLLocationCoordinate2D, carId: String)?
@@ -303,7 +305,7 @@ final class ConvoyModel {
             }
             return ConvoyRowText(
                 id: e.id, number: e.car.number, name: e.car.name, color: e.car.color,
-                subtitle: subtitle, subtitleIsWarning: e.isStale,
+                subtitle: subtitle, subtitleIsWarning: e.isStale && !holdsStaleWarning,
                 trailingPrimary: primary, trailingSecondary: secondary,
                 isStale: e.isStale, isSeparated: !e.hasArrived && (e.gap?.hasDrifted ?? false),
                 isMine: mine, hasArrived: e.hasArrived)
@@ -348,7 +350,7 @@ final class ConvoyModel {
                     : e.isStale
                     ? ConvoyFormat.lastSeen(age: e.age ?? 0)
                     : (e.position == nil ? "Waiting for its location" : ConvoyFormat.speed(metersPerSecond: e.speed)),
-                subtitleIsWarning: e.isStale,
+                subtitleIsWarning: e.isStale && !holdsStaleWarning,
                 trailingPrimary: joinAmount(e)?.text ?? "--",
                 trailingSecondary: "to join", isStale: e.isStale)
         }

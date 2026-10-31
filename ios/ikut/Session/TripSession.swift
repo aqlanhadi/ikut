@@ -50,6 +50,20 @@ final class TripSession {
     var isOrganizer: Bool { trip?.organizerId == userId && !userId.isEmpty }
     /// The trip is still running and this user is still in it: leaving, pausing and editing make sense (Lobby's canLeave, canEdit and canPause build on it).
     var isLiveMember: Bool { !isEnded && !membershipLost }
+    /// The convoy's stopped phase in effect (D122), nil while it is moving: from the trip, over after `ConvoyStop.cap`.
+    private(set) var convoyStop: ConvoyStop?
+    /// The convoy has stopped (We’ve stopped) and nobody has tapped Continue yet: the one value the tracking layer
+    /// reads to save battery while stopped (D124).
+    var convoyStopped: Bool { convoyStop != nil }
+    /// This phone tracks the lead car.
+    var isLeadTracker: Bool { !userId.isEmpty && car?.isLead == true && car?.trackerUserId == userId }
+    /// May tap Continue (and starts the phase with We’ve stopped): the lead car's tracker or the organizer.
+    var mayEndConvoyStop: Bool {
+        #if DEBUG
+        if let demoLeadsStop { return demoLeadsStop }
+        #endif
+        return ConvoyStop.mayStartOrEnd(isLeadTracker: isLeadTracker, isOrganizer: isOrganizer)
+    }
 
     @ObservationIgnored private let duty: TrackingDuty
     @ObservationIgnored private let injectedDB: Firestore?
@@ -92,10 +106,20 @@ final class TripSession {
     @ObservationIgnored private var expiryFor: Date?
 
     private var pauseStart: Date? { localPausedAt ?? car?.pausedAt }
+    /// Ends `convoyStop` when it reaches the cap, so the phase goes without a write.
+    @ObservationIgnored private var stopCapTask: Task<Void, Never>?
+    /// Where the lead car stood when this phone first saw the phase (in memory only).
+    @ObservationIgnored private var moveOff = ConvoyStop.MoveOff()
 
     #if DEBUG
     /// The paused banner's demo state: sharing paused just now, with nothing behind it.
     func pauseForDemo() { localPausedAt = clock() }
+    @ObservationIgnored private var demoLeadsStop: Bool?
+    /// The stopped banner's demo state: stopped 12 minutes ago, seen from the lead car (with Continue) or a passenger.
+    func stopConvoyForDemo(lead: Bool) {
+        demoLeadsStop = lead
+        convoyStop = ConvoyStop(since: clock().addingTimeInterval(-12 * 60), by: "u-c1", eventId: "demo-stop")
+    }
     #endif
 
     init(
@@ -128,6 +152,7 @@ final class TripSession {
 
     isolated deinit {
         expiryTask?.cancel()
+        stopCapTask?.cancel()
         restTask?.cancel()
         rebuilder.cancel()
         duty.shutDown()
@@ -192,6 +217,7 @@ final class TripSession {
                     guard let self, self.positionsListener != nil else { return }
                     if let positions {
                         self.positions = positions.keyedByID()
+                        self.syncConvoyStop()
                     }
                     if let message { self.errorMessage = message }
                 }
@@ -422,6 +448,44 @@ final class TripSession {
         if wasTracker, let carId, car?.pausedAt != nil { try? await writePausedAt(nil, carId: carId) }
     }
 
+    // MARK: - The convoy's stopped phase (D122)
+
+    /// Continue: ends the stopped phase for everyone (lead car's tracker or organizer; the rules refuse anyone else).
+    func continueConvoy() async throws {
+        guard trip?.stoppedAt != nil else { return }
+        try await ConvoyStopService.resume(tripId: tripId)
+    }
+
+    /// Follows the trip's stopped phase: the value, its 90-minute end, and on the lead car's phone the 500 m move-off.
+    private func syncConvoyStop() {
+        #if DEBUG
+        if demoLeadsStop != nil { return }
+        #endif
+        let now = clock()
+        let current = ConvoyStop.current(trip, now: now)
+        if current != convoyStop {
+            convoyStop = current
+            stopCapTask?.cancel()
+            if let since = current?.since {
+                let delay = ConvoyStop.endsAt(since).timeIntervalSince(now)
+                stopCapTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(max(delay, 0) + 1))
+                    guard !Task.isCancelled else { return }
+                    self?.syncConvoyStop()
+                }
+            }
+        }
+        guard let since = convoyStop?.since, isLeadTracker, isTracking, let carId = car?.id,
+              let fix = positions[carId] else {
+            moveOff.reset()
+            return
+        }
+        if moveOff.check(phase: since, here: fix.location.coordinate) {
+            log.info("lead car moved off: the stopped phase ends")
+            Task { try? await continueConvoy() }
+        }
+    }
+
     /// Organizer only: stops tracking right away, then marks the trip ended.
     func endTrip() async throws {
         guard isOrganizer else { return }
@@ -510,6 +574,7 @@ final class TripSession {
     /// tracking runs with. A reroute by the car-route service lands here through the snapshot of its own write.
     private func reevaluate() {
         guard !isClosing, !stopped else { return }
+        syncConvoyStop()
         let hasDuty = TripSessionLogic.shouldTrack(
             userId: userId, tripStatus: trip?.status, isMember: member != nil,
             trackerUserId: car?.trackerUserId)

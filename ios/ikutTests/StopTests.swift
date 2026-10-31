@@ -739,4 +739,39 @@ struct StopEmulatorTests {
         #expect(doc.closedReason == .cancelled)
         #expect(doc.expiresAt != nil)
     }
+
+    /// D122: the organizer's We've stopped closes the request and starts the stopped phase in one batch; a second one is
+    /// refused while it is on (the whole batch, so that request stays open); the organizer's Continue deletes the three
+    /// fields; a joined guest cannot Continue.
+    @Test func weveStoppedStartsTheStoppedPhaseAndContinueEndsIt() async throws {
+        let trip = try await EmulatorTrip.make(name: "Stopped", destination: Self.ipoh)
+        let ctx = context(trip.tripId, uid: trip.uid, carId: trip.carId, organizer: true)
+        let snap = try #require(ctx.snapshot())
+        let first = try await service.request(type: .stopFuel, message: nil, context: ctx, snapshot: snap)
+        let second = try await service.request(type: .stopFood, message: nil, context: ctx, snapshot: snap)
+        let tripRef = Firestore.firestore().document(FirestorePaths.trip(trip.tripId))
+        let code = try await trip.code()
+
+        try await ConvoyStopService.stopped(tripId: trip.tripId, eventId: first, userId: trip.uid)
+        let stopped = try await tripRef.getDocument(source: .server).data(as: Trip.self)
+        let since = try #require(stopped.stoppedAt)
+        #expect(abs(since.timeIntervalSinceNow) < 60)
+        #expect(stopped.stoppedBy == trip.uid && stopped.stoppedEventId == first)
+        #expect(ConvoyStop.current(stopped, now: Date()) != nil)
+        #expect(try await eventDoc(trip.tripId, first).closedReason == .stopped)
+        await #expect(throws: (any Error).self) {
+            try await ConvoyStopService.stopped(tripId: trip.tripId, eventId: second, userId: trip.uid)
+        }
+        #expect(try await eventDoc(trip.tripId, second).status != .closed)
+
+        try await ConvoyStopService.resume(tripId: trip.tripId)
+        let moving = try await tripRef.getDocument(source: .server).data(as: Trip.self)
+        #expect(moving.stoppedAt == nil && moving.stoppedBy == nil && moving.stoppedEventId == nil)
+        #expect(ConvoyStop.current(moving, now: Date()) == nil)
+
+        // Stopped again with the other request; a joined guest (not the lead car's tracker) cannot Continue.
+        try await ConvoyStopService.stopped(tripId: trip.tripId, eventId: second, userId: trip.uid)
+        _ = try await EmulatorTrip.joinAsGuest(code: code, name: "Wyna", carName: "Wyna X70", tracker: true)
+        await #expect(throws: (any Error).self) { try await ConvoyStopService.resume(tripId: trip.tripId) }
+    }
 }
