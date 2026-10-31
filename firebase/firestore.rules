@@ -415,13 +415,13 @@ service cloud.firestore {
       }
 
       // Planned stops (D25): members read. The organizer writes them in the lobby, before the trip has
-      // started. After that a stop is never added, moved or removed; only these change, each once:
+      // started. After that a stop is never added, moved or removed; only these change (each once, except minutes):
       //  - skipped, skippedBy, skippedAt: the organizer skips it for everyone,
       //  - leftAt, leftBy: the lead car's tracker or the organizer taps Leave (a stop skipped for everyone is
       //    not left, a stop that was left is not skipped),
       //  - arrivedAt: the lead car's tracker, or the organizer, marks when the lead car first counted itself at
       //    the stop; the start of "Leaving at 12:40", so every phone shows the same time,
-//  - minutes: the organizer changes the planned length of a stop still ahead (D121).
+      //  - minutes: the organizer changes the planned length of a stop still ahead (D121).
       match /stops/{stopId} {
         allow read: if isMember(tripId);
 

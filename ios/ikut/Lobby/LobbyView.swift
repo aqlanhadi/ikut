@@ -62,6 +62,8 @@ struct LobbyView: View {
     @State var sheetSafeBottom: CGFloat = 0
     /// This phone opened the map; covers the gap before the startedAt write comes back.
     @State var startedHere = false
+    /// What came of the last Stay change when it did not go straight through (D121).
+    @State var stayNote: StopLeave.Result?
     /// Shows `model` as given: nothing is loaded, started or remembered.
     var isSample = false
     /// In a sample lobby: whether to show the organizer's card.
@@ -249,10 +251,29 @@ struct LobbyView: View {
     /// A new stay for one stop (D121): the list shows it at once; the stop's `minutes` is written on its own, since the
     /// road doesn't change. Everyone else's list follows from the listener.
     func setStay(_ id: String, _ minutes: Int) {
-        planner.setStay(id: id, minutes: minutes)
+        guard let stop = model.stops.first(where: { $0.id == id }), StopStay.changed(stop, to: minutes) != nil else { return }
+        // Before the start the list is the planner's: a rebuild in progress would save the old length over this one.
+        if canEditStops, !planner.setStay(id: id, minutes: minutes) { return }
+        stayNote = nil
         guard !isSample else { return }
         let tripId = model.tripId
-        Task { _ = try? await StopLeaveService.setStay(tripId: tripId, stopId: id, minutes: minutes) }
+        Task {
+            do {
+                let sent = try await StopLeaveService.setStay(tripId: tripId, stopId: id, minutes: minutes)
+                stayNote = sent ? nil : .queued
+            } catch { stayNote = .refused }
+        }
+    }
+
+    /// "Sends when you have signal" or "That didn’t go through. Try again." under the stops, as on the map card.
+    @ViewBuilder var stayNoteLine: some View {
+        if stayNote == .queued {
+            Text("Sends when you have signal")
+                .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.stayQueued)
+        } else if stayNote == .refused {
+            Text("That didn’t go through. Try again.")
+                .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.stayRetry)
+        }
     }
 
     var currentUserId: String? { Auth.auth().currentUser?.uid }

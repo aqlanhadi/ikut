@@ -52,14 +52,13 @@ struct StopStayTests {
 
     @Test func leavingAtMovesWithTheNewLength() {
         let s = stop(arrivedAt: t0)
-        #expect(StopStay.leavingAt(s, minutes: 30) == t0.addingTimeInterval(30 * 60))
-        #expect(StopStay.leavingAt(s, minutes: 10) == t0.addingTimeInterval(10 * 60))
         // The same stop, read after the write arrived.
         let after = StopStay.changed(s, to: 30)
         #expect(after?.minutes == 30)
         #expect(after.flatMap(StopLeave.leavingAt) == t0.addingTimeInterval(30 * 60))
         // No arrival yet: no time to show, whatever the length.
-        #expect(StopStay.leavingAt(stop(arrivedAt: nil), minutes: 30) == nil)
+        #expect(StopStay.changed(stop(arrivedAt: nil), to: 30).flatMap(StopLeave.leavingAt) == nil)
+        #expect(StopStay.changed(s, to: 10).flatMap(StopLeave.leavingAt) == t0.addingTimeInterval(10 * 60))
     }
 
     @Test func theSameOrAnInvalidLengthChangesNothing() {

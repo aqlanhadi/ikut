@@ -862,7 +862,7 @@ describe('planned stops', () => {
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ order: 5 })));
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ routeOffset: 1 })));
     });
-    it('nothing but a skip can change', async () => {
+    it('nothing but a skip or the length can change', async () => {
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { order: 1 }));
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { name: 'Elsewhere' }));
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { kind: 'food' }));
@@ -897,6 +897,10 @@ describe('planned stops', () => {
       it('a skipped stop cannot change', async () => {
         await seedOver({ skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() });
         await assertFails(stay('org'));
+      });
+      it('the length can change after the lead car arrived', async () => {
+        await seedOver({ arrivedAt: Timestamp.now() });
+        await assertSucceeds(stay('org'));
       });
       it('a meeting point has no length to change', async () => {
         await seedOver({ kind: 'meet', minutes: deleteField(), order: 0, meetAt: Timestamp.now() });

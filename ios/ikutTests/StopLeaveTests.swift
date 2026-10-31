@@ -253,6 +253,45 @@ struct StopLeaveEmulatorTests {
         }
     }
 
+    /// The organizer changes a stop's stay before the start and after the lead car arrived; "Leaving at" follows; a
+    /// joined guest and a left stop are refused (D121).
+    @Test func theOrganizerChangesAStopsStay() async throws {
+        let trip = try await EmulatorTrip.make(name: "Stay", route: Fixtures.longRoute, stops: [Fixtures.tapah])
+        let code = try await trip.code()
+        let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
+
+        // Before the start a minutes-only write passes the stop's own validation.
+        try await StopLeaveService.setStay(tripId: trip.tripId, stopId: "tapah", minutes: 10)
+        #expect(try await ref.getDocument(as: PlannedStop.self).minutes == 10)
+
+        await TripService.markStarted(tripId: trip.tripId)
+        try await StopLeaveService.markArrived(tripId: trip.tripId, stopId: "tapah")
+        try await StopLeaveService.setStay(tripId: trip.tripId, stopId: "tapah", minutes: 30)
+        let changed = try await ref.getDocument(as: PlannedStop.self)
+        let arrivedAt = try #require(changed.arrivedAt)
+        #expect(changed.minutes == 30)
+        #expect(StopLeave.leavingAt(changed) == arrivedAt.addingTimeInterval(30 * 60))
+
+        // Out of range is refused.
+        await #expect(throws: (any Error).self) { try await StopLeaveService.setStay(tripId: trip.tripId, stopId: "tapah", minutes: 0) }
+
+        // A joined guest cannot.
+        let (_, _) = try await EmulatorTrip.joinAsGuest(code: code, name: "Wyna", carName: "Wyna's X70", tracker: true)
+        await #expect(throws: (any Error).self) { try await StopLeaveService.setStay(tripId: trip.tripId, stopId: "tapah", minutes: 60) }
+        #expect(try await ref.getDocument(as: PlannedStop.self).minutes == 30)
+    }
+
+    /// Once the stop is left its stay is fixed (D121).
+    @Test func aLeftStopKeepsItsStay() async throws {
+        let trip = try await EmulatorTrip.make(name: "StayLeft", route: Fixtures.longRoute, stops: [Fixtures.tapah])
+        let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
+        await TripService.markStarted(tripId: trip.tripId)
+        try await StopLeaveService.markArrived(tripId: trip.tripId, stopId: "tapah")
+        try await StopLeaveService.leave(tripId: trip.tripId, stopId: "tapah", userId: trip.uid)
+        await #expect(throws: (any Error).self) { try await StopLeaveService.setStay(tripId: trip.tripId, stopId: "tapah", minutes: 30) }
+        #expect(try await ref.getDocument(as: PlannedStop.self).minutes == 20)
+    }
+
     /// The organizer skips a stop nobody has reached, once; before the start and for a joined car it is refused.
     @Test func theOrganizerSkipsAStopForEveryoneOnce() async throws {
         let trip = try await EmulatorTrip.make(name: "SkipAll", route: Fixtures.longRoute, stops: [Fixtures.tapah])

@@ -126,7 +126,7 @@ struct StopArrivalCard: View {
                 HStack(spacing: Spacing.m) {
                     Text("Stay").font(.body)
                     Spacer(minLength: 0)
-                    StayMenu(minutes: stop.minutes, disabled: settingStay) { sendStay(stop, $0) }
+                    StayMenu(minutes: stop.minutes, disabled: settingStay, emptyTitle: "Not set") { sendStay(stop, $0) }
                 }
                 .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.xs)
                 .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))

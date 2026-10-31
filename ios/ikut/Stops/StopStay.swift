@@ -30,11 +30,4 @@ enum StopStay {
         copy.minutes = minutes
         return copy
     }
-
-    /// The "Leaving at" time with `minutes` chosen: `arrivedAt` plus the length; nil until the lead car arrived.
-    static func leavingAt(_ stop: PlannedStop, minutes: Int) -> Date? {
-        var copy = stop
-        copy.minutes = minutes
-        return StopLeave.leavingAt(copy)
-    }
 }

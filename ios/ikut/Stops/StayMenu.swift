@@ -5,6 +5,8 @@ import SwiftUI
 struct StayMenu: View {
     var minutes: Int?
     var disabled = false
+    /// What to read when no length is set: the lobby row offers "Add a stay", the card says "Not set".
+    var emptyTitle: LocalizedStringKey = "Add a stay"
     var onPick: (Int) -> Void
 
     var body: some View {
@@ -23,7 +25,7 @@ struct StayMenu: View {
                 if let minutes {
                     Text(StopFormat.length(minutes: minutes)).monospacedDigit()
                 } else {
-                    Text("Add a stay")
+                    Text(emptyTitle)
                 }
                 Image(systemName: Symbol.chevronUpDown).font(.footnote.weight(.semibold)).accessibilityHidden(true)
             }
@@ -33,6 +35,7 @@ struct StayMenu: View {
             .contentShape(Rectangle())
         }
         .disabled(disabled)
+        .accessibilityLabel(minutes.map { Text("Stay, \(StopFormat.length(minutes: $0))") } ?? Text("Stay, not set"))
         .accessibilityIdentifier(AXID.Stop.stay)
     }
 }

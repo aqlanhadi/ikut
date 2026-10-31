@@ -266,6 +266,7 @@ extension LobbyView {
                 stopRow(stop, text: texts[index], index: index, stops: stops)
             }
             .onMove(perform: canEditStops ? { planner.move(from: $0, to: $1) } : nil)
+            stayNoteLine
             if let failure, failure.place.stopId == nil {
                 StopNote(
                     tone: .failure,
@@ -400,6 +401,7 @@ extension LobbyView {
                         onStay: journeyStay(stop.id))
                 }
             }
+            stayNoteLine
             if journey.ahead.isEmpty {
                 Text("No more stops before \(trip.destination.name)")
                     .font(.subheadline).foregroundStyle(Color.surfaceSecondary)
