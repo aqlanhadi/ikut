@@ -229,21 +229,48 @@ final class LocalHazardNotifier: HazardNotifying {
 
 // MARK: CLMonitor
 
+/// Runs `make` once however many callers ask, and hands every caller the same value. A plain
+/// `if let value { return value }; value = await make()` lets a second caller in during the await
+/// (actor reentrancy) and so makes the value twice.
+@MainActor
+final class SingleFlight<Value: Sendable> {
+    private var value: Value?
+    private var pending: Task<Value, Never>?
+
+    func get(_ make: @escaping @Sendable () async -> Value) async -> Value {
+        if let value { return value }
+        if let pending { return await pending.value }
+        let task = Task { await make() }
+        pending = task
+        let made = await task.value
+        value = made
+        pending = nil
+        return made
+    }
+}
+
 /// `CLMonitor`-backed regions. Needs Always location authorization to wake the app. Only one
-/// `CLMonitor` with a given name may exist at a time, so create one of these per trip session.
+/// `CLMonitor` with a given name may exist at a time (a second raises an Objective-C exception), so
+/// every instance with the same name shares the one monitor, and its creation is single-flight:
+/// `add` and the `entries()` task both ask for it at once on a new trip.
 @MainActor
 final class CLMonitorRegionMonitor: RegionMonitoring {
+    private static var flights: [String: SingleFlight<CLMonitor>] = [:]
+
     private let name: String
-    private var monitor: CLMonitor?
+    private let makeMonitor: @Sendable (String) async -> CLMonitor
     private var ids: Set<String> = []
 
-    init(name: String = "ikutHazards") { self.name = name }
+    init(name: String = "ikutHazards", makeMonitor: @escaping @Sendable (String) async -> CLMonitor = { await CLMonitor($0) }) {
+        self.name = name
+        self.makeMonitor = makeMonitor
+    }
 
-    private func ensureMonitor() async -> CLMonitor {
-        if let monitor { return monitor }
-        let created = await CLMonitor(name)
-        monitor = created
-        return created
+    func ensureMonitor() async -> CLMonitor {
+        let flight = Self.flights[name] ?? SingleFlight()
+        Self.flights[name] = flight
+        let name = name, make = makeMonitor
+        return await flight.get { await make(name) }
     }
 
     func add(_ region: HazardRegion) async {
