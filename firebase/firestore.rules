@@ -276,7 +276,8 @@ service cloud.firestore {
     }
 
     // We've stopped by the lead car's tracker or the organizer starts the phase: the three fields only, server time,
-    // their own uid, and the stop request they name is closed as stopped by them (in the same batch: getAfter).
+    // their own uid, and the stop request they name ends this write closed as stopped by the same person (getAfter:
+    // closed in this batch, as the app does, or already before it).
     function startsStopPhase(tripId, next, prev) {
       let ev = getAfter(/databases/$(database)/documents/trips/$(tripId)/events/$(next.stoppedEventId)).data;
       return !stopPhaseLive(prev)

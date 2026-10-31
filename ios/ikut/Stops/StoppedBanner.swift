@@ -52,7 +52,11 @@ struct StoppedBanner: View {
         guard !isContinuing else { return }
         isContinuing = true
         Task {
-            do { try await session.continueConvoy() } catch { onError("Couldn’t reach the convoy. Try again in a moment.") }
+            do { try await session.continueConvoy() } catch {
+                onError(StopService.isRefusal(error)
+                    ? String(localized: "Only the lead car or the organiser can tap Continue.")
+                    : String(localized: "Couldn’t reach the convoy. Try again in a moment."))
+            }
             isContinuing = false
         }
     }

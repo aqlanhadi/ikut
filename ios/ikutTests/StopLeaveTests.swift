@@ -253,6 +253,35 @@ struct StopLeaveEmulatorTests {
         }
     }
 
+    /// D122: the organizer's Leave on a planned stop also ends a stopped phase that is on (Continue).
+    @Test func leaveOnAPlannedStopEndsTheStoppedPhase() async throws {
+        let trip = try await EmulatorTrip.make(name: "LeaveStopped", route: Fixtures.longRoute, stops: [Fixtures.tapah])
+        await TripService.markStarted(tripId: trip.tripId)
+        let eventId = try await EventService.report(
+            type: .stopFuel, tripId: trip.tripId, carId: trip.carId, authorId: trip.uid,
+            location: .init(latitude: 3, longitude: 101), heading: 90, route: nil, previousOffset: nil, message: nil)
+        try await ConvoyStopService.stopped(tripId: trip.tripId, eventId: eventId, userId: trip.uid)
+        try await StopLeaveService.markArrived(tripId: trip.tripId, stopId: "tapah")
+
+        let session = TripSession(tripId: trip.tripId, userId: trip.uid)
+        session.start()
+        defer { session.stop() }
+        await waitUntil(.seconds(10)) { session.convoyStopped && session.stops.contains { $0.id == "tapah" } }
+        #expect(session.convoyStopped)
+
+        try await session.leaveStop("tapah")
+        let tripRef = Firestore.firestore().document(FirestorePaths.trip(trip.tripId))
+        var moving: Trip?
+        for _ in 0..<40 {
+            moving = try await tripRef.getDocument(source: .server).data(as: Trip.self)
+            if moving?.stoppedAt == nil { break }
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        #expect(moving?.stoppedAt == nil && moving?.stoppedBy == nil && moving?.stoppedEventId == nil)
+        #expect(try await Firestore.firestore().document(FirestorePaths.stop(tripId: trip.tripId, stopId: "tapah"))
+            .getDocument(as: PlannedStop.self).isLeft)
+    }
+
     /// The organizer changes a stop's stay before the start and after the lead car arrived; "Leaving at" follows; a
     /// joined guest and a left stop are refused (D121).
     @Test func theOrganizerChangesAStopsStay() async throws {

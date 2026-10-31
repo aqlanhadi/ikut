@@ -450,6 +450,15 @@ final class TripSession {
 
     // MARK: - The convoy's stopped phase (D122)
 
+    /// Leave on a planned stop (D25 4a): true when the server took it, false when queued. A stopped phase still on ends
+    /// too (D122), on its own write that Leave does not wait for, so a slow or refused Continue never holds up Leave.
+    @discardableResult
+    func leaveStop(_ stopId: String) async throws -> Bool {
+        let sent = try await StopLeaveService.leave(tripId: tripId, stopId: stopId, userId: userId)
+        if convoyStopped && mayEndConvoyStop { Task { try? await continueConvoy() } }
+        return sent
+    }
+
     /// Continue: ends the stopped phase for everyone (lead car's tracker or organizer; the rules refuse anyone else).
     func continueConvoy() async throws {
         guard trip?.stoppedAt != nil else { return }
@@ -480,8 +489,10 @@ final class TripSession {
             moveOff.reset()
             return
         }
-        let moving = fix.speed > ConvoyOrdering.Config.default.parkedSpeed
-        if moveOff.check(phase: since, here: fix.location.coordinate, moving: moving) {
+        // Only a fresh fix faster than parked speed can end it (#682): one coarse fix while parked never does.
+        let moving = HazardLogic.isFresh(fix, now: now, config: .default)
+            && fix.speed > ConvoyOrdering.Config.default.parkedSpeed
+        if moveOff.check(phase: since, here: fix.location.coordinate, at: fix.updatedAt ?? now, moving: moving) {
             log.info("lead car moved off: the stopped phase ends")
             Task { try? await continueConvoy() }
         }

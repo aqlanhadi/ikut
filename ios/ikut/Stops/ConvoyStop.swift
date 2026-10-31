@@ -39,12 +39,31 @@ struct ConvoyStop: Equatable, Sendable {
 
     /// A car this far along the route past the stop point is still at the stop (cars spread out in a car park).
     static let atStopSpread: Double = 150
+    /// A planned stop this close past the stop point is where the convoy is stopping: its approach alert is not held.
+    static let plannedStopNear: Double = 500
 
-    /// Hazards and planned stops further along the route than the stop point are held while stopped: a parked car is
-    /// not approaching them. Cars still coming in to the stop keep their alerts for what lies before it.
+    /// Hazards further along the route than the stop point are held while stopped: a parked car is not approaching
+    /// them. Cars still coming in to the stop keep their alerts for what lies before it.
     static func holds(offset: Double, stopOffset: Double?) -> Bool {
         guard let stopOffset else { return false }
         return offset > stopOffset
+    }
+
+    /// A planned stop is held only when it lies more than `plannedStopNear` past the stop point: one just past it is
+    /// most likely the very place the convoy is pulling into.
+    static func holdsPlannedStop(offset: Double, stopOffset: Double?) -> Bool {
+        guard let stopOffset else { return false }
+        return offset > stopOffset + plannedStopNear
+    }
+
+    /// The stop point: the reference car's offset (the lead car, else the front car), unless its fresh fix says it is
+    /// moving faster than `parkedSpeed` (the lead car pulling away, a front car that drove on): then nothing is held.
+    static func stopPoint(
+        reference: ConvoyEntry?, config: ConvoyOrdering.Config = .default
+    ) -> Double? {
+        guard let reference else { return nil }
+        if !reference.isStale, !reference.isPaused, reference.movingSpeed >= config.parkedSpeed { return nil }
+        return reference.convoyOffset
     }
 
     /// The stop point to hold alerts beyond, for my car at `myOffset`: nil (hold nothing) once my car is past the stop
@@ -55,39 +74,57 @@ struct ConvoyStop: Equatable, Sendable {
         return stopOffset
     }
 
-    /// Remembers where the lead car stood when it first saw the phase, in memory only (nothing is written), and says
-    /// once when it has moved off. A new phase (another `since`) starts afresh.
+    /// How long the lead car stays at rest (within `restRadius`) before that place is where it stopped.
+    static let settleTime: TimeInterval = 120
+    static let restRadius: CLLocationDistance = 100
+    /// Before the lead car has settled anywhere (rolling in, a red light short of the car park), the phase ends only
+    /// this far from its first fix, so a mistaken We’ve stopped still ends at road speed.
+    static let unsettledMoveOff: CLLocationDistance = 2_000
+
+    /// Watches the lead car's own fixes in memory (nothing is written) and says once when it has moved off (#682): a
+    /// fresh fix that is moving, more than `moveOffDistance` from where it settled (at rest for `settleTime`), or more
+    /// than `unsettledMoveOff` from its first fix while it has not settled. A fix at rest never ends it, however far a
+    /// coarse fix jumps. A new phase (another `since`) starts afresh.
     struct MoveOff: Sendable {
         private var phase: Date?
+        private var first: CLLocationCoordinate2D?
+        private var rest: (at: CLLocationCoordinate2D, since: Date)?
         private var anchor: CLLocationCoordinate2D?
-        private var anchoredAtRest = false
         private var fired = false
 
         init() {}
 
-        /// No phase, or not the lead car's phone: forget the anchor.
+        /// No phase, or not the lead car's phone: forget everything.
         mutating func reset() { self = MoveOff() }
 
-        /// True once, the first time `here` is more than `moveOffDistance` from where the lead car stood: its first
-        /// fix in this phase, moved to its first fix that is not `moving` (a lead car still rolling into the car park
-        /// when the organizer tapped We’ve stopped is anchored where it comes to rest; one that never slows is measured
-        /// from its first fix, so a mistaken We’ve stopped still ends).
-        mutating func check(phase since: Date?, here: CLLocationCoordinate2D, moving: Bool = false) -> Bool {
+        /// - Parameters:
+        ///   - at: when the fix was taken.
+        ///   - moving: the fix is fresh and faster than `parkedSpeed`.
+        mutating func check(phase since: Date?, here: CLLocationCoordinate2D, at: Date, moving: Bool) -> Bool {
             guard let since else {
                 self = MoveOff()
                 return false
             }
             if phase != since { self = MoveOff(); phase = since }
-            guard let anchor, anchoredAtRest || moving else {
-                anchor = here
-                anchoredAtRest = !moving
+            if first == nil { first = here }
+            if !moving {
+                if let rest, Self.distance(rest.at, here) <= ConvoyStop.restRadius {
+                    if at.timeIntervalSince(rest.since) >= ConvoyStop.settleTime { anchor = rest.at }
+                } else {
+                    rest = (here, at)
+                }
                 return false
             }
-            guard !fired else { return false }
-            let moved = CLLocation(latitude: anchor.latitude, longitude: anchor.longitude)
-                .distance(from: CLLocation(latitude: here.latitude, longitude: here.longitude))
-            fired = moved > ConvoyStop.moveOffDistance
+            rest = nil
+            guard !fired, let from = anchor ?? first else { return false }
+            let limit = anchor == nil ? ConvoyStop.unsettledMoveOff : ConvoyStop.moveOffDistance
+            fired = Self.distance(from, here) > limit
             return fired
+        }
+
+        private static func distance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> CLLocationDistance {
+            CLLocation(latitude: a.latitude, longitude: a.longitude)
+                .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
         }
     }
 }

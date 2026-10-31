@@ -1121,10 +1121,8 @@ struct TripMapView: View {
     /// (no signal; Firestore keeps the write and sends it when the phone is back online), refused when the rules said no.
     private func leaveStop(_ stopId: String) async -> StopLeave.Result {
         do {
-            let sent = try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
-            // Leaving a stop moves the convoy on: a stopped phase still on ends too (D122), on its own write, so a
-            // refusal there never holds up Leave.
-            if session.convoyStopped { try? await session.continueConvoy() }
+            // Leaving a stop moves the convoy on: a stopped phase still on ends too (D122, `TripSession.leaveStop`).
+            let sent = try await session.leaveStop(stopId)
             return sent ? .sent : .queued
         } catch { return .refused }
     }

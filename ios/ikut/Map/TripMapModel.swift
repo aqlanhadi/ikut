@@ -57,11 +57,13 @@ final class TripMapModel {
     /// stale-car warning colour are held, and so are hazard and planned-stop approach alerts beyond the stop point.
     var convoyStop: ConvoyStop? { didSet { convoy.holdsStaleWarning = convoyStop != nil } }
     /// While stopped, where the convoy stopped along the main route (the lead car, else the front car), for holding
-    /// alerts beyond it; nil when moving, or once my car is past it (`ConvoyStop.holdPoint`).
+    /// alerts beyond it; nil when moving, when that car is driving again (`ConvoyStop.stopPoint`), or once my car is
+    /// past it (`ConvoyStop.holdPoint`).
     var stopPointOffset: Double? {
         guard convoyStop != nil else { return nil }
         return ConvoyStop.holdPoint(
-            stopOffset: (convoy.snapshot.lead ?? convoy.snapshot.front)?.convoyOffset, myOffset: convoy.myEntry?.convoyOffset)
+            stopOffset: ConvoyStop.stopPoint(reference: convoy.snapshot.lead ?? convoy.snapshot.front),
+            myOffset: convoy.myEntry?.convoyOffset)
     }
 
     @ObservationIgnored private let session: TripSession?
@@ -250,10 +252,11 @@ final class TripMapModel {
         announcer.announce(alert: alert)
     }
 
-    /// While stopped, a planned stop beyond the stop point waits: it fires once the convoy moves on (D122).
-    private var approachableStops: [PlannedStop] {
+    /// While stopped, a planned stop well beyond the stop point waits: it fires once the convoy moves on (D122). One
+    /// within `ConvoyStop.plannedStopNear` past it is where the convoy is pulling in, so it is not held.
+    var approachableStops: [PlannedStop] {
         let point = stopPointOffset
-        return stops.filter { !ConvoyStop.holds(offset: $0.routeOffset, stopOffset: point) }
+        return stops.filter { !ConvoyStop.holdsPlannedStop(offset: $0.routeOffset, stopOffset: point) }
     }
 
     private func stopApproachShowing(_ alert: TripAlert) -> Bool {

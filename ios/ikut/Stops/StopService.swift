@@ -44,6 +44,12 @@ struct StopService: StopServing {
         try await ServerWrite.commit { try await ref.updateData(data) }
     }
 
+    /// The server's rules refused the write (as opposed to no signal or a timeout).
+    static func isRefusal(_ error: Error) -> Bool {
+        let ns = error as NSError
+        return ns.domain == FirestoreErrorDomain && ns.code == FirestoreErrorCode.permissionDenied.rawValue
+    }
+
     /// What a close writes on the request (also part of We’ve stopped's batch, `ConvoyStopService.stopped`).
     static func closeData(reason: StopClosedReason, userId: String, now: Date) -> [String: Any] {
         ["status": StopStatus.closed.rawValue, "closedReason": reason.rawValue, "closedBy": userId,
@@ -76,10 +82,15 @@ struct StopService: StopServing {
                 Task {
                     do {
                         if starts {
-                            try await ConvoyStopService.stopped(
-                                tripId: context.tripId, eventId: eventId, userId: context.userId)
-                            onSuccess()
-                            return
+                            do {
+                                try await ConvoyStopService.stopped(
+                                    tripId: context.tripId, eventId: eventId, userId: context.userId)
+                                onSuccess()
+                                return
+                            } catch where Self.isRefusal(error) {
+                                // The rules said no to the phase (the lead car changed hands, a phase already on):
+                                // the request still closes, on its own.
+                            }
                         }
                         try await service.close(
                             tripId: context.tripId, eventId: eventId, reason: reason, userId: context.userId)
