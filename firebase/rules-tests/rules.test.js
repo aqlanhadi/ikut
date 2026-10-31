@@ -760,6 +760,121 @@ describe('stop requests', () => {
   });
 });
 
+// D122: We've stopped by the lead car's tracker or the organizer starts the convoy's stopped phase on the trip, in the
+// batch that closes the request; Continue deletes the three fields.
+describe('the stopped phase', () => {
+  const MIN = 60 * 1000;
+  const tripRef = (uid) => doc(db(uid), `trips/${T}`);
+  const stopReq = (over = {}) =>
+    event({ type: 'stopFuel', category: 'stopRequest', severity: 'medium', expiresAt: ts(-30 * MIN), ...over });
+  const fields = (uid, over = {}) => ({ stoppedAt: serverTimestamp(), stoppedBy: uid, stoppedEventId: 'stop1', ...over });
+  const cleared = { stoppedAt: deleteField(), stoppedBy: deleteField(), stoppedEventId: deleteField() };
+  // We've stopped as the app sends it: the close and the phase in one batch.
+  const weveStopped = (uid, over = {}, { eventId = 'stop1', reason = 'stopped' } = {}) => {
+    const f = db(uid);
+    const b = writeBatch(f);
+    b.update(doc(f, `trips/${T}/events/${eventId}`), { status: 'closed', closedReason: reason, closedBy: uid, expiresAt: ts() });
+    b.update(doc(f, `trips/${T}`), fields(uid, { stoppedEventId: eventId, ...over }));
+    return b.commit();
+  };
+  const setTrip = (over) => env.withSecurityRulesDisabled((c) => updateDoc(doc(c.firestore(), `trips/${T}`), over));
+  const stoppedNow = (msAgo = 0) => setTrip({ stoppedAt: ts(msAgo), stoppedBy: 'lead', stoppedEventId: 'stopDone' });
+
+  beforeEach(async () => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (c) => {
+      const f = c.firestore();
+      await setDoc(doc(f, `trips/${T}/members/lead`), memberDoc({ displayName: 'Lead', carId: 'carO' }));
+      await setDoc(doc(f, `trips/${T}/cars/carO`), carDoc({ name: 'Car O', isLead: true, trackerUserId: 'lead' }));
+      await setDoc(doc(f, `trips/${T}/events/stop1`), stopReq());
+      await setDoc(doc(f, `trips/${T}/events/stop2`), stopReq());
+      await setDoc(doc(f, `trips/${T}/events/stopDone`), stopReq({ expiresAt: ts(1000) }));
+    });
+  });
+
+  describe('starting it', () => {
+    it("the lead car's tracker starts it with We've stopped", () => assertSucceeds(weveStopped('lead')));
+    it('the organizer starts it', () => assertSucceeds(weveStopped('org')));
+    it('the asker closes the request but cannot start the phase', async () => {
+      await assertFails(weveStopped('mem'));
+      await assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/events/stop1`),
+        { status: 'closed', closedReason: 'stopped', closedBy: 'mem', expiresAt: ts() }));
+    });
+    it('another member or a stranger cannot start it', async () => {
+      await assertFails(updateDoc(tripRef('other'), fields('other')));
+      await assertFails(updateDoc(tripRef('stranger'), fields('stranger')));
+    });
+    it('a member of the lead car who is not its tracker cannot start it', async () => {
+      await env.withSecurityRulesDisabled((c) => setDoc(doc(c.firestore(), `trips/${T}/members/pass`),
+        memberDoc({ displayName: 'Pass', carId: 'carO' })));
+      await assertFails(updateDoc(tripRef('pass'), fields('pass')));
+    });
+    it('not without closing a stop request as stopped', async () => {
+      await assertFails(updateDoc(tripRef('lead'), fields('lead')));                       // request still open
+      await assertFails(weveStopped('mem', {}, { reason: 'cancelled' }));                  // cancelled
+      await assertFails(weveStopped('lead', {}, { eventId: 'ev1' }));                      // a hazard, not a request
+      await assertFails(updateDoc(tripRef('lead'), fields('lead', { stoppedEventId: 'nope' })));
+    });
+    it('server time and the caller only', async () => {
+      await assertFails(weveStopped('lead', { stoppedAt: ts() }));
+      await assertFails(weveStopped('lead', { stoppedBy: 'org' }));
+    });
+    it('not with extra fields or one missing', async () => {
+      await assertFails(weveStopped('lead', { name: 'Renamed' }));
+      await assertFails(weveStopped('lead', { stoppedLat: 3.1 }));
+      const f = db('lead');
+      const b = writeBatch(f);
+      b.update(doc(f, `trips/${T}/events/stop1`), { status: 'closed', closedReason: 'stopped', closedBy: 'lead', expiresAt: ts() });
+      b.update(doc(f, `trips/${T}`), { stoppedAt: serverTimestamp(), stoppedBy: 'lead' });
+      await assertFails(b.commit());
+    });
+    it('not twice while it is on', async () => {
+      await stoppedNow(10 * MIN);
+      await assertFails(weveStopped('lead', {}, { eventId: 'stop2' }));
+    });
+    it('again once a forgotten phase is past 90 minutes', async () => {
+      await stoppedNow(91 * MIN);
+      await assertSucceeds(weveStopped('lead', {}, { eventId: 'stop2' }));
+    });
+    it('not on an ended trip', async () => {
+      await setTrip({ status: 'ended', endedAt: Timestamp.now() });
+      await assertFails(weveStopped('lead'));
+    });
+  });
+
+  describe('Continue', () => {
+    beforeEach(() => stoppedNow(5 * MIN));
+    it("the lead car's tracker continues", () => assertSucceeds(updateDoc(tripRef('lead'), cleared)));
+    it('the organizer continues', () => assertSucceeds(updateDoc(tripRef('org'), cleared)));
+    it('another member or a stranger cannot', async () => {
+      await assertFails(updateDoc(tripRef('other'), cleared));
+      await assertFails(updateDoc(tripRef('stranger'), cleared));
+    });
+    it('all three fields go together, and nothing else changes', async () => {
+      await assertFails(updateDoc(tripRef('lead'), { stoppedAt: deleteField() }));
+      await assertFails(updateDoc(tripRef('lead'), { ...cleared, name: 'Renamed' }));
+    });
+    it('a forgotten phase past the cap can still be cleared', async () => {
+      await stoppedNow(120 * MIN);
+      await assertSucceeds(updateDoc(tripRef('lead'), cleared));
+    });
+    it('not when the convoy is not stopped', async () => {
+      await setTrip(cleared);
+      await assertFails(updateDoc(tripRef('lead'), cleared));
+      // (The organizer's trip edit takes a write that changes nothing, as before D122.)
+    });
+  });
+
+  it('the organizer still renames and ends a trip that is stopped', async () => {
+    await stoppedNow(5 * MIN);
+    await assertSucceeds(updateDoc(tripRef('org'), { name: 'Renamed' }));
+    await assertSucceeds(updateDoc(tripRef('org'), { status: 'ended', endedAt: serverTimestamp() }));
+  });
+  it('the organizer cannot set the phase through a trip edit', async () => {
+    await assertFails(updateDoc(tripRef('org'), { name: 'Renamed', ...fields('org') }));
+  });
+});
+
 describe('planned stops', () => {
   const stopDoc = (over = {}) => {
     const d = { name: 'R&R Tapah', coordinate: pt, routeOffset: 62000, kind: 'fuel', minutes: 20, order: 0, ...over };

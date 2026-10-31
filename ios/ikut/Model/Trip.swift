@@ -36,6 +36,12 @@ struct Trip: Codable, Sendable, Equatable, Identifiable {
     /// Written by the server when the trip ends (D107) and kept until the trip is deleted 90 days after it ended;
     /// nil on trips that ended before it existed. Never written by the app.
     var summary: TripSummary?
+    /// The convoy's stopped phase (D122): set when the lead car's tracker or the organizer taps We’ve stopped on a
+    /// stop request (server time), cleared by Continue. No place is kept, only when, who and which request.
+    /// `ConvoyStop` reads it; a phase older than `ConvoyStop.cap` counts as over even while the fields stay.
+    var stoppedAt: Date?
+    var stoppedBy: String?
+    var stoppedEventId: String?
 }
 
 /// What is left of a trip once its events and positions are gone (`trips/{id}.summary`): no names, no places. A number

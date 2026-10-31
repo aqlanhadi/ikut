@@ -92,7 +92,7 @@ service cloud.firestore {
     function validTripShape(d) {
       return d.keys().hasOnly(['name', 'code', 'organizerId', 'route', 'destination',
                                'status', 'createdAt', 'lastActivityAt', 'endedAt', 'startedAt',
-                               'routeSeconds', 'stopCount'])
+                               'routeSeconds', 'stopCount', 'stoppedAt', 'stoppedBy', 'stoppedEventId'])
         && d.keys().hasAll(['name', 'code', 'organizerId', 'route', 'destination', 'status', 'createdAt'])
         && isString(d.name, 0, 200)
         && isString(d.organizerId, 1, 128)
@@ -269,6 +269,34 @@ service cloud.firestore {
           && next.expiresAt <= request.time + duration.value(1, 'm'));
     }
 
+    // The convoy's stopped phase (D122) is on: started less than 90 minutes ago (ConvoyStop.cap). Older counts as over
+    // even while the fields stay, so a forgotten phase never blocks the next We've stopped.
+    function stopPhaseLive(d) {
+      return d.get('stoppedAt', null) != null && d.stoppedAt > request.time - duration.value(90, 'm');
+    }
+
+    // We've stopped by the lead car's tracker or the organizer starts the phase: the three fields only, server time,
+    // their own uid, and the stop request they name is closed as stopped by them (in the same batch: getAfter).
+    function startsStopPhase(tripId, next, prev) {
+      let ev = getAfter(/databases/$(database)/documents/trips/$(tripId)/events/$(next.stoppedEventId)).data;
+      return !stopPhaseLive(prev)
+        && next.diff(prev).affectedKeys().hasOnly(['stoppedAt', 'stoppedBy', 'stoppedEventId'])
+        && next.keys().hasAll(['stoppedAt', 'stoppedBy', 'stoppedEventId'])
+        && next.stoppedAt == request.time
+        && next.stoppedBy == request.auth.uid
+        && isString(next.stoppedEventId, 1, 128)
+        && ev.category == 'stopRequest'
+        && ev.get('closedReason', null) == 'stopped'
+        && ev.get('closedBy', null) == request.auth.uid;
+    }
+
+    // Continue (or Leave on a planned stop, or the lead car moving off) deletes all three fields; only while they are there.
+    function endsStopPhase(next, prev) {
+      return prev.get('stoppedAt', null) != null
+        && next.diff(prev).affectedKeys().hasOnly(['stoppedAt', 'stoppedBy', 'stoppedEventId'])
+        && !next.keys().hasAny(['stoppedAt', 'stoppedBy', 'stoppedEventId']);
+    }
+
     // ---------- rules ----------
 
     // Code claims (D103, D108): one doc per trip code, made by the createTrip function (admin SDK) in the same batch as
@@ -318,6 +346,12 @@ service cloud.firestore {
         && resource.data.get('startedAt', null) == null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['startedAt'])
         && request.resource.data.startedAt == request.time;
+
+      // D122: the lead car's tracker or the organizer starts and ends the convoy's stopped phase; nothing else changes.
+      allow update: if isLeadOrOrganizer(tripId)
+        && resource.data.status == 'active'
+        && (endsStopPhase(request.resource.data, resource.data)
+            || startsStopPhase(tripId, request.resource.data, resource.data));
 
       allow delete: if false;
 
