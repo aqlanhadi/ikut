@@ -480,7 +480,8 @@ final class TripSession {
             moveOff.reset()
             return
         }
-        if moveOff.check(phase: since, here: fix.location.coordinate) {
+        let moving = fix.speed > ConvoyOrdering.Config.default.parkedSpeed
+        if moveOff.check(phase: since, here: fix.location.coordinate, moving: moving) {
             log.info("lead car moved off: the stopped phase ends")
             Task { try? await continueConvoy() }
         }

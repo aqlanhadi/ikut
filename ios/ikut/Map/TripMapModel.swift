@@ -56,10 +56,12 @@ final class TripMapModel {
     /// The convoy's stopped phase (D122), from the session (the demos set it). While it is on, the gap warning and the
     /// stale-car warning colour are held, and so are hazard and planned-stop approach alerts beyond the stop point.
     var convoyStop: ConvoyStop? { didSet { convoy.holdsStaleWarning = convoyStop != nil } }
-    /// Where the convoy stopped along the main route: the lead car (else the front car) while stopped; nil otherwise.
+    /// While stopped, where the convoy stopped along the main route (the lead car, else the front car), for holding
+    /// alerts beyond it; nil when moving, or once my car is past it (`ConvoyStop.holdPoint`).
     var stopPointOffset: Double? {
         guard convoyStop != nil else { return nil }
-        return (convoy.snapshot.lead ?? convoy.snapshot.front)?.convoyOffset
+        return ConvoyStop.holdPoint(
+            stopOffset: (convoy.snapshot.lead ?? convoy.snapshot.front)?.convoyOffset, myOffset: convoy.myEntry?.convoyOffset)
     }
 
     @ObservationIgnored private let session: TripSession?

@@ -27,13 +27,13 @@ enum BannerSlot {
         case error
         /// Sharing paused: stays until resumed; comes back once the error is closed.
         case paused
-        /// The convoy has stopped (D122): stays until Continue; under the driver's own pause, which says why this
-        /// car is not sharing, and over the rest, which wait their turn while the convoy stands still.
-        case stopped
         // The rest: the newest of these shows (`tieOrder` breaks a tie). D38's "destination changed" joins here.
         case catchUp
         case alertBanner
         case routeNotice
+        /// The convoy has stopped (D122): stays until Continue, up to 90 minutes, and everyone already knows it, so
+        /// everything else goes over it (a car arriving, a new alert) and it comes back when they go.
+        case stopped
 
         /// Lower is more urgent. The last three have the same rank: those compete on arrival.
         var rank: Int {
@@ -45,8 +45,8 @@ enum BannerSlot {
             case .passed: 4
             case .error: 5
             case .paused: 6
-            case .stopped: 7
-            case .catchUp, .alertBanner, .routeNotice: 8
+            case .catchUp, .alertBanner, .routeNotice: 7
+            case .stopped: 8
             }
         }
 

@@ -18,14 +18,23 @@ struct BannerSlotTests {
         for message in M.allCases { #expect(shown([message]) == message) }
     }
 
-    @Test func theRankingIsHazardStopToastStopApproachPassedErrorPausedStoppedThenTheRest() {
-        let order: [M] = [.hazardApproach, .stopPill, .toast, .stopApproach, .passed, .error, .paused, .stopped]
+    @Test func theRankingIsHazardStopToastStopApproachPassedErrorPausedThenTheRest() {
+        let order: [M] = [.hazardApproach, .stopPill, .toast, .stopApproach, .passed, .error, .paused]
         for (i, higher) in order.enumerated() {
             for lower in order[(i + 1)...] + [.catchUp, .alertBanner, .routeNotice] {
                 #expect(shown([higher, lower]) == higher, "\(higher) over \(lower)")
                 #expect(shown([lower, higher]) == higher, "\(higher) over \(lower)")
             }
         }
+    }
+
+    /// D122: the convoy's stopped banner stands for up to 90 minutes and everyone knows it: every other message goes
+    /// over it, and it comes back when they go.
+    @Test func theStoppedBannerWaitsUnderEveryOtherMessage() {
+        for other in M.allCases where other != .stopped {
+            #expect(shown([.stopped, other]) == other, "\(other) over stopped")
+        }
+        #expect(shown([.stopped]) == .stopped)
     }
 
     @Test func aHazardTakesTheSlotFromEveryOtherMessage() {

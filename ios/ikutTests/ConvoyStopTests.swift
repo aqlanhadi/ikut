@@ -71,6 +71,18 @@ struct ConvoyStopTests {
         #expect(!ConvoyStop.holds(offset: 20_400, stopOffset: nil))
     }
 
+    @Test func aCarPastTheStopPointKeepsItsAlerts() {
+        // At the stop, or a car park's length past the lead car: hold beyond the stop point.
+        #expect(ConvoyStop.holdPoint(stopOffset: 20_000, myOffset: 19_000) == 20_000)
+        #expect(ConvoyStop.holdPoint(stopOffset: 20_000, myOffset: 20_150) == 20_000)
+        // 2 km on (missed the exit, or drove on): it is driving towards what lies ahead, so nothing is held.
+        #expect(ConvoyStop.holdPoint(stopOffset: 20_000, myOffset: 22_000) == nil)
+        #expect(!ConvoyStop.holds(offset: 22_400, stopOffset: ConvoyStop.holdPoint(stopOffset: 20_000, myOffset: 22_000)))
+        // Unknown either way: nothing held.
+        #expect(ConvoyStop.holdPoint(stopOffset: nil, myOffset: 19_000) == nil)
+        #expect(ConvoyStop.holdPoint(stopOffset: 20_000, myOffset: nil) == nil)
+    }
+
     // MARK: The lead car moves off
 
     /// About `meters` north of (3, 101).
@@ -79,11 +91,22 @@ struct ConvoyStopTests {
     }
 
     /// What `MoveOff` says at each fix, in order, from a fresh watch.
-    func moveOff(_ fixes: [(phase: Date?, meters: Double)]) -> [Bool] {
+    func moveOff(_ fixes: [(phase: Date?, meters: Double)], moving: Set<Int> = []) -> [Bool] {
         var watch = ConvoyStop.MoveOff()
         var said: [Bool] = []
-        for fix in fixes { said.append(watch.check(phase: fix.phase, here: spot(fix.meters))) }
+        for (i, fix) in fixes.enumerated() {
+            said.append(watch.check(phase: fix.phase, here: spot(fix.meters), moving: moving.contains(i)))
+        }
         return said
+    }
+
+    @Test func aLeadCarStillRollingInIsAnchoredWhereItComesToRest() {
+        // The organizer tapped We've stopped while the lead car was still driving into the R&R: 700 m on, it parks.
+        let said = moveOff([(t0, 0), (t0, 400), (t0, 700), (t0, 900), (t0, 1_300)], moving: [0, 1])
+        #expect(said == [false, false, false, false, true])
+        // A lead car that never slows down (We've stopped by mistake) is measured from its first fix.
+        let never = moveOff([(t0, 0), (t0, 300), (t0, 600)], moving: [0, 1, 2])
+        #expect(never == [false, false, true])
     }
 
     @Test func theLeadCarMovingMoreThan500mFromWhereItStoodEndsThePhaseOnce() {
