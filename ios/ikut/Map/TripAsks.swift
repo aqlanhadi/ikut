@@ -61,6 +61,15 @@ enum TripAskPlanner {
         default: return nil
         }
     }
+
+    /// What `ask` becomes when the planner says `planned`: an ask already on screen is never taken back by a
+    /// re-plan (Q30). The Always explainer coming up plans "nothing", and setting that over an alert still
+    /// presenting made UIKit dismiss it mid-transition; the buttons clear an ask, nothing else does.
+    static func resolve(current: TripAsk?, planned: TripAsk?) -> TripAsk? { current ?? planned }
+
+    /// How long a re-plan waits for the sheet or the alert that just closed to finish moving (Q30): an alert
+    /// presented over a transition in flight made UIKit assert. The first ask after the map appears waits too.
+    static let settle: Duration = .milliseconds(700)
 }
 
 /// Keeps the screen from sleeping only while the trip map is up for a running trip, with the app in front.
