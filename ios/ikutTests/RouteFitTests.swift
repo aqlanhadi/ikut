@@ -142,7 +142,7 @@ struct RouteFitTests {
     func homesFitIsCentredOnASmallPhone(scale: CGFloat) throws {
         let screen: CGFloat = 667, width: CGFloat = 375
         let padding = LobbySheet.mapPadding(scaledMedium: LobbySheet.compactHeight * scale, screenHeight: screen)
-        let insets = TripsHomeView.obscured(mapHeight: screen, reach: HomeSheet.reach(.list, compact: HomeSheet.compact(scaled: HomeSheet.compactHeight * scale, screenHeight: screen)), padding: padding, safeTop: 20)
+        let insets = TripsHomeView.obscured(mapHeight: screen, reach: HomeSheet.reach(compact: HomeSheet.compact(scaled: HomeSheet.compactHeight * scale, screenHeight: screen)), padding: padding, safeTop: 20)
         let aspect = MapFit.aspect(width: width, height: screen, padding: padding)
         let h = Double(screen - padding)
         // The top room follows the status bar: 20 + the marker, not the iPhone 17's 62.

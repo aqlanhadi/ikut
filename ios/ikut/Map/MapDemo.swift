@@ -155,7 +155,7 @@ enum MapDemo {
         return model
     }
 
-    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, card: String? = nil, report: Bool = false, ask: TripAsk? = nil) -> some View {
+    static func view(expanded: Bool = false, online: Bool = true, fiveCars: Bool = false, card: String? = nil, report: Bool = false, ask: TripAsk? = nil, placeName: String? = nil) -> some View {
         Backend.configure()
         let model = model(fiveCars: fiveCars)
         model.networkUp = online
@@ -164,7 +164,7 @@ enum MapDemo {
                 session: TripSession(tripId: "demo", userId: "u-c1"), model: model,
                 stopBoard: stopBoard("lead", fiveCars: fiveCars),
                 demoCard: card, demoReport: report, demoExpanded: expanded,
-                stopService: DemoStopService(), demoAsk: ask)
+                stopService: DemoStopService(), demoAsk: ask, demoPlaceName: placeName)
             }
         }
     }
