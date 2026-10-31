@@ -114,13 +114,14 @@ final class TrackingService {
 
     private func handle(_ fix: LocationFix, generation: Int) {
         guard isTracking, generation == self.generation, var builder, let publisher else { return }
-        let position = builder.build(from: fix, battery: PositionBuilder.battery(batteryLevel()))
-        self.builder = builder
         // Before a stopped phase the anchor just follows the car, so it begins where the car is when the phase does.
         if !convoyStopped { restAnchor = fix.coordinate }
         let movement: Movement = convoyStopped ? noteMovement(of: fix) : .rest
-        // A far but inaccurate fix in low power (a cell tower jump) is neither a move nor a place to publish.
+        // A far but inaccurate fix in low power (a cell tower jump) is neither a move nor a place to publish, and it
+        // must not move the builder's route hints either: only published fixes update the builder.
         if movement == .doubtful, power == .low { return }
+        let position = builder.build(from: fix, battery: PositionBuilder.battery(batteryLevel()))
+        self.builder = builder
         let moved = movement == .moved
         publisher.submit(position, urgent: power == .full || moved)
         if moved, power == .low { setPower(.full) }

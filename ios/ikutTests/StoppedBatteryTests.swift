@@ -97,15 +97,16 @@ struct LowPowerPublisherTests {
 
     @Test func aHeartbeatCarriesTheBatteryOfTheMoment() async {
         let p = make()
-        var level = 0.8
+        final class Level { var value = 0.8 }
+        let level = Level()
         p.refresh = { old in
             var fresh = old
-            fresh.battery = level
+            fresh.battery = level.value
             return fresh
         }
         p.submit(position(1, battery: 0.8))
         await settle()
-        level = 0.5
+        level.value = 0.5
         await clock.advance(by: 31)
         #expect(writer.written.count == 2)
         #expect(writer.written[1].battery == 0.5)
@@ -223,6 +224,33 @@ struct StoppedBatteryTests {
         #expect(seen == 0)
     }
 
+    @Test func aDroppedCellJumpLeavesTheBuildersStateAlone() async {
+        // A joining car: its own route runs from the north down onto the main route at lon 0.02.
+        let own = RouteLine([
+            CLLocationCoordinate2D(latitude: 0.02, longitude: 0),
+            CLLocationCoordinate2D(latitude: 0, longitude: 0.02),
+            CLLocationCoordinate2D(latitude: 0, longitude: 0.05),
+        ])
+        let service = TrackingService(source: source, writer: writer, clock: clock, batteryLevel: { 0.5 })
+        service.start(tripId: "t", carId: "c", mainRoute: route, carRoute: own)
+        func at(_ lat: Double, _ lon: Double, speed: Double = 0, accuracy: Double = 10) -> LocationFix {
+            LocationFix(
+                latitude: lat, longitude: lon, speed: speed, course: 90, timestamp: Date(), horizontalAccuracy: accuracy)
+        }
+        await deliver(at(0.02, 0))
+        service.setConvoyStopped(true)
+        await clock.advance(by: 121)
+        #expect(service.power == .low)
+        // A cell jump past the merge point, too inaccurate to tell: dropped, and it must not mark the car as merged.
+        await deliver(at(0, 0.03, speed: -1, accuracy: 5_000))
+        #expect(service.power == .low)
+        // The car really moves off, still on its way to the main route.
+        await clock.advance(by: 6)
+        await deliver(at(0.0199, 0, speed: 8))
+        #expect(service.power == .full)
+        #expect(writer.written.last?.convoyOffset == nil)
+    }
+
     @Test func aFixFasterThanParkedSpeedBringsFullPowerBack() async {
         let service = make()
         await deliver(fix(0))
@@ -287,8 +315,14 @@ struct StoppedBatteryScreenTests {
 
     @Test func aCarThatIsNotAtRestKeepsTheScreenHeldWhateverTheConvoyDoes() {
         let tracker = FakeTrackingController()
-        let session = TripSession(tripId: "t1", userId: "u1", tracker: tracker)
+        let session = TripSession(tripId: "t1", userId: "u1", tracker: tracker, clock: { Fixtures.t0 })
+        var stopped = Trip.fixture(route: Fixtures.longRoute.polyline, startedAt: Fixtures.t0.addingTimeInterval(-3_600))
+        stopped.stoppedAt = Fixtures.t0
+        session.applyForTesting(
+            trip: stopped, member: Member(id: "u1", displayName: "A", carId: "c1", role: .organizer),
+            car: Car.fixture("c1", lead: true, state: .convoy, tracker: "u1"))
         // A stopped convoy alone changes nothing: a moving car, or a phone with no tracker, is not at rest.
+        #expect(session.convoyStopped)
         #expect(!session.trackerAtRest)
         #expect(ScreenAwake.shouldHold(
             preference: true, onScreen: true, tripRunning: true, appActive: true, trackerAtRest: session.trackerAtRest))

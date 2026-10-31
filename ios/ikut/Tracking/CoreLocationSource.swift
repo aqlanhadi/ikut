@@ -28,8 +28,9 @@ final class CoreLocationSource: LocationSource {
     /// Low power (D124): a car at rest in a stopped convoy. A coarser accuracy (100 m) and a fix only after 100 m of
     /// movement, so the system can leave the GPS chip off and a parked car gets almost no fixes (iOS may still use GPS
     /// when it is the only source, so the saving is not guaranteed). Not 3 km: that is one cell tower and would hide a
-    /// drive-off for minutes; at 100 m the first fix after a car pulls out arrives about 10 s later at 36 km/h, and
-    /// that fix puts tracking back to full. The activity type stays automotive.
+    /// drive-off for minutes. A drive-off is caught by a fix with a valid speed, or once a fix's distance minus its
+    /// accuracy passes 100 m (often the second or third fix, so some tens of seconds at 36 km/h); either puts tracking
+    /// back to full. The activity type stays automotive.
     func setPower(_ power: TrackingPower) {
         switch power {
         case .full:
