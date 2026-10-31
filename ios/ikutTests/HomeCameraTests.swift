@@ -127,19 +127,16 @@ struct HomeCameraTests {
 
     @Test func leftTripFramingIsTheListsBecauseItRestsAtTheCollapsedStop() {
         let compact = HomeSheet.compactHeight
-        let left = HomeSheet.reach(.leftTrip, compact: compact)
+        let left = HomeSheet.reach(compact: compact)
         // The route is framed just above the left trip's short sheet, which is the list's (D116).
         #expect(left == HomeSheet.height(.leftTrip, compact: compact) + HomeSheet.detentExtra)
-        for mode in [HomeSheet.Mode.list, .whereTo, .newTrip, .join] {
-            #expect(HomeSheet.reach(mode, compact: compact) == HomeSheet.reach(.list, compact: compact))
-        }
         // Relative to the one padding: the strip's bottom is the reach less the padding.
         let padding = LobbySheet.defaultMapPadding
         let insets = TripsHomeView.obscured(mapHeight: 874, sheet: HomeSheet.height(.leftTrip, compact: compact),
                                             reach: left, padding: padding)
         #expect(abs(insets.bottom - Double(left - padding) / Double(874 - padding)) < 1e-9)
         // It scales with the text size as the sheet does.
-        #expect(HomeSheet.reach(.leftTrip, compact: 390) == 390 + HomeSheet.detentExtra)
+        #expect(HomeSheet.reach(compact: 390) == 390 + HomeSheet.detentExtra)
     }
 
     /// Fresh install: the camera opened on the fallback, the first fix came in on Where to? and flew to you. Close

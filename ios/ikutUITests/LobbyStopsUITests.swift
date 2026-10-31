@@ -130,9 +130,9 @@ final class CollapsedStopCalibrationUITests: XCTestCase {
         expectation(for: predicate, evaluatedWith: marker)
         waitForExpectations(timeout: 10)
         let measured = Double(marker.value as? String ?? "") ?? -1
-        // The From name comes from a place lookup (the simulator's own answer), so the title is one line (239) or wraps to two
-        // (273, one 34 pt title line more): either is the panel as designed; any other height means a row changed.
-        let oneLine = abs(measured - 239) <= 2, wrapped = abs(measured - 273) <= 2
-        XCTAssertTrue(oneLine || wrapped, "the folded sheet measures \(measured), not the collapsed stop's 239 (273 with a wrapped name)")
+        // The demo's place names are fixed and one line at default text, so the folded sheet measures exactly the collapsed
+        // stop, 239 pt. `SheetStops.collapsed` and `SheetStopsTests` pin the same constant; a row that grows a line or
+        // changes its spacing fails here.
+        XCTAssertTrue(abs(measured - 239) <= 2, "the folded sheet measures \(measured), not the collapsed stop's 239")
     }
 }

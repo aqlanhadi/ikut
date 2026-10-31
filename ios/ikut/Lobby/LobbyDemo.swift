@@ -522,7 +522,8 @@ enum DemoScreens {
         // The message field with the keyboard up: the card sits above the keyboard (Q16).
         case "road-card-pit-stop-message": return AnyView(MapDemo.view(card: "message"))
         case "road-card-report": return AnyView(MapDemo.view(report: true))
-        case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true))
+        // A fixed one-line From name, so the folded sheet measures the collapsed stop (`CollapsedStopCalibrationUITests`).
+        case "road-panel-short-5": return AnyView(MapDemo.view(fiveCars: true, placeName: "Ipoh"))
         // The list unfolded; the debris approach folds it 3 s in, and my car passes the debris about 9 s later (D42).
         case "road-hazard-pass": return AnyView(MapDemo.hazardPass())
         case "road-next-stop": return AnyView(NextStopDemo())

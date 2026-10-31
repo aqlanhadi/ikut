@@ -135,9 +135,9 @@ struct HomeSheetTests {
         // gap (28.7 over the detent), so the 239 pt one (D116; the
         // 300 pt one measured 320.7 pt tall, its top at 545.3) has its top at 874 - 267.7.
         #expect(abs(HomeSheet.defaultReach - (874 - 605.3)) < 2)
-        #expect(HomeSheet.reach(.list, compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
-        #expect(HomeSheet.reach(.list, compact: 390) == 420)
-        #expect(HomeSheet.reach(.list, compact: -5) == HomeSheet.detentExtra)
+        #expect(HomeSheet.reach(compact: HomeSheet.compactHeight) == HomeSheet.defaultReach)
+        #expect(HomeSheet.reach(compact: 390) == 420)
+        #expect(HomeSheet.reach(compact: -5) == HomeSheet.detentExtra)
         #expect(HomeSheet.compactHeight <= HomeSheet.defaultReach)
     }
 
@@ -233,7 +233,6 @@ struct PastTripsCacheTests {
     @Test func itReachesAsFarAsTheListAtEveryTextSize() {
         for compact in stride(from: HomeSheet.compactHeight, through: HomeSheet.compactHeight * 1.5, by: 25) {
             #expect(HomeSheet.height(.leftTrip, compact: compact) == HomeSheet.height(.list, compact: compact))
-            #expect(HomeSheet.reach(.leftTrip, compact: compact) == HomeSheet.reach(.list, compact: compact))
         }
     }
 

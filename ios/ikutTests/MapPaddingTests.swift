@@ -14,7 +14,7 @@ struct MapPaddingTests {
         let compact = HomeSheet.compact(scaled: HomeSheet.compactHeight * scale)
         // The scale is computed in a different order than the code's, so compare within rounding.
         #expect(abs(LobbySheet.mapPadding(scaledMedium: scaledMedium) - (compact + BottomSheet.detentExtra)) < 1e-9)
-        #expect(abs(LobbySheet.mapPadding(scaledMedium: scaledMedium) - HomeSheet.reach(.list, compact: compact)) < 1e-9)
+        #expect(abs(LobbySheet.mapPadding(scaledMedium: scaledMedium) - HomeSheet.reach(compact: compact)) < 1e-9)
     }
 
     @Test func thePaddingAtTheDefaultAndExtremeSizes() {
@@ -43,12 +43,12 @@ struct MapPaddingTests {
         let frame = Double(874 - padding)
         for mode in [HomeSheet.Mode.list, .whereTo, .newTrip, .leftTrip, .join] {
             let cover = HomeSheet.cover(mode, compact: compact)
-            let reach = HomeSheet.reach(mode, compact: compact)
+            let reach = HomeSheet.reach(compact: compact)
             let insets = TripsHomeView.obscured(mapHeight: 874, sheet: cover.bottom, reach: reach, padding: padding)
             #expect(abs(Double(padding) + insets.bottom * frame - Double(max(cover.bottom, reach))) < 1e-9, "\(mode)")
             #expect(abs(insets.top * frame - 92) < 1e-9)
             let create = HomeSheet.createInsets(mapHeight: 874, sheet: cover.bottom, compact: compact, padding: padding)
-            let cleared = max(HomeSheet.reach(.list, compact: compact), cover.bottom + HomeSheet.createMargin)
+            let cleared = max(HomeSheet.reach(compact: compact), cover.bottom + HomeSheet.createMargin)
             #expect(abs(Double(padding) + create.bottom * frame - Double(cleared)) < 1e-9, "\(mode)")
         }
         // The lobby keeps the trip above its medium sheet: positive now, the edge still its sheet's top.
@@ -64,7 +64,7 @@ struct MapPaddingTests {
     @Test(arguments: [CGFloat(300), 450], [CGFloat(470), 658])
     @MainActor func theListsStripEdgeIsItsReachAtAScaledTextSize(compact: CGFloat, scaledMedium: CGFloat) {
         let padding = LobbySheet.mapPadding(scaledMedium: scaledMedium)
-        let reach = HomeSheet.reach(.list, compact: compact)
+        let reach = HomeSheet.reach(compact: compact)
         let insets = TripsHomeView.obscured(mapHeight: 874, reach: reach, padding: padding)
         let frame = Double(874 - padding)
         // Frame bottom is `padding` above the screen's bottom; the strip's bottom edge is `bottom * frame` above that.

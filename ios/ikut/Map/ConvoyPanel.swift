@@ -28,6 +28,9 @@ struct ConvoyPanel: View {
     /// measures the header the driver sees; and where the on-screen panel reports them.
     var headerWords: ConvoyHeader.Text?
     var onHeader: (ConvoyHeader.Text) -> Void = { _ in }
+    /// The place lookup for the header's town names; a demo gives a fixed answer so its measured height never depends on
+    /// the simulator's geocoder.
+    var placeName: @MainActor (CLLocationCoordinate2D) async -> String? = { await RouteBuilder.placeName(at: $0) }
 
     @State private var originName: String?
     @State private var ownStartName: String?
@@ -58,7 +61,7 @@ struct ConvoyPanel: View {
         .onChange(of: headerText, initial: true) { _, text in if !probe { onHeader(text) } }
         .task(id: probe ? "" : originKey) {
             guard !probe, let start = model.mainRoute?.coordinates.first else { return }
-            originName = await RouteBuilder.placeName(at: start)
+            originName = await placeName(start)
         }
         .task(id: probe ? "" : ownInputs) {
             // Once per change of my car's route, merge offset, state or the main route, not per refresh.
@@ -76,12 +79,12 @@ struct ConvoyPanel: View {
         .task(id: probe ? "" : coordinateKey(ownStart)) {
             ownStartName = nil
             guard let start = ownStart else { return }
-            ownStartName = await RouteBuilder.placeName(at: start)
+            ownStartName = await placeName(start)
         }
         .task(id: probe ? "" : coordinateKey(joinCoordinate)) {
             joinPlaceName = nil
             guard let at = joinCoordinate else { return }
-            joinPlaceName = await RouteBuilder.placeName(at: at)
+            joinPlaceName = await placeName(at)
         }
     }
 

@@ -34,6 +34,8 @@ struct TripMapView: View {
     private var demoTour = false
     /// `follow-drive-interrupts` (D70): the sheet, a banner, Fit, Follow and a hazard in the middle of follow glides.
     private var demoInterrupts = false
+    /// A demo's fixed answer for every place name in the panel's header (no live lookup); nil in the app.
+    private var demoPlaceName: String?
 
     @Environment(TripScreenModel.self) private var stage
     @State private var model: TripMapModel
@@ -128,8 +130,9 @@ struct TripMapView: View {
         demoApproach: TripAlert? = nil, demoPassed: String? = nil, demoToast: ReportToastModel? = nil, demoTour: Bool = false,
         demoInterrupts: Bool = false, stopService: any StopServing = StopService(),
         demoPulledUp: Bool = false, continuation: PulledUpSheet? = nil, topBanner: DrivingBanner? = nil,
-        demoAsk: TripAsk? = nil
+        demoAsk: TripAsk? = nil, demoPlaceName: String? = nil
     ) {
+        self.demoPlaceName = demoPlaceName
         _ask = State(initialValue: demoAsk)
         _alerts = State(initialValue: alerts)
         self.session = session
@@ -1059,7 +1062,11 @@ struct TripMapView: View {
         ConvoyPanel(
             model: model, expanded: Binding(get: { panelExpanded }, set: { setExpanded($0) }),
             onNextStop: { id in sheet.arrivalStopId = id },
-            onHeader: { panelHeader = $0 })
+            onHeader: { panelHeader = $0 },
+            placeName: { [demoPlaceName] at in
+                if let demoPlaceName { return demoPlaceName }
+                return await RouteBuilder.placeName(at: at)
+            })
     }
 
     /// Report and Pit stop: pinned to the sheet's bottom, outside the scrolling panel.

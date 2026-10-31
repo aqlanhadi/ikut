@@ -270,7 +270,7 @@ struct HomeView: View {
     private func enterHome() {
         if home.here == nil, home.routes.isEmpty { home.here = TripsHomeView.lastKnownLocation() }
         if let camera = home.entryCamera(
-            mapHeight: stage.space.screenHeight, reach: HomeSheet.reach(.list, compact: HomeSheet.compact(scaled: shortHeight, screenHeight: SheetStops.screenHeight)),
+            mapHeight: stage.space.screenHeight, reach: HomeSheet.reach(compact: HomeSheet.compact(scaled: shortHeight, screenHeight: SheetStops.screenHeight)),
             padding: LobbySheet.mapPadding(scaledMedium: mediumHeight, screenHeight: SheetStops.screenHeight),
             safeTop: stage.space.safeTop,
             aspect: MapFit.aspect(width: stage.space.screenWidth, height: stage.space.screenHeight,

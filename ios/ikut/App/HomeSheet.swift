@@ -25,14 +25,14 @@ enum HomeSheet {
 
     static let detentExtra = BottomSheet.detentExtra
     /// From the screen's bottom edge to the top of the list's short sheet and the gap above it, at the default text size.
-    static let defaultReach: CGFloat = reach(.list, compact: compactHeight)
+    static let defaultReach: CGFloat = reach(compact: compactHeight)
 
     /// How far up from the screen's bottom edge the camera keeps the short sheet and the gap above it clear: the
     /// collapsed stop's, which the list, a picked trip and a left trip all rest at (D116). Where to?, New trip and
-    /// joining keep it too (`createInsets`). `mode` stays for the callers. This used to be the map's bottom padding; the padding is now one constant for every screen
+    /// joining keep it too (`createInsets`). This used to be the map's bottom padding; the padding is now one constant for every screen
     /// (`LobbySheet.mapPadding`, D109) and the camera reads this relative to it (`obscured`, `createInsets`), so the
     /// tall sheet covers the map on purpose and moves nothing (#343).
-    static func reach(_ mode: Mode, compact: CGFloat) -> CGFloat {
+    static func reach(compact: CGFloat) -> CGFloat {
         max(0, compact) + detentExtra
     }
 
@@ -96,7 +96,7 @@ enum HomeSheet {
         let topRoom = LobbyMapLogic.bar(safeTop: safeTop) + createPinRoom
         let full = mapHeight > sheet + topRoom ? mapHeight : 874
         let area = max(1, full - padding)
-        let cleared = max(reach(.list, compact: compact), sheet + createMargin)
+        let cleared = max(reach(compact: compact), sheet + createMargin)
         return (Double(topRoom / area), Double((cleared - padding) / area))
     }
 

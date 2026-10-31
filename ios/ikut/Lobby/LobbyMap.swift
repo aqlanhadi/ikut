@@ -30,7 +30,7 @@ enum LobbySheet {
     /// screen's `@ScaledMetric` of `compactHeight` (the text-size scale; the lobby's own cap is not applied, so every
     /// layer gets the same value).
     static func mapPadding(scaledMedium: CGFloat, screenHeight: CGFloat = SheetStops.referenceScreen) -> CGFloat {
-        HomeSheet.reach(.list, compact: homeShort(scaledMedium: scaledMedium, screenHeight: screenHeight))
+        HomeSheet.reach(compact: homeShort(scaledMedium: scaledMedium, screenHeight: screenHeight))
     }
 
     /// Home's short sheet's height at the text size `scaledMedium` stands for. At the default size it is the convoy's
