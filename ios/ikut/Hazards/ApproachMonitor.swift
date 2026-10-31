@@ -101,6 +101,9 @@ final class ApproachMonitor {
     private var mainOffsets: [String: Double?] = [:]
     private var ownOffsets: [String: Double?] = [:]
     private var tasks: [Task<Void, Never>] = []
+    /// While the convoy is stopped (D122): the stop point's offset on the main route. Hazards beyond it are left out
+    /// (not marked as announced), so they fire once the convoy moves on; nil holds nothing.
+    var holdBeyond: Double?
 
     init(
         announcer: any AlertAnnouncing, myCarId: String, myUserId: String? = nil,
@@ -144,7 +147,8 @@ final class ApproachMonitor {
         var candidates: [ApproachCore.Candidate] = []
         for event in events where isCandidate(event, now: now) {
             let key = HazardGeometry.key(for: event)
-            guard let offset = offset(of: event, key: key, route: route, onMain: onMain) else { continue }
+            guard let offset = offset(of: event, key: key, route: route, onMain: onMain),
+                  !(onMain && ConvoyStop.holds(offset: offset, stopOffset: holdBeyond)) else { continue }
             byId[key] = event
             candidates.append(.init(id: key, offset: offset))
         }

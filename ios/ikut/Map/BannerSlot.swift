@@ -31,6 +31,9 @@ enum BannerSlot {
         case catchUp
         case alertBanner
         case routeNotice
+        /// The convoy has stopped (D122): stays until Continue, up to 90 minutes, and everyone already knows it, so
+        /// everything else goes over it (a car arriving, a new alert) and it comes back when they go.
+        case stopped
 
         /// Lower is more urgent. The last three have the same rank: those compete on arrival.
         var rank: Int {
@@ -43,6 +46,7 @@ enum BannerSlot {
             case .error: 5
             case .paused: 6
             case .catchUp, .alertBanner, .routeNotice: 7
+            case .stopped: 8
             }
         }
 
@@ -70,7 +74,7 @@ enum BannerSlot {
     static func resolve(present: Set<Message>, arrivals: [Message: Date] = [:]) -> Result {
         let top = present.min { a, b in
             if a.rank != b.rank { return a.rank < b.rank }
-            if a.rank == 7 {
+            if a.rank == Message.alertBanner.rank {
                 let da = arrivals[a] ?? .distantFuture, db = arrivals[b] ?? .distantFuture
                 if da != db { return da > db }
             }
@@ -90,6 +94,7 @@ enum BannerSlot {
         var passedText: String?
         var error: String?
         var paused = false
+        var stopped = false
         var catchUpId: String?
         var alertBannerId: String?
         var routeNoticeText: String?
@@ -109,6 +114,7 @@ enum BannerSlot {
         if let text = i.passedText { present[.passed] = text }
         if let message = i.error { present[.error] = message }
         if i.paused { present[.paused] = "paused" }
+        if i.stopped { present[.stopped] = "stopped" }
         if let id = i.catchUpId { present[.catchUp] = id }
         if let id = i.alertBannerId { present[.alertBanner] = id }
         if let text = i.routeNoticeText { present[.routeNotice] = text }

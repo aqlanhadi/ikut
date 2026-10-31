@@ -48,6 +48,11 @@ export interface Trip {
   endedAt?: Timestamp;
   /** Written by the server when the trip ends (summary.ts); clients never write it. Kept until the trip is deleted 90 days after it ended. */
   summary?: TripSummary;
+  /** The convoy's stopped phase (D122): the lead car's tracker or the organizer tapped We've stopped on a stop request
+   * (server time); Continue deletes all three. No place, only when, who and which request. Older than 90 minutes counts as over. */
+  stoppedAt?: Timestamp;
+  stoppedBy?: string;
+  stoppedEventId?: string;
 }
 
 /** The small record of a finished trip (D107): no names, no coordinates. A number is null when it could not be worked out. */

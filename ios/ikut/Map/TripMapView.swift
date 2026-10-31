@@ -489,7 +489,7 @@ struct TripMapView: View {
             stopPillId: sheet.stopCardOpen ? nil : stopPill?.id,
             stopApproachId: stopApproachKind == nil ? nil : model.stopApproach?.id,
             toast: toast.state, passedText: passedText, error: glanceError.message, paused: session.isPaused,
-            catchUpId: model.catchUp?.id, alertBannerId: alertBannerAlert?.id,
+            stopped: session.convoyStopped, catchUpId: model.catchUp?.id, alertBannerId: alertBannerAlert?.id,
             routeNoticeText: session.rebuilder.notice?.text))
     }
 
@@ -617,6 +617,8 @@ struct TripMapView: View {
                 PausedBanner(session: session, onError: { message in
                     glanceError.show(message, cause: .pause)
                 })
+            case .stopped:
+                StoppedBanner(session: session) { message in glanceError.actionFinished(failure: message) }
             case .catchUp:
                 if let catchUp = model.catchUp { CatchUpPill(alert: catchUp, model: model) }
             case .alertBanner:
@@ -675,6 +677,8 @@ struct TripMapView: View {
     /// The convoy's motion ("On the move", "Arrived", ...), shown first in the pill.
     private var motion: ConvoyFormat.Motion {
         let snapshot = model.convoy.snapshot
+        // We've stopped (D122): Stopped for everyone, whatever speed the front car last reported.
+        if session.convoyStopped, !snapshot.everyoneArrived { return .stopped }
         return ConvoyFormat.motion(
             mineArrived: snapshot.hasArrived(model.myCarId), everyoneArrived: snapshot.everyoneArrived,
             frontSpeed: snapshot.etaReference?.speed)
@@ -1117,7 +1121,8 @@ struct TripMapView: View {
     /// (no signal; Firestore keeps the write and sends it when the phone is back online), refused when the rules said no.
     private func leaveStop(_ stopId: String) async -> StopLeave.Result {
         do {
-            let sent = try await StopLeaveService.leave(tripId: session.tripId, stopId: stopId, userId: session.userId)
+            // Leaving a stop moves the convoy on: a stopped phase still on ends too (D122, `TripSession.leaveStop`).
+            let sent = try await session.leaveStop(stopId)
             return sent ? .sent : .queued
         } catch { return .refused }
     }
@@ -1146,6 +1151,11 @@ struct TripMapView: View {
         let live = liveServices
             ? StopService.actions(
                 context: context,
+                startsConvoyStop: { [session] reason in
+                    ConvoyStop.startsWith(
+                        reason: reason, isLeadTracker: session.isLeadTracker, isOrganizer: session.isOrganizer,
+                        active: session.convoyStopped)
+                },
                 onError: { _ in glanceError.actionFinished(failure: "Couldn’t reach the convoy. Try again in a moment.") },
                 onSuccess: { glanceError.actionFinished(failure: nil) })
             : .none
@@ -1218,7 +1228,7 @@ struct TripMapView: View {
         SessionSignature(
             trip: session.trip, car: session.car, positions: session.positions,
             isTracking: session.isTracking, carId: session.member?.carId, stops: session.stops,
-            skipsMeetingPoint: session.skipsMeetingPoint, cars: session.cars)
+            skipsMeetingPoint: session.skipsMeetingPoint, cars: session.cars, convoyStop: session.convoyStop)
     }
 
     private struct SessionSignature: Equatable {
@@ -1230,6 +1240,7 @@ struct TripMapView: View {
         var stops: [PlannedStop]
         var skipsMeetingPoint: Bool
         var cars: [Car]
+        var convoyStop: ConvoyStop?
     }
 
     private func appear() {

@@ -28,6 +28,15 @@ struct BannerSlotTests {
         }
     }
 
+    /// D122: the convoy's stopped banner stands for up to 90 minutes and everyone knows it: every other message goes
+    /// over it, and it comes back when they go.
+    @Test func theStoppedBannerWaitsUnderEveryOtherMessage() {
+        for other in M.allCases where other != .stopped {
+            #expect(shown([.stopped, other]) == other, "\(other) over stopped")
+        }
+        #expect(shown([.stopped]) == .stopped)
+    }
+
     @Test func aHazardTakesTheSlotFromEveryOtherMessage() {
         #expect(shown(Set(M.allCases)) == .hazardApproach)
         #expect(shown(Set(M.allCases).subtracting([.hazardApproach])) == .stopPill)

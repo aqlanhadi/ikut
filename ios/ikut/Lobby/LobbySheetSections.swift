@@ -20,6 +20,12 @@ extension LobbyView {
                 PausedBanner(session: session, onError: { actionError = $0 }).lobbyRow()
             }
         }
+        // The convoy has stopped (D122): the same banner as under the trip pill, with Continue for the lead car.
+        if session.convoyStopped && !session.isEnded && !session.membershipLost {
+            Section {
+                StoppedBanner(session: session, onError: { actionError = $0 }).lobbyRow()
+            }
+        }
     }
 
     func bannerSection(_ title: LocalizedStringKey, systemImage: String) -> some View {
