@@ -25,8 +25,25 @@ final class CoreLocationSource: LocationSource {
         manager.showsBackgroundLocationIndicator = true
     }
 
+    /// Low power (D124): a car at rest in a stopped convoy. Cell and Wi-Fi fixes (about 100 m) instead of the GPS chip,
+    /// and a fix only after 100 m of movement, so a parked car gets none. 100 m, not 3 km: a 3 km fix is one cell tower
+    /// and would hide a drive-off for minutes; at 100 m the first fix after a car pulls out arrives about 10 s later at
+    /// 36 km/h, and that fix is what puts tracking back to full. The activity type stays automotive, so the system
+    /// still treats the car as driving when it moves.
+    func setPower(_ power: TrackingPower) {
+        switch power {
+        case .full:
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.distanceFilter = 50
+        case .low:
+            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            manager.distanceFilter = 100
+        }
+    }
+
     func start(onFix: @escaping @Sendable (LocationFix) -> Void) {
         delegate.onFix = onFix
+        setPower(.full)
         session = CLBackgroundActivitySession()
         manager.startUpdatingLocation()
     }

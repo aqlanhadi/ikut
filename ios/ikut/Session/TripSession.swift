@@ -474,6 +474,7 @@ final class TripSession {
         let current = ConvoyStop.current(trip, now: now)
         if current != convoyStop {
             convoyStop = current
+            duty.setConvoyStopped(current != nil)
             stopCapTask?.cancel()
             if let since = current?.since {
                 let delay = ConvoyStop.endsAt(since).timeIntervalSince(now)

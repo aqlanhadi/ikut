@@ -14,6 +14,9 @@ final class FakeTrackingController: TrackingControlling {
     private(set) var stopCount = 0
     private(set) var lastCarId: String?
     private(set) var lastCarRoute: RouteLine?
+    /// What `setConvoyStopped` was last told (D124).
+    private(set) var convoyStopped = false
+    func setConvoyStopped(_ stopped: Bool) { convoyStopped = stopped }
     /// Records `isTracking` at the moment of each stop() call, to check ordering.
     var onStop: (() -> Void)?
     var onFix: ((LocationFix) -> Void)?
@@ -147,6 +150,9 @@ final class FakeSource: LocationSource {
     private(set) var stopped = 0
     func start(onFix: @escaping @Sendable (LocationFix) -> Void) { started += 1; self.onFix = onFix }
     func stop() { stopped += 1; onFix = nil }
+    /// Every mode the service asked for, in order (after the start).
+    private(set) var powers: [TrackingPower] = []
+    func setPower(_ power: TrackingPower) { powers.append(power) }
 }
 
 // MARK: - Convoy

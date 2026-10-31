@@ -17,11 +17,23 @@ struct LocationFix: Sendable, Equatable {
     }
 }
 
+/// How hard the location source works (D124): `low` while the convoy is stopped and this car is at rest.
+enum TrackingPower: Sendable, Equatable {
+    case full
+    case low
+}
+
 /// Source of location fixes. `stop()` must stop delivering fixes immediately.
 @MainActor
 protocol LocationSource: AnyObject {
     func start(onFix: @escaping @Sendable (LocationFix) -> Void)
     func stop()
+    /// Switches between full accuracy and the low-power mode of a car at rest. A source that has one mode ignores it.
+    func setPower(_ power: TrackingPower)
+}
+
+extension LocationSource {
+    func setPower(_ power: TrackingPower) {}
 }
 
 /// Writes a car's latest position, resolving once the write is acknowledged by the server.

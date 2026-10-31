@@ -209,6 +209,7 @@ struct TripMapView: View {
             .onChange(of: readAloud) { _, _ in alerts.readAloudChanged() }
             .onChange(of: scenePhase) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, _ in updateAwake() }
+            .onChange(of: session.convoyStopped) { _, _ in updateAwake() }
             .onChange(of: session.isEnded) { _, ended in if ended { onEnded() } }
             // Opened on the app's first frame (a relaunch, a Now row read as started) the member doc comes after the
             // alerts started: from then on this car's own stop requests are not announced.
@@ -1302,7 +1303,7 @@ struct TripMapView: View {
         guard liveServices else { return }
         screenAwake.update(
             preference: keepAwakeOn, onScreen: onScreen, tripRunning: !session.isEnded,
-            appActive: scenePhase == .active)
+            appActive: scenePhase == .active, convoyStopped: session.convoyStopped)
     }
 
     private func disappear() {

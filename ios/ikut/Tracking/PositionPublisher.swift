@@ -5,6 +5,10 @@ import Foundation
 /// - A new fix is written at most once per `minInterval` (5 s).
 /// - With no new fix, the newest position is re-written after `movingInterval` (10 s) when moving,
 ///   or `heartbeatInterval` (30 s) when stationary, so followers see the car is alive.
+/// - While the convoy is stopped and the car is at rest (`lowPower`, D124) the newest position is re-written every
+///   `lowHeartbeatInterval` (45 s, under the 60 s a car counts as stale) whatever its speed, and a fix that shows
+///   nothing new (`urgent: false`) waits for that heartbeat. A fix that shows the car moved (`urgent: true`) goes out
+///   after `minInterval` as usual.
 /// - Only one write is in flight. Firestore acknowledges a write only once the server has it, so
 ///   while the network is down the write simply stays in flight; fixes arriving meanwhile replace
 ///   the single pending position instead of adding writes. When the write completes, at most one
@@ -15,6 +19,8 @@ final class PositionPublisher {
         var minInterval: TimeInterval = 5
         var movingInterval: TimeInterval = 10
         var heartbeatInterval: TimeInterval = 30
+        /// The heartbeat of a car at rest while the convoy is stopped. Cars are stale after 60 s, so this leaves 15 s.
+        var lowHeartbeatInterval: TimeInterval = 45
         /// At or above this speed (m/s) the car counts as moving.
         var movingSpeed: Double = 1
     }
@@ -31,6 +37,11 @@ final class PositionPublisher {
     private var lastSendAt: TimeInterval?
     private var inFlight = false
     private var stopped = false
+    private(set) var lowPower = false
+    /// The pending position shows the car moved: it is not held for the low-power heartbeat.
+    private var urgent = true
+    /// Refreshes what changes without a fix (the battery) on a re-write of an old position.
+    var refresh: (@MainActor (Position) -> Position)?
     private var wake: Task<Void, Never>?
     private var wakeDeadline: TimeInterval?
 
@@ -45,10 +56,18 @@ final class PositionPublisher {
     }
 
     /// Records the newest position, replacing any unsent one.
-    func submit(_ position: Position) {
+    func submit(_ position: Position, urgent: Bool = true) {
         guard !stopped else { return }
         latest = position
+        self.urgent = (dirty && self.urgent) || urgent
         dirty = true
+        evaluate()
+    }
+
+    /// Slow heartbeat on or off (the convoy is stopped and this car is at rest, or not). Re-plans the next write.
+    func setLowPower(_ on: Bool) {
+        guard on != lowPower else { return }
+        lowPower = on
         evaluate()
     }
 
@@ -68,7 +87,9 @@ final class PositionPublisher {
         let due: TimeInterval
         if let lastSendAt {
             if dirty {
-                due = lastSendAt + timing.minInterval
+                due = lastSendAt + (lowPower && !urgent ? timing.lowHeartbeatInterval : timing.minInterval)
+            } else if lowPower {
+                due = lastSendAt + timing.lowHeartbeatInterval
             } else {
                 let moving = position.speed >= timing.movingSpeed
                 due = lastSendAt + (moving ? timing.movingInterval : timing.heartbeatInterval)
@@ -84,6 +105,9 @@ final class PositionPublisher {
     }
 
     private func send(_ position: Position, at now: TimeInterval) {
+        var position = position
+        if !dirty, let refresh { position = refresh(position) }
+        urgent = false
         wake?.cancel()
         wake = nil
         wakeDeadline = nil

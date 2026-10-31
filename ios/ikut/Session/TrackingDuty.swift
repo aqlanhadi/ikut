@@ -67,6 +67,11 @@ final class TrackingDuty {
         stopNow()
     }
 
+    /// The convoy's stopped phase began or ended (D124): the tracker lowers its power for a car at rest, or restores it.
+    func setConvoyStopped(_ stopped: Bool) {
+        tracker.setConvoyStopped(stopped)
+    }
+
     /// Stops tracking synchronously and ends the session: no later fix reaches the car-route service.
     func stopNow() {
         tracker.stop()

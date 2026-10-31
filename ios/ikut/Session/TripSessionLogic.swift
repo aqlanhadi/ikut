@@ -12,6 +12,8 @@ protocol TrackingControlling: AnyObject {
     func firstFix() async -> LocationFix?
     /// Must stop location updates synchronously.
     func stop()
+    /// The convoy is stopped (or not): a car at rest then tracks in low power (D124).
+    func setConvoyStopped(_ stopped: Bool)
 }
 
 extension TrackingService: TrackingControlling {}
@@ -23,6 +25,7 @@ extension TrackingControlling {
         set {}
     }
     func firstFix() async -> LocationFix? { nil }
+    func setConvoyStopped(_ stopped: Bool) {}
 }
 
 /// What `TripSession` needs from `CarRouteService`; tests substitute a fake.
