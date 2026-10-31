@@ -1049,6 +1049,7 @@ struct TripMapView: View {
                 leave: leaveHandler,
                 skip: skipHandler,
                 skipAll: skipAllHandler,
+                setStay: setStayHandler,
                 listensToAnswers: liveServices
             ) {
                 closeArrivalCard()
@@ -1085,6 +1086,16 @@ struct TripMapView: View {
     private var skipHandler: (@MainActor @Sendable (String, Bool) async -> StopLeave.Result)? {
         guard liveServices else { return nil }
         return { stopId, skipping in await answerStop(stopId, skipping: skipping) }
+    }
+
+    private var setStayHandler: (@MainActor @Sendable (String, Int) async -> StopLeave.Result)? {
+        guard liveServices else { return nil }
+        return { stopId, minutes in
+            do {
+                let sent = try await StopLeaveService.setStay(tripId: session.tripId, stopId: stopId, minutes: minutes)
+                return sent ? .sent : .queued
+            } catch { return .refused }
+        }
     }
 
     private var skipAllHandler: (@MainActor @Sendable (String) async -> StopLeave.Result)? {

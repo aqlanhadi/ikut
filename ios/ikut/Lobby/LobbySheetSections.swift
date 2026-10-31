@@ -395,7 +395,9 @@ extension LobbyView {
             }
             ForEach(journey.ahead) { text in
                 if let stop = stops.first(where: { $0.id == text.id }) {
-                    StopRow(stop: stop, text: text, editable: false, turnBack: nil, failure: nil, failed: false, onRetry: {})
+                    StopRow(
+                        stop: stop, text: text, editable: false, turnBack: nil, failure: nil, failed: false, onRetry: {},
+                        onStay: journeyStay(stop.id))
                 }
             }
             if journey.ahead.isEmpty {
@@ -405,6 +407,13 @@ extension LobbyView {
         } header: {
             Text("Journey")
         }
+    }
+
+    /// The organizer's Stay menu on a stop still ahead once the trip is under way (D121); nil for everyone else.
+    func journeyStay(_ id: String) -> ((Int) -> Void)? {
+        guard let planned = model.stops.first(where: { $0.id == id }),
+              StopStay.canEdit(planned, isOrganizer: isOrganizer) else { return nil }
+        return { setStay(id, $0) }
     }
 
     func run(_ action: @escaping () async throws -> Void) {
@@ -435,7 +444,8 @@ extension LobbyView {
         StopRow(
             stop: stop, text: text, editable: canEditStops,
             turnBack: canEditStops && !planner.isBuilding ? planner.turnBacks[stop.id] : nil,
-            failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() })
+            failure: failedHere ? failure : nil, failed: failedHere, onRetry: { planner.retry() },
+            onStay: canEditStops && !stop.isMeeting && planner.status == .saved ? { setStay(stop.id, $0) } : nil)
             .contentShape(Rectangle())
             .onTapGesture { flyTo(stop.id) }
             .accessibilityAddTraits(.isButton)

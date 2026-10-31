@@ -246,6 +246,15 @@ struct LobbyView: View {
         }
     }
 
+    /// A new stay for one stop (D121): the list shows it at once; the stop's `minutes` is written on its own, since the
+    /// road doesn't change. Everyone else's list follows from the listener.
+    func setStay(_ id: String, _ minutes: Int) {
+        planner.setStay(id: id, minutes: minutes)
+        guard !isSample else { return }
+        let tripId = model.tripId
+        Task { _ = try? await StopLeaveService.setStay(tripId: tripId, stopId: id, minutes: minutes) }
+    }
+
     var currentUserId: String? { Auth.auth().currentUser?.uid }
 
     /// Remembers this trip for Home's past list, with who else is in it once the members have loaded.
