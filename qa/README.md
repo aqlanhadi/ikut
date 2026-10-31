@@ -97,6 +97,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
    stop button shows the stop with a badge (the card does not open by itself) and the pill asks for an OK; A taps OK on the pill, cars 3 and 4 say OK, A opens the stop from the
    Pit stop button (four OKs, the message in full) and taps We've stopped, B's button shows 4 of 4 OK and then both buttons are Pit stop again. The script checks the event (message, no
    place, `expiresAt` 30 minutes after `createdAt`), A's vote and the close (`status closed`, `closedReason stopped`).
+   D123: the same We've stopped starts the stopped phase, so both phones show the Stopped banner (A with Continue, B without), the script checks the trip holds `stoppedAt`, `stoppedBy` and `stoppedEventId`, A taps Continue and the banner clears on both phones and the three fields are gone. These are their own steps (6b on A, 7b on B) after the stop step, so a flake of the stop step (Q26) stops the run there and is reported as that step.
 6. B goes back to the lobby and pauses sharing: A's row 2 reads "Paused", `pausedAt` is set; Resume clears both.
 7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
    the map menu and lands on the recap, B's lobby says "Trip ended", the trip doc is `ended`.
@@ -120,6 +121,7 @@ its suite finishes; the script takes the suite's result and kills it after 60 s.
 | `lib/route.mjs`, `lib/tracking.mjs` | JS ports of the Swift logic, each function annotated with its source file. |
 | `lib/scenario.mjs` | The script: cars, speeds, gap, timeline, and the parked and stop scenarios. |
 | `lib/rebuild.mjs` | The route rebuilt mid-trip (port of `RouteRebuild`, `StopRouting.join`) and the town-loop geometry of `--scenario rebuild`, with `lib/rebuild.test.mjs`. |
+| `lib/convoystop.mjs` | The stopped phase (port of `ConvoyStop`: the 90 minute cap, who may end it, `MoveOff`) and the tracker's rest timer for low power (port of `TrackingService`), with `lib/convoystop.test.mjs`; also the stop-and-go track of `--scenario stopped`. |
 | `lib/stoparrival.mjs` | Who is at a planned stop (port of `StopArrival`), with `lib/stoparrival.test.mjs`. |
 | `lib/shell.mjs`, `lib/firebase-config.mjs` | `run`/`simctl`/`sleep`/`makeSay`, `endsWithResult` (the `RESULT` line and `--deadline`) and `holdSimulators` (the simulator lock) for the scripts that drive simulators; the production client config read from the app's plist. |
 | `simlock.sh` | Holds one or more simulators while a command runs, see Waiting on a run. |
@@ -167,6 +169,15 @@ Tapah all along, car 4 keeps to the highway (1.9 km past the turn-off at T=120, 
 follow; car 4 passes car 3 at about T=305. Tracks are made in memory (`syntheticTrack`), no GPX files; no phone, so not
 `--wait-app`.
 
+**A stopped convoy** (`--scenario stopped`, D123, 435 s, about 50 s at the default speed): cars 1-4 (synthetic tracks, 20 m/s) pull
+in at 6.1-6.2 km, car 1 parked about T=60 and car 4 about T=117. Car 3 asks for fuel at T=40, cars 2 and 4 say OK, and at T=70 the lead car
+says We've stopped exactly as the app does (`ConvoyStopService.stopped`): one batch that closes the request as stopped AND writes
+`stoppedAt` (server time), `stoppedBy` and `stoppedEventId` on the trip, under the real rules. Each car runs the tracker's rest
+timer (`lib/convoystop.mjs`, from each phone's own listener on the trip): 120 s at rest in the phase and it drops to the 45 s heartbeat
+(`PositionPublisher.setLowPower`). Car 1 taps Continue at T=345 (deletes the three fields), all four drive on at T=350. No phone,
+no timeline of the default drive; not `--wait-app`. The 90 minute cap is not played (it would need a 90 minute run): it is in
+`lib/convoystop.test.mjs` with the ported move-off rule and rest timer, next to the Swift cases they mirror.
+
 ## What is checked
 
 `convoy-sim.mjs` (PASS/FAIL lines, exit code 1 on any FAIL):
@@ -191,6 +202,15 @@ follow; car 4 passes car 3 at about T=305. Tracks are made in memory (`synthetic
   skip for everyone and a second Leave on the left stop are refused, and before it car 2 could not Leave or mark
   the arrival and car 4, still short of the stop, could skip and undo
 
+- stopped (`--scenario stopped`): before We've stopped the asker's own batch (a passenger, not the lead car) and a bare write of the three
+  fields are refused, the request stays open and the trip has no phase; after it the trip holds `stoppedAt` (server time),
+  `stoppedBy` the lead car and `stoppedEventId` the request, the request is closed as stopped by the same person, a passenger can neither
+  delete the fields nor change `stoppedBy` (unchanged afterwards), and all four phones read the phase from the trip; every parked car is in
+  low power after 120 s at rest, writes a heartbeat every 45 s (gaps between 40 and 50 s, under the 60 s stale limit), holds its place
+  within 5 m, and the server's last position of each is fresh; after Continue the trip has none of the fields, every phone has left low
+  power within 5 s, each car is back to a write every 5 to 10 s (at least 12 in the last 75 s) and moves on (over 500 m); the lead car's
+  move-off rule (ported, kept going as if Continue had never been tapped) stays quiet at rest and fires once, 500 to 530 m from where it
+  stood
 - rebuild (`--scenario rebuild`; car 1's, car 2's and every phone's view): convoy order against the highway truth before,
   just after and well after the rebuild and after car 4 passes the parked car; one batch, R&R Tapah's offset read
   moving once on every phone (old route, then new, by what the loop added) and Lunch's never; the route read changing

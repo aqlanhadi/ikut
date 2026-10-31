@@ -12,7 +12,7 @@ import XCTest
 ///   A creates the trip, B joins with the code, both lobbies show 4 cars once the script joins cars 3 and 4,
 ///   both open the map; convoy order 1, 3, 2, 4 on both; A reports debris, B sees the marker and gets the
 ///   approach alert; car 3 (scripted) reports an accident, both see it; B asks for a fuel stop with a message,
-///   A taps OK on the pill, cars 3 and 4 say OK, A (the lead) taps We've stopped; B pauses and resumes sharing (A sees "Paused"), leaves (A sees the car go),
+///   A taps OK on the pill, cars 3 and 4 say OK, A (the lead) taps We've stopped (B and A show the Stopped banner, A taps Continue); B pauses and resumes sharing (A sees "Paused"), leaves (A sees the car go),
 ///   rejoins as a new car, A ends the trip and B's lobby says "Trip ended".
 @MainActor
 class TwoPhoneConvoyBase: ConvoyUITestCase {
@@ -253,6 +253,21 @@ final class ConvoyOrganizerUITests: TwoPhoneConvoyBase {
             mark("a.stopped")
         }
 
+        // D123. We've stopped from the lead car also starts the convoy's stopped phase (D122): the banner shows on both
+        // phones, Continue only on A's. Its own step, after the B6 stop step above, so a flake there stays B6's.
+        try step("6b. the Stopped banner with Continue, and Continue clears it") {
+            let banner = element("trip.stopped")
+            let continueButton = app.buttons["trip.stopped.continue"]
+            try waitFor("A's Stopped banner, with Continue (A is the lead car)", timeout: 30) { banner.exists && continueButton.exists }
+            shot("10b-stopped-banner")
+            mark("a.sawStopped")
+            try waitMark("b.sawStopped", timeout: 120)
+            continueButton.tap()
+            try waitFor("the Stopped banner clears on A", timeout: 30) { !banner.exists }
+            shot("10c-continued")
+            mark("a.continued")
+        }
+
         try step("7. sees B paused, then sharing again") {
             try waitMark("b.paused", timeout: 180)
             try waitFor("row 2 says Paused", timeout: 60) { element("convoy.row.2").label.contains("Paused") }
@@ -398,6 +413,17 @@ final class ConvoyJoinerUITests: TwoPhoneConvoyBase {
             try waitMark("a.stopped", timeout: 120)
             try waitFor("the button is Pit stop again on B", timeout: 60) { stopButton.label == "Pit stop" }
             shot("11-stop-closed")
+        }
+
+        try step("7b. the Stopped banner, without Continue, until A taps it") {
+            let banner = element("trip.stopped")
+            try waitFor("B's Stopped banner", timeout: 60) { banner.exists }
+            XCTAssertFalse(app.buttons["trip.stopped.continue"].exists, "only the lead car and the organizer get Continue")
+            shot("11b-stopped-banner")
+            mark("b.sawStopped")
+            try waitMark("a.continued", timeout: 120)
+            try waitFor("the Stopped banner clears on B", timeout: 30) { !banner.exists }
+            shot("11c-continued")
         }
 
         try step("8. pauses sharing from the pulled-up sheet, then resumes") {

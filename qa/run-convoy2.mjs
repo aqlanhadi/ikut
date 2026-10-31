@@ -260,6 +260,14 @@ async function scenario() {
   const closed = (await getDoc(doc(reader(), `trips/${tripId}/events/${stop.id}`))).data();
   check('stop closed as stopped by phone A (We\'ve stopped)', closed.status === 'closed' && closed.closedReason === 'stopped' && Boolean(closed.closedBy) && closed.expiresAt.toMillis() <= Date.now() + 1000, JSON.stringify({ status: closed.status, closedReason: closed.closedReason }));
 
+  // 6b. D122: We've stopped from the lead car also recorded the stop on the trip, until A taps Continue.
+  await sync.wait('a.sawStopped', 300);
+  const phase = (await getDoc(doc(reader(), `trips/${tripId}`))).data();
+  check('We\'ve stopped also recorded the stop on the trip: stoppedAt, stoppedBy a member, stoppedEventId the request', Boolean(phase.stoppedAt) && Boolean(phase.stoppedBy) && phase.stoppedEventId === stop.id, JSON.stringify({ by: phase.stoppedBy, event: phase.stoppedEventId }));
+  await sync.wait('a.continued', 300);
+  const resumedTrip = (await getDoc(doc(reader(), `trips/${tripId}`))).data();
+  check('Continue deleted stoppedAt, stoppedBy and stoppedEventId', resumedTrip.stoppedAt === undefined && resumedTrip.stoppedBy === undefined && resumedTrip.stoppedEventId === undefined && resumedTrip.status === 'active', JSON.stringify({ at: resumedTrip.stoppedAt, status: resumedTrip.status }));
+
   // 7. pause / resume. B resumes as soon as phone A has seen the pause, which can be before one read here
   // lands, so listen from before B pauses and keep whether pausedAt ever showed.
   let sawPausedAt = false;

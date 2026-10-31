@@ -50,10 +50,11 @@ import { httpsCallable } from 'firebase/functions';
 import { CarRouteLogic, Polyline, RouteLine, haversine } from './lib/route.mjs';
 import { readGpx, withMotion } from './lib/gpx.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher, distanceText } from './lib/tracking.mjs';
-import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOP_NEXT, TRIP, appKey, loadRoutes, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
+import { DURATION, FIX_HZ, REBUILD, SCENARIOS, STOP, STOPPED, STOP_NEXT, TRIP, appKey, loadRoutes, scenarioCars, scenarioTimeline } from './lib/scenario.mjs';
 import { ON_ROUTE_TOLERANCE, distinctValues, rebuildRoute, staleReads, syntheticTrack, townDetour } from './lib/rebuild.mjs';
 import { CatchUpHeadsUp, LEAD_TIME, catchUpSpoken, driftedGaps, entries, referenceId, relativeDistance, spokenStopRequest, togetherPairs } from './lib/farahead.mjs';
 import { tally as stopTally } from './lib/stoparrival.mjs';
+import { MoveOff, PARKED_SPEED, RestTracker, current as stopPhase, stopAndGoTrack } from './lib/convoystop.mjs';
 import { isOpen, leavingAt, nextStop } from './lib/stopleave.mjs';
 import { PROJECT_ID } from './lib/firebase-config.mjs';
 import { endsWithResult, sleep } from './lib/shell.mjs';
@@ -114,11 +115,12 @@ const CARS = scenarioCars(opts.scenario);
 const APP_KEY = appKey(opts.scenario);
 const STOPPING = opts.scenario === 'stop';
 const REBUILDING = opts.scenario === 'rebuild';
-if ((STOPPING || REBUILDING) && opts.waitApp) throw new Error(`the ${opts.scenario} scenario has no phone car: run it without --wait-app`);
+const STOPPED_PHASE = opts.scenario === 'stopped';
+if ((STOPPING || REBUILDING || STOPPED_PHASE) && opts.waitApp) throw new Error(`the ${opts.scenario} scenario has no phone car: run it without --wait-app`);
 // IKUT_QA_BREAK=<name> breaks the rebuild scenario on purpose, to see its check fail (qa/README.md, *What is checked*).
 const BREAK = REBUILDING ? process.env.IKUT_QA_BREAK ?? '' : '';
 /** Seconds of drive: the whole scripted drive, or the rebuild's. */
-const RUN = REBUILDING ? REBUILD.duration : DURATION;
+const RUN = REBUILDING ? REBUILD.duration : STOPPED_PHASE ? STOPPED.duration : DURATION;
 /** Cars parked on the route ahead of the convoy (the parked scenario). */
 const PARKED = CARS.filter((c) => c.waitOffset !== undefined);
 
@@ -172,7 +174,8 @@ const tripPolyline = detour ? Polyline.encode(detour.coordinates) : mainPolyline
 let tripLine = detour ? new RouteLine(Polyline.decode(tripPolyline)) : mainRoute;
 
 function loadTrack(key, spec) {
-  const pts = withMotion(spec.synthetic ? syntheticTrack(mainRoute, { startOffset: spec.startOffset, speed: spec.speed, seconds: RUN }) : readGpx(path.join(here, 'gpx', `${key}.gpx`)));
+  const synth = () => (spec.parkAt !== undefined ? stopAndGoTrack(mainRoute, { ...spec, seconds: RUN }) : syntheticTrack(mainRoute, { startOffset: spec.startOffset, speed: spec.speed, seconds: RUN }));
+  const pts = withMotion(spec.synthetic ? synth() : readGpx(path.join(here, 'gpx', `${key}.gpx`)));
   // Fixes by second; a gap (car 2) simply has no entry.
   const bySecond = new Map();
   for (const p of pts) bySecond.set(Math.round(p.t * FIX_HZ), p);
@@ -269,6 +272,8 @@ class Phone {
     this.ownHint = null;
     this.builder = new PositionBuilder(tripLine, this.own);
     this.publisher = new PositionPublisher({ write: (p) => this.writePosition(p), now: () => clock.T });
+    // D124: the tracker's rest timer drops to low power in a stopped phase (lib/convoystop.mjs).
+    if (STOPPED_PHASE) this.rest = new RestTracker({ onPower: (low) => { this.publisher.setLowPower(low); (this.power ??= []).push({ T: clock.T, wall: Date.now(), low }); } });
     return plan;
   }
 
@@ -457,7 +462,7 @@ class Phone {
     this.lastFix = fix;
     const position = this.builder.build(fix, battery);
     this.lastPosition = position;
-    this.publisher.submit(position);
+    this.publisher.submit(position, this.rest ? { urgent: this.rest.fix(fix, clock.T) } : undefined);
     this.#carRouteHandle(fix);
     this.#approach(position);
   }
@@ -533,7 +538,32 @@ class Phone {
     });
   }
 
+  // ---- The stopped phase (D122), as the app does it: ConvoyStopService.stopped / resume (ios/ikut/Stops/ConvoyStopService.swift)
+  /** The batch that closes the request as stopped AND starts the phase. `by`/`event` are for the probes that must be refused. */
+  async weveStopped(eventId, { phase = true } = {}) {
+    const batch = writeBatch(this.db);
+    batch.update(doc(this.db, `trips/${this.tripId}/events/${eventId}`), { status: 'closed', closedReason: 'stopped', closedBy: this.uid, expiresAt: Timestamp.now() });
+    if (phase) batch.update(doc(this.db, `trips/${this.tripId}`), { stoppedAt: serverTimestamp(), stoppedBy: this.uid, stoppedEventId: eventId });
+    await batch.commit();
+  }
+  async continueConvoy() {
+    await updateDoc(doc(this.db, `trips/${this.tripId}`), { stoppedAt: deleteField(), stoppedBy: deleteField(), stoppedEventId: deleteField() });
+  }
+  /** TripSession's trip listener: the phase as this phone reads it, handed to the tracker's rest timer. */
+  watchTrip() {
+    this.unsubTripPhase = onSnapshot(doc(this.db, `trips/${this.tripId}`), (snap) => {
+      const t = snap.data({ serverTimestamps: 'estimate' });
+      this.trip = t;
+      const at = t?.stoppedAt?.toMillis();
+      if (at !== undefined) this.phaseSeen ??= at / 1000;
+      const phase = stopPhase({ status: t?.status, stoppedAt: at === undefined ? null : at / 1000, stoppedBy: t?.stoppedBy, stoppedEventId: t?.stoppedEventId }, Date.now() / 1000);
+      (this.phaseTrail ??= []).push({ T: clock.T, wall: Date.now(), on: Boolean(phase) });
+      this.rest?.setConvoyStopped(Boolean(phase), clock.T);
+    });
+  }
+
   async close() {
+    this.unsubTripPhase?.();
     this.unsubscribe?.();
     this.unsubPositions?.();
     this.unsubCars?.();
@@ -637,6 +667,12 @@ async function main() {
     if (REBUILDING) p.watchRebuild();
     if (p.spec.waitOffset !== undefined || (STOPPING && p.key === 'car1') || (REBUILDING && (p.key === 'car1' || p.key === 'car2'))) p.watchConvoy(new Map([...phones.values()].map((q) => [q.carId, q.spec.displayName])));
     if (STOPPING && p.key === 'car1') p.watchStops();
+    if (STOPPED_PHASE) p.watchTrip();
+  }
+
+  if (STOPPED_PHASE) {
+    await updateDoc(doc(organizer.db, `trips/${tripId}`), { startedAt: serverTimestamp() });
+    tripStarted = true;
   }
 
   // Rules probes: things a client must not be able to do.
@@ -704,7 +740,7 @@ async function main() {
   clock.label = 'drive';
   const goWall = Date.now();
   const timeline = scenarioTimeline(opts.scenario).map((e) => ({ ...e, done: false }));
-  const scheduled = REBUILDING ? scheduleRebuildChecks({ phones, tripId, organizer }) : STOPPING ? [] : scheduleChecks({ phones, tracks, truth, tripId, organizer, getAppCarId: () => appCarId });
+  const scheduled = REBUILDING ? scheduleRebuildChecks({ phones, tripId, organizer }) : STOPPED_PHASE ? scheduleStoppedChecks({ phones, tripId, organizer }) : STOPPING ? [] : scheduleChecks({ phones, tracks, truth, tripId, organizer, getAppCarId: () => appCarId });
   const ctx = { phones, tripId, organizer, tracks, truth, stopEvent: null, hazard: null, hazardAt: null };
   let stopProbed = false;
   const gapCar = phones.get('car2');
@@ -723,8 +759,10 @@ async function main() {
     for (const p of phones.values()) {
       const fix = tracks[p.key].bySecond.get(sec);
       if (fix) p.onFix(fix, Math.max(0.2, 0.8 - T / 6000));
+      p.rest?.tick(T);
       p.publisher.tick();
     }
+    if (STOPPED_PHASE) shadowMoveOff(phones.get('car1'), tracks.car1.bySecond.get(sec), T, ctx);
     if (STOPPING) {
       phones.get('car1').judgeArrival();
       if (T >= 100 && !stopProbed) { stopProbed = true; await stopProbesBefore(phones, tripId).catch((e) => check('rules: stop probes before Leave', false, `threw: ${e.message}`)); }
@@ -792,6 +830,15 @@ async function runTimeline(ev, ctx) {
   } else if (ev.do === 'ok') {
     await p.ok(ctx.stopEvent.id);
     log(`${p.key} says OK`);
+  } else if (ev.do === 'weveStopped') {
+    ctx.stoppedWall = Date.now();
+    await p.weveStopped(ctx.stopEvent.id);
+    ctx.stopResolvedAt = clock.T;
+    log(`${p.key} (lead) says we've stopped: the request closes and the trip records the stop, in one batch`);
+  } else if (ev.do === 'continue') {
+    ctx.continueWall = Date.now();
+    await p.continueConvoy();
+    log(`${p.key} (lead) taps Continue`);
   } else if (ev.do === 'markStopped') {
     await p.markStopped(ctx.stopEvent.id);
     ctx.stopResolvedAt = clock.T;
@@ -800,6 +847,18 @@ async function runTimeline(ev, ctx) {
 }
 
 // ---------------------------------------------------------------- rules probes
+
+/** The lead car's move-off rule (ConvoyStop.MoveOff), fed car 1's fixes with the phase kept as if Continue had never been tapped. */
+function shadowMoveOff(car1, fix, T, ctx) {
+  if (!fix) return;
+  car1.moveOff ??= new MoveOff();
+  if (!car1.phaseSeen || fix.t < 0) return;
+  const rested = car1.moveOffRest ??= { from: null };
+  if (fix.speed < PARKED_SPEED) rested.from ??= { latitude: fix.latitude, longitude: fix.longitude };
+  if (car1.moveOff.check({ phase: car1.phaseSeen, here: fix, at: T, moving: fix.speed >= PARKED_SPEED }) && !ctx.moveOffAt) {
+    ctx.moveOffAt = { T, metres: haversine(rested.from, fix) };
+  }
+}
 
 async function rulesProbes(phones, tripId) {
   const car2 = phones.get('car2');
@@ -1098,6 +1157,102 @@ async function skipAndRebuild(ctx) {
     await again.commit();
     ctx.rb.batches = 2;
   }
+}
+
+/** The stopped scenario's probes and checks (D122, D124): the rules, the batch, low power at rest, Continue, full rate again. */
+function scheduleStoppedChecks({ phones, tripId, organizer }) {
+  const car = (k) => phones.get(k);
+  const keys = ['car1', 'car2', 'car3', 'car4'];
+  const tripRef = (p) => doc(p.db, `trips/${tripId}`);
+  const phaseFields = (p, eventId) => ({ stoppedAt: serverTimestamp(), stoppedBy: p.uid, stoppedEventId: eventId });
+  const fields = async () => { const t = (await getDoc(tripRef(organizer))).data(); return { at: t.stoppedAt, by: t.stoppedBy, event: t.stoppedEventId, status: t.status }; };
+  const inWindow = (p, from, to) => (p.writes ?? []).filter((w) => w.T >= from && w.T <= to);
+  const gaps = (ws) => ws.slice(1).map((w, i) => w.T - ws[i].T);
+  return [
+    {
+      at: STOPPED.stoppedAt - 8, name: 'rules: before We have stopped, a car that is not the lead car cannot start the phase',
+      async run(ctx) {
+        const asker = car('car3');
+        const id = ctx.stopEvent.id;
+        setLogLevel('silent');
+        // The asker may close its own request as stopped, but not start the phase: the batch is refused whole.
+        await refused('rules: the asker (not the lead car or organizer) cannot start the stopped phase in the batch', () => asker.weveStopped(id));
+        await refused('rules: a car cannot write the phase fields without closing the request as stopped', () => updateDoc(tripRef(car('car2')), phaseFields(car('car2'), id)));
+        setLogLevel('error');
+        const ev = (await getDoc(doc(asker.db, `trips/${tripId}/events/${id}`))).data();
+        const f = await fields();
+        check('the refused batch left the request open and the trip with no phase', ev.status !== 'closed' && f.at === undefined && f.by === undefined && f.event === undefined, JSON.stringify({ status: ev.status, ...f, at: f.at?.toMillis() }));
+      },
+    },
+    {
+      at: STOPPED.stoppedAt + 8, name: 'We have stopped',
+      async run(ctx) {
+        const f = await fields();
+        const lead = car('car1');
+        check('We have stopped: the trip records stoppedAt (server time), stoppedBy the lead car, stoppedEventId the request', f.at !== undefined && Math.abs(f.at.toMillis() - ctx.stoppedWall) <= 15_000 && f.by === lead.uid && f.event === ctx.stopEvent.id && f.status === 'active', JSON.stringify({ by: f.by, event: f.event, at: f.at?.toMillis(), wall: ctx.stoppedWall }));
+        const ev = (await getDoc(doc(organizer.db, `trips/${tripId}/events/${ctx.stopEvent.id}`))).data();
+        check('the same batch closed the request as stopped by the lead car', ev.status === 'closed' && ev.closedReason === 'stopped' && ev.closedBy === lead.uid, JSON.stringify({ status: ev.status, reason: ev.closedReason }));
+        setLogLevel('silent');
+        await refused('rules: a passenger car cannot end the phase', () => updateDoc(tripRef(car('car2')), { stoppedAt: deleteField(), stoppedBy: deleteField(), stoppedEventId: deleteField() }));
+        await refused('rules: a passenger car cannot change who stopped the convoy', () => updateDoc(tripRef(car('car3')), { stoppedBy: car('car3').uid }));
+        setLogLevel('error');
+        const after = await fields();
+        check('the phase is unchanged after the passengers\' attempts', after.at?.toMillis() === f.at.toMillis() && after.by === f.by && after.event === f.event, '');
+        // Every phone reads it from the trip doc (TripSession's listener) and starts its rest timer.
+        const seen = keys.filter((k) => car(k).phaseTrail?.some((x) => x.on));
+        check('all four phones read the phase from the trip', seen.length === 4, `seen by ${seen.join(', ')}`);
+      },
+    },
+    {
+      at: STOPPED.lowFrom, name: 'low power at rest',
+      async run() {
+        const low = keys.filter((k) => car(k).rest.low);
+        check('every parked car is in low power after 120 s at rest in the phase', low.length === 4, `low: ${low.join(', ')}; trail ${keys.map((k) => `${k} ${JSON.stringify(car(k).power?.map((x) => `${x.low ? 'low' : 'full'}@${x.T}`))}`).join(' ')}`);
+      },
+    },
+    {
+      at: STOPPED.lowTo + 1, name: 'heartbeats at rest',
+      async run() {
+        const positions = await readPositions(organizer, tripId);
+        for (const k of keys) {
+          const p = car(k);
+          const ws = inWindow(p, STOPPED.lowFrom, STOPPED.lowTo);
+          const g = gaps(ws);
+          const offsets = ws.map((w) => w.convoyOffset);
+          check(`${k}: at rest the heartbeat is a write every 45 s, never more than 50 (stale is 60), never under 40`, ws.length >= 2 && Math.max(...g) <= 50 && Math.min(...g) >= 40, `${ws.length} writes, gaps ${g.join(', ')} s`);
+          check(`${k}: holds its place at rest (within 5 m)`, ws.length > 0 && Math.max(...offsets) - Math.min(...offsets) <= 5, `${Math.min(...offsets).toFixed(1)}..${Math.max(...offsets).toFixed(1)} m`);
+          const pos = positions.get(p.carId);
+          const ageSeen = pos?.updatedAt ? ((Date.now() - pos.updatedAt.toMillis()) / 1000) * opts.speed : Infinity;
+          check(`${k}: the server's last position is fresh (under 60 scenario seconds old), so the convoy does not show it stale`, ageSeen < 60, `${ageSeen.toFixed(0)} s`);
+        }
+      },
+    },
+    {
+      at: STOPPED.resumeAt + 15, name: 'Continue',
+      async run(ctx) {
+        const f = await fields();
+        check('Continue: the trip has no stoppedAt, stoppedBy or stoppedEventId, and is still active', f.at === undefined && f.by === undefined && f.event === undefined && f.status === 'active', JSON.stringify({ ...f, at: undefined }));
+        const off = keys.map((k) => car(k).power?.findLast((x) => !x.low));
+        const quick = off.every((x, i) => x && x.wall >= ctx.continueWall && x.wall - ctx.continueWall <= 5_000 && !car(keys[i]).rest.low);
+        check('Continue: every phone sees it and leaves low power within 5 s', quick, off.map((x, i) => `${keys[i]} ${x ? x.wall - ctx.continueWall : 'never'} ms`).join(', '));
+        check('Continue: every phone\'s rest timer reads the phase as over', keys.every((k) => car(k).phaseTrail.at(-1).on === false), '');
+      },
+    },
+    {
+      at: STOPPED.duration - 5, name: 'full rate again',
+      async run(ctx) {
+        const from = STOPPED.resumeAt + 10;
+        for (const k of keys) {
+          const ws = inWindow(car(k), from, STOPPED.duration);
+          const g = gaps(ws);
+          check(`${k}: back to full rate after Continue (a write every 5 to 10 s, at least 12 in the last 75 s)`, ws.length >= 12 && Math.max(...g) <= 11, `${ws.length} writes, longest gap ${Math.max(...g)} s`);
+          check(`${k}: its position moves on again (the heartbeat was not just repeating the stop)`, ws.at(-1).convoyOffset - ws[0].convoyOffset > 500, `${(ws.at(-1).convoyOffset - ws[0].convoyOffset).toFixed(0)} m`);
+        }
+        const m = ctx.moveOffAt;
+        check('the lead car\'s move-off rule (ported) stays quiet at rest and fires 500 m past where it stood, once', Boolean(m) && m.T > STOPPED.resumeAt && m.metres > 500 && m.metres <= 530, m ? `at T=${m.T}, ${m.metres.toFixed(0)} m` : 'never fired');
+      },
+    },
+  ];
 }
 
 function scheduleRebuildChecks({ phones, tripId, organizer }) {
