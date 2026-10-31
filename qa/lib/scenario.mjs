@@ -116,7 +116,28 @@ export const REBUILD_CARS = [
   { key: 'car4', kind: 'main', name: 'Daniel’s City', displayName: 'Daniel', color: '#7C3AED', startOffset: 13_500, speed: 27.9, synthetic: true },
 ];
 
-export const SCENARIOS = ['drive', 'parked', 'stop', 'rebuild'];
+/**
+ * The stopped phase (D122/D124, `--scenario stopped` on convoy-sim.mjs): cars 1-4 drive 20 m/s from just behind each other
+ * and pull in at 6.1-6.2 km (car i 20 m short of car i-1: car 1 is parked about T=60, car 4 about T=117). Car 3 asks
+ * for fuel at T=40, cars 2 and 4 say OK, and at T=70 the lead car says We've stopped, as the app does: one batch that
+ * closes the request and writes stoppedAt/stoppedBy/stoppedEventId on the trip. The cars sit at rest (low power from
+ * 120 s on: a 45 s heartbeat), car 1 says Continue at T=345, and all four drive on at T=350. No phone, no `app` car.
+ * Synthetic tracks (stopAndGoTrack in lib/convoystop.mjs).
+ */
+export const STOPPED = { duration: 435, requestAt: 40, stoppedAt: 70, continueAt: 345, resumeAt: 350, lowFrom: 245, lowTo: 340 };
+const stoppedCar = (c, startOffset, parkAt) => ({ ...c, kind: 'main', startOffset, speed: 20, parkAt, resumeAt: STOPPED.resumeAt, synthetic: true });
+export const STOPPED_CARS = [
+  stoppedCar(CARS[0], 5000, 6200), stoppedCar(CARS[1], 4600, 6180), stoppedCar(CARS[2], 4200, 6160), stoppedCar(CARS[3], 3800, 6140),
+].map(({ mergeAt, ownCruise, mainSpeed, gap, phase, ...c }) => c);
+export const STOPPED_TIMELINE = [
+  { at: STOPPED.requestAt, car: 'car3', do: 'stopRequest', type: 'stopFuel', message: 'Low on fuel, next R&R please' },
+  { at: 50, car: 'car2', do: 'ok' },
+  { at: 55, car: 'car4', do: 'ok' },
+  { at: STOPPED.stoppedAt, car: 'car1', do: 'weveStopped' },
+  { at: STOPPED.continueAt, car: 'car1', do: 'continue' },
+];
+
+export const SCENARIOS = ['drive', 'parked', 'stop', 'rebuild', 'stopped'];
 
 /** The cars of a scenario: 'drive' (the default) or 'parked'. */
 export function scenarioCars(name = 'drive') {
@@ -124,11 +145,12 @@ export function scenarioCars(name = 'drive') {
   if (name === 'parked') return [...CARS.filter((c) => c.kind !== 'app'), ...PARKED_CARS];
   if (name === 'stop') return STOP_CARS;
   if (name === 'rebuild') return REBUILD_CARS;
+  if (name === 'stopped') return STOPPED_CARS;
   throw new Error(`unknown scenario ${name} (${SCENARIOS.join(' or ')})`);
 }
 
 /** The scripted happenings of a scenario. */
-export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : name === 'stop' || name === 'rebuild' ? [] : TIMELINE);
+export const scenarioTimeline = (name = 'drive') => (name === 'parked' ? PARKED_TIMELINE : name === 'stopped' ? STOPPED_TIMELINE : name === 'stop' || name === 'rebuild' ? [] : TIMELINE);
 
 /** The phone's track in a scenario. */
 export const appKey = (name = 'drive') => scenarioCars(name).find((c) => c.kind === 'app')?.key;
