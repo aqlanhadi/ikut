@@ -31,6 +31,8 @@ enum AXID {
     enum Debug {
         static let designDrillViews = "designDrill.views"
         static let designLanguage = "designLanguage"
+        static let liveActivityStart = "debug.liveActivity.start"
+        static let liveActivityStatus = "debug.liveActivity.status"
         static let settingsDesign = "settingsDesign"
         static let settingsName = "settingsName"
         static func sizes(_ name: String) -> String { "sizes.\(name)" }
