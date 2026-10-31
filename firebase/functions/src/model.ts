@@ -70,7 +70,7 @@ export type PlannedStopKind = "meet" | "fuel" | "food" | "rest" | "toilet" | "si
 
 /**
  * trips/{tripId}/stops/{stopId}: a place on the main route that cars arrive at and leave.
- * The organizer writes them before `startedAt`; afterwards only the skip fields, `arrivedAt` and the leave fields (`leftAt`, `leftBy`) change, each once.
+ * The organizer writes them before `startedAt`; afterwards only the skip fields, `arrivedAt` and the leave fields (`leftAt`, `leftBy`) change, each once, and the organizer can still change `minutes` on a stop that is open (D121).
  * A stop chosen mid-trip (D4) is meant to be a document of the same shape.
  */
 export interface PlannedStop {

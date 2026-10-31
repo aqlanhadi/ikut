@@ -862,10 +862,60 @@ describe('planned stops', () => {
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ order: 5 })));
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), skip({ routeOffset: 1 })));
     });
-    it('nothing but a skip can change', async () => {
+    it('nothing but a skip or the length can change', async () => {
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { order: 1 }));
       await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { name: 'Elsewhere' }));
-      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { minutes: 5 }));
+      await assertFails(updateDoc(doc(db('org'), stopPath('s1')), { kind: 'food' }));
+    });
+    describe('changing the length of a stop (D121)', () => {
+      const stay = (who, over = {}, id = 's1') => updateDoc(doc(db(who), stopPath(id)), { minutes: 30, ...over });
+      const seedOver = (over, id = 's1') => env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), stopPath(id)), over));
+      it('the organizer changes the length of an open stop', () => assertSucceeds(stay('org')));
+      it('the organizer can give a length to a stop that had none', () => assertSucceeds(stay('org', { minutes: 15 }, 's2')));
+      it('any whole number from 1 to 720 is allowed', async () => {
+        await assertSucceeds(stay('org', { minutes: 1 }));
+        await assertSucceeds(stay('org', { minutes: 720 }));
+      });
+      it('a length out of range or not a whole number is refused', async () => {
+        await assertFails(stay('org', { minutes: 0 }));
+        await assertFails(stay('org', { minutes: 721 }));
+        await assertFails(stay('org', { minutes: -5 }));
+        await assertFails(stay('org', { minutes: 12.5 }));
+        await assertFails(stay('org', { minutes: '30' }));
+        await assertFails(stay('org', { minutes: null }));
+      });
+      it('a member who is not the organizer, the lead car and a stranger cannot', async () => {
+        await assertFails(stay('mem'));
+        await assertFails(stay('lead'));
+        await assertFails(stay('stranger'));
+      });
+      it('a stop the convoy has left cannot change', async () => {
+        await seedOver({ leftAt: Timestamp.now(), leftBy: 'org' });
+        await assertFails(stay('org'));
+      });
+      it('a skipped stop cannot change', async () => {
+        await seedOver({ skipped: true, skippedBy: 'org', skippedAt: Timestamp.now() });
+        await assertFails(stay('org'));
+      });
+      it('the length can change after the lead car arrived', async () => {
+        await seedOver({ arrivedAt: Timestamp.now() });
+        await assertSucceeds(stay('org'));
+      });
+      it('a meeting point has no length to change', async () => {
+        await seedOver({ kind: 'meet', minutes: deleteField(), order: 0, meetAt: Timestamp.now() });
+        await assertFails(stay('org'));
+      });
+      it('nothing else can ride along', async () => {
+        await assertFails(stay('org', { order: 1 }));
+        await assertFails(stay('org', { routeOffset: 1 }));
+        await assertFails(stay('org', { arrivedAt: serverTimestamp() }));
+        await assertFails(stay('org', { skipped: true, skippedBy: 'org', skippedAt: serverTimestamp() }));
+      });
+      it('not on an ended trip', async () => {
+        await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { status: 'ended', endedAt: ts() }));
+        await assertFails(stay('org'));
+      });
     });
     it('no stop can be added or removed', async () => {
       await assertFails(setDoc(doc(db('org'), stopPath('s3')), stopDoc({ order: 2 })));

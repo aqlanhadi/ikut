@@ -21,6 +21,8 @@ struct StopArrivalCard: View {
     var skip: (@MainActor @Sendable (String, Bool) async -> StopLeave.Result)?
     /// The organizer skips the stop for everyone (D25 4b); the result of the write. Nil in demos.
     var skipAll: (@MainActor @Sendable (String) async -> StopLeave.Result)?
+    /// The organizer changes the stop's planned length (D121); the result of the write. Nil in demos.
+    var setStay: (@MainActor @Sendable (String, Int) async -> StopLeave.Result)?
     /// Listens to the stop's answers (live cards). The demo gives `initialAnswers` instead.
     var listensToAnswers = false
     var initialAnswers: [StopAnswer] = []
@@ -45,6 +47,9 @@ struct StopArrivalCard: View {
     @State private var skippingAll = false
     @State private var skipAllQueued = false
     @State private var couldNotSkipAll = false
+    @State private var settingStay = false
+    @State private var stayQueued = false
+    @State private var couldNotSetStay = false
 
     var body: some View {
         if let frozenNow {
@@ -74,6 +79,7 @@ struct StopArrivalCard: View {
                 }
                 skippingLines(tally, stop: stop)
                 leavingRow(stop)
+                stayRow(stop)
             } actions: {
                 leaveActions(stop, tally: tally)
                 skipActions(stop, skippers: skippers)
@@ -109,6 +115,45 @@ struct StopArrivalCard: View {
             .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier(AXID.Stop.arrivalLeavingAt)
+        }
+    }
+
+    /// "Stay · 20 min ▾" for the organizer on a stop still ahead: a menu of the usual lengths (and the stop's own).
+    /// Everyone else reads the length in the header and in "Leaving at".
+    @ViewBuilder private func stayRow(_ stop: PlannedStop) -> some View {
+        if StopStay.canEdit(stop, isOrganizer: isOrganizer), model.tripStarted {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack(spacing: Spacing.m) {
+                    Text("Stay").font(.body)
+                    Spacer(minLength: 0)
+                    StayMenu(minutes: stop.minutes, disabled: settingStay, emptyTitle: "Not set") { sendStay(stop, $0) }
+                }
+                .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.xs)
+                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                if stayQueued {
+                    Text("Sends when you have signal")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.stayQueued)
+                } else if couldNotSetStay {
+                    Text("That didn’t go through. Try again.")
+                        .font(.footnote).foregroundStyle(Color.surfaceSecondary).accessibilityIdentifier(AXID.Stop.stayRetry)
+                }
+            }
+        }
+    }
+
+    private func sendStay(_ stop: PlannedStop, _ minutes: Int) {
+        guard let setStay, let id = stop.id, !settingStay, StopStay.changed(stop, to: minutes) != nil else { return }
+        settingStay = true
+        couldNotSetStay = false
+        stayQueued = false
+        Task {
+            let result = await setStay(id, minutes)
+            settingStay = false
+            switch result {
+            case .sent: break
+            case .queued: stayQueued = true
+            case .refused: couldNotSetStay = true
+            }
         }
     }
 

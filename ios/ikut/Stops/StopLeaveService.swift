@@ -38,4 +38,14 @@ enum StopLeaveService {
         let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: tripId, stopId: stopId))
         return try await ServerWrite.commit { try await ref.updateData(payload) }
     }
+
+    /// The organizer changes how long a stop still ahead lasts (D121); the rules take only `minutes` here, once the
+    /// trip has started and while the stop is open. Everyone's "Leaving at" and "N min planned" follow from the
+    /// listener. Offline, the write stays queued and the call returns false.
+    @discardableResult
+    static func setStay(tripId: String, stopId: String, minutes: Int) async throws -> Bool {
+        nonisolated(unsafe) let payload: [String: Any] = ["minutes": minutes]
+        let ref = Firestore.firestore().document(FirestorePaths.stop(tripId: tripId, stopId: stopId))
+        return try await ServerWrite.commit { try await ref.updateData(payload) }
+    }
 }

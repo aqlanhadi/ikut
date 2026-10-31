@@ -72,6 +72,9 @@ struct StopRow: View {
     var failure: StopPlanner.Failure?
     var failed: Bool
     var onRetry: () -> Void
+    /// The organizer's way to change the stay (D121): a menu at the row's end. Nil for everyone else, on the meeting
+    /// point, on a stop already left or skipped, and while the route is being rebuilt.
+    var onStay: ((Int) -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -85,6 +88,9 @@ struct StopRow: View {
                     Text(failed ? StopFormat.detail(stop) : text.detail).font(.footnote).foregroundStyle(Color.surfaceSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                if let onStay {
+                    StayMenu(minutes: stop.minutes, onPick: onStay)
+                }
                 if editable {
                     Image(systemName: Symbol.reorder)
                         .foregroundStyle(Color.surfaceSecondary)
@@ -105,7 +111,7 @@ struct StopRow: View {
                     .padding(.leading, Self.noteIndent).padding(.bottom, Spacing.s)
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: onStay == nil ? .combine : .contain)
     }
 
     @ViewBuilder private var badge: some View {

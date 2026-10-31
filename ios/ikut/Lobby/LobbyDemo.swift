@@ -544,6 +544,8 @@ enum DemoScreens {
         case "road-leave": return AnyView(StopArrivalDemo(.leave))
         case "road-leave-confirm": return AnyView(StopArrivalDemo(.leaveConfirm))
         case "road-leave-other": return AnyView(StopArrivalDemo(.leaveOther))
+        case "road-stay": return AnyView(StopArrivalDemo(.stay))
+        case "road-stay-other": return AnyView(StopArrivalDemo(.stayOther))
         case "road-leave-meet": return AnyView(StopArrivalDemo(.leaveMeeting))
         case "road-skip": return AnyView(StopArrivalDemo(.skip))
         case "road-skip-mine": return AnyView(StopArrivalDemo(.skipMine))

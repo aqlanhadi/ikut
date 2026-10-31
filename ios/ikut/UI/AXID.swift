@@ -136,6 +136,9 @@ enum AXID {
         static let send = "stop.send"
         static let skip = "stop.skip"
         static let skipAll = "stop.skipAll"
+        static let stay = "stop.stay"
+        static let stayQueued = "stop.stay.queued"
+        static let stayRetry = "stop.stay.retry"
         static let skipAllCancel = "stop.skipAll.cancel"
         static let skipAllConfirm = "stop.skipAll.confirm"
         static let skipAllConfirmText = "stop.skipAll.confirm.text"
@@ -286,6 +289,9 @@ enum AXID {
         Stop.send,
         Stop.skip,
         Stop.skipAll,
+        Stop.stay,
+        Stop.stayQueued,
+        Stop.stayRetry,
         Stop.skipAllCancel,
         Stop.skipAllConfirm,
         Stop.skipAllConfirmText,

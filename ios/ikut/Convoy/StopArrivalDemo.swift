@@ -8,10 +8,11 @@ import SwiftUI
 /// car: three cars skipping read as a count, no button). With Leave, D25 4a: `road-leave` (lead car or organizer, "Leaving at 12:40"), `road-leave-confirm` (after tapping
 /// Leave), `road-leave-other` (another car: no button), `road-leave-meet` (meeting point, "Leaving at 9:00");
 /// Skip for everyone, D25 4b: `road-skip-all` (the organizer, no car at the stop yet: "Skip this stop"), `road-skip-all-confirm` (after tapping it), `road-skip-all-others` (a passenger: "Aqlan can skip this stop for everyone."), `road-skip-all-meet` (a meeting point: no skip, only Leave);
+/// The organizer's Stay menu on the card, D121: `road-stay` (the organizer: "Stay 20 min" with a menu under "Leaving at 12:40"), `road-stay-other` (a passenger: no menu, the length is only read);
 /// A car nobody shares location from, #231: `road-not-sharing` (listed, not counted);
 /// RoadStops.dc.html), over the demo convoy. The clock is fixed, so the cars never go stale while it is looked at.
 struct StopArrivalDemo: View {
-    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting, skip, skipMine, skipOthers, skipLead, skipAll, skipAllConfirm, skipAllOthers, skipAllMeeting, notSharing }
+    enum Scene { case someHere, allHere, meeting, leave, leaveConfirm, leaveOther, leaveMeeting, skip, skipMine, skipOthers, skipLead, skipAll, skipAllConfirm, skipAllOthers, skipAllMeeting, notSharing, stay, stayOther }
 
     var scene: Scene
     @State private var map: TripMapModel
@@ -55,7 +56,7 @@ struct StopArrivalDemo: View {
         case .skipAll, .skipAllConfirm, .skipAllOthers:
             positions = ["c1": fix(stopOffset - 9_000, joining: false), "c2": fix(stopOffset - 9_100, joining: false),
                          "c4": fix(stopOffset - 10_000, joining: false), "c3": fix(stopOffset - 12_000, joining: true)]
-        case .someHere, .notSharing, .leave, .leaveConfirm, .leaveOther, .skip, .skipMine, .skipOthers, .skipLead:
+        case .someHere, .notSharing, .stay, .stayOther, .leave, .leaveConfirm, .leaveOther, .skip, .skipMine, .skipOthers, .skipLead:
             positions = ["c1": fix(stopOffset, joining: false), "c2": fix(stopOffset - 80, joining: false),
                          "c4": fix(stopOffset - 4_000, joining: false), "c3": fix(stopOffset - 12_000, joining: true)]
         case .allHere:
@@ -73,7 +74,7 @@ struct StopArrivalDemo: View {
             kind: meets ? .meet : .fuel, minutes: meets ? nil : 20,
             meetAt: meets ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: now) : nil, order: 0)
         stop.id = "s1"
-        let leaveScene = [.leave, .leaveConfirm, .leaveOther, .leaveMeeting].contains(scene)
+        let leaveScene = [.leave, .leaveConfirm, .leaveOther, .leaveMeeting, .stay, .stayOther].contains(scene)
         // The lead car got there at 12:20; 20 planned minutes make "Leaving at 12:40".
         if leaveScene, !meets { stop.arrivedAt = Calendar.current.date(bySettingHour: 12, minute: 20, second: 0, of: now) }
         // c4 has nobody sharing location from it: listed "Not sharing location", outside the count.
@@ -81,7 +82,7 @@ struct StopArrivalDemo: View {
         model.setStops([stop])
         model.setCars(cars)
         model.tripStarted = leaveScene || [.skip, .skipMine, .skipOthers, .skipLead, .skipAll, .skipAllConfirm, .skipAllOthers, .skipAllMeeting].contains(scene)
-        let viewer = scene == .leaveOther || scene == .skipAllOthers ? "c2" : [.skip, .skipMine, .skipOthers].contains(scene) ? "c4" : "c1"
+        let viewer = scene == .leaveOther || scene == .stayOther || scene == .skipAllOthers ? "c2" : [.skip, .skipMine, .skipOthers].contains(scene) ? "c4" : "c1"
         model.apply(trip: nil, myCar: cars.first { $0.id == viewer }, myCarId: viewer, positions: positions, isTracker: true)
         return (model, "s1")
     }
@@ -90,7 +91,7 @@ struct StopArrivalDemo: View {
         ZStack(alignment: .bottom) {
             Color(.systemGray4).ignoresSafeArea()
             StopArrivalCard(
-                model: map, stopId: stopId, frozenNow: now, isOrganizer: ![.leaveOther, .skip, .skipMine, .skipOthers, .skipAllOthers].contains(scene), leave: nil,
+                model: map, stopId: stopId, frozenNow: now, isOrganizer: ![.leaveOther, .stayOther, .skip, .skipMine, .skipOthers, .skipAllOthers].contains(scene), leave: nil,
                 skip: nil, skipAll: nil, initialAnswers: answers, onClose: {}, startConfirming: scene == .leaveConfirm,
                 startConfirmingSkipAll: scene == .skipAllConfirm)
                 .padding(.horizontal, Spacing.s)

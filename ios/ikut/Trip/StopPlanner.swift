@@ -181,6 +181,18 @@ final class StopPlanner {
         rebuild()
     }
 
+    /// A new stay for one stop (D121): no route to rebuild, since the road does not change, so the list just shows it
+    /// at once while the caller writes `minutes` on its own. False while a rebuild is going or has failed (the
+    /// rebuild would save the old length over it), for the meeting point (it has no stay) and for a length the rules
+    /// refuse.
+    @discardableResult
+    func setStay(id: String, minutes: Int) -> Bool {
+        guard status == .saved, StopStay.isValid(minutes),
+              let index = items.firstIndex(where: { $0.id == id }), !items[index].isMeeting else { return false }
+        items[index].minutes = minutes
+        return true
+    }
+
     func remove(id: String) {
         guard items.contains(where: { $0.id == id }) else { return }
         items.removeAll { $0.id == id }

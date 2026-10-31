@@ -13,7 +13,7 @@ enum PlannedStopKind: String, Codable, Sendable, Equatable, CaseIterable {
 /// `trips/{tripId}/stops/{stopId}`: a place on the main route that cars arrive at and leave.
 ///
 /// The organizer writes them in the lobby, before `startedAt`, together with the route that goes
-/// through them; after the start only `skipped` (with `skippedBy`, `skippedAt`), `arrivedAt` and the leave fields change. The same
+/// through them; after the start only `skipped` (with `skippedBy`, `skippedAt`), `arrivedAt`, `minutes` (the organizer, D121) and the leave fields change. The same
 /// shape is meant for a stop chosen mid-trip (D4): a stop request would carry the id of one of
 /// these documents, and arrival and leave work on a stop whatever put it on the route.
 struct PlannedStop: Codable, Sendable, Equatable, Identifiable {

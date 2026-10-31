@@ -32,6 +32,7 @@
 		178973148E0EE42B411C79AC /* TripAskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66FF5396649ED8B58EC123A7 /* TripAskTests.swift */; };
 		17DA6727AB3AC3E5A87D2600 /* BackendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB0B6EE647875B8999B3F6F /* BackendTests.swift */; };
 		182F641F0D1FDCD38526AC70 /* ServerWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56BDE68F366CE545C453468B /* ServerWrite.swift */; };
+		184B3EE1BD29EBACF2156E84 /* StayMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8C676DFC86FE54FB7A604B /* StayMenu.swift */; };
 		1940A6D8FC37BFF48FFF1F6C /* RouteRebuildTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F301BBC2CC2CB8E8D89E2CF /* RouteRebuildTests.swift */; };
 		19EFCDBD9C810050CAC5F065 /* StopPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55067EC070E1EB3342E091A2 /* StopPlanner.swift */; };
 		1A45BEC679CB0662408243D8 /* PositionPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BB58A9FD28B315E822A8F2 /* PositionPublisher.swift */; };
@@ -60,6 +61,7 @@
 		2EB8598D20B54002BA5E917E /* OwnWayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01DEFBBB0C0EB62CCBCF7C6E /* OwnWayTests.swift */; };
 		2F95598DD8FDAA17D01B2DA1 /* YouTagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06B07E299123E0601E23DBDD /* YouTagTests.swift */; };
 		2FA7B4DE64C9B6F7D8315DB5 /* kl-ipoh-south.json in Resources */ = {isa = PBXBuildFile; fileRef = 2244F4B55239022AF10B572D /* kl-ipoh-south.json */; };
+		2FD7F4C95863E826E4007407 /* StopStay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781B2B025047017EAE703162 /* StopStay.swift */; };
 		303337D10340B4EF477BB00E /* StopService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85031A857FFEE9A7F7CEE986 /* StopService.swift */; };
 		315D376CEFE79F22BC03169D /* NewTripFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23FCA90E7E8D9F5A2A28D42C /* NewTripFlow.swift */; };
 		3238E7CD833C608EF250940E /* EventService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4374E90353623C476DD233DD /* EventService.swift */; };
@@ -89,6 +91,7 @@
 		43C7A32C2A143215D37D1AF2 /* CameraTourDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAF84B4D76AF2635109EAD53 /* CameraTourDemo.swift */; };
 		441D6445951053C29F1E89A0 /* ReportToastModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B897B8297B6CD8B5B2ED04 /* ReportToastModel.swift */; };
 		45BAED86337E8591BE1EEE93 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FD88D2E34D13FB464F448E3D /* PrivacyInfo.xcprivacy */; };
+		461CBEF8554440FEAB134F71 /* StopStayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4414D45359942F395A99AC24 /* StopStayTests.swift */; };
 		48A0796725D089ABD3E90FD1 /* LobbyStopsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D219AF64C8F12910D7096FED /* LobbyStopsViews.swift */; };
 		492C358B52A97BF1B786229D /* DesignSharedSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C32E0202EBC37910EABBD67 /* DesignSharedSection.swift */; };
 		497D57D6894689A82B8664C6 /* FollowGlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED21589D476E823056C68F4D /* FollowGlideTests.swift */; };
@@ -456,6 +459,7 @@
 		4374E90353623C476DD233DD /* EventService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventService.swift; sourceTree = "<group>"; };
 		43A631D9F08E4EC1DEDCEA38 /* ConvoySheetStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoySheetStateTests.swift; sourceTree = "<group>"; };
 		43ACD9F833E2DB5C669E7D3E /* HomeNowEmulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeNowEmulatorTests.swift; sourceTree = "<group>"; };
+		4414D45359942F395A99AC24 /* StopStayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopStayTests.swift; sourceTree = "<group>"; };
 		4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		456F6193440599A0317F386C /* TripExitMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripExitMenu.swift; sourceTree = "<group>"; };
 		4768AA5F7F13B94DAC71DBF4 /* HistoryDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDelete.swift; sourceTree = "<group>"; };
@@ -509,6 +513,7 @@
 		77791F51A29C0865B5076CFD /* TextContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContrastTests.swift; sourceTree = "<group>"; };
 		77EAE8F3DD34538653CD0A53 /* StopArrival.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrival.swift; sourceTree = "<group>"; };
 		7817F4C6CB269ADF3664EA9E /* RecapMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapMapView.swift; sourceTree = "<group>"; };
+		781B2B025047017EAE703162 /* StopStay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopStay.swift; sourceTree = "<group>"; };
 		7884FB4A0C113246FB01562C /* NewTripFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTripFlowTests.swift; sourceTree = "<group>"; };
 		78AF9425F9F284ADFB93DDEA /* LaunchRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchRoute.swift; sourceTree = "<group>"; };
 		78D453D6AC365CA4856EA9D2 /* CatchUpHeadsUp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatchUpHeadsUp.swift; sourceTree = "<group>"; };
@@ -633,6 +638,7 @@
 		DC0271B715040D99DB4103D4 /* TripsHomeView+Demo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TripsHomeView+Demo.swift"; sourceTree = "<group>"; };
 		DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardLogic.swift; sourceTree = "<group>"; };
 		DE0DD61BCABA3D8EADF2ABE6 /* PlacesAlongTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesAlongTests.swift; sourceTree = "<group>"; };
+		DE8C676DFC86FE54FB7A604B /* StayMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StayMenu.swift; sourceTree = "<group>"; };
 		E00D2E21B9C9E2428BB8B757 /* RecapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapContent.swift; sourceTree = "<group>"; };
 		E047C4D86365E2C469F00DA8 /* ikut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ikut.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E0CBCC67DC1C481AA5F5CA5A /* ReportToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportToastView.swift; sourceTree = "<group>"; };
@@ -1053,6 +1059,7 @@
 		D75868DAA8171C1E85F5A772 /* Stops */ = {
 			isa = PBXGroup;
 			children = (
+				DE8C676DFC86FE54FB7A604B /* StayMenu.swift */,
 				7EB09C76879DEECF2EC83A0D /* StopAnswerService.swift */,
 				ED5C0A6F59D04C932E39B764 /* StopArrivalCard.swift */,
 				0C1B7CE38A043F2B0EBAC9A5 /* StopAskModel.swift */,
@@ -1067,6 +1074,7 @@
 				1DE38EDF4446EB6024A65E6A /* StopPillView.swift */,
 				6E9FECDF460E58D501376FA8 /* StopPlaces.swift */,
 				85031A857FFEE9A7F7CEE986 /* StopService.swift */,
+				781B2B025047017EAE703162 /* StopStay.swift */,
 			);
 			path = Stops;
 			sourceTree = "<group>";
@@ -1150,6 +1158,7 @@
 				85C199021086844F76B783FE /* StopOurSideTests.swift */,
 				13A17502ECF89C7385935BA5 /* StopRouteTests.swift */,
 				2B3A6F9768498485D37D581A /* StopSkipAllTests.swift */,
+				4414D45359942F395A99AC24 /* StopStayTests.swift */,
 				644401FB5F0CAB8C10EF3B3B /* StopTests.swift */,
 				99B57D9F42E46F04ABDC9F7C /* SuggestStopsSheetTests.swift */,
 				384006EAE2516E1932D44513 /* SymbolTests.swift */,
@@ -1596,6 +1605,7 @@
 				5120D81232DF1D6218DB0AF9 /* SheetChrome.swift in Sources */,
 				32DBAEAD7E043F2ACB981C6F /* SheetStops.swift in Sources */,
 				7EB16AC882C383870E93B612 /* SpeechQueue.swift in Sources */,
+				184B3EE1BD29EBACF2156E84 /* StayMenu.swift in Sources */,
 				843411F16EA0BC70B57A05EB /* StopAnswer.swift in Sources */,
 				5C5315B337B1E03783D95E49 /* StopAnswerService.swift in Sources */,
 				4CDFCFA89CBE14EB3CE2D9F7 /* StopApproach.swift in Sources */,
@@ -1621,6 +1631,7 @@
 				4C2FA06DB04BD4142B933300 /* StopRouting.swift in Sources */,
 				303337D10340B4EF477BB00E /* StopService.swift in Sources */,
 				E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */,
+				2FD7F4C95863E826E4007407 /* StopStay.swift in Sources */,
 				2978ECA93E41D961DDB2B7CD /* SuggestStops.swift in Sources */,
 				AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */,
 				173EBAB26CACA9FC97787DDD /* Symbol.swift in Sources */,
@@ -1749,6 +1760,7 @@
 				D823810299EDCF93BD262452 /* StopOurSideTests.swift in Sources */,
 				7071413ED6DCCA15A288B693 /* StopRouteTests.swift in Sources */,
 				3AD9AEB8B316FD22E3E27B49 /* StopSkipAllTests.swift in Sources */,
+				461CBEF8554440FEAB134F71 /* StopStayTests.swift in Sources */,
 				4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */,
 				40BC71734DC98A8BB57D4D52 /* SuggestStopsSheetTests.swift in Sources */,
 				5154B6F0F7D17F6C6A153092 /* SymbolTests.swift in Sources */,

@@ -10,6 +10,7 @@ enum Symbol {
     static let forward = "chevron.right"
     static let expandUp = "chevron.up"
     static let next = "arrow.right"
+    static let chevronUpDown = "chevron.up.chevron.down"
     static let tick = "checkmark"
     static let tickCircle = "checkmark.circle"
     static let share = "square.and.arrow.up"
@@ -96,6 +97,7 @@ enum Symbol {
         forward,
         expandUp,
         next,
+        chevronUpDown,
         tick,
         tickCircle,
         share,
