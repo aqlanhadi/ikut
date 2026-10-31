@@ -212,6 +212,8 @@ enum AXID {
         Convoy.summary,
         Debug.designDrillViews,
         Debug.designLanguage,
+        Debug.liveActivityStart,
+        Debug.liveActivityStatus,
         Debug.settingsDesign,
         Debug.settingsName,
         Home.join,
