@@ -11,6 +11,8 @@ struct LocationFix: Sendable, Equatable {
     /// Degrees clockwise from north; negative when CoreLocation has no valid course.
     var course: Double
     var timestamp: Date
+    /// Radius of uncertainty in meters (CoreLocation's `horizontalAccuracy`); 0 when not known (fakes, old callers).
+    var horizontalAccuracy: Double = 0
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -52,10 +54,17 @@ protocol TrackingClock: AnyObject {
 
 @MainActor
 final class SystemTrackingClock: TrackingClock {
-    var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+    /// Seconds on the continuous clock, which keeps counting while the phone sleeps (`systemUptime` does not, and
+    /// would stretch the 45 s heartbeat across a sleep).
+    private let origin = ContinuousClock.now
+
+    var now: TimeInterval {
+        let d = origin.duration(to: .now)
+        return Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18
+    }
 
     func sleep(until deadline: TimeInterval) async throws {
-        try await Task.sleep(for: .seconds(max(0, deadline - now)))
+        try await Task.sleep(for: .seconds(max(0, deadline - now)), clock: .continuous)
     }
 }
 

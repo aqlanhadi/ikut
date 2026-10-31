@@ -130,7 +130,10 @@ final class PositionPublisher {
         inFlight = false
         guard !stopped else { return }
         // Retry the failed position later unless a newer one has replaced it.
-        if failed { dirty = true }
+        if failed {
+            dirty = true
+            urgent = true  // a failed heartbeat is retried after `minInterval`, not after another heartbeat
+        }
         evaluate()
     }
 

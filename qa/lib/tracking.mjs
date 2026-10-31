@@ -86,7 +86,7 @@ export const DEFAULT_TIMING = { minInterval: 5, movingInterval: 10, heartbeatInt
  */
 export class PositionPublisher {
   /** @param write async (position) => void   @param now () => seconds on the scenario clock */
-  constructor({ write, now, timing = DEFAULT_TIMING }) {
+  constructor({ write, now, timing = DEFAULT_TIMING, refresh = null }) {
     this.write = write;
     this.now = now;
     this.timing = timing;
@@ -98,6 +98,8 @@ export class PositionPublisher {
     this.stopped = false;
     this.lowPower = false;
     this.urgent = true;
+    /** (position) => position: what changes without a fix (the battery), applied to a heartbeat re-write. */
+    this.refresh = refresh;
   }
 
   /** `urgent: false` is a fix that shows nothing new while in low power (D124): it waits for the heartbeat. */
@@ -145,6 +147,7 @@ export class PositionPublisher {
   }
 
   #send(position, now) {
+    if (!this.dirty && this.refresh) position = this.refresh(position);
     this.urgent = false;
     this.inFlight = true;
     this.dirty = false;
@@ -159,7 +162,10 @@ export class PositionPublisher {
   #finished(failed) {
     this.inFlight = false;
     if (this.stopped) return;
-    if (failed) this.dirty = true;
+    if (failed) {
+      this.dirty = true;
+      this.urgent = true; // a failed heartbeat is retried after minInterval, not another heartbeat
+    }
     this.evaluate();
   }
 }

@@ -14,6 +14,8 @@ protocol TrackingControlling: AnyObject {
     func stop()
     /// The convoy is stopped (or not): a car at rest then tracks in low power (D124).
     func setConvoyStopped(_ stopped: Bool)
+    /// Called with true when the car drops to low power (at rest in a stopped phase) and false when it leaves it.
+    var onPowerChange: ((Bool) -> Void)? { get set }
 }
 
 extension TrackingService: TrackingControlling {}
@@ -26,6 +28,10 @@ extension TrackingControlling {
     }
     func firstFix() async -> LocationFix? { nil }
     func setConvoyStopped(_ stopped: Bool) {}
+    var onPowerChange: ((Bool) -> Void)? {
+        get { nil }
+        set {}
+    }
 }
 
 /// What `TripSession` needs from `CarRouteService`; tests substitute a fake.

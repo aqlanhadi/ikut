@@ -22,10 +22,13 @@ final class TrackingService {
     /// The convoy is stopped (D124), as `TripSession` last said. Kept across a restart of tracking.
     private(set) var convoyStopped = false
     /// Low power is on: this car has been at rest through a stopped phase.
-    private(set) var power: TrackingPower = .full
+    private(set) var power: TrackingPower = .full {
+        didSet { if power != oldValue { onPowerChange?(power == .low) } }
+    }
+    /// Called on the main actor when the power changes: true for low power.
+    var onPowerChange: ((Bool) -> Void)?
     /// Where the car last was at rest, and since when (the clock's time); the settle timer runs from it.
     private var restAnchor: CLLocationCoordinate2D?
-    private var restSince: TimeInterval = 0
     private var restTask: Task<Void, Never>?
     /// Called on the main actor with every fix that was published, after the position is built.
     var onFix: ((LocationFix) -> Void)?
@@ -115,7 +118,10 @@ final class TrackingService {
         self.builder = builder
         // Before a stopped phase the anchor just follows the car, so it begins where the car is when the phase does.
         if !convoyStopped { restAnchor = fix.coordinate }
-        let moved = convoyStopped && noteMovement(of: fix)
+        let movement: Movement = convoyStopped ? noteMovement(of: fix) : .rest
+        // A far but inaccurate fix in low power (a cell tower jump) is neither a move nor a place to publish.
+        if movement == .doubtful, power == .low { return }
+        let moved = movement == .moved
         publisher.submit(position, urgent: power == .full || moved)
         if moved, power == .low { setPower(.full) }
         onFix?(fix)
@@ -142,29 +148,34 @@ final class TrackingService {
         }
     }
 
-    /// True when the fix shows the car is moving (a valid speed over `parkedSpeed`, the same speed `MoveOff` reads) or
-    /// is more than `restRadius` from where it rested; the place and the settle timer then start afresh from it.
-    private func noteMovement(of fix: LocationFix) -> Bool {
+    private enum Movement { case rest, moved, doubtful }
+
+    /// `moved` when the fix shows the car is moving (a valid speed at or over `parkedSpeed`, the speed `MoveOff` reads)
+    /// or is surely more than `restRadius` from where it rested (its distance minus its accuracy); the place and the
+    /// settle timer then start afresh from it. `doubtful` when it is more than `restRadius` away but too inaccurate to
+    /// tell. Otherwise `rest`.
+    private func noteMovement(of fix: LocationFix) -> Movement {
         let speeding = fix.speed >= ConvoyOrdering.Config.default.parkedSpeed
         let here = fix.coordinate
-        if let anchor = restAnchor, !speeding {
+        guard let anchor = restAnchor else {
+            restAnchor = here
+            return speeding ? .moved : .rest
+        }
+        if !speeding {
             let d = CLLocation(latitude: anchor.latitude, longitude: anchor.longitude)
                 .distance(from: CLLocation(latitude: here.latitude, longitude: here.longitude))
-            if d <= Self.restRadius { return false }
-        } else if restAnchor == nil, !speeding {
-            restAnchor = here
-            return false
+            if d <= Self.restRadius { return .rest }
+            if d - max(fix.horizontalAccuracy, 0) <= Self.restRadius { return .doubtful }
         }
         restAnchor = here
         if power == .full { armRestTimer() }
-        return true
+        return .moved
     }
 
     /// Drops to low power after `settleTime` without a moving fix; a fix that moved re-arms it.
     private func armRestTimer() {
         restTask?.cancel()
-        restSince = clock.now
-        let deadline = restSince + Self.settleTime
+        let deadline = clock.now + Self.settleTime
         let current = generation
         restTask = Task { [clock] in
             do { try await clock.sleep(until: deadline) } catch { return }
