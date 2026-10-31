@@ -4,6 +4,10 @@
 //   RestTracker           <- ios/ikut/Tracking/TrackingService.swift    (handle, noteMovement, armRestTimer: low power after
 //                                                                        120 s at rest in a stopped phase, full on a move)
 //
+// Not ported: the Swift `doubtful` case (a far but inaccurate fix in low power is ignored; here such a fix counts as moved,
+// the scenario's fixes carry no accuracy), and MoveOff's freshness check on the fix (TripSession uses a strict `>` on a fresh
+// fix, `shadowMoveOff` here takes `speed >=`).
+//
 // Time is in seconds on the scenario clock (`at`); a trip's `stoppedAt` is in the same unit here.
 
 import { haversine } from './route.mjs';

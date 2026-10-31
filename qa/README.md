@@ -39,7 +39,7 @@ location, and the lobby's button turns to Show map), and feed it the track with 
   so a killed run never leaves it held. Wrap other screen-driving commands the same way:
   `qa/simlock.sh <udid> -- xcodebuild test … -only-testing:ikutUITests/CreateTripUITests`.
 
-- **Don't run `convoy-sim --scenario stop` next to a `with-rules` or rule-mutant run on :8080.** Both use the shared
+- **Don't run `convoy-sim --scenario stop` (or `stopped`) next to a `with-rules` or rule-mutant run on :8080.** Both use the shared
   emulator: a swapped rules file makes the stop scenario's writes fail or its positions read stale, and its
   FAIL then says nothing about the app (two false FAILs came that way in D25 3b). Run it with the emulator
   otherwise idle, or put its rules in with `tools/with-rules.mjs <worktree> -- node qa/convoy-sim.mjs --scenario stop`.
@@ -97,7 +97,7 @@ What it checks, in order (each phone step prints `QA CHECK: PASS|FAIL`, the scri
    stop button shows the stop with a badge (the card does not open by itself) and the pill asks for an OK; A taps OK on the pill, cars 3 and 4 say OK, A opens the stop from the
    Pit stop button (four OKs, the message in full) and taps We've stopped, B's button shows 4 of 4 OK and then both buttons are Pit stop again. The script checks the event (message, no
    place, `expiresAt` 30 minutes after `createdAt`), A's vote and the close (`status closed`, `closedReason stopped`).
-   D123: the same We've stopped starts the stopped phase, so both phones show the Stopped banner (A with Continue, B without), the script checks the trip holds `stoppedAt`, `stoppedBy` and `stoppedEventId`, A taps Continue and the banner clears on both phones and the three fields are gone. These are their own steps (6b on A, 7b on B) after the stop step, so a flake of the stop step (Q26) stops the run there and is reported as that step.
+   D123: the same We've stopped starts the stopped phase, so both phones show the Stopped banner (A with Continue, B without), the script checks the trip holds `stoppedAt`, `stoppedBy` and `stoppedEventId`, A taps Continue and the banner clears on both phones and the three fields are gone. These are their own steps (6b on A, 7b on B) after the stop step, so a flake of the stop step (Q26) stops the run there and is reported as that step. Step 6b must finish within about 80 s of We've stopped: A's phone drives at 90 km/h and the phase ends by itself once the lead car is 2 km from where it first stopped, which would make A's Continue tap fail (D123, decision 693).
 6. B goes back to the lobby and pauses sharing: A's row 2 reads "Paused", `pausedAt` is set; Resume clears both.
 7. B leaves the trip: its car disappears from A's list (memberCleanup deletes it). B rejoins as car 5, A ends the trip from
    the map menu and lands on the recap, B's lobby says "Trip ended", the trip doc is `ended`.

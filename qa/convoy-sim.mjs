@@ -28,6 +28,10 @@
 //  10. With --scenario rebuild (D25 4d), the organizer skips a town stop off the highway for everyone and rebuilds the route
 //      through the stops ahead in one batch; the cars follow it. See qa/README.md, *The drive*.
 //
+//  11. With --scenario stopped (D123), the lead car says We've stopped (the app's batch: closes the request and writes the
+//      trip's stoppedAt/stoppedBy/stoppedEventId), the parked cars drop to low power and keep a 45 s heartbeat, then Continue
+//      ends the phase and the cars drive on. See qa/README.md, *The drive*.
+//
 // Source of each piece of logic is cited in lib/route.mjs and lib/tracking.mjs.
 //
 // Speed: without a phone (no --wait-app) it plays at 10x by default, slowing to 2x for car 2's signal drop, the one
@@ -104,7 +108,7 @@ if (opts.help) {
   --deadline S      stop with RESULT: ABORT after S seconds (default: the wait, the scenario at --speed, and 300)
   --expect-app-ok   check that the phone's car said OK to the stop request (the UI test taps OK)
   --end-trip        end the trip when the scenario finishes (default: leave it active)
-  --scenario S      drive (default), parked (car 6 and the phone parked on the route far ahead, D26) stop (the cars pull in at a planned stop, D25) or rebuild (a skipped town stop rebuilds the route, D25 4d)
+  --scenario S      drive (default), parked (car 6 and the phone parked on the route far ahead, D26) stop (the cars pull in at a planned stop, D25), stopped (We've stopped, then Continue, D123) or rebuild (a skipped town stop rebuilds the route, D25 4d)
   --setup-only      create the trip and cars, print the code, write positions as a heartbeat and wait (Ctrl-C to stop)
   --host H          emulator host (default 127.0.0.1)
   --state-file F    JSON with code, tripId and phase, for scripts (default $TMPDIR/ikut-qa/state.json)
