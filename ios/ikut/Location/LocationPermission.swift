@@ -26,6 +26,9 @@ final class LocationPermission {
     @ObservationIgnored private let delegate = Delegate()
     @ObservationIgnored private var waiter: Waiter?
     @ObservationIgnored private var sawPrompt = false
+    /// How long a request may wait with the status still undecided before the caller goes on anyway (Q31: iOS can
+    /// show no prompt at all, e.g. right after a reinstall, and the join sheet sat on "Asking" for good).
+    @ObservationIgnored var noAnswerLimit: Duration = .seconds(10)
     @ObservationIgnored nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
     init() {
@@ -108,7 +111,7 @@ final class LocationPermission {
     }
 
     /// Suspends until the status satisfies `until`, the prompt is dismissed, or iOS shows no prompt.
-    private func awaitAnswer(until: @escaping (Status) -> Bool, request: () -> Void) async {
+    func awaitAnswer(until: @escaping (Status) -> Bool, request: () -> Void) async {
         finishWait()
         sawPrompt = false
         await withCheckedContinuation { continuation in
@@ -123,7 +126,12 @@ final class LocationPermission {
                 try? await Task.sleep(for: .seconds(1))
                 guard self.waiter === waiter, !sawPrompt else { return }
                 refresh()
-                if self.waiter === waiter, status != .notDetermined { finishWait() }
+                if self.waiter === waiter, status != .notDetermined { finishWait(); return }
+                // Still undecided: a prompt may be up (a person reading it), but never wait for good.
+                try? await Task.sleep(for: noAnswerLimit)
+                guard self.waiter === waiter else { return }
+                refresh()
+                finishWait()
             }
         }
     }
