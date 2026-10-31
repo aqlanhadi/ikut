@@ -25,8 +25,26 @@ final class CoreLocationSource: LocationSource {
         manager.showsBackgroundLocationIndicator = true
     }
 
+    /// Low power (D124): a car at rest in a stopped convoy. A coarser accuracy (100 m) and a fix only after 100 m of
+    /// movement, so the system can leave the GPS chip off and a parked car gets almost no fixes (iOS may still use GPS
+    /// when it is the only source, so the saving is not guaranteed). Not 3 km: that is one cell tower and would hide a
+    /// drive-off for minutes. A drive-off is caught by a fix with a valid speed, or once a fix's distance minus its
+    /// accuracy passes 100 m (often the second or third fix, so some tens of seconds at 36 km/h); either puts tracking
+    /// back to full. The activity type stays automotive.
+    func setPower(_ power: TrackingPower) {
+        switch power {
+        case .full:
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.distanceFilter = 50
+        case .low:
+            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            manager.distanceFilter = 100
+        }
+    }
+
     func start(onFix: @escaping @Sendable (LocationFix) -> Void) {
         delegate.onFix = onFix
+        setPower(.full)
         session = CLBackgroundActivitySession()
         manager.startUpdatingLocation()
     }
@@ -47,7 +65,8 @@ final class CoreLocationSource: LocationSource {
             for l in locations where l.horizontalAccuracy >= 0 && -l.timestamp.timeIntervalSinceNow <= CoreLocationSource.maxFixAge {
                 onFix(LocationFix(
                     latitude: l.coordinate.latitude, longitude: l.coordinate.longitude,
-                    speed: l.speed, course: l.course, timestamp: l.timestamp))
+                    speed: l.speed, course: l.course, timestamp: l.timestamp,
+                    horizontalAccuracy: l.horizontalAccuracy))
             }
         }
 

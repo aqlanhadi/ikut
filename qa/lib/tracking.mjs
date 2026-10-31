@@ -76,7 +76,7 @@ export class PositionBuilder {
 
 // ---------------------------------------------------------------- PositionPublisher
 
-export const DEFAULT_TIMING = { minInterval: 5, movingInterval: 10, heartbeatInterval: 30, movingSpeed: 1 };
+export const DEFAULT_TIMING = { minInterval: 5, movingInterval: 10, heartbeatInterval: 30, lowHeartbeatInterval: 45, movingSpeed: 1 };
 
 /**
  * Decides when positions are written. Same state machine as the Swift class:
@@ -86,7 +86,7 @@ export const DEFAULT_TIMING = { minInterval: 5, movingInterval: 10, heartbeatInt
  */
 export class PositionPublisher {
   /** @param write async (position) => void   @param now () => seconds on the scenario clock */
-  constructor({ write, now, timing = DEFAULT_TIMING }) {
+  constructor({ write, now, timing = DEFAULT_TIMING, refresh = null }) {
     this.write = write;
     this.now = now;
     this.timing = timing;
@@ -96,12 +96,25 @@ export class PositionPublisher {
     this.inFlight = false;
     this.writeCount = 0;
     this.stopped = false;
+    this.lowPower = false;
+    this.urgent = true;
+    /** (position) => position: what changes without a fix (the battery), applied to a heartbeat re-write. */
+    this.refresh = refresh;
   }
 
-  submit(position) {
+  /** `urgent: false` is a fix that shows nothing new while in low power (D124): it waits for the heartbeat. */
+  submit(position, { urgent = true } = {}) {
     if (this.stopped) return;
     this.latest = position;
+    this.urgent = (this.dirty && this.urgent) || urgent;
     this.dirty = true;
+    this.evaluate();
+  }
+
+  /** The convoy is stopped and this car at rest (D124): slow heartbeat. */
+  setLowPower(on) {
+    if (on === this.lowPower) return;
+    this.lowPower = on;
     this.evaluate();
   }
 
@@ -120,7 +133,9 @@ export class PositionPublisher {
     let due;
     if (this.lastSendAt !== null) {
       if (this.dirty) {
-        due = this.lastSendAt + this.timing.minInterval;
+        due = this.lastSendAt + (this.lowPower && !this.urgent ? this.timing.lowHeartbeatInterval : this.timing.minInterval);
+      } else if (this.lowPower) {
+        due = this.lastSendAt + this.timing.lowHeartbeatInterval;
       } else {
         const moving = this.latest.speed >= this.timing.movingSpeed;
         due = this.lastSendAt + (moving ? this.timing.movingInterval : this.timing.heartbeatInterval);
@@ -132,6 +147,8 @@ export class PositionPublisher {
   }
 
   #send(position, now) {
+    if (!this.dirty && this.refresh) position = this.refresh(position);
+    this.urgent = false;
     this.inFlight = true;
     this.dirty = false;
     this.lastSendAt = now;
@@ -145,7 +162,10 @@ export class PositionPublisher {
   #finished(failed) {
     this.inFlight = false;
     if (this.stopped) return;
-    if (failed) this.dirty = true;
+    if (failed) {
+      this.dirty = true;
+      this.urgent = true; // a failed heartbeat is retried after minInterval, not another heartbeat
+    }
     this.evaluate();
   }
 }

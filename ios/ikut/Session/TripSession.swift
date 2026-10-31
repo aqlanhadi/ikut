@@ -55,6 +55,9 @@ final class TripSession {
     /// The convoy has stopped (We’ve stopped) and nobody has tapped Continue yet: the one value the tracking layer
     /// reads to save battery while stopped (D124).
     var convoyStopped: Bool { convoyStop != nil }
+    /// This phone's own tracker is at rest in a stopped phase and in low power (D124): the one value the screen reads to
+    /// let the phone sleep. False for a phone with no tracker, or a car still driving in.
+    var trackerAtRest: Bool { duty.isLowPower }
     /// This phone tracks the lead car.
     var isLeadTracker: Bool { !userId.isEmpty && car?.isLead == true && car?.trackerUserId == userId }
     /// May tap Continue (and starts the phase with We’ve stopped): the lead car's tracker or the organizer.
@@ -100,6 +103,7 @@ final class TripSession {
     /// Set the instant this user pauses, before the write lands; cleared on resume or losing tracker duty.
     private var localPausedAt: Date?
     @ObservationIgnored private let clock: () -> Date
+    @ObservationIgnored private let stopResumer: @MainActor (String) async throws -> Void
     @ObservationIgnored private let pauseWriter: PauseWriter?
     @ObservationIgnored private let leaveWriter: LeaveWriter?
     @ObservationIgnored private var expiryTask: Task<Void, Never>?
@@ -131,8 +135,10 @@ final class TripSession {
         clock: @escaping () -> Date = { Date() },
         pauseWriter: PauseWriter? = nil,
         leaveWriter: LeaveWriter? = nil,
-        restDelay: Duration = .seconds(1)
+        restDelay: Duration = .seconds(1),
+        stopResumer: @escaping @MainActor (String) async throws -> Void = { _ = try await ConvoyStopService.resume(tripId: $0) }
     ) {
+        self.stopResumer = stopResumer
         self.restDelay = restDelay
         self.leaveWriter = leaveWriter
         self.clock = clock
@@ -462,7 +468,7 @@ final class TripSession {
     /// Continue: ends the stopped phase for everyone (lead car's tracker or organizer; the rules refuse anyone else).
     func continueConvoy() async throws {
         guard trip?.stoppedAt != nil else { return }
-        try await ConvoyStopService.resume(tripId: tripId)
+        try await stopResumer(tripId)
     }
 
     /// Follows the trip's stopped phase: the value, its 90-minute end, and on the lead car's phone the 500 m move-off.
@@ -474,6 +480,7 @@ final class TripSession {
         let current = ConvoyStop.current(trip, now: now)
         if current != convoyStop {
             convoyStop = current
+            duty.setConvoyStopped(current != nil)
             stopCapTask?.cancel()
             if let since = current?.since {
                 let delay = ConvoyStop.endsAt(since).timeIntervalSince(now)
@@ -527,8 +534,9 @@ final class TripSession {
     /// Test seam: feeds the state the listeners would, without Firestore.
     func applyForTesting(
         trip: Trip?, member: Member?, car: Car?, stops: [PlannedStop] = [], skipsMeetingPoint: Bool = false,
-        cars: [Car] = [], members: [Member] = []
+        cars: [Car] = [], members: [Member] = [], positions: [String: Position]? = nil
     ) {
+        if let positions { self.positions = positions }
         self.cars = cars
         self.members = members
         self.trip = trip

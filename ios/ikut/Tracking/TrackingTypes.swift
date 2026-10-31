@@ -11,10 +11,18 @@ struct LocationFix: Sendable, Equatable {
     /// Degrees clockwise from north; negative when CoreLocation has no valid course.
     var course: Double
     var timestamp: Date
+    /// Radius of uncertainty in meters (CoreLocation's `horizontalAccuracy`); 0 when not known (fakes, old callers).
+    var horizontalAccuracy: Double = 0
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
+}
+
+/// How hard the location source works (D124): `low` while the convoy is stopped and this car is at rest.
+enum TrackingPower: Sendable, Equatable {
+    case full
+    case low
 }
 
 /// Source of location fixes. `stop()` must stop delivering fixes immediately.
@@ -22,6 +30,12 @@ struct LocationFix: Sendable, Equatable {
 protocol LocationSource: AnyObject {
     func start(onFix: @escaping @Sendable (LocationFix) -> Void)
     func stop()
+    /// Switches between full accuracy and the low-power mode of a car at rest. A source that has one mode ignores it.
+    func setPower(_ power: TrackingPower)
+}
+
+extension LocationSource {
+    func setPower(_ power: TrackingPower) {}
 }
 
 /// Writes a car's latest position, resolving once the write is acknowledged by the server.
@@ -40,10 +54,17 @@ protocol TrackingClock: AnyObject {
 
 @MainActor
 final class SystemTrackingClock: TrackingClock {
-    var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+    /// Seconds on the continuous clock, which keeps counting while the phone sleeps (`systemUptime` does not, and
+    /// would stretch the 45 s heartbeat across a sleep).
+    private let origin = ContinuousClock.now
+
+    var now: TimeInterval {
+        let d = origin.duration(to: .now)
+        return Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18
+    }
 
     func sleep(until deadline: TimeInterval) async throws {
-        try await Task.sleep(for: .seconds(max(0, deadline - now)))
+        try await Task.sleep(for: .seconds(max(0, deadline - now)), clock: .continuous)
     }
 }
 

@@ -72,7 +72,9 @@ enum TripAskPlanner {
     static let settle: Duration = .milliseconds(700)
 }
 
-/// Keeps the screen from sleeping only while the trip map is up for a running trip, with the app in front.
+/// Keeps the screen from sleeping only while the trip map is up for a running trip, with the app in front, and not
+/// while this car's tracker is at rest in a stopped convoy (D124): a parked car's phone may sleep and tracking carries
+/// on in the background. A car still driving in, and a phone with no tracker, keep the screen on.
 @MainActor
 final class ScreenAwake {
     private let setIdleTimerDisabled: @MainActor (Bool) -> Void
@@ -86,13 +88,16 @@ final class ScreenAwake {
     /// keeps that answer.
     static func preference(answered: Bool, stored: Bool) -> Bool { answered ? stored : true }
 
-    static func shouldHold(preference: Bool, onScreen: Bool, tripRunning: Bool, appActive: Bool) -> Bool {
-        preference && onScreen && tripRunning && appActive
+    static func shouldHold(
+        preference: Bool, onScreen: Bool, tripRunning: Bool, appActive: Bool, trackerAtRest: Bool = false
+    ) -> Bool {
+        preference && onScreen && tripRunning && appActive && !trackerAtRest
     }
 
-    func update(preference: Bool, onScreen: Bool, tripRunning: Bool, appActive: Bool) {
+    func update(preference: Bool, onScreen: Bool, tripRunning: Bool, appActive: Bool, trackerAtRest: Bool = false) {
         let hold = Self.shouldHold(
-            preference: preference, onScreen: onScreen, tripRunning: tripRunning, appActive: appActive)
+            preference: preference, onScreen: onScreen, tripRunning: tripRunning, appActive: appActive,
+            trackerAtRest: trackerAtRest)
         guard hold != isHeld else { return }
         isHeld = hold
         setIdleTimerDisabled(hold)

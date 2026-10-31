@@ -27,6 +27,9 @@ final class TrackingDuty {
         didSet { PlacesRefresher.tripRunning = isTracking }
     }
 
+    /// This car's tracker is in low power: at rest in a stopped phase (D124). False without a tracker.
+    private(set) var isLowPower = false
+
     /// The trip's main route as the session holds it right now (startup finishes after the trip may have changed).
     @ObservationIgnored var mainRoute: () -> String? = { nil }
 
@@ -57,6 +60,7 @@ final class TrackingDuty {
         self.carRouteFactory = carRouteFactory
         self.ensureTimeout = ensureTimeout
         self.tracker.onFix = { [weak self] fix in self?.handle(fix: fix) }
+        self.tracker.onPowerChange = { [weak self] low in self?.isLowPower = low }
     }
 
     /// The session's deinit: no later fix, tracking stopped, and the tracking session ended (the generation goes up), so a
@@ -64,7 +68,13 @@ final class TrackingDuty {
     /// (`PlacesRefresher` is the session's to reset.)
     func shutDown() {
         tracker.onFix = nil
+        tracker.onPowerChange = nil
         stopNow()
+    }
+
+    /// The convoy's stopped phase began or ended (D124): the tracker lowers its power for a car at rest, or restores it.
+    func setConvoyStopped(_ stopped: Bool) {
+        tracker.setConvoyStopped(stopped)
     }
 
     /// Stops tracking synchronously and ends the session: no later fix reaches the car-route service.
@@ -77,6 +87,7 @@ final class TrackingDuty {
         sessionKey = nil
         trackedCarRoute = nil
         isTracking = false
+        isLowPower = false
     }
 
     /// Starts, restarts (own route changed) or stops tracking to match what the session wants (nil: nothing).
