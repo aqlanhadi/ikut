@@ -55,6 +55,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ikut shows your car to the others in your trip while the trip is active.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

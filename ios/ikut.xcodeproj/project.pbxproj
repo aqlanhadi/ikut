@@ -159,6 +159,7 @@
 		72445B83188E679CC45FEFED /* BottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259104081FD2BD54F7BCE87D /* BottomSheet.swift */; };
 		72913577CD65DD10CE46D83D /* EventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F201EC357C45D84BC4395C /* EventTests.swift */; };
 		7296DE8EDE46EEF454129D03 /* TripSessionLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8ECEB1452E465155C7324B /* TripSessionLogic.swift */; };
+		733FD38069B5701F707C3FDA /* LiveActivitySpikeDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90421B31611505789C4BD75A /* LiveActivitySpikeDemo.swift */; };
 		7555E494FCA3E97B96F8F4C8 /* StopPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE38EDF4446EB6024A65E6A /* StopPillView.swift */; };
 		7653E76A448372FD7BED706A /* NameEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */; };
 		76B843F8B3A574B935D96CC7 /* PlaceSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091A73560C6A3A87AF053698 /* PlaceSide.swift */; };
@@ -200,6 +201,7 @@
 		91048901E8ADA438604E985C /* DrivingGlance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1361DC3293C4BFA1B3D9DA1B /* DrivingGlance.swift */; };
 		9207EC6458D290501ABD4B82 /* SingleFlightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC69623D2F2C47ACE7135F1D /* SingleFlightTests.swift */; };
 		92645091B22B66E6182B8677 /* Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32A559C01AF2D0E5DF90BFD /* Geometry.swift */; };
+		9323FD1B4C5D04EFBF135565 /* ConvoyActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BED3AC436787A0397E9E2BC /* ConvoyActivityAttributes.swift */; };
 		934D513F0C9E2DFAE1B60D1C /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1304E49E36F2492119BD9EF /* Fixtures.swift */; };
 		9390CA75D748EB1F49145BB4 /* DocumentID+Sendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16FA1B25A7565ED6310E01DB /* DocumentID+Sendable.swift */; };
 		93BB893037046A99E4340FE6 /* TextContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77791F51A29C0865B5076CFD /* TextContrastTests.swift */; };
@@ -251,6 +253,7 @@
 		AF60B8C636FE4D0AB06D49D1 /* SuggestStopsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01043B5C41A66BD353B61377 /* SuggestStopsSheet.swift */; };
 		AFDC7F89119C98D63362C915 /* RouteFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F972FD505779E98F561F7AA8 /* RouteFitTests.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
+		B13B750323E3837F5F328EC2 /* IkutWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03BA46613ED5774351FAB76 /* IkutWidgetsBundle.swift */; };
 		B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */; };
 		B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */; };
 		B5BB23830D40544D04DC5E61 /* ikut.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0A209AB9671B47B22C20E451 /* ikut.icon */; };
@@ -259,6 +262,7 @@
 		B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */; };
 		B80DAA47953098D10019E756 /* DeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69797704602A7657261A60C /* DeepLink.swift */; };
 		B96A0EA0861E291DD9F012F4 /* AlertWording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E26FDD008B015443CC328 /* AlertWording.swift */; };
+		B9AC5A6F96D11E6615901D7C /* ConvoyActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BED3AC436787A0397E9E2BC /* ConvoyActivityAttributes.swift */; };
 		BA0D0564B72D2C2D3F761D70 /* HazardMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D43EA449C4A10B16261D617 /* HazardMapContent.swift */; };
 		BBC7265561425EB5BCB5ED25 /* HomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56D59AA9467F430D986EC9F /* HomeSheet.swift */; };
 		BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E803C8C9331D07C56F506F44 /* LobbyContent.swift */; };
@@ -318,6 +322,8 @@
 		E8B8A890DFC2D6B25A54222E /* ReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13C9B5436E98A08C1DDE6F8 /* ReportTests.swift */; };
 		E8FAFF650596F42F4D4081B3 /* StopSkipAll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9768D2207272BEAAFAB2D6B0 /* StopSkipAll.swift */; };
 		EA34025E916A7D1EF7A5734B /* StopContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEB2E053516041BB6ABA3EB /* StopContext.swift */; };
+		EADBB7EA2839D720F78BA224 /* ikutWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7597286138529A2317F2E764 /* ikutWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		EAECDAF546E87856E651B8DA /* ConvoyLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F5509881A45EDE95C9A4959 /* ConvoyLiveActivity.swift */; };
 		EC912979E5006A45CFC1EBE8 /* LobbyMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B249BC9D63DDB50ACFFF29BF /* LobbyMapTests.swift */; };
 		ECFB40507E2C0ED0F4BEDE8E /* HomeNow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5E973FCE988F061DA7D83 /* HomeNow.swift */; };
 		ED90BE38CF8197260613896B /* StopArrival.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EAE8F3DD34538653CD0A53 /* StopArrival.swift */; };
@@ -345,6 +351,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		AE68DB52BBC9148E38295B5D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D168A2D27FC6121C72BC9F0C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D4AC3DDDD2EF67DFB5B0B247;
+			remoteInfo = ikutWidgets;
+		};
 		C3CF7F54770CD454D64B0959 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = D168A2D27FC6121C72BC9F0C /* Project object */;
@@ -360,6 +373,20 @@
 			remoteInfo = ikut;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		49AD076CB8B9D7FDCF4F9951 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				EADBB7EA2839D720F78BA224 /* ikutWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		01043B5C41A66BD353B61377 /* SuggestStopsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestStopsSheet.swift; sourceTree = "<group>"; };
@@ -447,6 +474,7 @@
 		322ED2F251FFDF594FC7D83E /* PickedTrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedTrip.swift; sourceTree = "<group>"; };
 		3375CFBCC39B1C2F76B90699 /* MapDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDemo.swift; sourceTree = "<group>"; };
 		33BBF4A42770388A0C41B7DB /* DesignLanguageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignLanguageView.swift; sourceTree = "<group>"; };
+		340B5F4372CF428DE96567BC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3444E323182FDDB4B67D7428 /* HazardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardTests.swift; sourceTree = "<group>"; };
 		3460F253525E62DCFA34217E /* CameraInsetMove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraInsetMove.swift; sourceTree = "<group>"; };
 		384006EAE2516E1932D44513 /* SymbolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolTests.swift; sourceTree = "<group>"; };
@@ -455,6 +483,7 @@
 		3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalTests.swift; sourceTree = "<group>"; };
 		3A35DDA4D1E6725F5C83A49A /* DesignInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignInventory.swift; sourceTree = "<group>"; };
 		3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometryTests.swift; sourceTree = "<group>"; };
+		3BED3AC436787A0397E9E2BC /* ConvoyActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyActivityAttributes.swift; sourceTree = "<group>"; };
 		3CCC8291CDD3C3F118813710 /* PlacesRefresher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefresher.swift; sourceTree = "<group>"; };
 		3D43EA449C4A10B16261D617 /* HazardMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardMapContent.swift; sourceTree = "<group>"; };
 		3D65FF5F2F5692F51D7AE812 /* StopAnswerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopAnswerTests.swift; sourceTree = "<group>"; };
@@ -501,6 +530,7 @@
 		5E8F683B24F08AB39B44BCE9 /* AppCheckProviderChoiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCheckProviderChoiceTests.swift; sourceTree = "<group>"; };
 		5EB773D4289E1A1E3AE2688A /* HomeTripRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTripRows.swift; sourceTree = "<group>"; };
 		5ECC11A32A566C739AFB09A4 /* JoinDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinDemo.swift; sourceTree = "<group>"; };
+		5F5509881A45EDE95C9A4959 /* ConvoyLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyLiveActivity.swift; sourceTree = "<group>"; };
 		602451A52A1377A676346889 /* LocationPermissionWaitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPermissionWaitTests.swift; sourceTree = "<group>"; };
 		643A99005C1667737C153F8B /* Place.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Place.swift; sourceTree = "<group>"; };
 		644401FB5F0CAB8C10EF3B3B /* StopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopTests.swift; sourceTree = "<group>"; };
@@ -520,6 +550,7 @@
 		6E9FECDF460E58D501376FA8 /* StopPlaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopPlaces.swift; sourceTree = "<group>"; };
 		71B82F24EB5831D1B00E8EF6 /* ReportContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportContext.swift; sourceTree = "<group>"; };
 		733A27B1422ACC870244D3E8 /* HomeRenameAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRenameAlerts.swift; sourceTree = "<group>"; };
+		7597286138529A2317F2E764 /* ikutWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ikutWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		77791F51A29C0865B5076CFD /* TextContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContrastTests.swift; sourceTree = "<group>"; };
 		77EAE8F3DD34538653CD0A53 /* StopArrival.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrival.swift; sourceTree = "<group>"; };
 		7817F4C6CB269ADF3664EA9E /* RecapMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapMapView.swift; sourceTree = "<group>"; };
@@ -560,6 +591,7 @@
 		8EB8DC03DE6CE40C04670411 /* ConvoyFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyFormat.swift; sourceTree = "<group>"; };
 		8EDC1FF24AC67487B6B4F31E /* PlaceSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearch.swift; sourceTree = "<group>"; };
 		8EEB2E053516041BB6ABA3EB /* StopContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopContext.swift; sourceTree = "<group>"; };
+		90421B31611505789C4BD75A /* LiveActivitySpikeDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitySpikeDemo.swift; sourceTree = "<group>"; };
 		9256AE8480413335567EC1FC /* HazardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardModel.swift; sourceTree = "<group>"; };
 		92C73E6E157AAC5F01E45FF7 /* GeoPoint+Coordinate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeoPoint+Coordinate.swift"; sourceTree = "<group>"; };
 		930848C6717DEC58B1DC47B5 /* ButtonSizesDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonSizesDemo.swift; sourceTree = "<group>"; };
@@ -636,6 +668,7 @@
 		CE33658AD5A3A5E7C666380E /* ApproachMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproachMonitor.swift; sourceTree = "<group>"; };
 		CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameEntryView.swift; sourceTree = "<group>"; };
 		CF4929E443213AF6C3151555 /* OwnWay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnWay.swift; sourceTree = "<group>"; };
+		D03BA46613ED5774351FAB76 /* IkutWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkutWidgetsBundle.swift; sourceTree = "<group>"; };
 		D0D7948AC8E4880C3065A836 /* MapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTests.swift; sourceTree = "<group>"; };
 		D1BBE8E3EE194663BF0A67F1 /* MapModeControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapModeControl.swift; sourceTree = "<group>"; };
 		D219AF64C8F12910D7096FED /* LobbyStopsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyStopsViews.swift; sourceTree = "<group>"; };
@@ -715,6 +748,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0970BE5E87F72C67EB23B905 /* LiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				3BED3AC436787A0397E9E2BC /* ConvoyActivityAttributes.swift */,
+				90421B31611505789C4BD75A /* LiveActivitySpikeDemo.swift */,
+			);
+			path = LiveActivity;
+			sourceTree = "<group>";
+		};
 		0C3C6779B68FE359CFD8B4DB /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -805,6 +847,7 @@
 				E047C4D86365E2C469F00DA8 /* ikut.app */,
 				583B73D2368E1D00EF28CEBF /* ikutTests.xctest */,
 				24BB05DEBD1D95C5141FBF56 /* ikutUITests.xctest */,
+				7597286138529A2317F2E764 /* ikutWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -838,6 +881,16 @@
 				E0CBCC67DC1C481AA5F5CA5A /* ReportToastView.swift */,
 			);
 			path = Report;
+			sourceTree = "<group>";
+		};
+		45C7EC053CF91523B7CEB544 /* ikutWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				5F5509881A45EDE95C9A4959 /* ConvoyLiveActivity.swift */,
+				D03BA46613ED5774351FAB76 /* IkutWidgetsBundle.swift */,
+				340B5F4372CF428DE96567BC /* Info.plist */,
+			);
+			path = ikutWidgets;
 			sourceTree = "<group>";
 		};
 		54488051A55659F3D4435BDE /* Tracking */ = {
@@ -954,6 +1007,7 @@
 				95EC3862FCF8411AFEC613B2 /* Events */,
 				DC97585F4AFB44A65A9575CF /* Hazards */,
 				6C3068BE8A241E250EE40BE6 /* Join */,
+				0970BE5E87F72C67EB23B905 /* LiveActivity */,
 				2076B8570AB33B5A9BB71AFB /* Lobby */,
 				CDABCA7EEE72819B5EF15C46 /* Location */,
 				7F65D13C5B6E78E6C8FB91E7 /* Map */,
@@ -996,6 +1050,7 @@
 				962BCAA4615A543EA38FDB80 /* ikut */,
 				D7B8B479794B7C1CA1E5773F /* ikutTests */,
 				9432B6EF8EFD3744D9183D32 /* ikutUITests */,
+				45C7EC053CF91523B7CEB544 /* ikutWidgets */,
 				3AF58B37E0BAA6C0B1F3CA88 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -1333,11 +1388,13 @@
 				738D3C7B6C3BEA2E152158EC /* Sources */,
 				EBFDC60EE273FA430AD4B9D9 /* Resources */,
 				05C61F26E499BD79273FEDAF /* Frameworks */,
+				49AD076CB8B9D7FDCF4F9951 /* Embed Foundation Extensions */,
 				ECB051EAB1D15495CBD574D6 /* Strip local-network keys (Release) */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				E89F5503C6A429C7BEC8E3CB /* PBXTargetDependency */,
 			);
 			name = ikut;
 			packageProductDependencies = (
@@ -1369,6 +1426,23 @@
 			productReference = 583B73D2368E1D00EF28CEBF /* ikutTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		D4AC3DDDD2EF67DFB5B0B247 /* ikutWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A22120CD6CC8EE006F717980 /* Build configuration list for PBXNativeTarget "ikutWidgets" */;
+			buildPhases = (
+				2ED2489AC3975CFBDB19CAD9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ikutWidgets;
+			packageProductDependencies = (
+			);
+			productName = ikutWidgets;
+			productReference = 7597286138529A2317F2E764 /* ikutWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1388,6 +1462,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					3D487084AB97B5D7CAEBE691 = {
+						DevelopmentTeam = Y67R3NPM7F;
+						ProvisioningStyle = Automatic;
+					};
+					D4AC3DDDD2EF67DFB5B0B247 = {
 						DevelopmentTeam = Y67R3NPM7F;
 						ProvisioningStyle = Automatic;
 					};
@@ -1411,6 +1489,7 @@
 			projectRoot = "";
 			targets = (
 				347B7937203FF3F5070213DD /* ikut */,
+				D4AC3DDDD2EF67DFB5B0B247 /* ikutWidgets */,
 				3D487084AB97B5D7CAEBE691 /* ikutTests */,
 				1358EC4767333147817215F1 /* ikutUITests */,
 			);
@@ -1468,6 +1547,16 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2ED2489AC3975CFBDB19CAD9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9323FD1B4C5D04EFBF135565 /* ConvoyActivityAttributes.swift in Sources */,
+				EAECDAF546E87856E651B8DA /* ConvoyLiveActivity.swift in Sources */,
+				B13B750323E3837F5F328EC2 /* IkutWidgetsBundle.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		738D3C7B6C3BEA2E152158EC /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1500,6 +1589,7 @@
 				C8E8AF333911A888C78785A4 /* CardSheetFrame.swift in Sources */,
 				D53034881D28E618144A5117 /* CatchUpHeadsUp.swift in Sources */,
 				543F159C6474EEE812A787EF /* ContentView.swift in Sources */,
+				B9AC5A6F96D11E6615901D7C /* ConvoyActivityAttributes.swift in Sources */,
 				95EC198723C3BA9E48C96F02 /* ConvoyFormat.swift in Sources */,
 				6664FBFA3EF09F710D984DEE /* ConvoyHeader.swift in Sources */,
 				66B1B1B98B60E2439AD59234 /* ConvoyModel.swift in Sources */,
@@ -1555,6 +1645,7 @@
 				97E9528F2550495189BD61C4 /* JoinStepper.swift in Sources */,
 				4B2726AABB0929C5FA48E233 /* JoinTowns.swift in Sources */,
 				CC753D5CE3CE3D2B64E15D04 /* LaunchRoute.swift in Sources */,
+				733FD38069B5701F707C3FDA /* LiveActivitySpikeDemo.swift in Sources */,
 				66086EF8F71F7F9414B5ED2F /* LiveSpeechEngine.swift in Sources */,
 				BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */,
 				06E8B7D6E99A761D1368E5D4 /* LobbyDemo.swift in Sources */,
@@ -1817,6 +1908,11 @@
 			target = 347B7937203FF3F5070213DD /* ikut */;
 			targetProxy = DD82B631BB2549F1854EC4E6 /* PBXContainerItemProxy */;
 		};
+		E89F5503C6A429C7BEC8E3CB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D4AC3DDDD2EF67DFB5B0B247 /* ikutWidgets */;
+			targetProxy = AE68DB52BBC9148E38295B5D /* PBXContainerItemProxy */;
+		};
 		FB7DC1E5EFC8FD13A9464C2F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 347B7937203FF3F5070213DD /* ikut */;
@@ -1930,6 +2026,22 @@
 			};
 			name = Release;
 		};
+		725402612A28B487E1B721A1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = ikutWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		80B31C2F6CC6DE03A0F256A6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2015,6 +2127,22 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
+		};
+		A9426CA848DFE038E92BEE5D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = ikutWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 		B4075FAABBA021DA635FC7DE /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -2102,6 +2230,15 @@
 			buildConfigurations = (
 				80B31C2F6CC6DE03A0F256A6 /* Debug */,
 				E5E1246366C4B7C5016E207F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A22120CD6CC8EE006F717980 /* Build configuration list for PBXNativeTarget "ikutWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				725402612A28B487E1B721A1 /* Debug */,
+				A9426CA848DFE038E92BEE5D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

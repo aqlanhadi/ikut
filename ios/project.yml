@@ -48,6 +48,7 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UIBackgroundModes: [location]
+        NSSupportsLiveActivities: true
         NSCameraUsageDescription: ikut uses the camera to scan a trip’s QR code.
         CFBundleURLTypes:
           - CFBundleURLName: dev.aqlan.ikut
@@ -87,6 +88,8 @@ targets:
             /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity:NSAllowsLocalNetworking" "$PLIST" || true
           fi
     dependencies:
+      - target: ikutWidgets
+        embed: true
       - package: Firebase
         product: FirebaseAppCheck
       - package: Firebase
@@ -95,6 +98,24 @@ targets:
         product: FirebaseFirestore
       - package: Firebase
         product: FirebaseFunctions
+
+  # The Live Activity (D3): Lock Screen and Dynamic Island views. It only draws; the app starts and updates it.
+  ikutWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ikutWidgets
+      - path: ikut/LiveActivity/ConvoyActivityAttributes.swift
+    info:
+      path: ikutWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: ikut
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikut.widgets
+        SKIP_INSTALL: YES
 
   ikutTests:
     type: bundle.unit-test
