@@ -307,12 +307,15 @@ struct OpenTrip {
     let planner: StopPlanner
     /// The driving layer's model: made with the trip, put on screen when driving starts.
     let map: TripMapModel
+    /// The Live Activity on this car's tracker phone (D3); nil for demos and tests, which never start one.
+    let activity: ConvoyActivityController?
 
     /// The app's: a session for the signed-in person, and stop edits saved to the trip.
     static func live(tripId: String) -> OpenTrip {
         let session = TripSession(tripId: tripId, userId: Auth.auth().currentUser?.uid ?? "")
         return OpenTrip(id: tripId, session: session,
-                        planner: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) })
+                        planner: StopPlanner { plan in try await TripService.saveStops(tripId: tripId, plan: plan) },
+                        liveActivity: true)
     }
 
     #if DEBUG
@@ -323,13 +326,17 @@ struct OpenTrip {
     }
     #endif
 
-    init(id: String, session: TripSession, planner: StopPlanner) {
+    init(id: String, session: TripSession, planner: StopPlanner, liveActivity: Bool = false) {
         self.id = id
         self.session = session
         lobby = LobbyModel(session: session)
         self.planner = planner
-        map = TripMapModel(session: session)
+        let map = TripMapModel(session: session)
         map.mode = TripScreenLogic.drivingEntryMode
+        self.map = map
+        let activity = liveActivity ? ConvoyActivityController.live(session: session, map: map) : nil
+        self.activity = activity
+        session.activityNudge = { [weak activity] in activity?.tick() }
     }
 }
 
@@ -434,7 +441,9 @@ final class TripScreenModel {
         let fresh = trip?.id != tripId
         if fresh {
             trip?.session.stop()
+            trip?.activity?.leave()
             trip = makeTrip(tripId)
+            trip?.activity?.start()
             sheet.cover([], among: TripSheetCover.trip)
         }
         if asksAlways, let session = trip?.session, session.consumeAlwaysExplainer(action: .showAlwaysExplainer) {
@@ -505,6 +514,7 @@ final class TripScreenModel {
     /// listeners), before Home takes the map, and its objects go.
     func exit() {
         trip?.session.stop()
+        trip?.activity?.leave()
         trip = nil
         sheet.cover([], among: TripSheetCover.trip)
         pulledUp = false

@@ -116,9 +116,9 @@ frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#CC450D|CC450D|Lobby/LobbyView.swift:72
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:877
 frame|width 30||Location/LocationAskStep.swift:33
-frame|width 14, height 14||Map/ConvoyPanel.swift:274
-frame|width 14, height 14||Map/ConvoyPanel.swift:281
-frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:401
+frame|width 14, height 14||Map/ConvoyPanel.swift:276
+frame|width 14, height 14||Map/ConvoyPanel.swift:283
+frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:403
 frame|height 4||Map/ConvoyRows.swift:16
 frame|width 12, height 12||Map/ConvoyRows.swift:22
 frame|width 18, height 18||Map/ConvoyRows.swift:32
@@ -127,9 +127,9 @@ frame|height 30||Map/ConvoyRows.swift:39
 opacity|0.6||Map/MapMarkerView.swift:83
 frame|width 18, height 18||Map/MapMarkerView.swift:150
 color|#0A7CFF|0A7CFF|Map/TripMapContent.swift:34
-frame|width 10, height 10||Map/TripMapView.swift:641
-frame|width 12, height 12||Map/TripMapView.swift:662
-frame|minHeight 56||Map/TripMapView.swift:674
+frame|width 10, height 10||Map/TripMapView.swift:645
+frame|width 12, height 12||Map/TripMapView.swift:666
+frame|minHeight 56||Map/TripMapView.swift:678
 frame|height 150||Recap/RecapContent.swift:65
 frame|height 30||Recap/RecapContent.swift:72
 frame|width 0.5||Recap/RecapContent.swift:146
@@ -158,6 +158,9 @@ color|#0F766E|0F766E|Trip/TripService.swift:19
 color|#7C3AED|7C3AED|Trip/TripService.swift:19
 color|#BE185D|BE185D|Trip/TripService.swift:19
 color|#A16207|A16207|Trip/TripService.swift:19
+opacity|0.6||UI/ActivityPalette.swift:12
+opacity|0.82||UI/ActivityPalette.swift:13
+opacity|0.86||UI/ActivityPalette.swift:14
 opacity|0.25||UI/GlassSurface.swift:86
 frame|minHeight 58||UI/Theme.swift:206
 frame|height 28||UI/TripComponents.swift:108

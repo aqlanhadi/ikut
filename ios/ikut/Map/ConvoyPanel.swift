@@ -83,8 +83,10 @@ struct ConvoyPanel: View {
         }
         .task(id: probe ? "" : coordinateKey(joinCoordinate)) {
             joinPlaceName = nil
+            model.joinPlaceName = nil
             guard let at = joinCoordinate else { return }
             joinPlaceName = await placeName(at)
+            model.joinPlaceName = joinPlaceName.map(ConvoyFormat.placeShortName)
         }
     }
 

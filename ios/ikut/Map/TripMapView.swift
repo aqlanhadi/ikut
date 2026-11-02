@@ -233,6 +233,10 @@ struct TripMapView: View {
                 }
             }
             .task(id: pillTimerKey) { await tickPill() }
+            // What the Live Activity reads that only this screen holds (D3).
+            .onChange(of: stopBoard, initial: true) { _, board in model.activityFeed.requests = board.requests }
+            .onChange(of: pillMemory, initial: true) { _, memory in model.activityFeed.questionSeen = memory.questionSeen }
+            .onChange(of: approach?.eventId, initial: true) { _, id in model.activityFeed.hazardEventId = id }
             .task { await watchDriving() }
             // The phone's own fixes for the map (D70): the tracker's stops in the background, where its map draws
             // nothing; a passenger's runs as before. The last fix is kept while it is stopped.

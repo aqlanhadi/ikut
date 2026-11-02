@@ -71,6 +71,8 @@ enum Symbol {
     // MARK: Cars, hazards and messages
     static let car = "car.fill"
     static let cars = "car.2.fill"
+    /// A car joining the convoy: the Live Activity's Joining state.
+    static let merge = "arrow.triangle.merge"
     static let warning = "exclamationmark.triangle.fill"
     static let warningOutline = "exclamationmark.triangle"
     static let accident = "exclamationmark.octagon.fill"
@@ -161,6 +163,7 @@ enum Symbol {
         rain,
         heavyRain,
         carTrouble,
+        merge,
         message,
         awardLead,
         awardReporter,

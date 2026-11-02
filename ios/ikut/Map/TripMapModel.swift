@@ -66,6 +66,18 @@ final class TripMapModel {
             myOffset: convoy.myEntry?.convoyOffset)
     }
 
+    /// What the Live Activity reads that only the map's screen knows (D3): the hazard approach alert being followed, and
+    /// the open stop requests with when each first needed my OK. The screen writes them as they change.
+    struct ActivityFeed: Equatable {
+        var hazardEventId: String?
+        var requests: [StopRequestState] = []
+        var questionSeen: [String: Date] = [:]
+    }
+    @ObservationIgnored var activityFeed = ActivityFeed()
+    /// The town my car meets the convoy at, as the panel's header looked it up (the Live Activity says the same, so the
+    /// geocoder is asked once). Nil until the panel has it.
+    @ObservationIgnored var joinPlaceName: String?
+
     @ObservationIgnored private let session: TripSession?
     /// The map reads the session's cars (`start()` to `stop()`).
     @ObservationIgnored private var reading = false
@@ -613,6 +625,13 @@ extension TripMapModel {
             mine += me.speed * min(max(now.timeIntervalSince(at), 0), 30)
         }
         return mine
+    }
+
+    /// "Wyna", the owner of the car that reported a hazard; nil when the event or its car is not known.
+    func hazardReporter(eventId: String) -> String? {
+        guard let carId = events.first(where: { $0.id == eventId })?.carId,
+              let car = cars.first(where: { $0.id == carId }) else { return nil }
+        return StopLeave.ownerWord(car)
     }
 
     /// Seconds to cover `distance` at my current speed; nil when unknown or barely moving.
