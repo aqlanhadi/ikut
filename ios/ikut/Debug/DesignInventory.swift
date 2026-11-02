@@ -4,9 +4,6 @@
 enum DesignInventory {
     /// name | kind | file | times its name is written elsewhere
     static let viewRows = """
-ActivityBadge|View|LiveActivity/ActivityPalette.swift|0
-ActivityGlyph|View|LiveActivity/ActivityPalette.swift|0
-IkutMark|View|LiveActivity/ActivityPalette.swift|0
 AddStopContent|View|Trip/AddStopSheet.swift|1
 AlertBannerView|View|Alerts/AlertBannerView.swift|1
 AlwaysLocationExplainerView|View|Location/AlwaysLocationExplainerView.swift|1
@@ -106,9 +103,6 @@ frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
 color|#737378|737378|Join/JoinSheet.swift:390
-opacity|0.6||LiveActivity/ActivityPalette.swift:12
-opacity|0.82||LiveActivity/ActivityPalette.swift:13
-opacity|0.86||LiveActivity/ActivityPalette.swift:14
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:223
 opacity|0.5||Lobby/LobbyMap.swift:316
 padding|6||Lobby/LobbyMap.swift:340
@@ -164,6 +158,9 @@ color|#0F766E|0F766E|Trip/TripService.swift:19
 color|#7C3AED|7C3AED|Trip/TripService.swift:19
 color|#BE185D|BE185D|Trip/TripService.swift:19
 color|#A16207|A16207|Trip/TripService.swift:19
+opacity|0.6||UI/ActivityPalette.swift:12
+opacity|0.82||UI/ActivityPalette.swift:13
+opacity|0.86||UI/ActivityPalette.swift:14
 opacity|0.25||UI/GlassSurface.swift:86
 frame|minHeight 58||UI/Theme.swift:206
 frame|height 28||UI/TripComponents.swift:108
