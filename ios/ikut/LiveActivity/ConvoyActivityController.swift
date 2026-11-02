@@ -2,11 +2,16 @@ import ActivityKit
 import FirebaseAuth
 import Foundation
 import OSLog
+import UIKit
 
 /// What the controller needs from ActivityKit, so a test can stand in for it.
 @MainActor
 protocol ConvoyActivityClient: AnyObject {
+    /// There is an activity for this trip that can be updated: active, or stale or pending (ActivityKit marks an
+    /// activity stale when its stale date passes; it is still there and takes updates).
     var isRunning: Bool { get }
+    /// The person swiped the activity away: it is not started again for this trip in this session (#727).
+    var isDismissed: Bool { get }
     /// Live Activities are on for ikut (the person can switch them off in Settings; then nothing shows and nothing is asked).
     var isEnabled: Bool { get }
     func start(tripId: String, state: ConvoyActivityAttributes.ContentState, staleDate: Date?) throws
@@ -41,10 +46,15 @@ final class ConvoyActivityController {
         /// How long Arrived and Trip ended stay on the Lock Screen (note 8).
         static let finalStay: TimeInterval = 15 * 60
 
-        /// A new kind goes at once; any other change after `minGap`; an unchanged state after `heartbeat`.
-        static func shouldSend(kindChanged: Bool, changed: Bool, sinceLast: TimeInterval) -> Bool {
-            if kindChanged { return true }
-            return changed ? sinceLast >= minGap : sinceLast >= heartbeat
+        /// Going into Hazard ahead, Stop request or Sharing paused (the last word before tracking stops) goes at once; every other change, a new kind included, waits for
+        /// `minGap`, so a state that flips back and forth (the 150 m edge of a stop, a catch-up) cannot send every
+        /// tick: at most 4 updates a minute (#721). An unchanged state goes after `heartbeat`.
+        static func shouldSend(
+            into kind: ConvoyActivityAttributes.Kind, kindChanged: Bool, changed: Bool, sinceLast: TimeInterval
+        ) -> Bool {
+            if kindChanged, kind == .hazardAhead || kind == .stopRequest || kind == .sharingPaused { return true }
+            if kindChanged || changed { return sinceLast >= minGap }
+            return sinceLast >= heartbeat
         }
     }
 
@@ -57,6 +67,7 @@ final class ConvoyActivityController {
     /// Arrived or Trip ended was sent as the last update: nothing more is sent, and leaving the trip leaves it to go by itself.
     private(set) var isFinished = false
     private var ticker: Task<Void, Never>?
+    private var startFailureLogged = false
 
     init(
         tripId: String, client: ConvoyActivityClient, clock: @escaping () -> Date = { Date() },
@@ -73,7 +84,8 @@ final class ConvoyActivityController {
         guard ticker == nil else { return }
         ticker = Task { [weak self] in
             while !Task.isCancelled {
-                self?.tick()
+                guard let self else { return }
+                tick()
                 try? await Task.sleep(for: .seconds(5))
             }
         }
@@ -108,12 +120,16 @@ final class ConvoyActivityController {
             return
         }
         guard client.isRunning else {
-            guard client.isEnabled else { return }
+            // Switched off in Settings, or swiped away by the person: not started again.
+            guard client.isEnabled, !client.isDismissed else { return }
             do {
                 try client.start(tripId: tripId, state: state, staleDate: stale)
                 last = (state, now)
             } catch {
-                log.notice("could not start the live activity: \(error.localizedDescription, privacy: .public)")
+                if !startFailureLogged {
+                    startFailureLogged = true
+                    log.notice("could not start the live activity: \(error.localizedDescription, privacy: .public)")
+                }
             }
             return
         }
@@ -123,19 +139,29 @@ final class ConvoyActivityController {
         same.dataAt = previous?.dataAt
         let changed = previous != same
         guard Pacing.shouldSend(
-            kindChanged: previous?.kind != state.kind, changed: changed,
+            into: state.kind, kindChanged: previous?.kind != state.kind, changed: changed,
             sinceLast: last.map { now.timeIntervalSince($0.at) } ?? .infinity) else { return }
         client.update(state, staleDate: stale)
         last = (state, now)
     }
 
+    /// Arrived and Trip ended are the last update: an activity already on the Lock Screen takes it and goes after 15
+    /// minutes. None running (swiped away, ended, or an ended trip opened later) starts nothing: a fresh "Arrived" an hour
+    /// after the fact would be false.
     private func finish(with state: ConvoyActivityAttributes.ContentState) {
         isFinished = true
-        if client.isRunning {
-            client.end(final: state, dismissAfter: Pacing.finalStay)
-        } else if client.isEnabled, (try? client.start(tripId: tripId, state: state, staleDate: nil)) != nil {
-            client.end(final: state, dismissAfter: Pacing.finalStay)
-        }
+        if client.isRunning { client.end(final: state, dismissAfter: Pacing.finalStay) }
+    }
+}
+
+/// A background task's id, ended once whichever of the work and the expiry comes first.
+private final class BackgroundTask: @unchecked Sendable {
+    var id = UIBackgroundTaskIdentifier.invalid
+    func end() {
+        guard id != .invalid else { return }
+        let ended = id
+        id = .invalid
+        Task { @MainActor in UIApplication.shared.endBackgroundTask(ended) }
     }
 }
 
@@ -162,8 +188,10 @@ private final class ActivityBox: @unchecked Sendable {
 @MainActor
 final class ActivityKitClient: ConvoyActivityClient {
     private var box: ActivityBox?
+    private let tripId: String
 
     init(tripId: String) {
+        self.tripId = tripId
         // One per trip: a relaunch picks up the one already on the Lock Screen, and ends any other.
         for existing in Activity<ConvoyActivityAttributes>.activities {
             let found = ActivityBox(existing)
@@ -175,7 +203,20 @@ final class ActivityKitClient: ConvoyActivityClient {
         }
     }
 
-    var isRunning: Bool { box?.activity.activityState == .active }
+    /// Only ended and dismissed count as gone: a stale or pending activity is still there and takes updates.
+    var isRunning: Bool {
+        guard let state = box?.activity.activityState else { return false }
+        switch state {
+        case .ended, .dismissed: return false
+        default: return true
+        }
+    }
+
+    private static var dismissedTrips: Set<String> = []
+    var isDismissed: Bool {
+        if box?.activity.activityState == .dismissed { Self.dismissedTrips.insert(tripId) }
+        return Self.dismissedTrips.contains(tripId)
+    }
     var isEnabled: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
 
     func start(tripId: String, state: ConvoyActivityAttributes.ContentState, staleDate: Date?) throws {
@@ -185,20 +226,30 @@ final class ActivityKitClient: ConvoyActivityClient {
 
     func update(_ state: ConvoyActivityAttributes.ContentState, staleDate: Date?) {
         guard let box else { return }
-        Task { await box.update(state, staleDate: staleDate) }
+        Self.keepAwake { await box.update(state, staleDate: staleDate) }
     }
 
     func end(final state: ConvoyActivityAttributes.ContentState?, dismissAfter: TimeInterval?) {
         guard let current = box else { return }
         box = nil
-        Task { await current.end(final: state, dismissAfter: dismissAfter) }
+        Self.keepAwake { await current.end(final: state, dismissAfter: dismissAfter) }
+    }
+
+    /// The last word before the phone locks (Trip ended, Sharing paused) must get out even if iOS is about to suspend the
+    /// app: the update runs inside a background task.
+    private static func keepAwake(_ work: @escaping @Sendable () async -> Void) {
+        let task = BackgroundTask()
+        task.id = UIApplication.shared.beginBackgroundTask(withName: "liveActivityUpdate") { task.end() }
+        Task {
+            await work()
+            task.end()
+        }
     }
 }
 
 extension ConvoyActivityController {
     /// The app's: reads the open trip's session and map. Only the car's tracker phone, on a trip it is still in.
     static func live(session: TripSession, map: TripMapModel) -> ConvoyActivityController {
-        let place = JoinPlace()
         var loaded = false
         return ConvoyActivityController(tripId: session.tripId, client: ActivityKitClient(tripId: session.tripId)) {
             // A trip seen once and now gone is deleted (or this person was removed): the activity goes at once.
@@ -210,28 +261,7 @@ extension ConvoyActivityController {
             // Only the car's tracker phone, on a trip it is still in (Arrived and Trip ended still show their last update).
             guard car.trackerUserId == session.userId, !session.userId.isEmpty, session.isLiveMember || session.isEnded
             else { return .no }
-            place.update(car: map.myCar, main: map.mainRoute)
-            return ConvoyActivityInput.snapshot(session: session, map: map, joinPlace: place.name).map { .yes($0) } ?? .loading
-        }
-    }
-}
-
-/// The town my car meets the convoy at, looked up once per place (the panel's header says the same).
-@MainActor
-private final class JoinPlace {
-    private(set) var name: String?
-    private var key: String?
-
-    func update(car: Car?, main: RouteLine?) {
-        guard car?.state == .joining, let main, let at = OwnWayLogic.joinCoordinate(OwnWayLogic.join(car: car, main: main)?.join, main: main)
-        else { name = nil; key = nil; return }
-        let next = "\(at.latitude),\(at.longitude)"
-        guard next != key else { return }
-        key = next
-        name = nil
-        Task {
-            let found = await RouteBuilder.placeName(at: at)
-            if key == next { name = found.map(ConvoyFormat.placeShortName) }
+            return ConvoyActivityInput.snapshot(session: session, map: map, joinPlace: map.joinPlaceName).map { .yes($0) } ?? .loading
         }
     }
 }

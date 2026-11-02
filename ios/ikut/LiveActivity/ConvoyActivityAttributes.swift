@@ -66,10 +66,11 @@ struct ConvoyActivityAttributes: ActivityAttributes {
         var hereCount: Int?
         var hereTotal: Int?
         var leaveAt: Date?
-        var arriveAt: Date?
+        /// Seconds still to go from the stop to the destination: "Ipoh by 13:09" is the leaving time plus this.
+        var toGoSeconds: Double?
 
-        // Hazard ahead: the label ("Debris"), who reported it, how far (nil: no fresh fix, no metres).
-        var hazardLabel: String?
+        // Hazard ahead: the event type as the app stores it ("debris"; the extension builds the word), who reported it, how far (nil: no fresh fix, no metres).
+        var hazardType: String?
         var reporterName: String?
         var hazardMeters: Double?
 

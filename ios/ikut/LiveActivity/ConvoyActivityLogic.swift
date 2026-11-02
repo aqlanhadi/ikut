@@ -32,12 +32,13 @@ struct ConvoyActivityInput: Equatable {
         var total: Int
         /// `StopLeave.leavingAt`; nil when the stop has no planned stay.
         var leaveAt: Date?
-        /// The time of leaving plus the time still to go from the stop.
-        var arriveAt: Date?
+        /// Seconds still to go from the stop to the destination (the panel's pace over the road left after the stop).
+        var toGoSeconds: Double?
     }
 
     struct Hazard: Equatable {
-        var label: String
+        /// The event type as stored ("debris").
+        var type: String
         var reporter: String?
         /// Meters to it along the route; nil without a fresh fix of my car (the state then says no metres).
         var meters: Double?
@@ -180,7 +181,7 @@ enum ConvoyActivityLogic {
             if s.meetsAtDestination { s.place = nil }
         case .hazardAhead:
             let h = i.hazard
-            s.hazardLabel = h?.label
+            s.hazardType = h?.type
             s.reporterName = h?.reporter
             s.hazardMeters = h?.meters.map { ($0 / 50).rounded() * 50 }
             applyTrack(&s, i, window: hazardWindowMeters, ring: nil, hazard: h?.offset)
@@ -200,7 +201,7 @@ enum ConvoyActivityLogic {
             s.hereCount = i.stopHere?.here
             s.hereTotal = i.stopHere?.total
             s.leaveAt = i.stopHere?.leaveAt
-            s.arriveAt = i.stopHere?.arriveAt
+            s.toGoSeconds = i.stopHere?.toGoSeconds
             applyTrack(&s, i, window: windowMeters, ring: nil, hazard: nil)
         case .parkedAhead:
             s.otherName = i.parkedAhead?.name

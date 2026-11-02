@@ -104,9 +104,9 @@ struct LiveActivityDemo: View {
         case "at-stop":
             i.nextStop = .init(name: "R&R Tapah", offset: 50_050, meters: 0, seconds: nil, isHere: true)
             let leave = now.addingTimeInterval(12 * 60)
-            i.stopHere = .init(here: 3, total: 4, leaveAt: leave, arriveAt: leave.addingTimeInterval(29 * 60))
+            i.stopHere = .init(here: 3, total: 4, leaveAt: leave, toGoSeconds: 29 * 60)
         case "hazard", "hazard-no-distance":
-            i.hazard = .init(label: "Debris", reporter: "Wyna", meters: name == "hazard" ? 350 : nil, offset: 50_350)
+            i.hazard = .init(type: "debris", reporter: "Wyna", meters: name == "hazard" ? 350 : nil, offset: 50_350)
         case "stop-request": i.request = request
         case "after-ok":
             i.request = .init(requesterName: "Wyna", reason: .fuel, meters: -5_000, okCount: 3, total: 4, iSaidOK: true, iAsked: false, owesMyAnswer: false, since: now)

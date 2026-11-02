@@ -334,7 +334,9 @@ struct OpenTrip {
         let map = TripMapModel(session: session)
         map.mode = TripScreenLogic.drivingEntryMode
         self.map = map
-        activity = liveActivity ? ConvoyActivityController.live(session: session, map: map) : nil
+        let activity = liveActivity ? ConvoyActivityController.live(session: session, map: map) : nil
+        self.activity = activity
+        session.activityNudge = { [weak activity] in activity?.tick() }
     }
 }
 

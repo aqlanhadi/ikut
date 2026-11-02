@@ -4,6 +4,9 @@
 enum DesignInventory {
     /// name | kind | file | times its name is written elsewhere
     static let viewRows = """
+ActivityBadge|View|LiveActivity/ActivityPalette.swift|0
+ActivityGlyph|View|LiveActivity/ActivityPalette.swift|0
+IkutMark|View|LiveActivity/ActivityPalette.swift|0
 AddStopContent|View|Trip/AddStopSheet.swift|1
 AlertBannerView|View|Alerts/AlertBannerView.swift|1
 AlwaysLocationExplainerView|View|Location/AlwaysLocationExplainerView.swift|1
@@ -103,6 +106,9 @@ frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
 color|#737378|737378|Join/JoinSheet.swift:390
+opacity|0.6||LiveActivity/ActivityPalette.swift:12
+opacity|0.82||LiveActivity/ActivityPalette.swift:13
+opacity|0.86||LiveActivity/ActivityPalette.swift:14
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:223
 opacity|0.5||Lobby/LobbyMap.swift:316
 padding|6||Lobby/LobbyMap.swift:340
@@ -116,9 +122,9 @@ frame|minHeight 36||Lobby/LobbyStopsViews.swift:43
 color|#CC450D|CC450D|Lobby/LobbyView.swift:72
 frame|maxWidth 260, maxHeight 260||Lobby/LobbyView.swift:877
 frame|width 30||Location/LocationAskStep.swift:33
-frame|width 14, height 14||Map/ConvoyPanel.swift:274
-frame|width 14, height 14||Map/ConvoyPanel.swift:281
-frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:401
+frame|width 14, height 14||Map/ConvoyPanel.swift:276
+frame|width 14, height 14||Map/ConvoyPanel.swift:283
+frame|minWidth 22, minHeight 22||Map/ConvoyPanel.swift:403
 frame|height 4||Map/ConvoyRows.swift:16
 frame|width 12, height 12||Map/ConvoyRows.swift:22
 frame|width 18, height 18||Map/ConvoyRows.swift:32

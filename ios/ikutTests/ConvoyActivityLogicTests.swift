@@ -51,7 +51,7 @@ struct ConvoyActivityLogicTests {
         #expect(kind(i) == .catchUp)
         i.request = request(owes: true)
         #expect(kind(i) == .stopRequest)
-        i.hazard = .init(label: "Debris", reporter: "Wyna", meters: 350, offset: 50_350)
+        i.hazard = .init(type: "debris", reporter: "Wyna", meters: 350, offset: 50_350)
         #expect(kind(i) == .hazardAhead)
         i.pausedUntil = now.addingTimeInterval(23 * 60)
         #expect(kind(i) == .sharingPaused)
@@ -157,7 +157,7 @@ struct ConvoyActivityLogicTests {
 
     @Test func hazardNarrowsTheWindowAndRoundsTo50Metres() {
         var i = convoy()
-        i.hazard = .init(label: "Debris", reporter: "Wyna", meters: 362, offset: 50_362)
+        i.hazard = .init(type: "debris", reporter: "Wyna", meters: 362, offset: 50_362)
         let s = ConvoyActivityLogic.state(i).state
         #expect(s.hazardMeters == 350)
         // 350 m ahead on a 1 km window: 50% + 17.5%.
@@ -167,7 +167,7 @@ struct ConvoyActivityLogicTests {
         // No fresh fix: no metres, and the label stays.
         i.hazard?.meters = nil
         let none = ConvoyActivityLogic.state(i).state
-        #expect(none.hazardMeters == nil && none.hazardLabel == "Debris")
+        #expect(none.hazardMeters == nil && none.hazardType == "debris")
         #expect(ConvoyActivityPresentation.trailing(none, now: now) == .nothing)
         // A hazard beyond the window stays on the edge.
         i.hazard?.offset = 55_000
@@ -180,10 +180,10 @@ struct ConvoyActivityLogicTests {
         var i = convoy()
         i.nextStop = .init(name: "R&R Tapah", offset: 50_050, meters: 0, seconds: nil, isHere: true)
         let leave = now.addingTimeInterval(12 * 60)
-        i.stopHere = .init(here: 3, total: 4, leaveAt: leave, arriveAt: leave.addingTimeInterval(29 * 60))
+        i.stopHere = .init(here: 3, total: 4, leaveAt: leave, toGoSeconds: 29 * 60)
         let s = ConvoyActivityLogic.state(i).state
         #expect(s.kind == .atStop && s.stopName == "R&R Tapah" && s.hereCount == 3 && s.hereTotal == 4)
-        #expect(s.leaveAt == leave && s.arriveAt == leave.addingTimeInterval(1_740))
+        #expect(s.leaveAt == leave && s.toGoSeconds == 1_740)
         // No ring on the track at a stop: the card says where the car is.
         #expect(s.stopRing == nil)
         #expect(ConvoyActivityPresentation.trailing(s, now: now) == .value("3/4", .ring))
@@ -279,7 +279,7 @@ struct ConvoyActivityLogicTests {
         i = convoy()
         i.headsUp = .init(name: "Aisha", meters: 3_300, seconds: 120)
         states.append(ConvoyActivityLogic.state(i).state)
-        i.hazard = .init(label: "Debris", reporter: nil, meters: 350, offset: nil)
+        i.hazard = .init(type: "debris", reporter: nil, meters: 350, offset: nil)
         states.append(ConvoyActivityLogic.state(i).state)
         i.hazard = nil
         i.request = request(owes: true)

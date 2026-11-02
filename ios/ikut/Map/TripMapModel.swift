@@ -74,6 +74,9 @@ final class TripMapModel {
         var questionSeen: [String: Date] = [:]
     }
     @ObservationIgnored var activityFeed = ActivityFeed()
+    /// The town my car meets the convoy at, as the panel's header looked it up (the Live Activity says the same, so the
+    /// geocoder is asked once). Nil until the panel has it.
+    @ObservationIgnored var joinPlaceName: String?
 
     @ObservationIgnored private let session: TripSession?
     /// The map reads the session's cars (`start()` to `stop()`).

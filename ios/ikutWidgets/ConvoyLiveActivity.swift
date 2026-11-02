@@ -91,6 +91,13 @@ private struct LockCard: View {
                     if let subtitle = words.subtitle {
                         Text(verbatim: subtitle).font(.footnote).foregroundStyle(ActivityPalette.secondary).lineLimit(1)
                     }
+                    if let end = words.pauseEnd {
+                        HStack(spacing: 0) {
+                            Text("Back on in ")
+                            PauseTimer(end: end)
+                        }
+                        .font(.footnote).foregroundStyle(ActivityPalette.secondary).lineLimit(1)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let big = words.big { BigValue(text: big, caption: words.caption, tint: words.bigTint, size: 26) }
@@ -98,7 +105,7 @@ private struct LockCard: View {
             if words.showsTrack { ActivityTrack(state: state, dimmed: context.isStale) }
             if let line = words.line {
                 Text(verbatim: line).font(.subheadline)
-                    .foregroundStyle(words.lineIsWarning ? ActivityPalette.yellow : ActivityPalette.line).lineLimit(2)
+                    .foregroundStyle(words.lineIsWarning ? ActivityPalette.yellow : ActivityPalette.line).lineLimit(1)
             }
             if let request = words.request { RequestRow(request: request, size: 14) }
             if let leave = words.leave { LeaveRow(text: leave.text, size: 14) }
@@ -129,16 +136,26 @@ private struct BigValue: View {
 }
 
 private struct RequestRow: View {
-    let request: (text: String, detail: String)
+    let request: (text: String, detail: String, symbol: String)
     let size: CGFloat
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: Symbol.fuel).foregroundStyle(ActivityPalette.positive)
+            Image(systemName: request.symbol).foregroundStyle(ActivityPalette.positive)
             Text(verbatim: request.text).fontWeight(.semibold).lineLimit(1)
             Text(verbatim: "· \(request.detail)").foregroundStyle(ActivityPalette.secondary).lineLimit(1)
         }
         .font(.system(size: size))
+    }
+}
+
+/// Counts down on the phone itself: while sharing is paused the app sleeps and sends nothing, so a number fixed at the last
+/// update would stand still. iOS 17 shows it as minutes and seconds (note 17).
+private struct PauseTimer: View {
+    let end: Date
+
+    var body: some View {
+        Text(timerInterval: Date.now...max(end, Date.now), pauseTime: nil, countsDown: true, showsHours: false).monospacedDigit()
     }
 }
 
@@ -191,7 +208,9 @@ private struct ExpandedValue: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {
-            if let big = words.big {
+            if let end = words.pauseEnd {
+                PauseTimer(end: end).font(.system(size: 18, weight: .bold, design: .rounded)).foregroundStyle(words.bigTint ?? .white)
+            } else if let big = words.big {
                 Text(verbatim: big).font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(words.bigTint ?? .white).lineLimit(1).minimumScaleFactor(0.7)
             } else if case .value(let text, _) = trailing {
@@ -203,7 +222,7 @@ private struct ExpandedValue: View {
             } else if case .cross = trailing {
                 Image(systemName: Symbol.close).font(.system(size: 22, weight: .bold)).foregroundStyle(ActivityPalette.secondary)
             }
-            if let caption = words.caption, words.big != nil || trailing != .nothing {
+            if let caption = words.caption, words.big != nil || words.pauseEnd != nil || trailing != .nothing {
                 Text(verbatim: caption).font(.caption2).foregroundStyle(ActivityPalette.secondary).lineLimit(1)
             }
         }

@@ -41,7 +41,7 @@ extension ConvoyActivityInput {
             if me.hasArrived {
                 i.arrived = Arrived(
                     count: convoy.convoy.filter(\.hasArrived).count, total: convoy.convoy.count + convoy.joining.count,
-                    driveSeconds: map.departedAt.map { now.timeIntervalSince($0) })
+                    driveSeconds: driveSeconds(departedAt: map.departedAt, arrivedAt: me.position.updatedAt ?? now))
             }
         } else if let mine = convoy.myJoining {
             let meets = map.mainRoute.flatMap { OwnWayLogic.join(car: map.myCar, main: $0)?.join } == .meetsAtDestination
@@ -77,27 +77,52 @@ extension ConvoyActivityInput {
         let tally = StopArrival.tally(
             target: target, convoy: convoy.convoy, joining: convoy.joining, pace: pace, now: now, cars: map.cars)
         let leaveAt = StopLeave.leavingAt(stop)
-        var arriveAt: Date?
-        if let leaveAt, let pace, let length = map.mainRoute?.length {
-            arriveAt = leaveAt.addingTimeInterval(pace * max(0, length - stop.routeOffset))
-        }
-        i.stopHere = StopHere(here: tally.here, total: tally.total, leaveAt: leaveAt, arriveAt: arriveAt)
+        var toGo: Double?
+        if let pace, let length = map.mainRoute?.length { toGo = pace * max(0, length - stop.routeOffset) }
+        i.stopHere = StopHere(here: tally.here, total: tally.total, leaveAt: leaveAt, toGoSeconds: toGo)
+    }
+
+    /// Drive time up to the moment the car arrived (its last position), not up to now: an ended trip opened an hour
+    /// later must not read an hour longer.
+    static func driveSeconds(departedAt: Date?, arrivedAt: Date) -> Double? {
+        departedAt.map { max(0, arrivedAt.timeIntervalSince($0)) }
+    }
+
+    /// Note 5: metres only while this phone's own GPS fix is at most 10 s old. The car's Firestore position is written
+    /// every 10 s while moving and not at all offline, so it says nothing about the phone's fix.
+    static let hazardFixFreshness: TimeInterval = 10
+    static func hazardMetersAreFresh(fixAt: Date?, now: Date) -> Bool {
+        fixAt.map { now.timeIntervalSince($0) <= hazardFixFreshness && now.timeIntervalSince($0) > -hazardFixFreshness } ?? false
     }
 
     @MainActor
     private static func hazardFields(_ i: inout ConvoyActivityInput, map: TripMapModel, now: Date) {
         guard let id = map.activityFeed.hazardEventId, let marker = map.hazards.markers.first(where: { $0.id == id }) else { return }
-        // No metres without a fresh fix of my car (note 5): `myOffsetNow` carries a fix forward only while it is fresh.
-        let fresh = map.convoy.myEntry?.position.updatedAt.map { now.timeIntervalSince($0) <= 10 } ?? false
+        let fresh = hazardMetersAreFresh(fixAt: map.device?.at, now: now)
         i.hazard = Hazard(
-            label: marker.label, reporter: map.hazardReporter(eventId: id),
+            type: marker.type.rawValue, reporter: map.hazardReporter(eventId: id),
             meters: fresh ? map.approachDistance(eventId: id, now: now) : nil, offset: marker.mainOffset)
     }
 
-    /// The oldest open request: the one the pill would ask about, or the one my car answered or asked.
+    /// The request the activity speaks of: the oldest I owe an OK on that is still inside its 2 minutes, else my own,
+    /// else one I said OK to. A request nobody told this phone about before (no `seen`) falls back to when it was asked,
+    /// and with neither it counts as expired, so it can never hold the activity for ever (#709). `requests` are oldest first.
+    static func chooseRequest(
+        _ requests: [StopRequestState], seen: [String: Date], now: Date
+    ) -> (request: StopRequestState, owes: Bool, since: Date)? {
+        func since(_ r: StopRequestState) -> Date { seen[r.eventId] ?? r.askedAt ?? .distantPast }
+        if let owed = requests.first(where: {
+            StopLogic.needsAnswer($0) && now.timeIntervalSince(since($0)) < ConvoyActivityLogic.requestWindow
+        }) { return (owed, true, since(owed)) }
+        if let mine = requests.first(where: StopLogic.viewerIsRequester) { return (mine, false, since(mine)) }
+        if let said = requests.first(where: { $0.viewerCarIsOK && !StopLogic.needsAnswer($0) }) { return (said, false, since(said)) }
+        return nil
+    }
+
     @MainActor
     private static func requestFields(_ i: inout ConvoyActivityInput, map: TripMapModel, now: Date) {
-        guard let r = map.activityFeed.requests.first else { return }
+        guard let (r, owes, since) = chooseRequest(map.activityFeed.requests, seen: map.activityFeed.questionSeen, now: now)
+        else { return }
         let reason: Reason
         switch r.type {
         case .stopFuel: reason = .fuel
@@ -105,11 +130,10 @@ extension ConvoyActivityInput {
         case .stopToilet: reason = .toilet
         default: reason = .rest
         }
-        let owes = StopLogic.needsAnswer(r)
         i.request = Request(
             requesterName: r.requesterName, reason: reason, meters: map.convoy.distance(fromMyCarTo: r.requesterCarId),
             okCount: r.okCount, total: r.rows.count, iSaidOK: r.viewerCarIsOK && !StopLogic.viewerIsRequester(r),
-            iAsked: StopLogic.viewerIsRequester(r), owesMyAnswer: owes, since: map.activityFeed.questionSeen[r.eventId] ?? now)
+            iAsked: StopLogic.viewerIsRequester(r), owesMyAnswer: owes, since: since)
     }
 
     /// The heads-up from the car coming up behind, and my car parked far ahead of the nearest car behind.

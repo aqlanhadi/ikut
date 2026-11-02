@@ -17,7 +17,12 @@ final class TripSession {
     let tripId: String
     let userId: String
 
-    private(set) var trip: Trip?
+    private(set) var trip: Trip? {
+        didSet { if oldValue?.status != trip?.status { activityNudge?() } }
+    }
+    /// The Live Activity's last word has to leave before the phone locks (Trip ended, Sharing paused): tracking stops
+    /// with these, and iOS may suspend the app before the activity's next check. Set by the open trip's controller.
+    @ObservationIgnored var activityNudge: (@MainActor () -> Void)?
     private(set) var member: Member?
     private(set) var car: Car?
     /// The planned stops, in driving order.
@@ -407,6 +412,7 @@ final class TripSession {
         let now = clock()
         localPausedAt = now
         stopTrackingNow()
+        activityNudge?()
         syncExpiryTimer()
         try await writePausedAt(now, carId: carId)
     }

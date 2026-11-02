@@ -20,7 +20,10 @@ struct ActivityWords {
     var line: String?
     var lineIsWarning = false
     /// The next-stop slot line while a stop request is open: "Wyna's fuel stop" and its detail.
-    var request: (text: String, detail: String)?
+    var request: (text: String, detail: String, symbol: String)?
+    /// Sharing paused: when it ends. The views count down to it themselves (the app sleeps while paused, so nothing
+    /// would update the number).
+    var pauseEnd: Date?
     /// Leaving at … · … by …, with the leaving time and arrival it was made from.
     var leave: (text: String, leaveAt: Date)?
     /// Hazard ahead and Stop request: the alert glyph alone in the compact island, no ikut mark.
@@ -112,9 +115,9 @@ struct ActivityWords {
             if let name = s.requesterName, let reason = s.reason {
                 let ok = s.okCount ?? 0, total = s.okTotal ?? 0
                 if s.iAsked {
-                    request = (Self.youAsked(reason), String(localized: "\(ok) of \(total) OK · waiting for \(max(0, total - ok))"))
+                    request = (Self.youAsked(reason), String(localized: "\(ok) of \(total) OK · waiting for \(max(0, total - ok))"), Self.symbol(for: reason))
                 } else {
-                    request = (Self.theirStop(name, reason), String(localized: "You said OK · \(ok) of \(total)"))
+                    request = (Self.theirStop(name, reason), String(localized: "You said OK · \(ok) of \(total)"), Self.symbol(for: reason))
                 }
             }
         case .atStop:
@@ -130,7 +133,10 @@ struct ActivityWords {
             showsTrack = true
             var leaveLine = ""
             if let leaveAt = s.leaveAt {
-                let arrive = s.arriveAt.map { String(localized: "\(s.destination) by \(ConvoyFormat.clock($0))") }
+                // The arrival is the later of now and the leaving time, plus the time still to go from the stop.
+                let arrive = s.toGoSeconds.map {
+                    String(localized: "\(s.destination) by \(ConvoyFormat.clock(max(now, leaveAt).addingTimeInterval($0)))")
+                }
                 let when = leaveAt > now
                     ? String(localized: "Leaving at \(ConvoyFormat.clock(leaveAt))") : String(localized: "Leave now")
                 leave = ([when, arrive].compactMap { $0 }.joined(separator: " · "), leaveAt)
@@ -142,7 +148,7 @@ struct ActivityWords {
             tint = ActivityPalette.yellow
             onTint = .black
             isAlert = true
-            title = String(localized: "\(s.hazardLabel ?? "Hazard") ahead")
+            title = Self.hazardTitle(s.hazardType)
             subtitle = s.reporterName.map { String(localized: "Reported by \($0)’s car") }
             big = s.hazardMeters.map(ConvoyFormat.distance)
             caption = big == nil ? nil : String(localized: "ahead")
@@ -150,7 +156,7 @@ struct ActivityWords {
             showsTrack = true
             small = (title, s.reporterName.map { String(localized: "\($0)’s car") } ?? "", big)
         case .stopRequest:
-            symbol = Symbol.fuel
+            symbol = Self.symbol(for: s.reason ?? .rest)
             tint = ActivityPalette.positive
             onTint = .black
             isAlert = true
@@ -180,11 +186,10 @@ struct ActivityWords {
             onTint = .black
             let minutes = s.pausedUntil.map { ConvoyActivityPresentation.minutes(until: $0, now: now) } ?? 1
             title = String(localized: "Sharing paused")
-            subtitle = String(localized: "Back on in \(minutes) min")
-            big = String(localized: "\(minutes) min")
+            pauseEnd = s.pausedUntil
             caption = String(localized: "until back on")
             bigTint = ActivityPalette.orange
-            small = (title, "", big)
+            small = (title, "", String(localized: "\(minutes) min"))
         case .arrived:
             symbol = Symbol.flag
             tint = ActivityPalette.positive
@@ -223,6 +228,29 @@ struct ActivityWords {
         let behind = s.behindName.flatMap { name in s.behindMeters.map { String(localized: "\(name) \(ConvoyFormat.distance($0)) behind") } }
         let parts = [ahead, behind].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// "Debris ahead": the word is built here from the event type the app sends (note 17).
+    static func hazardTitle(_ type: String?) -> String {
+        switch type {
+        case "debris": String(localized: "Debris ahead")
+        case "accident": String(localized: "Accident ahead")
+        case "pothole": String(localized: "Pothole ahead")
+        case "animal": String(localized: "Animal ahead")
+        case "stoppedVehicle": String(localized: "Stopped vehicle ahead")
+        case "roadworks": String(localized: "Roadworks ahead")
+        default: String(localized: "Hazard ahead")
+        }
+    }
+
+    /// The symbol of the reason, as `StopLogic.reasonSymbol` picks it.
+    static func symbol(for reason: ConvoyActivityAttributes.Reason) -> String {
+        switch reason {
+        case .fuel: Symbol.fuel
+        case .food: Symbol.food
+        case .toilet: Symbol.toilet
+        case .rest: Symbol.rest
+        }
     }
 
     static func needs(_ name: String, _ reason: ConvoyActivityAttributes.Reason) -> String {
