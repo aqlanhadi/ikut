@@ -1,4 +1,5 @@
 #if DEBUG
+import OSLog
 import SwiftUI
 
 /// `IKUT_SCREEN=live-activity-<state>` (D3 piece 2a): starts a real Live Activity with that state's canned content, so
@@ -40,8 +41,10 @@ struct LiveActivityDemo: View {
             try client.start(tripId: "demo-\(name)", state: state, staleDate: staleOffset.map { input.now.addingTimeInterval($0) } ?? stale)
             self.client = client
             status = "Started: \(state.kind.rawValue)"
+            Logger(subsystem: "dev.aqlan.ikut", category: "liveActivityDemo").notice("\(status, privacy: .public)")
         } catch {
             status = "Could not start: \(error.localizedDescription)"
+            Logger(subsystem: "dev.aqlan.ikut", category: "liveActivityDemo").notice("\(status, privacy: .public)")
         }
     }
 
