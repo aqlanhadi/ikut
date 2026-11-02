@@ -106,6 +106,10 @@ targets:
     sources:
       - path: ikutWidgets
       - path: ikut/LiveActivity/ConvoyActivityAttributes.swift
+      - path: ikut/LiveActivity/ConvoyActivityPresentation.swift
+      - path: ikut/Convoy/ConvoyFormat.swift
+      - path: ikut/UI/Symbol.swift
+      - path: ikut/Localizable.xcstrings
     info:
       path: ikutWidgets/Info.plist
       properties:

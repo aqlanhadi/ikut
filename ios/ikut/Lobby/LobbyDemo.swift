@@ -556,7 +556,8 @@ enum DemoScreens {
         case "road-skip-all-others": return AnyView(StopArrivalDemo(.skipAllOthers))
         case "road-skip-all-meet": return AnyView(StopArrivalDemo(.skipAllMeeting))
         // D57: the camera's long and short hops on the driving map, then the recap map's steps, looping.
-        case "live-activity-spike": return AnyView(LiveActivitySpikeDemo())
+        case let name where name.hasPrefix("live-activity-") && LiveActivityDemo.names.contains(String(name.dropFirst(14))):
+            return AnyView(LiveActivityDemo(name: String(name.dropFirst(14))))
         case "camera-tour": return AnyView(CameraTourDemo().environment(LocationPermission()).environment(AuthModel()))
         // D70: following my car on its own fixes every second, the other cars written every 5 s, gliding.
         case "follow-drive": return AnyView(FollowDriveDemo().environment(LocationPermission()).environment(AuthModel()))

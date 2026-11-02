@@ -44,6 +44,11 @@ final class TripSession {
     /// True while this car's sharing is paused: the tracker paused it here, or the car doc says so
     /// (e.g. after a relaunch) and the pause has not expired.
     var isPaused: Bool { TripSessionLogic.isPaused(pausedAt: pauseStart, now: clock()) }
+    /// When the pause ends by itself (`TripSessionLogic.pauseExpiry`), nil while sharing is on. The Live Activity counts down to it.
+    var pausedUntil: Date? {
+        guard isPaused, let start = pauseStart else { return nil }
+        return start.addingTimeInterval(TripSessionLogic.pauseExpiry)
+    }
     var isEnded: Bool { trip?.status == .ended }
     /// Started (`startedAt`) and not ended: the one answer the lobby and the convoy both read.
     var isStarted: Bool { TripSessionLogic.isStarted(trip) }
