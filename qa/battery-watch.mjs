@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { initializeApp } from 'firebase/app';
+import { attachAppCheck } from './lib/appcheck.mjs';
 import { deleteUser, getAuth, signInAnonymously } from 'firebase/auth';
 import { deleteDoc, doc, initializeFirestore, onSnapshot, terminate } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -35,6 +36,7 @@ const config = productionFirebaseConfig();
 spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
 
 const app = initializeApp(config);
+attachAppCheck(app, config);
 const auth = getAuth(app);
 const { user } = await signInAnonymously(auth);
 const db = initializeFirestore(app, {});

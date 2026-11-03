@@ -36,6 +36,7 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/
 import { CarRouteLogic, Polyline, RouteLine, bearing } from './route.mjs';
 import { ApproachCore, PositionBuilder, PositionPublisher } from './tracking.mjs';
 import { PROJECT_ID, REGION, productionFirebaseConfig } from './firebase-config.mjs';
+import { attachAppCheck } from './appcheck.mjs';
 import { endsWithResult, run, simctl, sleep } from './shell.mjs';
 import { loadRoutes } from './scenario.mjs';
 
@@ -95,6 +96,7 @@ export function firebaseConfig(o, appId) {
  */
 export async function connectEmulators(o, appId) {
   const app = initializeApp(firebaseConfig(o, appId), appId);
+  if (o.backend === 'production') attachAppCheck(app, firebaseConfig(o, appId));
   const auth = getAuth(app);
   const db = initializeFirestore(app, {});
   const fns = getFunctions(app, REGION);

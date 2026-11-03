@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { endsWithResult } from './lib/shell.mjs';
+import { attachAppCheck } from './lib/appcheck.mjs';
 import { Polyline, destinationPoint, haversine } from './lib/route.mjs';
 
 const emulators = process.argv.includes('--emulators');
@@ -37,6 +38,7 @@ const end = endsWithResult({ deadlineS: 300, signals: true });
 const clients = []; // every signed-in client, so cleanup reaches them whatever fails
 async function client(name) {
   const app = initializeApp(config, name);
+  if (!emulators) attachAppCheck(app, config);
   const auth = getAuth(app);
   const db = initializeFirestore(app, {});
   const fns = getFunctions(app, REGION);
