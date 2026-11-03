@@ -130,4 +130,31 @@ struct NameStepTests {
         #expect(!model.askingName)
         #expect(model.mode == .list)
     }
+
+    /// Q33: the location request ended with no answer; the name step isn't left on "Signing in" and Where to? follows.
+    @Test func undecidedLocationAfterTheNameClearsTheSpinnerAndGoesOnToWhereTo() async {
+        let model = HomeModel()
+        model.beginNaming(camera: camera(3), goBack: { _ in })
+        model.nameStep?.name = "Aqlan"
+        let signedIn = await model.nameStep?.submit(signIn: { _ in })
+        #expect(signedIn == true)
+        #expect(model.nameStep?.isWorking == true)
+        let permission = LocationPermission(demo: .notDetermined)
+        permission.noAnswerLimit = .milliseconds(50)
+        let answer = await permission.requestWhenInUse()
+        #expect(answer == .notDetermined)
+        #expect(model.locationUndecidedAfterName(answer))
+        #expect(model.nameStep?.isWorking == false)
+        #expect(model.creating)
+        model.endNameHandOff()
+        #expect(model.nameStep != nil)
+        #expect(model.creating)
+    }
+
+    @Test func aDecidedAnswerLeavesTheHandOffToTheCaller() {
+        let model = HomeModel()
+        model.beginNaming(camera: camera(3), goBack: { _ in })
+        #expect(!model.locationUndecidedAfterName(.denied))
+        #expect(!model.creating)
+    }
 }

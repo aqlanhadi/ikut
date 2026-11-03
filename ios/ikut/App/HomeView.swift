@@ -327,7 +327,11 @@ struct HomeView: View {
         while true {
             switch LocationAccess.nextAction(status: location.status, accuracy: location.accuracy, context: .joiningTrip) {
             case .requestWhenInUse:
-                if await location.requestWhenInUse() == .notDetermined { return }
+                if await location.requestWhenInUse() == .notDetermined {
+                    // No answer within the cap: go on to Where to? instead of leaving the name step on its spinner (Q33).
+                    if case .create = route, keepingSheet { home.locationUndecidedAfterName(.notDetermined) }
+                    return
+                }
                 // A join link took the sheet over while iOS's prompt was up.
                 if keepingSheet, home.nameStep == nil { return }
             case .requestFullAccuracy:
