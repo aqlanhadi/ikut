@@ -49,7 +49,7 @@ For field tests and battery runs, install with the `ikut-release` scheme. It bui
 
 App Check makes the app prove to Firebase that it is the real app, so someone who only has the committed `GoogleService-Info.plist` can't call the backend.
 
-- Release build on a real iPhone: Apple App Attest. This needs the App Attest entitlement, which a free personal team can't sign; until the paid team is set up (see the comment on `IKUT_APPATTEST` in `ios/project.yml`), Release builds use the debug provider like the rest.
+- Release build on a real iPhone: Apple App Attest. This needs the App Attest entitlement, which a free personal team can't sign. `IKUT_APPATTEST` is `YES` in `ios/project.yml` (the paid team is enrolled); clear it to build with a free team, and Release then uses the debug provider like the rest. The same switch signs in Sign in with Apple.
 - Debug builds, the simulator, and any device without App Attest: the App Check debug provider. The first launch logs a debug token.
 - Against the local emulators the app sends no token and the emulators ignore App Check (the functions never enforce it there), so tests and simulated drives work as before. Firebase logs "Cannot instantiate FIRAppCheck … without a provider factory" on every emulator launch; it is harmless.
 

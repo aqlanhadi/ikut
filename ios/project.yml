@@ -60,9 +60,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikut
         # App Attest needs a paid team: the free Personal Team's profile can't carry the entitlement
         # (the build stops with "Provisioning profile ... doesn't include the App Attest capability").
-        # Once the paid team is enrolled (S1): set DEVELOPMENT_TEAM above, then set IKUT_APPATTEST to "YES".
-        # That one switch signs the entitlement in and makes Release use App Attest on a device.
-        # Until then Release falls back to the App Check debug provider (see AppCheckProviderChoice).
+        # The paid team is enrolled (S1), so IKUT_APPATTEST is "YES": the one switch signs the entitlement in and makes
+        # Release use App Attest on a device. Clear it to "" to build with a free team (Release then falls back to the
+        # App Check debug provider, see AppCheckProviderChoice).
         CODE_SIGN_ENTITLEMENTS: $(IKUT_APPATTEST_ENTITLEMENTS_$(IKUT_APPATTEST))
         IKUT_APPATTEST_ENTITLEMENTS_YES: ikut/ikut.entitlements
         # Sign in with Apple (A3) is in ikut.entitlements too, so the one switch above signs both in on a device. A
@@ -76,7 +76,7 @@ targets:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(IKUT_SIWA_FLAG_$(IKUT_APPATTEST))
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]": $(inherited) IKUT_SIWA
         IKUT_SIWA_FLAG_YES: IKUT_SIWA
-        IKUT_APPATTEST: ""
+        IKUT_APPATTEST: "YES"
         IKUT_APPATTEST_ENVIRONMENT: production
         ASSETCATALOG_COMPILER_APPICON_NAME: ikut
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

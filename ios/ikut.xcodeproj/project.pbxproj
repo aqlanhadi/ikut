@@ -2034,7 +2034,7 @@
 				CODE_SIGN_ENTITLEMENTS = "$(IKUT_APPATTEST_ENTITLEMENTS_$(IKUT_APPATTEST))";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "$(IKUT_SIM_ENTITLEMENTS_$(IKUT_APPATTEST))";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				IKUT_APPATTEST = "";
+				IKUT_APPATTEST = YES;
 				IKUT_APPATTEST_ENTITLEMENTS_YES = ikut/ikut.entitlements;
 				IKUT_APPATTEST_ENVIRONMENT = development;
 				IKUT_SIM_ENTITLEMENTS_ = "ikut/ikut-simulator.entitlements";
@@ -2264,7 +2264,7 @@
 				CODE_SIGN_ENTITLEMENTS = "$(IKUT_APPATTEST_ENTITLEMENTS_$(IKUT_APPATTEST))";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "$(IKUT_SIM_ENTITLEMENTS_$(IKUT_APPATTEST))";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				IKUT_APPATTEST = "";
+				IKUT_APPATTEST = YES;
 				IKUT_APPATTEST_ENTITLEMENTS_YES = ikut/ikut.entitlements;
 				IKUT_APPATTEST_ENVIRONMENT = production;
 				IKUT_SIM_ENTITLEMENTS_ = "ikut/ikut-simulator.entitlements";
