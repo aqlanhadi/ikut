@@ -211,7 +211,7 @@ struct JoinSheet: View {
         NameStepSections(name: $model.displayName, isWorking: isWorking, error: nameError,
                          footer: "What the convoy sees in new trips. Joining needs only a name, no account.",
                          focused: $nameFocused, onSubmit: submitName,
-                         apple: AppleStepActions(working: { isWorking = $0 }, signedIn: { model.displayName = auth.displayName ?? model.displayName; isWorking = false; goNext() },
+                         apple: AppleStepActions(working: { isWorking = $0 }, signedIn: { model.displayName = $0; isWorking = false; goNext() },
                                                  line: { nameError = $0 }))
     }
 

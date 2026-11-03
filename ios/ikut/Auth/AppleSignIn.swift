@@ -25,8 +25,8 @@ struct AppleIdentity {
 /// signed-in user. The Firebase calls come in as closures (`AuthModel.signInWithApple`), so the logic is testable.
 enum AppleSignIn {
     enum Outcome: Equatable {
-        /// Signed in and the Auth profile has a name.
-        case signedIn
+        /// Signed in; the Auth profile has this name (cleaned, at most 30 characters).
+        case signedIn(name: String)
         /// Signed in, but Apple sent no name and the profile has none: the name step still asks for one.
         case needsName
         /// The person closed Apple's sheet. Not a problem, nothing to show.
@@ -59,7 +59,12 @@ enum AppleSignIn {
     /// "Given Family" from what Apple sent, or nil when there is nothing usable (Apple only sends it the first time).
     static func displayName(from name: PersonNameComponents?) -> String? {
         guard let name else { return nil }
-        let joined = [name.givenName, name.familyName].compactMap { $0 }.joined(separator: " ")
+        return cleanName([name.givenName, name.familyName].compactMap { $0 }.joined(separator: " "))
+    }
+
+    /// A name from the profile or from Apple as the convoy shows it: whitespace tidied, cut to the limit; nil when empty.
+    static func cleanName(_ raw: String?) -> String? {
+        guard let joined = raw else { return nil }
         switch DisplayName.validate(joined) {
         case .success(let value): return value
         case .failure(.empty): return nil
@@ -96,11 +101,10 @@ enum AppleSignIn {
             if isCancelled(error) { return .cancelled }
             throw error
         }
-        var name = try await signIn(identity, rawNonce)
-        if name?.isEmpty != false, let fromApple = displayName(from: identity.fullName) {
-            try await saveName(fromApple)
-            name = fromApple
-        }
-        return name?.isEmpty == false ? .signedIn : .needsName
+        let existing = try await signIn(identity, rawNonce)
+        // The profile's name wins (Apple sends it once); either is cleaned, and saved when that changed it.
+        guard let name = cleanName(existing) ?? displayName(from: identity.fullName) else { return .needsName }
+        if name != existing { try await saveName(name) }
+        return .signedIn(name: name)
     }
 }

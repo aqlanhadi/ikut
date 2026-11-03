@@ -580,6 +580,8 @@ struct TripsHomeView: View {
         #endif
     }
 
+    private var tripInNow: Bool { !HomeNow.split(model.past).now.isEmpty }
+
     private func signOut() {
         settingsShown = false
         auth.signOut()
@@ -589,11 +591,11 @@ struct TripsHomeView: View {
         let onRename = { newName = profileName ?? ""; renaming = true }
         #if DEBUG
         let method = demoAlert == "settings-guest" ? SignInMethod.guest : auth.signInMethod ?? (demoAlert?.hasPrefix("settings") == true ? .apple : nil)
-        return SettingsSheet(name: profileName ?? "", signInMethod: method, design: demoAlert?.hasPrefix("settings-design") == true,
+        return SettingsSheet(name: profileName ?? "", signInMethod: method, tripInNow: tripInNow, design: demoAlert?.hasPrefix("settings-design") == true,
                              drill: Self.settingsDrill(demoAlert), onRename: onRename, onSignOut: signOut,
                              onClose: { settingsShown = false })
         #else
-        return SettingsSheet(name: profileName ?? "", signInMethod: auth.signInMethod, onRename: onRename, onSignOut: signOut,
+        return SettingsSheet(name: profileName ?? "", signInMethod: auth.signInMethod, tripInNow: tripInNow, onRename: onRename, onSignOut: signOut,
                              onClose: { settingsShown = false })
         #endif
     }

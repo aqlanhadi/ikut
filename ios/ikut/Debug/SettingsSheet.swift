@@ -8,6 +8,8 @@ struct SettingsSheet: View {
 
     var name: String
     var signInMethod: SignInMethod?
+    /// A trip is in Now: signing out would strand the car in it, so Sign out waits until it is left.
+    var tripInNow = false
     var onRename: () -> Void
     var onSignOut: () -> Void
     var onClose: () -> Void
@@ -15,10 +17,11 @@ struct SettingsSheet: View {
     @State private var path = NavigationPath()
 
     /// `design` opens with Design language pushed, and `drill` one of its lists on top of it (launch states).
-    init(name: String, signInMethod: SignInMethod? = nil, design: Bool = false, drill: DesignDrill? = nil,
+    init(name: String, signInMethod: SignInMethod? = nil, tripInNow: Bool = false, design: Bool = false, drill: DesignDrill? = nil,
          onRename: @escaping () -> Void, onSignOut: @escaping () -> Void = {}, onClose: @escaping () -> Void) {
         self.name = name
         self.signInMethod = signInMethod
+        self.tripInNow = tripInNow
         self.onRename = onRename
         self.onSignOut = onSignOut
         self.onClose = onClose
@@ -46,17 +49,20 @@ struct SettingsSheet: View {
                     }
                     if let signInMethod {
                         Section {
-                            LabeledContent("Signed in with", value: signInMethod == .apple ? "Apple" : "Guest")
-                                .accessibilityIdentifier(AXID.Debug.settingsSignIn)
+                            LabeledContent("Account") {
+                                if signInMethod == .apple { Text("Apple") } else { Text("Guest (no account)") }
+                            }
+                            .accessibilityIdentifier(AXID.Debug.settingsSignIn)
                             Button("Sign out", role: .destructive) { asking = true }
+                                .disabled(tripInNow)
                                 .accessibilityIdentifier(AXID.Debug.settingsSignOut)
-                        } header: {
-                            Text("Account")
                         } footer: {
-                            if signInMethod == .apple {
-                                Text("Sign in with Apple again to get your trips back.")
+                            if tripInNow {
+                                Text("Leave your current trip before you sign out.")
+                            } else if signInMethod == .apple {
+                                Text("Signing out clears the trips kept on this phone. Signing in with Apple again brings your name back.")
                             } else {
-                                Text("A guest has no account, so signing out starts you over with no trips.")
+                                Text("A guest has no account. Signing out clears the trips kept on this phone and you start over.")
                             }
                         }
                     }

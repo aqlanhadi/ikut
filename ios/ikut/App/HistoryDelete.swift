@@ -75,6 +75,18 @@ enum HistoryDelete {
         }
     }
 
+    /// Everything this phone keeps of its trips (Sign out): every entry's local files, any cached route or recap
+    /// left without an entry, and the "asked" memory.
+    @MainActor
+    static func removeAllLocal(defaults: UserDefaults = .standard) {
+        for entry in PastTrips.all(defaults: defaults) { removeLocalFiles(entry, defaults: defaults) }
+        for id in PastTripsMapService.cachedRoutes().keys {
+            PastTripsMapService.forget(tripId: id)
+            RecapService.removeCache(tripId: id)
+        }
+        UserDefaults.standard.removeObject(forKey: askedKey)
+    }
+
     /// `TripMapView`'s `@AppStorage` key for which asks were answered for a trip.
     static let askedKey = "ikut.map.askedTrip"
 

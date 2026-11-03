@@ -2039,6 +2039,7 @@
 				IKUT_APPATTEST_ENVIRONMENT = development;
 				IKUT_SIM_ENTITLEMENTS_ = "ikut/ikut-simulator.entitlements";
 				IKUT_SIM_ENTITLEMENTS_YES = ikut/ikut.entitlements;
+				IKUT_SIWA_FLAG_YES = IKUT_SIWA;
 				INFOPLIST_FILE = ikut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2047,6 +2048,8 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(IKUT_SIWA_FLAG_$(IKUT_APPATTEST))";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]" = "$(inherited) IKUT_SIWA";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_EMIT_LOC_STRINGS_ALLOW_IN_DEBUG = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2266,6 +2269,7 @@
 				IKUT_APPATTEST_ENVIRONMENT = production;
 				IKUT_SIM_ENTITLEMENTS_ = "ikut/ikut-simulator.entitlements";
 				IKUT_SIM_ENTITLEMENTS_YES = ikut/ikut.entitlements;
+				IKUT_SIWA_FLAG_YES = IKUT_SIWA;
 				INFOPLIST_FILE = ikut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2274,6 +2278,8 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(IKUT_SIWA_FLAG_$(IKUT_APPATTEST))";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]" = "$(inherited) IKUT_SIWA";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_EMIT_LOC_STRINGS_ALLOW_IN_DEBUG = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";

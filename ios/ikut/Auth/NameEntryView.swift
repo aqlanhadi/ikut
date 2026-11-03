@@ -28,7 +28,7 @@ struct NameEntryView: View {
     /// "Your name" and its field.
     private var nameFieldCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Just use a name", top: Spacing.xl)
+            CardHeader(AppleSignInButton.isAvailable ? "Just use a name" : "Your name", top: Spacing.xl)
                 .accessibilityHidden(true)
             TextField("Your name", text: $name)
                 .textContentType(.givenName)
@@ -57,16 +57,18 @@ struct NameEntryView: View {
                     .accessibilityAddTraits(.isHeader)
                     .padding(.horizontal, Spacing.l)
 
-                AppleSignInButton(actions: AppleStepActions(
-                    working: { isWorking = $0 }, signedIn: { isWorking = false; onDone() }, line: { errorMessage = $0 }),
-                                  disabled: isWorking)
-                    .padding(.top, Spacing.l)
+                if AppleSignInButton.isAvailable {
+                    AppleSignInButton(actions: AppleStepActions(
+                        working: { isWorking = $0 }, signedIn: { _ in isWorking = false; onDone() }, line: { errorMessage = $0 }),
+                                      disabled: isWorking)
+                        .padding(.top, Spacing.l)
+                }
 
                 nameFieldCard
                     .onChange(of: name) { errorMessage = nil }
 
                 if let errorMessage {
-                    InlineNote(.verbatim(errorMessage), tone: .alert)
+                    InlineNote(.verbatim(errorMessage), tone: AppleSignInButton.tone(for: errorMessage))
                         .padding(.top, Spacing.s)
                         .accessibilityIdentifier(AXID.Name.error)
                 }

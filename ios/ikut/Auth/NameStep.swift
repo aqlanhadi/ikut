@@ -49,8 +49,8 @@ final class NameStepState {
 struct AppleStepActions {
     /// Apple's sheet or the Firebase sign-in is running (true) or done (false): the step shows its spinner.
     var working: (Bool) -> Void
-    /// Signed in and named: carry on.
-    var signedIn: () -> Void
+    /// Signed in, with the profile's name: carry on.
+    var signedIn: (String) -> Void
     /// The line to show under the field: a problem, or that the name is still needed.
     var line: (String) -> Void
 }
@@ -63,6 +63,18 @@ struct AppleSignInButton: View {
     var actions: AppleStepActions
     var disabled: Bool
     @State private var rawNonce = ""
+
+    /// Whether this build carries the Sign in with Apple entitlement (`IKUT_SIWA`, from project.yml).
+    static var isAvailable: Bool {
+        #if IKUT_SIWA
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// The needs-a-name line is a nudge, not a problem, so it isn't drawn in the alert colour.
+    static func tone(for line: String) -> InlineNote.Tone { line == needsNameLine ? .hint : .alert }
 
     static let needsNameLine = "Apple didn’t share your name. Add the name the convoy should see."
 
@@ -85,9 +97,9 @@ struct AppleSignInButton: View {
         Task {
             do {
                 switch try await auth.signInWithApple(result, rawNonce: rawNonce) {
-                case .signedIn:
+                case .signedIn(let name):
                     // The spinner stays up, for whatever comes next to replace the step.
-                    actions.signedIn()
+                    actions.signedIn(name)
                     return
                 case .needsName:
                     actions.line(Self.needsNameLine)
@@ -113,8 +125,10 @@ struct NameStepSections: View {
     /// Nil leaves the step as a name only.
     var apple: AppleStepActions?
 
+    private var showsApple: Bool { apple != nil && AppleSignInButton.isAvailable }
+
     var body: some View {
-        if let apple {
+        if let apple, AppleSignInButton.isAvailable {
             Section {
                 AppleSignInButton(actions: apple, disabled: isWorking)
                     .listRowInsets(EdgeInsets())
@@ -137,11 +151,11 @@ struct NameStepSections: View {
         } header: {
             // The line and the caption share the header, so the field stays as high as it was above the keyboard.
             VStack(alignment: .leading, spacing: Spacing.m) {
-                if apple == nil {
+                if !showsApple {
                     Text("Drive together. Arrive together.")
                         .font(.title3).foregroundStyle(.secondary).textCase(nil)
                 }
-                if apple == nil {
+                if !showsApple {
                     Text("Your name").accessibilityHidden(true)
                 } else {
                     Text("Just use a name").accessibilityHidden(true)
@@ -152,7 +166,7 @@ struct NameStepSections: View {
         }
         if let error {
             Section {
-                InlineNote(.verbatim(error), tone: .alert, inset: 0)
+                InlineNote(.verbatim(error), tone: AppleSignInButton.tone(for: error), inset: 0)
                     .lobbyRow()
                     .accessibilityIdentifier(AXID.Name.error)
             }

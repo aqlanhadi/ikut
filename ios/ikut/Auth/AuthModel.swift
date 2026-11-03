@@ -57,8 +57,12 @@ final class AuthModel {
     }
 
     /// Settings' Sign out. The state listener then moves `state` to `.signedOut`.
+    /// It also clears this phone's local history, so the next person to sign in doesn't see these trips.
     func signOut() {
-        Self.performSignOut(signOut: { try Auth.auth().signOut() }, forget: JoinTowns.forgetAll)
+        Self.performSignOut(signOut: { try Auth.auth().signOut() }, forget: {
+            HistoryDelete.removeAllLocal()
+            JoinTowns.forgetAll()
+        })
     }
 
     /// The decision on its own, so a test can feed it errors: only "user gone" errors sign out;
@@ -114,8 +118,11 @@ final class AuthModel {
         return try await AppleSignIn.complete(mapped, rawNonce: rawNonce, signIn: { identity, nonce in
             let credential = OAuthProvider.appleCredential(withIDToken: identity.idToken, rawNonce: nonce,
                                                            fullName: identity.fullName)
-            let signedIn = try await Auth.auth().signIn(with: credential)
-            return signedIn.user.displayName
+            let user = try await Auth.auth().signIn(with: credential).user
+            // Now, not when the listener's task runs: the sheet reads the name and method straight after.
+            self.apply(uid: user.uid, name: user.displayName,
+                       method: SignInMethod.of(providerIDs: user.providerData.map(\.providerID)))
+            return user.displayName
         }, saveName: { try await self.setName($0) })
     }
 

@@ -55,7 +55,6 @@ TripMapView|View|Map/TripMapView.swift|1
 TripScreenHost|View|Map/TripScreen.swift|1
 WelcomeView|View|App/WelcomeView.swift|1
 WhereToSheet|View|Trip/NewTripSheet.swift|1
-AppleSignInButton|View|Auth/NameStep.swift|2
 ConvoyPanel|View|Map/ConvoyPanel.swift|2
 DrivingList|ViewModifier|Map/TripMapView.swift|2
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|2
@@ -87,6 +86,7 @@ StopNote|View|Lobby/LobbyStopsViews.swift|4
 RecapEventDot|View|Recap/RecapView.swift|5
 RouteTotalLine|View|Lobby/LobbyStopsViews.swift|5
 TripsHomeView|View|App/TripsHomeView.swift|5
+AppleSignInButton|View|Auth/NameStep.swift|8
 DarkBanner|View|Alerts/DarkBanner.swift|11
 StopActionButton|View|Stops/StopCardParts.swift|18
 """

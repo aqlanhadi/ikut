@@ -71,6 +71,11 @@ targets:
         CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: $(IKUT_SIM_ENTITLEMENTS_$(IKUT_APPATTEST))
         IKUT_SIM_ENTITLEMENTS_YES: ikut/ikut.entitlements
         IKUT_SIM_ENTITLEMENTS_: ikut/ikut-simulator.entitlements
+        # IKUT_SIWA is set exactly when the build carries the Sign in with Apple entitlement (a simulator, or the
+        # switch on); without it the name step shows only the name field instead of a button that can't work.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(IKUT_SIWA_FLAG_$(IKUT_APPATTEST))
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]": $(inherited) IKUT_SIWA
+        IKUT_SIWA_FLAG_YES: IKUT_SIWA
         IKUT_APPATTEST: ""
         IKUT_APPATTEST_ENVIRONMENT: production
         ASSETCATALOG_COMPILER_APPICON_NAME: ikut

@@ -163,14 +163,14 @@ struct AppleSignInTests {
         nonisolated(unsafe) var nonce: String?
         let outcome = try await AppleSignIn.complete(.success(AppleIdentity(idToken: "t", fullName: parts)), rawNonce: "raw",
                                                      signIn: { _, n in nonce = n; return nil }, saveName: { saved = $0 })
-        #expect(outcome == .signedIn && saved == "Nurul Aina" && nonce == "raw")
+        #expect(outcome == .signedIn(name: "Nurul Aina") && saved == "Nurul Aina" && nonce == "raw")
     }
 
     @Test func aReturningUserWithANameKeepsIt() async throws {
         nonisolated(unsafe) var saved: String?
         let outcome = try await AppleSignIn.complete(.success(AppleIdentity(idToken: "t", fullName: nil)), rawNonce: "n",
                                                      signIn: { _, _ in "Nurul" }, saveName: { saved = $0 })
-        #expect(outcome == .signedIn && saved == nil)
+        #expect(outcome == .signedIn(name: "Nurul") && saved == nil)
     }
 
     @Test func aReturningUserWithoutANameLandsOnTheNameStep() async throws {
@@ -181,6 +181,24 @@ struct AppleSignInTests {
         #expect(AuthModel.state(uid: "apple-user", name: "") == .signedOut)
         #expect(AuthModel.state(uid: "apple-user", name: nil) == .signedOut)
         #expect(AuthModel.state(uid: "apple-user", name: "Nurul") == .signedIn)
+    }
+
+    @Test func anOverLongAppleNameIsCutAndSavedCut() async throws {
+        var parts = PersonNameComponents()
+        parts.givenName = String(repeating: "a", count: 25)
+        parts.familyName = String(repeating: "b", count: 25)
+        nonisolated(unsafe) var saved: String?
+        let outcome = try await AppleSignIn.complete(.success(AppleIdentity(idToken: "t", fullName: parts)), rawNonce: "n",
+                                                     signIn: { _, _ in nil }, saveName: { saved = $0 })
+        #expect(saved?.count == DisplayName.maxLength)
+        #expect(outcome == .signedIn(name: saved ?? "?"))
+    }
+
+    @Test func aProfileNameThatNeedsCleaningIsSavedCleaned() async throws {
+        nonisolated(unsafe) var saved: String?
+        let outcome = try await AppleSignIn.complete(.success(AppleIdentity(idToken: "t", fullName: nil)), rawNonce: "n",
+                                                     signIn: { _, _ in "  Nurul   Aina " }, saveName: { saved = $0 })
+        #expect(saved == "Nurul Aina" && outcome == .signedIn(name: "Nurul Aina"))
     }
 
     @Test func providerDecidesTheSignInMethod() {
