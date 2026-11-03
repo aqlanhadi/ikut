@@ -48,6 +48,7 @@ struct SettingsSheet: View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 SheetHeader(title: "Settings", onClose: onClose)
+                    .disabled(deleting)
                     .padding(.horizontal, Spacing.l)
                     .padding(.top, Spacing.l)
                 List {
@@ -102,6 +103,7 @@ struct SettingsSheet: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .disabled(deleting)
             }
             .confirmationDialog("Sign out?", isPresented: $asking, titleVisibility: .visible) {
                 Button("Sign out", role: .destructive, action: onSignOut)
@@ -112,7 +114,7 @@ struct SettingsSheet: View {
                 Button("Keep my account", role: .cancel) {}
             } message: {
                 if tripInNow {
-                    Text("This removes your name and your cars from every trip, and what you posted. Trips you organise are handed to someone else, or ended if nobody else is in them. The trip you’re in now will be handed over or ended too. It can’t be undone. Apple will ask you to confirm it’s you.")
+                    Text("This removes your name and your cars from every trip, and what you posted. You’ll leave the trip you’re in now. If you organise it, it’s handed to someone else or ended. It can’t be undone. Apple will ask you to confirm it’s you.")
                 } else {
                     Text("This removes your name and your cars from every trip, and what you posted. Trips you organise are handed to someone else, or ended if nobody else is in them. It can’t be undone. Apple will ask you to confirm it’s you.")
                 }

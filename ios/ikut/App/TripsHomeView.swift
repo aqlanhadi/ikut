@@ -677,6 +677,8 @@ struct TripsHomeView: View {
             Button("OK", role: .cancel) {}
         }
         .onAppear { if !model.isDemo { model.reloadPast() } }
+        // Sign out and Delete account clear the saved trips: the list follows, instead of showing them until it reappears.
+        .onChange(of: auth.state) { if !model.isDemo { model.reloadPast() } }
         // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
         .task(id: parts.now.map(\.id)) {
             guard !model.isDemo else { return }

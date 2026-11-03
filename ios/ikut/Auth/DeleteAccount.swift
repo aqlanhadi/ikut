@@ -32,6 +32,8 @@ enum DeleteAccount {
         var stopWork: @MainActor () -> Void
         /// Shows Apple's sheet; throws what the sheet throws (a closed sheet is `AppleSignIn.isCancelled`).
         var askApple: @MainActor () async throws -> Proof
+        /// Asks Firebase whether the signed-in user still exists; throws what the SDK throws (a gone user is `AuthModel.isMissingUser`).
+        var reload: @MainActor () async throws -> Void
         var reauthenticate: @MainActor (Proof) async throws -> Void
         var revoke: @MainActor (String) async throws -> Void
         var callServer: @MainActor ([String]) async throws -> Void
@@ -59,8 +61,24 @@ enum DeleteAccount {
         return out
     }
 
+    /// True when the SDK says the user is gone from the server (a deletion that finished but whose answer was lost).
+    @MainActor
+    private static func userIsGone(_ steps: Steps) async -> Bool {
+        do { try await steps.reload() } catch let error as NSError where AuthModel.isMissingUser(error) { return true } catch {}
+        return false
+    }
+
+    @MainActor
+    private static func finish(_ steps: Steps) -> Outcome {
+        steps.clearLocal()
+        steps.signOut()
+        return .deleted
+    }
+
     @MainActor
     static func run(tripIds ids: [String], steps: Steps) async -> Outcome {
+        // An earlier try may have deleted the account with its answer lost: nothing is left to ask Apple about.
+        if await userIsGone(steps) { return finish(steps) }
         let proof: Proof
         do {
             proof = try await steps.askApple()
@@ -69,28 +87,34 @@ enum DeleteAccount {
         }
         guard let code = proof.identity.authorizationCode, !code.isEmpty else { return .failed(noCodeLine) }
         steps.stopWork()
-        var alreadyGone = false
         do {
             try await steps.reauthenticate(proof)
         } catch let error as NSError where AuthModel.isMissingUser(error) {
-            // A deletion that finished but whose answer was lost: nothing is left to delete or revoke.
-            alreadyGone = true
+            return finish(steps)
+        } catch let error as NSError {
+            // The SDK reports a deleted user as a mismatch with the Apple ID: ask again whether the user is there.
+            if AuthErrorCode(rawValue: error.code) == .userMismatch, error.domain == AuthErrorDomain, await userIsGone(steps) {
+                return finish(steps)
+            }
+            return .failed(line(for: error))
+        }
+        do {
+            try await steps.revoke(code)
+            try await steps.callServer(tripIds(ids))
+        } catch let error as NSError where AuthModel.isMissingUser(error) {
+            // The account went away between the steps.
         } catch {
             return .failed(line(for: error))
         }
-        if !alreadyGone {
-            do {
-                try await steps.revoke(code)
-                try await steps.callServer(tripIds(ids))
-            } catch let error as NSError where AuthModel.isMissingUser(error) {
-                // Same: the account went away between the steps.
-            } catch {
-                return .failed(line(for: error))
-            }
-        }
-        steps.clearLocal()
-        steps.signOut()
-        return .deleted
+        return finish(steps)
+    }
+
+    /// Revokes Apple's token. Needs the signed-in user: without one the SDK never calls back, so this throws instead.
+    /// The Auth emulator has no revoke, so an emulator build skips it. `send` is the SDK call.
+    @MainActor static func revokeToken(_ code: String, hasUser: Bool, emulator: Bool, send: (String) async throws -> Void) async throws {
+        guard hasUser else { throw NSError(domain: AuthErrorDomain, code: AuthErrorCode.userNotFound.rawValue) }
+        if emulator { return }
+        try await send(code)
     }
 
     static func line(for error: Error) -> String {
@@ -118,13 +142,23 @@ enum DeleteAccount {
         Steps(
             stopWork: stopWork,
             askApple: { try await AppleSheet.ask() },
+            reload: {
+                guard let user = Auth.auth().currentUser else { throw NSError(domain: AuthErrorDomain, code: AuthErrorCode.userNotFound.rawValue) }
+                try await user.reload()
+            },
             reauthenticate: { proof in
                 guard let user = Auth.auth().currentUser else { throw NSError(domain: AuthErrorDomain, code: AuthErrorCode.userNotFound.rawValue) }
                 let credential = OAuthProvider.appleCredential(withIDToken: proof.identity.idToken, rawNonce: proof.rawNonce,
                                                                fullName: nil)
                 _ = try await user.reauthenticate(with: credential)
             },
-            revoke: { code in try await Auth.auth().revokeToken(withAuthorizationCode: code) },
+            revoke: { code in
+                var isEmulator = false
+                if case .emulators = Backend.current { isEmulator = true }
+                try await revokeToken(code, hasUser: Auth.auth().currentUser != nil, emulator: isEmulator) {
+                    try await Auth.auth().revokeToken(withAuthorizationCode: $0)
+                }
+            },
             callServer: { ids in
                 let callable = Backend.functions.httpsCallable("deleteAccount")
                 callable.timeoutInterval = serverTimeout
@@ -133,6 +167,7 @@ enum DeleteAccount {
             clearLocal: {
                 HistoryDelete.removeAllLocal()
                 JoinTowns.forgetAll()
+                PersistenceReset.markPending()
             },
             signOut: { try? Auth.auth().signOut() })
     }

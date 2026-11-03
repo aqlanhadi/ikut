@@ -200,6 +200,7 @@
 		8699DA76482D1A79209C0CA7 /* HomeRenameAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733A27B1422ACC870244D3E8 /* HomeRenameAlerts.swift */; };
 		8736207F4C70DFC6ED87A072 /* BannerSlotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385EEAB04673E246156A8065 /* BannerSlotTests.swift */; };
 		875D0079B62FB671E73E3916 /* README-places.md in Resources */ = {isa = PBXBuildFile; fileRef = CBAB9007352FC219EF36852D /* README-places.md */; };
+		89571CE45B001FB16BAB1AEC /* PersistenceReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = D605884AAAE6566E945B6974 /* PersistenceReset.swift */; };
 		896F02208FFDCCBE93C739BF /* StopCardDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8874DCFA37C43892F53DB83 /* StopCardDemo.swift */; };
 		89BB595EFC0CFB11F2BC5EA8 /* ConvoyActivityLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = D278F4DEDDD5B7826C759896 /* ConvoyActivityLogic.swift */; };
 		89E1E4C74927026617A7BC88 /* TripScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511C3C2D00712F5DF0E5FBDE /* TripScreen.swift */; };
@@ -349,6 +350,7 @@
 		EA34025E916A7D1EF7A5734B /* StopContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEB2E053516041BB6ABA3EB /* StopContext.swift */; };
 		EADBB7EA2839D720F78BA224 /* ikutWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7597286138529A2317F2E764 /* ikutWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EAECDAF546E87856E651B8DA /* ConvoyLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F5509881A45EDE95C9A4959 /* ConvoyLiveActivity.swift */; };
+		EB5D393BAA3D102D75BA891A /* DeleteAccountEmulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09AE57E03FBFC41245ADFA0C /* DeleteAccountEmulatorTests.swift */; };
 		EC912979E5006A45CFC1EBE8 /* LobbyMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B249BC9D63DDB50ACFFF29BF /* LobbyMapTests.swift */; };
 		ECFB40507E2C0ED0F4BEDE8E /* HomeNow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5E973FCE988F061DA7D83 /* HomeNow.swift */; };
 		ED90BE38CF8197260613896B /* StopArrival.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EAE8F3DD34538653CD0A53 /* StopArrival.swift */; };
@@ -426,6 +428,7 @@
 		076A4E68B7B0C8291C62A7BB /* NextStopDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextStopDemo.swift; sourceTree = "<group>"; };
 		091A73560C6A3A87AF053698 /* PlaceSide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSide.swift; sourceTree = "<group>"; };
 		091C79B7B0A90381F07CB73D /* TripComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripComponents.swift; sourceTree = "<group>"; };
+		09AE57E03FBFC41245ADFA0C /* DeleteAccountEmulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountEmulatorTests.swift; sourceTree = "<group>"; };
 		09C338848B4C5F5868C34A58 /* SheetStopsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetStopsTests.swift; sourceTree = "<group>"; };
 		0A209AB9671B47B22C20E451 /* ikut.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = ikut.icon; sourceTree = "<group>"; };
 		0A4E5CFD212660AF7CDEACD3 /* DesignTokenCeiling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokenCeiling.swift; sourceTree = "<group>"; };
@@ -716,6 +719,7 @@
 		D48A434052AFFBB764E4C775 /* JoinLocationStepUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinLocationStepUITests.swift; sourceTree = "<group>"; };
 		D5B9983493E2F7D36C7DE967 /* NameStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameStep.swift; sourceTree = "<group>"; };
 		D5CC855754E9178514F37A36 /* ConvoyActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyActivityController.swift; sourceTree = "<group>"; };
+		D605884AAAE6566E945B6974 /* PersistenceReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceReset.swift; sourceTree = "<group>"; };
 		D757ACAEB4EF983CCD2DA5F1 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyUITestCase.swift; sourceTree = "<group>"; };
 		D9BCB0351F2296820F0BECCE /* LiveActivitySamples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitySamples.swift; sourceTree = "<group>"; };
@@ -888,6 +892,7 @@
 				B525ECB828782B83874210FE /* DisplayName.swift */,
 				CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */,
 				D5B9983493E2F7D36C7DE967 /* NameStep.swift */,
+				D605884AAAE6566E945B6974 /* PersistenceReset.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -1233,6 +1238,7 @@
 				F2DDC8165D86585EE8935670 /* ConvoyStopTests.swift */,
 				E0D7B5FA67D691851818F691 /* ConvoyTests.swift */,
 				FF89FA387B7C3EF17035FE77 /* DeepLinkTests.swift */,
+				09AE57E03FBFC41245ADFA0C /* DeleteAccountEmulatorTests.swift */,
 				B499CD0B9D1847D86A8CE286 /* DeleteAccountTests.swift */,
 				FC037B2B119969C5EA87597F /* DesignInventoryTests.swift */,
 				F96D7D95AD4B85B47A729BFE /* DrivingGlanceTests.swift */,
@@ -1773,6 +1779,7 @@
 				684CB36C69FD2DA907C54EC7 /* PanelSheet.swift in Sources */,
 				0BAFE3B186247E8A27720E2D /* PastTripsMap.swift in Sources */,
 				D80A984085D33024BE6B519E /* PausedBanner.swift in Sources */,
+				89571CE45B001FB16BAB1AEC /* PersistenceReset.swift in Sources */,
 				C9EBB30503561CC0D3A77FD9 /* PickedTrip.swift in Sources */,
 				E65D046D442B93F1F5CBE70B /* PickedTripSheet.swift in Sources */,
 				38373405A6B7F536006DDAE3 /* Place.swift in Sources */,
@@ -1909,6 +1916,7 @@
 				9FDD61E28603B8F114691622 /* ConvoyStopTests.swift in Sources */,
 				D1864EF7221B8BE851CE5990 /* ConvoyTests.swift in Sources */,
 				7B2B2622524DCA230BA33FC3 /* DeepLinkTests.swift in Sources */,
+				EB5D393BAA3D102D75BA891A /* DeleteAccountEmulatorTests.swift in Sources */,
 				AECEC2B5BB3DF361746AA475 /* DeleteAccountTests.swift in Sources */,
 				961714A83150F17EEE627CDA /* DesignInventoryTests.swift in Sources */,
 				2850B1E1AF850FA86A54164D /* DrivingGlanceTests.swift in Sources */,
