@@ -68,10 +68,6 @@ struct SettingsSheet: View {
                             }
                             .accessibilityIdentifier(AXID.Debug.settingsSignIn)
                             Button("Sign out", role: .destructive) { asking = true }
-                                .confirmationDialog("Sign out?", isPresented: $asking, titleVisibility: .visible) {
-                                    Button("Sign out", role: .destructive, action: onSignOut)
-                                    Button("Stay signed in", role: .cancel) {}
-                                }
                                 .disabled(tripInNow)
                                 .accessibilityIdentifier(AXID.Debug.settingsSignOut)
                         } footer: {
@@ -95,16 +91,6 @@ struct SettingsSheet: View {
                                 .accessibilityIdentifier(AXID.Debug.settingsDeleting)
                             } else {
                                 Button("Delete account", role: .destructive) { confirmingDelete = true }
-                                    .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                                        Button("Delete account", role: .destructive, action: deleteAfterDialog)
-                                        Button("Keep my account", role: .cancel) {}
-                                    } message: {
-                                        if tripInNow {
-                                            Text("This removes your name and your cars from every trip, and what you posted. You’ll leave the trip you’re in now. If you organise it, it’s handed to someone else or ended. It can’t be undone. Apple will ask you to confirm it’s you.")
-                                        } else {
-                                            Text("This removes your name and your cars from every trip, and what you posted. Trips you organise are handed to someone else, or ended if nobody else is in them. It can’t be undone. Apple will ask you to confirm it’s you.")
-                                        }
-                                    }
                                     .accessibilityIdentifier(AXID.Debug.settingsDeleteAccount)
                             }
                         } footer: {
@@ -118,6 +104,20 @@ struct SettingsSheet: View {
                 }
                 .listStyle(.insetGrouped)
                 .disabled(deleting)
+            }
+            .alert("Sign out?", isPresented: $asking) {
+                Button("Sign out", role: .destructive, action: onSignOut)
+                Button("Stay signed in", role: .cancel) {}
+            }
+            .alert("Delete your account?", isPresented: $confirmingDelete) {
+                Button("Delete account", role: .destructive, action: deleteAfterDialog)
+                Button("Keep my account", role: .cancel) {}
+            } message: {
+                if tripInNow {
+                    Text("This removes your name and your cars from every trip, and what you posted. You’ll leave the trip you’re in now. If you organise it, it’s handed to someone else or ended. It can’t be undone. Apple will ask you to confirm it’s you.")
+                } else {
+                    Text("This removes your name and your cars from every trip, and what you posted. Trips you organise are handed to someone else, or ended if nobody else is in them. It can’t be undone. Apple will ask you to confirm it’s you.")
+                }
             }
             .alert("Your account is still here", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
                 Button("Try again", action: deleteAccount)
