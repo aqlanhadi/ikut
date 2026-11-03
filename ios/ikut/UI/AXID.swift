@@ -33,6 +33,8 @@ enum AXID {
         static let designLanguage = "designLanguage"
         static let liveActivityStart = "debug.liveActivity.start"
         static let liveActivityStatus = "debug.liveActivity.status"
+        static let settingsDeleteAccount = "settingsDeleteAccount"
+        static let settingsDeleting = "settingsDeleting"
         static let settingsDesign = "settingsDesign"
         static let settingsName = "settingsName"
         static let settingsSignIn = "settingsSignIn"
@@ -217,6 +219,8 @@ enum AXID {
         Debug.designLanguage,
         Debug.liveActivityStart,
         Debug.liveActivityStatus,
+        Debug.settingsDeleteAccount,
+        Debug.settingsDeleting,
         Debug.settingsDesign,
         Debug.settingsName,
         Debug.settingsSignIn,

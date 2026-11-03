@@ -23,7 +23,9 @@ enum StopLeaveService {
     }
 
     /// The organizer's display name from their member document (members can read it); nil when it can't be read.
+    /// An empty or "deleted" organiser id has no member document: no name, and no path is built.
     static func organizerName(tripId: String, organizerId: String) async -> String? {
+        guard FirestorePaths.isRealUserId(organizerId), !tripId.isEmpty else { return nil }
         let ref = Firestore.firestore().document(FirestorePaths.member(tripId: tripId, userId: organizerId))
         return try? await ref.getDocument(as: Member.self).displayName
     }
