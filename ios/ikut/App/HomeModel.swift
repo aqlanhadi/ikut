@@ -331,7 +331,18 @@ final class HomeModel {
     /// The hand-off from the name step ended: if Where to? wasn't asked for (a location answer stopped the trip), the list
     /// comes back; if a link took the sheet over, it is left alone.
     func endNameHandOff() {
+        nameStep?.isWorking = false
         if nameStep != nil, !creating { closeNaming() }
+    }
+
+    /// iOS's location request ended with no answer (no prompt came up, or the wait hit its cap, Q31): the name step
+    /// doesn't stay on its spinner and doesn't close; Where to? follows like it does after the join sheet's location
+    /// step, whatever the answer (D58), and the person answers iOS's prompt whenever it shows. True if it went on.
+    @discardableResult
+    func locationUndecidedAfterName(_ status: LocationAccess.Status) -> Bool {
+        guard status == .notDetermined else { return false }
+        nameStep?.isWorking = false
+        return creatingAfterName()
     }
 
     /// Back to Home's list. Nothing was written.
