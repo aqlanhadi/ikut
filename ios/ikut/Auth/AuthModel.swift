@@ -62,6 +62,7 @@ final class AuthModel {
         Self.performSignOut(signOut: { try Auth.auth().signOut() }, forget: {
             HistoryDelete.removeAllLocal()
             JoinTowns.forgetAll()
+            PersistenceReset.markPending()
         })
     }
 

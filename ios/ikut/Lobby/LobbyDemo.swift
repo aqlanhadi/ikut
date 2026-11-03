@@ -425,6 +425,9 @@ enum DemoScreens {
         // A3: the name step with Continue with Apple as the main choice, and the line when Apple sent no name.
         case "name-entry-apple": return AnyView(NameEntryView(demo: "apple").environment(AuthModel()))
         case "name-entry-apple-needs-name": return AnyView(NameEntryView(demo: "apple-needs-name").environment(AuthModel()))
+        case "settings-delete-ask": return home("settings-delete-ask")
+        case "settings-delete-working": return home("settings-delete-working")
+        case "settings-delete-error": return home("settings-delete-error")
         case "settings-design": return home("settings-design")
         case "settings-design-fonts": return home("settings-design-fonts")
         // The lobby with an ask already up: Start with a car not sharing, Leave, End, Trip name, the QR code.

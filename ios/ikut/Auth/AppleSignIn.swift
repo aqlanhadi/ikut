@@ -19,6 +19,8 @@ enum SignInMethod: Equatable {
 struct AppleIdentity {
     var idToken: String
     var fullName: PersonNameComponents?
+    /// The one-time code Apple's sheet returns, which Firebase needs to revoke the Apple token (account deletion).
+    var authorizationCode: String? = nil
 }
 
 /// Sign in with Apple through Firebase: the nonce, the name Apple sends once, and how a finished sheet turns into a
@@ -86,7 +88,8 @@ enum AppleSignIn {
               let data = credential.identityToken, let token = String(data: data, encoding: .utf8) else {
             throw Problem.noToken
         }
-        return AppleIdentity(idToken: token, fullName: credential.fullName)
+        let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+        return AppleIdentity(idToken: token, fullName: credential.fullName, authorizationCode: code)
     }
 
     /// Finishes a sheet result. `signIn` signs in with Firebase (replacing any guest) and returns the profile's name

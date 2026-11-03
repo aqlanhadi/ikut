@@ -165,6 +165,16 @@ private final class BackgroundTask: @unchecked Sendable {
     }
 }
 
+extension ConvoyActivityController {
+    /// Ends every convoy Live Activity on the Lock Screen, including one left by an earlier launch (account deletion).
+    static func endAll() {
+        for existing in Activity<ConvoyActivityAttributes>.activities {
+            let box = ActivityBox(existing)
+            Task { await box.end(final: nil, dismissAfter: nil) }
+        }
+    }
+}
+
 /// ActivityKit's calls are async and not main-actor, so the activity is held where Swift 6 can pass it around.
 private final class ActivityBox: @unchecked Sendable {
     let activity: Activity<ConvoyActivityAttributes>

@@ -13,11 +13,20 @@ struct SettingsSheet: View {
     var onRename: () -> Void
     var onSignOut: () -> Void
     var onClose: () -> Void
+    /// Deletes the account (Apple's sheet, the server, this phone); nil hides Delete account.
+    var onDeleteAccount: (() async -> DeleteAccount.Outcome)?
     @State private var asking = false
+    @State private var confirmingDelete = false
+    @State private var deleting = false
+    @State private var deleteError: String?
     @State private var path = NavigationPath()
 
     /// `design` opens with Design language pushed, and `drill` one of its lists on top of it (launch states).
+    /// `deleteDemo` opens with the delete confirmation, the working row or the try-again alert showing (launch states).
+    enum DeleteDemo { case ask, working, problem }
+
     init(name: String, signInMethod: SignInMethod? = nil, tripInNow: Bool = false, design: Bool = false, drill: DesignDrill? = nil,
+         deleteDemo: DeleteDemo? = nil, onDeleteAccount: (() async -> DeleteAccount.Outcome)? = nil,
          onRename: @escaping () -> Void, onSignOut: @escaping () -> Void = {}, onClose: @escaping () -> Void) {
         self.name = name
         self.signInMethod = signInMethod
@@ -25,6 +34,10 @@ struct SettingsSheet: View {
         self.onRename = onRename
         self.onSignOut = onSignOut
         self.onClose = onClose
+        self.onDeleteAccount = onDeleteAccount
+        _confirmingDelete = State(initialValue: deleteDemo == .ask)
+        _deleting = State(initialValue: deleteDemo == .working)
+        _deleteError = State(initialValue: deleteDemo == .problem ? DeleteAccount.tryAgainLine : nil)
         var path = NavigationPath()
         if design || drill != nil { path.append(Page.design) }
         if let drill { path.append(drill) }
@@ -35,6 +48,7 @@ struct SettingsSheet: View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 SheetHeader(title: "Settings", onClose: onClose)
+                    .disabled(deleting)
                     .padding(.horizontal, Spacing.l)
                     .padding(.top, Spacing.l)
                 List {
@@ -66,17 +80,52 @@ struct SettingsSheet: View {
                             }
                         }
                     }
+                    if signInMethod == .apple, onDeleteAccount != nil {
+                        Section {
+                            if deleting {
+                                HStack(spacing: Spacing.m) {
+                                    ProgressView()
+                                    Text("Deleting your account…")
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier(AXID.Debug.settingsDeleting)
+                            } else {
+                                Button("Delete account", role: .destructive) { confirmingDelete = true }
+                                    .accessibilityIdentifier(AXID.Debug.settingsDeleteAccount)
+                            }
+                        } footer: {
+                            Text("Removes your name and cars from every trip. This can’t be undone.")
+                        }
+                    }
                     Section("Developer") {
                         NavigationLink("Design language", value: Page.design)
                             .accessibilityIdentifier(AXID.Debug.settingsDesign)
                     }
                 }
                 .listStyle(.insetGrouped)
+                .disabled(deleting)
             }
             .confirmationDialog("Sign out?", isPresented: $asking, titleVisibility: .visible) {
                 Button("Sign out", role: .destructive, action: onSignOut)
                 Button("Stay signed in", role: .cancel) {}
             }
+            .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Delete account", role: .destructive, action: deleteAccount)
+                Button("Keep my account", role: .cancel) {}
+            } message: {
+                if tripInNow {
+                    Text("This removes your name and your cars from every trip, and what you posted. You’ll leave the trip you’re in now. If you organise it, it’s handed to someone else or ended. It can’t be undone. Apple will ask you to confirm it’s you.")
+                } else {
+                    Text("This removes your name and your cars from every trip, and what you posted. Trips you organise are handed to someone else, or ended if nobody else is in them. It can’t be undone. Apple will ask you to confirm it’s you.")
+                }
+            }
+            .alert("Your account is still here", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+                Button("Try again", action: deleteAccount)
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text(deleteError ?? "")
+            }
+            .interactiveDismissDisabled(deleting)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Page.self) { _ in
                 DesignLanguageView()
@@ -84,6 +133,21 @@ struct SettingsSheet: View {
                     .navigationBarTitleDisplayMode(.inline)
             }
             .navigationDestination(for: DesignDrill.self) { DesignDrillView(drill: $0) }
+        }
+    }
+
+    /// Apple's sheet first; a closed sheet changes nothing. A step that doesn't go through leaves the person signed in.
+    private func deleteAccount() {
+        guard let onDeleteAccount, !deleting else { return }
+        deleting = true
+        Task {
+            let outcome = await onDeleteAccount()
+            deleting = false
+            switch outcome {
+            case .deleted: onClose()
+            case .cancelled: break
+            case .failed(let line): deleteError = line
+            }
         }
     }
 }

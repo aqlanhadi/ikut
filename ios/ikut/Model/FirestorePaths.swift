@@ -8,6 +8,11 @@ enum FirestorePaths {
     static func car(tripId: String, carId: String) -> String { "\(cars(tripId: tripId))/\(carId)" }
 
     static func members(tripId: String) -> String { "\(trip(tripId))/members" }
+    /// The organiserId the server writes when the person who organised a trip deleted their account (`deleteAccount`).
+    static let deletedUserId = "deleted"
+    /// False for an empty id and for the server's placeholder: no member document exists for them, and an empty id
+    /// would make a path Firestore refuses (it crashes the app on a document with an empty segment).
+    static func isRealUserId(_ id: String?) -> Bool { id.map { !$0.isEmpty && $0 != deletedUserId } ?? false }
     static func member(tripId: String, userId: String) -> String { "\(members(tripId: tripId))/\(userId)" }
     /// Who the organiser removed (D104); written only in the removal batch, never read by the app.
     static func removed(tripId: String, userId: String) -> String { "\(trip(tripId))/removed/\(userId)" }

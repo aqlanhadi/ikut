@@ -217,6 +217,7 @@ final class LiveAlertNameSource: AlertNameSource {
     func displayName(tripId: String, userId: String) async -> String? {
         let key = "\(tripId)/\(userId)"
         if let cached = cache[key] { return cached }
+        guard FirestorePaths.isRealUserId(userId), !tripId.isEmpty else { return nil }
         let member = try? await Firestore.firestore()
             .document(FirestorePaths.member(tripId: tripId, userId: userId))
             .getDocument(as: Member.self)

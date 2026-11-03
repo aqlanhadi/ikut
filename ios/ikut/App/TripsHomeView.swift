@@ -42,6 +42,16 @@ struct TripsHomeView: View {
     #if DEBUG
     /// A launch state opens with a name alert up: `rename` (the field) or `rename-error` (it couldn't be saved).
     var demoAlert: String?
+    /// `settings-delete-ask`, `-working` and `-error` open Settings with the delete confirmation, the working row or
+    /// the try-again alert showing.
+    static func settingsDeleteDemo(_ demo: String?) -> SettingsSheet.DeleteDemo? {
+        switch demo {
+        case "settings-delete-ask": .ask
+        case "settings-delete-working": .working
+        case "settings-delete-error": .problem
+        default: nil
+        }
+    }
     /// `settings-design-fonts` opens Settings on Design with the font sizes list pushed.
     static func settingsDrill(_ demo: String?) -> DesignDrill? { demo == "settings-design-fonts" ? .literals(.font) : nil }
     #endif
@@ -569,7 +579,8 @@ struct TripsHomeView: View {
         #if DEBUG
         .onAppear {
             switch demoAlert {
-            case "settings", "settings-guest", "settings-design", "settings-design-fonts": settingsShown = true
+            case "settings", "settings-guest", "settings-design", "settings-design-fonts",
+                 "settings-delete-ask", "settings-delete-working", "settings-delete-error": settingsShown = true
             case "rename": newName = "Nurul"; renaming = true
             case "delete-ask": deleting = model.past.first { HistoryDelete.canDelete($0) }
             case "delete-failed": model.deleteProblem = HistoryDelete.couldntLeave
@@ -587,15 +598,28 @@ struct TripsHomeView: View {
         auth.signOut()
     }
 
+    /// Everything that could write for the account's trips goes quiet before the deletion: the open trip's session
+    /// (tracking and listeners), its Live Activity, and any Live Activity left on the Lock Screen by an earlier launch.
+    private func stopWorkForDeletion() {
+        if stage.trip != nil { stage.exit() }
+        ConvoyActivityController.endAll()
+    }
+
+    private func deleteAccount() async -> DeleteAccount.Outcome {
+        await auth.deleteAccount(stopWork: stopWorkForDeletion)
+    }
+
     private var settingsSheet: SettingsSheet {
         let onRename = { newName = profileName ?? ""; renaming = true }
         #if DEBUG
         let method = demoAlert == "settings-guest" ? SignInMethod.guest : auth.signInMethod ?? (demoAlert?.hasPrefix("settings") == true ? .apple : nil)
         return SettingsSheet(name: profileName ?? "", signInMethod: method, tripInNow: tripInNow, design: demoAlert?.hasPrefix("settings-design") == true,
-                             drill: Self.settingsDrill(demoAlert), onRename: onRename, onSignOut: signOut,
+                             drill: Self.settingsDrill(demoAlert), deleteDemo: Self.settingsDeleteDemo(demoAlert),
+                             onDeleteAccount: deleteAccount, onRename: onRename, onSignOut: signOut,
                              onClose: { settingsShown = false })
         #else
-        return SettingsSheet(name: profileName ?? "", signInMethod: auth.signInMethod, tripInNow: tripInNow, onRename: onRename, onSignOut: signOut,
+        return SettingsSheet(name: profileName ?? "", signInMethod: auth.signInMethod, tripInNow: tripInNow,
+                             onDeleteAccount: deleteAccount, onRename: onRename, onSignOut: signOut,
                              onClose: { settingsShown = false })
         #endif
     }
@@ -653,6 +677,8 @@ struct TripsHomeView: View {
             Button("OK", role: .cancel) {}
         }
         .onAppear { if !model.isDemo { model.reloadPast() } }
+        // Sign out and Delete account clear the saved trips: the list follows, instead of showing them until it reappears.
+        .onChange(of: auth.state) { if !model.isDemo { model.reloadPast() } }
         // Starts each time the list appears (and when the trips in Now change), so Now is read once per appearance.
         .task(id: parts.now.map(\.id)) {
             guard !model.isDemo else { return }

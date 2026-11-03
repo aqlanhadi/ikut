@@ -38,6 +38,8 @@ enum Backend {
         AppCheckProviderChoice.current.install()
         FirebaseApp.configure()
         defer { dropUserFromOtherBackend() }
+        // After the settings below (they must come before Firestore starts) and before anything reads.
+        defer { PersistenceReset.clearFirestore() }
 
         guard case .emulators(let host) = current else { return }
         Auth.auth().useEmulator(withHost: host, port: 9099)
