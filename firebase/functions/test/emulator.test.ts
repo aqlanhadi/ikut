@@ -18,6 +18,9 @@ import { findActiveTripId, joinTripTransaction, parseJoinInput, REMOVED_FROM_TRI
 import { ROTATE_PRODUCTION_LIMITS, isValidTripId, rotateCodeForUser } from "../lib/rotateTrip.js";
 import { HANDOVER_LIMITS } from "../lib/createLimit.js";
 import { HANDOVER_PRODUCTION_LIMITS, handOverTripForUser } from "../lib/handOverTrip.js";
+import { deleteAccountForUser, parseDeleteInput } from "../lib/deleteAccount.js";
+import { deleteAccount } from "../lib/deleteAccountCall.js";
+import { CREATE_LIMITS as CREATE_LIMITS_COL } from "../lib/createLimit.js";
 import { previewTripData } from "../lib/previewTrip.js";
 import { decodePolyline, encodePolyline } from "../lib/previewRoute.js";
 
@@ -90,7 +93,7 @@ describe("joinTrip (emulator)", () => {
     const car = (await tripRef.collection("cars").doc(carId).get()).data()!;
     assert.deepEqual(car, { name: "Myvi", color: "red", isLead: false, state: "joining", number: 2, trackerUserId: user.uid });
     const member = (await tripRef.collection("members").doc(user.uid).get()).data()!;
-    assert.deepEqual(member, { displayName: "Sam", carId, role: "member" });
+    assert.deepEqual(member, { displayName: "Sam", carId, role: "member", userId: user.uid });
     assert.ok((await tripRef.get()).data()!.lastActivityAt);
   });
 
@@ -1229,7 +1232,7 @@ describe("createTrip (emulator, D108)", () => {
     assert.equal(trip.endedAt, undefined);
 
     const member = (await db.collection("trips").doc(tripId).collection("members").doc(u.uid).get()).data()!;
-    assert.deepEqual(member, { displayName: "Sam", carId: data.carId, role: "organizer" });
+    assert.deepEqual(member, { displayName: "Sam", carId: data.carId, role: "organizer", userId: u.uid });
     const claim = (await claimOf(code)).data()!;
     assert.equal(claim.tripId, tripId);
     assert.equal(claim.organizerId, u.uid);
@@ -1935,5 +1938,183 @@ describe("trip summary and 90-day delete (emulator, D107)", () => {
     assert.equal((await t.ref.get()).exists, true);
     assert.equal((await t.ref.collection("members").get()).size, 3);
     assert.equal((await t.ref.collection("cars").get()).size, 2);
+  });
+});
+
+
+describe("deleteAccount (emulator)", () => {
+  const ts = (h = 1) => Timestamp.fromMillis(Date.now() - h * 3_600_000);
+  const place = new GeoPoint(3, 101);
+  const position = { location: place, speed: 10, heading: 90, routeOffset: 100, updatedAt: ts(0.01) };
+  const event = (authorId: string, carId: string, extra: Record<string, unknown> = {}) => ({
+    type: "pothole", category: "hazard", severity: "low", location: place, heading: 0, routeOffset: 5,
+    authorId, carId, createdAt: ts(0.5), ...extra,
+  });
+
+  /** Every document under the project as JSON, subcollections included. */
+  async function dump(): Promise<string[]> {
+    const out: string[] = [];
+    const walk = async (cols: FirebaseFirestore.CollectionReference[]) => {
+      for (const col of cols) {
+        for (const ref of await col.listDocuments()) {
+          const snap = await ref.get();
+          if (snap.exists) out.push(`${ref.path} ${JSON.stringify(snap.data())}`);
+          await walk(await ref.listCollections());
+        }
+      }
+    };
+    await walk(await db.listCollections());
+    return out;
+  }
+
+  async function world() {
+    const me = "uid-me-" + freshCode() + Date.now(), bo = "uid-bo-" + freshCode() + Date.now();
+    const name = "Zelda" + freshCode();
+    const mk = async (organizerId: string, status: "active" | "ended", extra: Record<string, unknown> = {}) => {
+      const code = freshCode();
+      const ref = db.collection("trips").doc();
+      await ref.set({ name: "Trip", code, organizerId, route: "", destination: { name: "D", coordinate: place }, status,
+        createdAt: ts(5), ...(status === "ended" ? { endedAt: ts(2) } : {}), ...extra });
+      await db.collection("codes").doc(code).set({ tripId: ref.id, organizerId, createdAt: ts(5) });
+      return { ref, code };
+    };
+    const car = (t: FirebaseFirestore.DocumentReference, id: string, extra: Record<string, unknown> = {}) =>
+      t.collection("cars").doc(id).set({ name: "Car " + id, color: "blue", isLead: false, state: "convoy", ...extra });
+    const member = (t: FirebaseFirestore.DocumentReference, uid: string, displayName: string, carId: string, role = "member", withUserId = true) =>
+      t.collection("members").doc(uid).set({ displayName, carId, role, pushToken: "tok-" + uid, ...(withUserId ? { userId: uid } : {}) });
+
+    // 1. Active, I organise, Bo rides along: handed over.
+    const one = await mk(me, "active", { stoppedBy: me, stoppedAt: ts(0.1), stoppedEventId: "e-stop" });
+    await car(one.ref, "lead", { isLead: true, trackerUserId: me, route: "abc" });
+    await car(one.ref, "bo1", { trackerUserId: bo });
+    await member(one.ref, me, name, "lead", "organizer");
+    await member(one.ref, bo, "Bo", "bo1");
+    await one.ref.collection("positions").doc("lead").set(position);
+    await one.ref.collection("positions").doc("bo1").set(position);
+    await one.ref.collection("events").doc("mine").set(event(me, "lead"));
+    await one.ref.collection("events").doc("mine").collection("votes").doc("bo1").set({ userId: bo, at: ts(0.1) });
+    await one.ref.collection("events").doc("bos").set(event(bo, "bo1", { category: "stopRequest", status: "closed", closedBy: me, closedReason: "stopped" }));
+    await one.ref.collection("events").doc("bos").collection("votes").doc("lead").set({ userId: me, at: ts(0.1) });
+    await one.ref.collection("stops").doc("s1").set({ name: "Rest", kind: "rest", order: 0, skippedBy: me, leftBy: me, skipped: true });
+    await one.ref.collection("stops").doc("s1").collection("answers").doc("lead").set({ answer: "skip", userId: me, at: ts(0.1) });
+    await one.ref.collection("removed").doc("gone").set({ userId: "gone", removedBy: me, removedAt: ts(1) });
+    await one.ref.collection("removed").doc(me).set({ userId: me, removedBy: bo, removedAt: ts(1) });
+    // 2. Active, I am alone.
+    const two = await mk(me, "active");
+    await car(two.ref, "solo", { isLead: true, trackerUserId: me });
+    await member(two.ref, me, name, "solo", "organizer", false);
+    await two.ref.collection("positions").doc("solo").set(position);
+    await two.ref.collection("events").doc("x").set(event(me, "solo"));
+    // 3. Ended, Bo organised, I was a plain member in my own car.
+    const three = await mk(bo, "ended", { summary: { distanceMeters: 1, durationSeconds: 2, peopleCount: 2, carCount: 2, stopCount: 0, roadReportCount: 1, summarisedAt: ts(1) } });
+    await car(three.ref, "me3", { trackerUserId: me, route: "own" });
+    await car(three.ref, "bo3", { isLead: true });
+    await member(three.ref, me, name, "me3");
+    await member(three.ref, bo, "Bo", "bo3", "organizer");
+    await three.ref.collection("positions").doc("me3").set(position);
+    await three.ref.collection("events").doc("old").set(event(me, "me3"));
+    await db.collection(CREATE_LIMITS_COL).doc(me).set({ times: [Date.now()] });
+    await db.collection("guessLimits").doc(me).set({ times: [Date.now()] });
+    return { me, bo, name, one, two, three };
+  }
+
+  const fakeAuth = () => { const deleted: string[] = []; return { deleted, deleteAuthUser: async (u: string) => { deleted.push(u); } }; };
+
+  it("joinTrip writes the member's own uid, and a rejoin fills it in on an older member", async () => {
+    const t = await seedTrip();
+    const u = "joiner-" + freshCode();
+    const input = parseJoinInput({ code: t.code, displayName: "Ali", car: newCar(), tracker: false });
+    await joinTripTransaction(db, u, t.tripRef.id, input);
+    assert.equal((await t.tripRef.collection("members").doc(u).get()).get("userId"), u);
+    await t.tripRef.collection("members").doc(u).update({ userId: FieldValue.delete() });
+    await joinTripTransaction(db, u, t.tripRef.id, input);
+    assert.equal((await t.tripRef.collection("members").doc(u).get()).get("userId"), u);
+  });
+
+  it("refuses a call with no sign-in", async () => {
+    await assert.rejects(
+      () => (deleteAccount as any).run({ data: {}, auth: undefined, rawRequest: {} }),
+      (e: { code?: string }) => e.code === "unauthenticated",
+    );
+  });
+
+  it("rejects a malformed trip hint list and accepts none", () => {
+    assert.deepEqual(parseDeleteInput(undefined), []);
+    assert.deepEqual(parseDeleteInput({ tripIds: ["a", "a", "b"] }), ["a", "b"]);
+    for (const bad of [{ tripIds: "x" }, { tripIds: ["a/b"] }, { tripIds: [1] }, { tripIds: Array(201).fill("a") }]) {
+      assert.throws(() => parseDeleteInput(bad), (e: { code?: string }) => e.code === "invalid-argument");
+    }
+  });
+
+  it("leaves nothing naming the person, and the Auth user goes last", async () => {
+    const w = await world();
+    const auth = fakeAuth();
+    const r = await deleteAccountForUser(db, w.me, { tripIds: [w.two.ref.id] }, auth);
+    assert.deepEqual(r, { ok: true });
+    assert.deepEqual(auth.deleted, [w.me]);
+    const left = (await dump()).filter((d) => d.includes(w.me) || d.includes(w.name));
+    assert.deepEqual(left, []);
+    // Trip 1 was handed over: still active, Bo runs it, Bo's car, event and vote stay; the lead car lost its tracker.
+    const one = (await w.one.ref.get()).data()!;
+    assert.equal(one.status, "active");
+    assert.equal(one.organizerId, w.bo);
+    assert.equal((await w.one.ref.collection("members").doc(w.bo).get()).get("role"), "organizer");
+    assert.equal((await w.one.ref.collection("members").doc(w.me).get()).exists, false);
+    assert.equal((await w.one.ref.collection("events").doc("bos").get()).exists, true);
+    assert.equal((await w.one.ref.collection("events").doc("mine").get()).exists, false);
+    assert.equal((await w.one.ref.collection("events").doc("mine").collection("votes").get()).size, 0);
+    assert.equal((await w.one.ref.collection("positions").doc("lead").get()).exists, false);
+    assert.equal((await w.one.ref.collection("positions").doc("bo1").get()).exists, true);
+    assert.equal((await w.one.ref.collection("cars").doc("bo1").get()).exists, true);
+    assert.equal((await w.one.ref.collection("removed").doc("gone").get()).exists, true);
+    assert.equal((await w.one.ref.collection("stops").doc("s1").get()).exists, true);
+    // Trip 2 (alone) ended with its summary written before the member doc went; nothing of me, no positions.
+    const two = (await w.two.ref.get()).data()!;
+    assert.equal(two.status, "ended");
+    assert.equal(two.organizerId, "");
+    assert.equal(two.summary.peopleCount, 1);
+    assert.equal((await w.two.ref.collection("positions").get()).size, 0);
+    assert.equal((await w.two.ref.collection("cars").get()).size, 0);
+    assert.equal((await w.two.ref.collection("events").get()).size, 0);
+    assert.equal((await db.collection("codes").doc(w.two.code).get()).get("organizerId"), "");
+    // Trip 3 (ended, plain member): keeps Bo, his car and the summary; my car and position are gone.
+    const three = (await w.three.ref.get()).data()!;
+    assert.equal(three.organizerId, w.bo);
+    assert.equal(three.summary.peopleCount, 2);
+    assert.equal((await w.three.ref.collection("cars").doc("bo3").get()).exists, true);
+    assert.equal((await w.three.ref.collection("cars").doc("me3").get()).exists, false);
+    assert.equal((await w.three.ref.collection("members").get()).size, 1);
+    assert.equal((await db.collection(CREATE_LIMITS_COL).doc(w.me).get()).exists, false);
+    assert.equal((await db.collection("guessLimits").doc(w.me).get()).exists, false);
+  });
+
+  it("a failure part-way keeps the Auth user, and a second call finishes", async () => {
+    const w = await world();
+    const auth = fakeAuth();
+    const order: string[] = [];
+    await assert.rejects(() => deleteAccountForUser(db, w.me, { tripIds: [w.two.ref.id] }, {
+      ...auth, beforeTrip: (id) => { order.push(id); if (order.length === 2) throw new Error("boom"); },
+    }), /boom/);
+    assert.deepEqual(auth.deleted, []);
+    assert.ok((await dump()).some((d) => d.includes(w.me)), "something is still left after the failure");
+    await deleteAccountForUser(db, w.me, {}, auth);
+    assert.deepEqual(auth.deleted, [w.me]);
+    assert.deepEqual((await dump()).filter((d) => d.includes(w.me) || d.includes(w.name)), []);
+  });
+
+  it("an Auth failure at the end leaves the data cleared and a retry deletes the user", async () => {
+    const w = await world();
+    await assert.rejects(() => deleteAccountForUser(db, w.me, {}, { deleteAuthUser: async () => { throw new Error("auth down"); } }), /auth down/);
+    const auth = fakeAuth();
+    await deleteAccountForUser(db, w.me, {}, auth);
+    assert.deepEqual(auth.deleted, [w.me]);
+  });
+
+  it("a hint for a trip the caller is not in changes nothing", async () => {
+    const w = await world();
+    const other = await seedTrip();
+    await deleteAccountForUser(db, "stranger-" + w.me, { tripIds: [other.tripRef.id] }, fakeAuth());
+    assert.equal((await other.tripRef.collection("members").doc(other.organizerId).get()).exists, true);
+    assert.equal((await other.tripRef.get()).get("organizerId"), other.organizerId);
   });
 });

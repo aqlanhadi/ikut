@@ -138,6 +138,8 @@ export interface Member {
   carId: string;
   role: MemberRole;
   pushToken?: string;
+  /** The member's own uid (also the doc id), written by createTrip and joinTrip so deleteAccount can find every trip a person is in with one collection-group query. Absent on members from before it existed. */
+  userId?: string;
 }
 
 /** trips/{tripId}/positions/{carId} */

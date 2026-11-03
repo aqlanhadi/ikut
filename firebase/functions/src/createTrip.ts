@@ -109,7 +109,7 @@ export async function createTripWithFreeCode(
         ...(input.routeSeconds !== undefined ? { routeSeconds: input.routeSeconds } : {}),
         status: "active", createdAt: FieldValue.serverTimestamp(),
       };
-      const member: Member = { displayName: input.organizerName, carId: input.carId, role: "organizer" };
+      const member: Member = { displayName: input.organizerName, carId: input.carId, role: "organizer", userId: uid };
       tx.create(tripRef, trip);
       tx.create(db.collection("codes").doc(code), { tripId: tripRef.id, organizerId: uid, createdAt: FieldValue.serverTimestamp() });
       tx.create(tripRef.collection("members").doc(uid), member);

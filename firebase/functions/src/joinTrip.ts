@@ -221,9 +221,9 @@ export async function joinTripTransaction(
     }
 
     if (existing) {
-      tx.update(memberRef, { displayName: input.displayName, carId: carRef.id });
+      tx.update(memberRef, { displayName: input.displayName, carId: carRef.id, userId: uid });
     } else {
-      const member: Member = { displayName: input.displayName, carId: carRef.id, role: "member" };
+      const member: Member = { displayName: input.displayName, carId: carRef.id, role: "member", userId: uid };
       tx.create(memberRef, member);
     }
     tx.update(tripRef, { lastActivityAt: FieldValue.serverTimestamp() });
