@@ -288,6 +288,14 @@ describe('members', () => {
     assertFails(setDoc(doc(db('org'), `trips/${T}/members/stranger`), memberDoc())));
   it('member can update displayName', () =>
     assertSucceeds(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy' })));
+  it('a client cannot set or change a member userId (only the functions write it, A4)', async () => {
+    // Setting it on a member doc without one, changing it, and setting it together with an allowed change all fail.
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { userId: 'mem' }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { userId: 'someone-else' }));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { displayName: 'Sammy', userId: 'mem' }));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/mem`), memberDoc({ userId: 'mem' })));
+    await assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { userId: 'other' }));
+  });
   it('member cannot set pushToken (D98: every member can read member docs; push tokens will live in an owner-only doc)', () =>
     assertFails(updateDoc(doc(db('mem'), `trips/${T}/members/mem`), { pushToken: 'tok' })));
   it('the organizer cannot create their own member doc, with or without a trip create (D108)', async () => {

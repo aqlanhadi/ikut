@@ -36,13 +36,44 @@ function tooManyHandOvers(waitMilliseconds: number): HttpsError {
     { reason: "too-many-handovers", retryAfterSeconds: seconds });
 }
 
+/**
+ * The hand-over itself, with no limit counted (deleteAccount hands over to leave nobody stranded and must not be
+ * stopped by the per-trip count). Checks and writes as described above; throws the same errors.
+ */
+export async function handOverTransaction(db: Firestore, uid: string, tripId: string, targetId: unknown): Promise<void> {
+  // A user id is a document id like a trip id: no slashes, not "." or "..", not a reserved "__x__" one.
+  if (!isValidTripId(targetId)) throw new HttpsError("invalid-argument", NOT_A_MEMBER);
+  const tripRef = db.collection("trips").doc(tripId);
+  await db.runTransaction(async (tx: Transaction) => {
+    // Reads first; the trip is checked again, it may have ended or changed hands since the first look.
+    const trip = (await tx.get(tripRef)).data() as Trip | undefined;
+    if (!trip || trip.organizerId !== uid) throw new HttpsError("permission-denied", NOT_YOUR_TRIP_TO_GIVE);
+    if (trip.status !== "active") throw new HttpsError("failed-precondition", TRIP_ENDED);
+    const target = await tx.get(tripRef.collection("members").doc(targetId));
+    if (targetId === uid || !target.exists) throw new HttpsError("invalid-argument", NOT_A_MEMBER);
+    const claim = await tx.get(db.collection("codes").doc(trip.code));
+    const mine = await tx.get(tripRef.collection("members").doc(uid));
+    const cars = tripRef.collection("cars");
+    const myCar = mine.exists ? await tx.get(cars.doc((mine.data() as Member).carId)) : undefined;
+    const targetCarId = (target.data() as Member).carId;
+    const targetCar = await tx.get(cars.doc(targetCarId));
+    tx.update(tripRef, { organizerId: targetId });
+    if (claim.exists && claim.data()?.tripId === tripId) tx.update(claim.ref, { organizerId: targetId });
+    tx.update(target.ref, { role: "organizer" });
+    if (mine.exists) tx.update(mine.ref, { role: "member" });
+    // The lead label goes with the trip: when the old organiser's car is the lead and the target rides in another
+    // car, that car becomes the lead and the old one stops being it (so it is cleaned up once it is empty).
+    if (myCar?.exists && (myCar.data() as Car).isLead === true && targetCar.exists && targetCar.ref.path !== myCar.ref.path) {
+      tx.update(targetCar.ref, { isLead: true });
+      tx.update(myCar.ref, { isLead: false });
+    }
+  });
+}
+
 export async function handOverTripForUser(
   db: Firestore, uid: string, tripId: string, targetId: unknown, opts: { limits?: CreateLimits; now?: number } = {},
 ): Promise<{ ok: true }> {
-  // A user id is a document id like a trip id: no slashes, not "." or "..", not a reserved "__x__" one.
-  if (!isValidTripId(targetId)) {
-    throw new HttpsError("invalid-argument", NOT_A_MEMBER);
-  }
+  if (!isValidTripId(targetId)) throw new HttpsError("invalid-argument", NOT_A_MEMBER);
   const tripRef = db.collection("trips").doc(tripId);
   // Who is asking is checked before a slot is spent: a missing trip and someone else's look the same.
   const first = (await tripRef.get()).data() as Trip | undefined;
@@ -51,30 +82,7 @@ export async function handOverTripForUser(
   const now = opts.now ?? Date.now();
   await reserve(db, tripId, now, opts.limits ?? handOverLimitsFor(), HANDOVER_LIMITS, tooManyHandOvers);
   try {
-    await db.runTransaction(async (tx: Transaction) => {
-      // Reads first; the trip is checked again, it may have ended or changed hands since the first look.
-      const trip = (await tx.get(tripRef)).data() as Trip | undefined;
-      if (!trip || trip.organizerId !== uid) throw new HttpsError("permission-denied", NOT_YOUR_TRIP_TO_GIVE);
-      if (trip.status !== "active") throw new HttpsError("failed-precondition", TRIP_ENDED);
-      const target = await tx.get(tripRef.collection("members").doc(targetId));
-      if (targetId === uid || !target.exists) throw new HttpsError("invalid-argument", NOT_A_MEMBER);
-      const claim = await tx.get(db.collection("codes").doc(trip.code));
-      const mine = await tx.get(tripRef.collection("members").doc(uid));
-      const cars = tripRef.collection("cars");
-      const myCar = mine.exists ? await tx.get(cars.doc((mine.data() as Member).carId)) : undefined;
-      const targetCarId = (target.data() as Member).carId;
-      const targetCar = await tx.get(cars.doc(targetCarId));
-      tx.update(tripRef, { organizerId: targetId });
-      if (claim.exists && claim.data()?.tripId === tripId) tx.update(claim.ref, { organizerId: targetId });
-      tx.update(target.ref, { role: "organizer" });
-      if (mine.exists) tx.update(mine.ref, { role: "member" });
-      // The lead label goes with the trip: when the old organiser's car is the lead and the target rides in another
-      // car, that car becomes the lead and the old one stops being it (so it is cleaned up once it is empty).
-      if (myCar?.exists && (myCar.data() as Car).isLead === true && targetCar.exists && targetCar.ref.path !== myCar.ref.path) {
-        tx.update(targetCar.ref, { isLead: true });
-        tx.update(myCar.ref, { isLead: false });
-      }
-    });
+    await handOverTransaction(db, uid, tripId, targetId);
     return { ok: true };
   } catch (err) {
     await release(db, tripId, now, HANDOVER_LIMITS);

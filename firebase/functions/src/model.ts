@@ -33,6 +33,7 @@ export interface Trip {
   name: string;
   /** 6-character join code. */
   code: string;
+  /** The organiser's uid; "deleted" on an ended trip whose organiser deleted their account (never empty). */
   organizerId: string;
   route: string;
   destination: Destination;

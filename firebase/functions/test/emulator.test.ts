@@ -1985,7 +1985,7 @@ describe("deleteAccount (emulator)", () => {
 
     // 1. Active, I organise, Bo rides along: handed over.
     const one = await mk(me, "active", { stoppedBy: me, stoppedAt: ts(0.1), stoppedEventId: "e-stop" });
-    await car(one.ref, "lead", { isLead: true, trackerUserId: me, route: "abc" });
+    await car(one.ref, "lead", { isLead: true, trackerUserId: me, route: "abc", name: `${name}'s car`, number: 1 });
     await car(one.ref, "bo1", { trackerUserId: bo });
     await member(one.ref, me, name, "lead", "organizer");
     await member(one.ref, bo, "Bo", "bo1");
@@ -1999,15 +1999,17 @@ describe("deleteAccount (emulator)", () => {
     await one.ref.collection("stops").doc("s1").collection("answers").doc("lead").set({ answer: "skip", userId: me, at: ts(0.1) });
     await one.ref.collection("removed").doc("gone").set({ userId: "gone", removedBy: me, removedAt: ts(1) });
     await one.ref.collection("removed").doc(me).set({ userId: me, removedBy: bo, removedAt: ts(1) });
+    // The hand-over limit is used up: a leaving organiser must still be able to hand over.
+    await db.collection("handOverLimits").doc(one.ref.id).set({ creates: Array.from({ length: 10 }, (_, i) => Date.now() - 1000 - i), expiresAt: Timestamp.fromMillis(Date.now() + 86_400_000) });
     // 2. Active, I am alone.
     const two = await mk(me, "active");
-    await car(two.ref, "solo", { isLead: true, trackerUserId: me });
+    await car(two.ref, "solo", { isLead: true, trackerUserId: me, name: `${name}'s car` });
     await member(two.ref, me, name, "solo", "organizer", false);
     await two.ref.collection("positions").doc("solo").set(position);
     await two.ref.collection("events").doc("x").set(event(me, "solo"));
     // 3. Ended, Bo organised, I was a plain member in my own car.
     const three = await mk(bo, "ended", { summary: { distanceMeters: 1, durationSeconds: 2, peopleCount: 2, carCount: 2, stopCount: 0, roadReportCount: 1, summarisedAt: ts(1) } });
-    await car(three.ref, "me3", { trackerUserId: me, route: "own" });
+    await car(three.ref, "me3", { trackerUserId: me, route: "own", name: `${name}'s car` });
     await car(three.ref, "bo3", { isLead: true });
     await member(three.ref, me, name, "me3");
     await member(three.ref, bo, "Bo", "bo3", "organizer");
@@ -2029,6 +2031,87 @@ describe("deleteAccount (emulator)", () => {
     await t.tripRef.collection("members").doc(u).update({ userId: FieldValue.delete() });
     await joinTripTransaction(db, u, t.tripRef.id, input);
     assert.equal((await t.tripRef.collection("members").doc(u).get()).get("userId"), u);
+  });
+
+  it("a hand-over does not spend the limit, and the same-car rider is preferred", async () => {
+    const me = "me-sc-" + Date.now(), bo = "bo-sc-" + Date.now(), ann = "ann-sc-" + Date.now();
+    const code = freshCode();
+    const ref = db.collection("trips").doc();
+    await ref.set({ name: "T", code, organizerId: me, route: "", destination: { name: "D", coordinate: place }, status: "active", createdAt: ts(5) });
+    await ref.collection("cars").doc("lead").set({ name: "Zed's car", color: "blue", isLead: true, state: "convoy", trackerUserId: me, number: 1 });
+    await ref.collection("cars").doc("other").set({ name: "Other", color: "red", isLead: false, state: "convoy", number: 2 });
+    await ref.collection("members").doc(ann).set({ displayName: "Ann", carId: "other", role: "member", userId: ann });
+    await ref.collection("members").doc(me).set({ displayName: "Zed", carId: "lead", role: "organizer", userId: me });
+    await ref.collection("members").doc(bo).set({ displayName: "Bo", carId: "lead", role: "member", userId: bo });
+    const limit = { creates: Array.from({ length: 10 }, (_, i) => Date.now() - 1000 - i), expiresAt: Timestamp.fromMillis(Date.now() + 86_400_000) };
+    await db.collection("handOverLimits").doc(ref.id).set(limit);
+    await deleteAccountForUser(db, me, {}, fakeAuth());
+    assert.equal((await ref.get()).get("organizerId"), bo);
+    assert.equal((await ref.get()).get("status"), "active");
+    assert.deepEqual((await db.collection("handOverLimits").doc(ref.id).get()).get("creates"), limit.creates);
+    // The lead car stays (Bo rides in it): no tracker, no name of mine, no position.
+    const lead = (await ref.collection("cars").doc("lead").get()).data()!;
+    assert.equal(lead.name, "Lead car");
+    assert.equal(lead.trackerUserId, undefined);
+  });
+
+  it("someone who cannot take the trip is skipped; if nobody can, it ends with its summary", async () => {
+    const BAD = "x".repeat(129);
+    const mkTrip = async (members: string[]) => {
+      const me = "me-sk-" + Date.now() + freshCode();
+      const ref = db.collection("trips").doc();
+      await ref.set({ name: "T", code: freshCode(), organizerId: me, route: "", destination: { name: "D", coordinate: place }, status: "active", createdAt: ts(5) });
+      await ref.collection("cars").doc("lead").set({ name: "Lead", color: "blue", isLead: true, state: "convoy", trackerUserId: me });
+      await ref.collection("members").doc(me).set({ displayName: "Zed", carId: "lead", role: "organizer", userId: me });
+      for (const m of members) await ref.collection("members").doc(m).set({ displayName: "X", carId: "lead", role: "member", userId: m });
+      return { me, ref };
+    };
+    // BAD is not a usable id: handed over to the next one.
+    const a = await mkTrip([BAD, "good-" + freshCode()]);
+    await deleteAccountForUser(db, a.me, {}, fakeAuth());
+    assert.equal((await a.ref.get()).get("status"), "active");
+    assert.ok(!(await a.ref.get()).get("organizerId").startsWith("xxxx"));
+    // Only the unusable one: the trip ends, the summary counts both, nobody is left naming the organiser.
+    const b = await mkTrip([BAD]);
+    await deleteAccountForUser(db, b.me, {}, fakeAuth());
+    const d = (await b.ref.get()).data()!;
+    assert.equal(d.status, "ended");
+    assert.equal(d.organizerId, "deleted");
+    assert.equal(d.summary.peopleCount, 2);
+    assert.equal((await b.ref.collection("members").doc(b.me).get()).exists, false);
+  });
+
+  it("a plain member found only by the hint, on a doc without userId, is cleared; a shared car loses tracker and name", async () => {
+    const me = "me-h-" + Date.now() + freshCode(), bo = "bo-h-" + Date.now() + freshCode(), ann = "ann-h-" + Date.now() + freshCode();
+    const ref = db.collection("trips").doc();
+    await ref.set({ name: "T", code: freshCode(), organizerId: bo, route: "", destination: { name: "D", coordinate: place }, status: "active", createdAt: ts(5) });
+    await ref.collection("cars").doc("lead").set({ name: "Bo's car", color: "blue", isLead: true, state: "convoy", trackerUserId: bo, number: 1 });
+    await ref.collection("cars").doc("z").set({ name: "Zelda's car", color: "red", isLead: false, state: "convoy", trackerUserId: me, number: 3 });
+    await ref.collection("members").doc(bo).set({ displayName: "Bo", carId: "lead", role: "organizer", userId: bo });
+    await ref.collection("members").doc(me).set({ displayName: "Zelda", carId: "z", role: "member" });
+    await ref.collection("members").doc(ann).set({ displayName: "Ann", carId: "z", role: "member", userId: ann });
+    await ref.collection("positions").doc("z").set(position);
+    // Without the hint the old doc is not found.
+    await deleteAccountForUser(db, me, {}, fakeAuth());
+    assert.equal((await ref.collection("members").doc(me).get()).exists, true);
+    await deleteAccountForUser(db, me, { tripIds: [ref.id] }, fakeAuth());
+    assert.equal((await ref.collection("members").doc(me).get()).exists, false);
+    const z = (await ref.collection("cars").doc("z").get()).data()!;
+    assert.equal(z.trackerUserId, undefined);
+    assert.equal(z.name, "Car 3");
+    assert.equal((await ref.collection("positions").doc("z").get()).exists, false);
+    assert.equal((await ref.collection("members").doc(ann).get()).exists, true);
+  });
+
+  it("a trip whose whole-delete failed part-way is finished by a retry", async () => {
+    const me = "me-w-" + Date.now() + freshCode();
+    const ref = db.collection("trips").doc();
+    // The trip doc is gone but its member doc (with userId) and a position remain.
+    await ref.collection("members").doc(me).set({ displayName: "Zelda", carId: "c", role: "organizer", userId: me });
+    await ref.collection("positions").doc("c").set(position);
+    await deleteAccountForUser(db, me, {}, fakeAuth());
+    assert.equal((await ref.collection("members").get()).size, 0);
+    assert.equal((await ref.collection("positions").get()).size, 0);
   });
 
   it("refuses a call with no sign-in", async () => {
@@ -2068,15 +2151,11 @@ describe("deleteAccount (emulator)", () => {
     assert.equal((await w.one.ref.collection("cars").doc("bo1").get()).exists, true);
     assert.equal((await w.one.ref.collection("removed").doc("gone").get()).exists, true);
     assert.equal((await w.one.ref.collection("stops").doc("s1").get()).exists, true);
-    // Trip 2 (alone) ended with its summary written before the member doc went; nothing of me, no positions.
-    const two = (await w.two.ref.get()).data()!;
-    assert.equal(two.status, "ended");
-    assert.equal(two.organizerId, "");
-    assert.equal(two.summary.peopleCount, 1);
+    // Trip 2 (alone): nobody is left, so the whole trip goes, with its code claim and positions.
+    assert.equal((await w.two.ref.get()).exists, false);
     assert.equal((await w.two.ref.collection("positions").get()).size, 0);
-    assert.equal((await w.two.ref.collection("cars").get()).size, 0);
-    assert.equal((await w.two.ref.collection("events").get()).size, 0);
-    assert.equal((await db.collection("codes").doc(w.two.code).get()).get("organizerId"), "");
+    assert.equal((await w.two.ref.collection("members").get()).size, 0);
+    assert.equal((await db.collection("codes").doc(w.two.code).get()).exists, false);
     // Trip 3 (ended, plain member): keeps Bo, his car and the summary; my car and position are gone.
     const three = (await w.three.ref.get()).data()!;
     assert.equal(three.organizerId, w.bo);
