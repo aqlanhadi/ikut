@@ -40,6 +40,35 @@ enum ActivitySize {
     static let trackHeight: CGFloat = 20
 }
 
+/// The track's sizes, all from the bar's height so the bar, the dots and the marks read as one drawing (D3 note 18):
+/// the end dots are the bar's own height and gap, car circles and the stop ring share one ring width and one base
+/// size, my car is one size step bigger (a ring width more on every side), and the hazard diamond's corners reach the
+/// same base size. `ActivityTrackMetricsTests` pins the rules.
+enum ActivityTrackMetrics {
+    /// The bar's thickness: the unit everything else is a multiple of.
+    static let bar: CGFloat = 4
+    /// The ring around a car, the stop ring's stroke: half the bar.
+    static let ring: CGFloat = bar / 2
+    /// The coloured disc of another car, inside its ring.
+    static let disc: CGFloat = bar * 2.5
+    /// Another car, the stop ring and the hazard diamond's corner to corner, rings included.
+    static let base: CGFloat = disc + 2 * ring
+    /// My car: one step bigger, the disc grown by the ring on every side.
+    static let mine: CGFloat = base + 2 * ring
+    /// The hazard diamond's side, so its corners reach `base`.
+    static let diamondSide: CGFloat = base / 2.0.squareRoot()
+    /// The row of dots at each end: the bar's height, the bar's gap, fading away from the bar.
+    static let endDots = 3
+    static let endDotSize: CGFloat = bar
+    static let endSpacing: CGFloat = bar
+    /// The unfilled bar's white, and each end dot's share of the bar colour it continues, nearest the bar first.
+    static let trackOpacity = 0.2
+    static let endFade: [Double] = [1, 0.7, 0.4]
+    static let dimmedOpacity = 0.5
+
+    static func carSize(isMine: Bool) -> CGFloat { isMine ? mine : base }
+}
+
 /// The bare ikut mark, no disc or tile (decision #713): the route, the followers, the joiner and the lead arrow, redrawn on
 /// the 1024 grid of the app icon's source layers (`ikut.icon`: route, followers, joiner, lead-dark).
 struct IkutMark: View {

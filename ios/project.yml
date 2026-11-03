@@ -108,6 +108,9 @@ targets:
       - path: ikut/LiveActivity/ConvoyActivityAttributes.swift
       - path: ikut/LiveActivity/ConvoyActivityPresentation.swift
       - path: ikut/LiveActivity/ActivityWords.swift
+      # Previews only (Debug): the sample convoy and the state function it feeds, the same ones the app's launch states use.
+      - path: ikut/LiveActivity/ConvoyActivityLogic.swift
+      - path: ikut/LiveActivity/LiveActivitySamples.swift
       - path: ikut/UI/ActivityPalette.swift
       - path: ikut/Convoy/ConvoyFormat.swift
       - path: ikut/UI/Symbol.swift
@@ -122,6 +125,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.aqlan.ikut.widgets
         SKIP_INSTALL: YES
+      configs:
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES: ConvoyActivityLogic.swift LiveActivitySamples.swift ActivityPreviews.swift
 
   ikutTests:
     type: bundle.unit-test
