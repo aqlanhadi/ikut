@@ -420,6 +420,11 @@ enum DemoScreens {
         case "home-rename-error": return home("rename-error")
         // D72 (Debug): Home's name button opens Settings: on You, on Design, and Design with the font sizes list pushed.
         case "settings": return home("settings")
+        // A3: Settings for someone signed in with Apple (above) and for a guest.
+        case "settings-guest": return home("settings-guest")
+        // A3: the name step with Continue with Apple as the main choice, and the line when Apple sent no name.
+        case "name-entry-apple": return AnyView(NameEntryView(demo: "apple").environment(AuthModel()))
+        case "name-entry-apple-needs-name": return AnyView(NameEntryView(demo: "apple-needs-name").environment(AuthModel()))
         case "settings-design": return home("settings-design")
         case "settings-design-fonts": return home("settings-design-fonts")
         // The lobby with an ask already up: Start with a car not sharing, Leave, End, Trip name, the QR code.

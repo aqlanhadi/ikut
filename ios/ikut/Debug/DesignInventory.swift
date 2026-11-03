@@ -55,6 +55,7 @@ TripMapView|View|Map/TripMapView.swift|1
 TripScreenHost|View|Map/TripScreen.swift|1
 WelcomeView|View|App/WelcomeView.swift|1
 WhereToSheet|View|Trip/NewTripSheet.swift|1
+AppleSignInButton|View|Auth/NameStep.swift|2
 ConvoyPanel|View|Map/ConvoyPanel.swift|2
 DrivingList|ViewModifier|Map/TripMapView.swift|2
 HomeRenameAlerts|ViewModifier|App/HomeRenameAlerts.swift|2
@@ -102,7 +103,7 @@ frame|width 30, height 30||App/HomeMapContent.swift:134
 frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
-color|#737378|737378|Join/JoinSheet.swift:390
+color|#737378|737378|Join/JoinSheet.swift:392
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:223
 opacity|0.5||Lobby/LobbyMap.swift:316
 padding|6||Lobby/LobbyMap.swift:340

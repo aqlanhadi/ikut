@@ -19,16 +19,16 @@ struct NameEntryView: View {
     /// Launch states `name-entry-error` (the sign-in problem line) and `name-entry-signing-in` (the spinner on Continue).
     init(demo: String) {
         onDone = {}
-        _name = State(initialValue: "Nurul")
+        _name = State(initialValue: demo.hasPrefix("apple") ? "" : "Nurul")
         _isWorking = State(initialValue: demo == "signing-in")
-        _errorMessage = State(initialValue: demo == "error" ? "Couldn’t sign you in. Check your signal and try again." : nil)
+        _errorMessage = State(initialValue: demo == "apple-needs-name" ? AppleSignInButton.needsNameLine : demo == "error" ? "Couldn’t sign you in. Check your signal and try again." : nil)
     }
     #endif
 
     /// "Your name" and its field.
     private var nameFieldCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            CardHeader("Your name", top: Spacing.xl)
+            CardHeader("Just use a name", top: Spacing.xl)
                 .accessibilityHidden(true)
             TextField("Your name", text: $name)
                 .textContentType(.givenName)
@@ -56,6 +56,11 @@ struct NameEntryView: View {
                     .font(.title2.bold())
                     .accessibilityAddTraits(.isHeader)
                     .padding(.horizontal, Spacing.l)
+
+                AppleSignInButton(actions: AppleStepActions(
+                    working: { isWorking = $0 }, signedIn: { isWorking = false; onDone() }, line: { errorMessage = $0 }),
+                                  disabled: isWorking)
+                    .padding(.top, Spacing.l)
 
                 nameFieldCard
                     .onChange(of: name) { errorMessage = nil }
