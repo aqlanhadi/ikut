@@ -7,15 +7,23 @@ struct SettingsSheet: View {
     enum Page: Hashable { case design }
 
     var name: String
+    var signInMethod: SignInMethod?
+    /// A trip is in Now: signing out would strand the car in it, so Sign out waits until it is left.
+    var tripInNow = false
     var onRename: () -> Void
+    var onSignOut: () -> Void
     var onClose: () -> Void
+    @State private var asking = false
     @State private var path = NavigationPath()
 
     /// `design` opens with Design language pushed, and `drill` one of its lists on top of it (launch states).
-    init(name: String, design: Bool = false, drill: DesignDrill? = nil, onRename: @escaping () -> Void,
-         onClose: @escaping () -> Void) {
+    init(name: String, signInMethod: SignInMethod? = nil, tripInNow: Bool = false, design: Bool = false, drill: DesignDrill? = nil,
+         onRename: @escaping () -> Void, onSignOut: @escaping () -> Void = {}, onClose: @escaping () -> Void) {
         self.name = name
+        self.signInMethod = signInMethod
+        self.tripInNow = tripInNow
         self.onRename = onRename
+        self.onSignOut = onSignOut
         self.onClose = onClose
         var path = NavigationPath()
         if design || drill != nil { path.append(Page.design) }
@@ -39,12 +47,35 @@ struct SettingsSheet: View {
                     } footer: {
                         Text("The convoy sees this name in new trips.")
                     }
+                    if let signInMethod {
+                        Section {
+                            LabeledContent("Account") {
+                                if signInMethod == .apple { Text("Apple") } else { Text("Guest (no account)") }
+                            }
+                            .accessibilityIdentifier(AXID.Debug.settingsSignIn)
+                            Button("Sign out", role: .destructive) { asking = true }
+                                .disabled(tripInNow)
+                                .accessibilityIdentifier(AXID.Debug.settingsSignOut)
+                        } footer: {
+                            if tripInNow {
+                                Text("Leave your current trip before you sign out.")
+                            } else if signInMethod == .apple {
+                                Text("Signing out clears the trips kept on this phone. Signing in with Apple again brings your name back.")
+                            } else {
+                                Text("A guest has no account. Signing out clears the trips kept on this phone and you start over.")
+                            }
+                        }
+                    }
                     Section("Developer") {
                         NavigationLink("Design language", value: Page.design)
                             .accessibilityIdentifier(AXID.Debug.settingsDesign)
                     }
                 }
                 .listStyle(.insetGrouped)
+            }
+            .confirmationDialog("Sign out?", isPresented: $asking, titleVisibility: .visible) {
+                Button("Sign out", role: .destructive, action: onSignOut)
+                Button("Stay signed in", role: .cancel) {}
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Page.self) { _ in

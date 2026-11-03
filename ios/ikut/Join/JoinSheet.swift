@@ -210,7 +210,9 @@ struct JoinSheet: View {
         @Bindable var model = model
         NameStepSections(name: $model.displayName, isWorking: isWorking, error: nameError,
                          footer: "What the convoy sees in new trips. Joining needs only a name, no account.",
-                         focused: $nameFocused, onSubmit: submitName)
+                         focused: $nameFocused, onSubmit: submitName,
+                         apple: AppleStepActions(working: { isWorking = $0 }, signedIn: { model.displayName = $0; isWorking = false; goNext() },
+                                                 line: { nameError = $0 }))
     }
 
     private var firstName: String { (try? DisplayName.validate(model.displayName).get()) ?? model.displayName }

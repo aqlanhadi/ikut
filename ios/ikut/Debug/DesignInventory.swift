@@ -86,6 +86,7 @@ StopNote|View|Lobby/LobbyStopsViews.swift|4
 RecapEventDot|View|Recap/RecapView.swift|5
 RouteTotalLine|View|Lobby/LobbyStopsViews.swift|5
 TripsHomeView|View|App/TripsHomeView.swift|5
+AppleSignInButton|View|Auth/NameStep.swift|8
 DarkBanner|View|Alerts/DarkBanner.swift|11
 StopActionButton|View|Stops/StopCardParts.swift|18
 """
@@ -102,7 +103,7 @@ frame|width 30, height 30||App/HomeMapContent.swift:134
 frame|width 88, height 88||App/WelcomeView.swift:36
 frame|width 36, height 36||App/WelcomeView.swift:57
 frame|width 0||Hazards/HazardMapContent.swift:43
-color|#737378|737378|Join/JoinSheet.swift:390
+color|#737378|737378|Join/JoinSheet.swift:392
 color|#0A7CFF|0A7CFF|Lobby/LobbyMap.swift:223
 opacity|0.5||Lobby/LobbyMap.swift:316
 padding|6||Lobby/LobbyMap.swift:340

@@ -63,6 +63,7 @@
 		2D0C6E3BE606EFBC1D986BBC /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A44815085CACEC69E8C24459 /* FirebaseAuth */; };
 		2D8FE1BC7E69464B90967908 /* NewTripSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2C70B230100C595E9CB0FD /* NewTripSheet.swift */; };
 		2DAE6B663058967FCC0164DA /* RecapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A359927AF19ECCCD8185BBE /* RecapTests.swift */; };
+		2DF4FB9DD1813EEE77AF6FE2 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B3CFB726223FDAD7FE6BA29 /* AppleSignIn.swift */; };
 		2EB8598D20B54002BA5E917E /* OwnWayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01DEFBBB0C0EB62CCBCF7C6E /* OwnWayTests.swift */; };
 		2F780694AF9AAB9BC85B5424 /* Symbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EB7D8F7B36CE100D1B0BECC /* Symbol.swift */; };
 		2F95598DD8FDAA17D01B2DA1 /* YouTagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06B07E299123E0601E23DBDD /* YouTagTests.swift */; };
@@ -509,6 +510,7 @@
 		3A01C5346C8306EBCFEBF4E4 /* StopArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopArrivalTests.swift; sourceTree = "<group>"; };
 		3A35DDA4D1E6725F5C83A49A /* DesignInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignInventory.swift; sourceTree = "<group>"; };
 		3A5A882A71079F598A407E97 /* RouteGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometryTests.swift; sourceTree = "<group>"; };
+		3B3CFB726223FDAD7FE6BA29 /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
 		3BED3AC436787A0397E9E2BC /* ConvoyActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyActivityAttributes.swift; sourceTree = "<group>"; };
 		3CCC8291CDD3C3F118813710 /* PlacesRefresher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesRefresher.swift; sourceTree = "<group>"; };
 		3D43EA449C4A10B16261D617 /* HazardMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HazardMapContent.swift; sourceTree = "<group>"; };
@@ -666,6 +668,7 @@
 		B1C004029CF785E6F7B0DC74 /* PolylineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineTests.swift; sourceTree = "<group>"; };
 		B249BC9D63DDB50ACFFF29BF /* LobbyMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyMapTests.swift; sourceTree = "<group>"; };
 		B29793AC27056798E231C29E /* RouteRebuild.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRebuild.swift; sourceTree = "<group>"; };
+		B3111AFB96E96B6CD08B4094 /* ikut-simulator.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "ikut-simulator.entitlements"; sourceTree = "<group>"; };
 		B32A559C01AF2D0E5DF90BFD /* Geometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geometry.swift; sourceTree = "<group>"; };
 		B525ECB828782B83874210FE /* DisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayName.swift; sourceTree = "<group>"; };
 		B56593AF71DE13AE887A4A0E /* ConvoyHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyHeader.swift; sourceTree = "<group>"; };
@@ -875,6 +878,7 @@
 		343E40F373297D410D74CD72 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
+				3B3CFB726223FDAD7FE6BA29 /* AppleSignIn.swift */,
 				F9B8A252DC3CE42F6CD2BF18 /* AuthModel.swift */,
 				B525ECB828782B83874210FE /* DisplayName.swift */,
 				CF4653CF9ABAFD0C23E1DEFB /* NameEntryView.swift */,
@@ -1037,6 +1041,7 @@
 		962BCAA4615A543EA38FDB80 /* ikut */ = {
 			isa = PBXGroup;
 			children = (
+				B3111AFB96E96B6CD08B4094 /* ikut-simulator.entitlements */,
 				48B40EC9426F8A1EFD05AC7D /* ikut.entitlements */,
 				7DC390858FBBDA52C3ED0823 /* Info.plist */,
 				96739A38EAAD35FD18B7C4E2 /* Localizable.xcstrings */,
@@ -1642,6 +1647,7 @@
 				EF1A302DC6528C5F849A0C48 /* AlwaysLocationExplainerView.swift in Sources */,
 				9D11F64FD74369DACE4704CA /* AnimationDump.swift in Sources */,
 				5C4B1C353923F9934A5F3D01 /* AppCheckSetup.swift in Sources */,
+				2DF4FB9DD1813EEE77AF6FE2 /* AppleSignIn.swift in Sources */,
 				B7F29797106F4C33FA1C201C /* ApproachMonitor.swift in Sources */,
 				591D0BEAD1974F23903F13DC /* ApproachPill.swift in Sources */,
 				0DD28578E4FB340814A4FA9A /* AuthModel.swift in Sources */,
@@ -2026,10 +2032,14 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "$(IKUT_APPATTEST_ENTITLEMENTS_$(IKUT_APPATTEST))";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "$(IKUT_SIM_ENTITLEMENTS_$(IKUT_APPATTEST))";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				IKUT_APPATTEST = "";
 				IKUT_APPATTEST_ENTITLEMENTS_YES = ikut/ikut.entitlements;
 				IKUT_APPATTEST_ENVIRONMENT = development;
+				IKUT_SIM_ENTITLEMENTS_ = "ikut/ikut-simulator.entitlements";
+				IKUT_SIM_ENTITLEMENTS_YES = ikut/ikut.entitlements;
+				IKUT_SIWA_FLAG_YES = IKUT_SIWA;
 				INFOPLIST_FILE = ikut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2038,6 +2048,8 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(IKUT_SIWA_FLAG_$(IKUT_APPATTEST))";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]" = "$(inherited) IKUT_SIWA";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_EMIT_LOC_STRINGS_ALLOW_IN_DEBUG = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2250,10 +2262,14 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "$(IKUT_APPATTEST_ENTITLEMENTS_$(IKUT_APPATTEST))";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "$(IKUT_SIM_ENTITLEMENTS_$(IKUT_APPATTEST))";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				IKUT_APPATTEST = "";
 				IKUT_APPATTEST_ENTITLEMENTS_YES = ikut/ikut.entitlements;
 				IKUT_APPATTEST_ENVIRONMENT = production;
+				IKUT_SIM_ENTITLEMENTS_ = "ikut/ikut-simulator.entitlements";
+				IKUT_SIM_ENTITLEMENTS_YES = ikut/ikut.entitlements;
+				IKUT_SIWA_FLAG_YES = IKUT_SIWA;
 				INFOPLIST_FILE = ikut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2262,6 +2278,8 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.aqlan.ikut;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(IKUT_SIWA_FLAG_$(IKUT_APPATTEST))";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]" = "$(inherited) IKUT_SIWA";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_EMIT_LOC_STRINGS_ALLOW_IN_DEBUG = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";

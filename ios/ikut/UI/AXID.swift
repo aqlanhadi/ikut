@@ -35,6 +35,8 @@ enum AXID {
         static let liveActivityStatus = "debug.liveActivity.status"
         static let settingsDesign = "settingsDesign"
         static let settingsName = "settingsName"
+        static let settingsSignIn = "settingsSignIn"
+        static let settingsSignOut = "settingsSignOut"
         static func sizes(_ name: String) -> String { "sizes.\(name)" }
         static func sizesCaption(_ name: String) -> String { "sizes.\(name).caption" }
         static func designDrill(_ raw: String) -> String { "designDrill.\(raw)" }
@@ -91,6 +93,7 @@ enum AXID {
         static let hazardMarker = "hazard.marker"
     }
     enum Name {
+        static let apple = "nameApple"
         static let error = "nameError"
         static let field = "nameField"
     }
@@ -216,6 +219,8 @@ enum AXID {
         Debug.liveActivityStatus,
         Debug.settingsDesign,
         Debug.settingsName,
+        Debug.settingsSignIn,
+        Debug.settingsSignOut,
         Home.join,
         Home.pickedLeft,
         Home.whereTo,
@@ -257,6 +262,7 @@ enum AXID {
         Map.error,
         Map.errorClose,
         Map.hazardMarker,
+        Name.apple,
         Name.error,
         Name.field,
         Recap.root,

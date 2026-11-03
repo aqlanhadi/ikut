@@ -18,7 +18,9 @@ extension TripsHomeView {
             List {
                 NameStepSections(name: $step.name, isWorking: step.isWorking, error: step.error,
                                  footer: "The convoy sees this name. You don’t need an account to start a trip.",
-                                 focused: $nameFocused, onSubmit: { submitName(step) })
+                                 focused: $nameFocused, onSubmit: { submitName(step) },
+                                 apple: AppleStepActions(working: { step.isWorking = $0 }, signedIn: { _ in onNamed() },
+                                                         line: { step.error = $0 }))
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)

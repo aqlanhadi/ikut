@@ -569,7 +569,7 @@ struct TripsHomeView: View {
         #if DEBUG
         .onAppear {
             switch demoAlert {
-            case "settings", "settings-design", "settings-design-fonts": settingsShown = true
+            case "settings", "settings-guest", "settings-design", "settings-design-fonts": settingsShown = true
             case "rename": newName = "Nurul"; renaming = true
             case "delete-ask": deleting = model.past.first { HistoryDelete.canDelete($0) }
             case "delete-failed": model.deleteProblem = HistoryDelete.couldntLeave
@@ -580,13 +580,23 @@ struct TripsHomeView: View {
         #endif
     }
 
+    private var tripInNow: Bool { !HomeNow.split(model.past).now.isEmpty }
+
+    private func signOut() {
+        settingsShown = false
+        auth.signOut()
+    }
+
     private var settingsSheet: SettingsSheet {
         let onRename = { newName = profileName ?? ""; renaming = true }
         #if DEBUG
-        return SettingsSheet(name: profileName ?? "", design: demoAlert?.hasPrefix("settings-design") == true,
-                             drill: Self.settingsDrill(demoAlert), onRename: onRename, onClose: { settingsShown = false })
+        let method = demoAlert == "settings-guest" ? SignInMethod.guest : auth.signInMethod ?? (demoAlert?.hasPrefix("settings") == true ? .apple : nil)
+        return SettingsSheet(name: profileName ?? "", signInMethod: method, tripInNow: tripInNow, design: demoAlert?.hasPrefix("settings-design") == true,
+                             drill: Self.settingsDrill(demoAlert), onRename: onRename, onSignOut: signOut,
+                             onClose: { settingsShown = false })
         #else
-        return SettingsSheet(name: profileName ?? "", onRename: onRename, onClose: { settingsShown = false })
+        return SettingsSheet(name: profileName ?? "", signInMethod: auth.signInMethod, tripInNow: tripInNow, onRename: onRename, onSignOut: signOut,
+                             onClose: { settingsShown = false })
         #endif
     }
 

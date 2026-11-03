@@ -96,6 +96,30 @@ struct HistoryDeleteTests {
         #expect(PastTripsMapService.cachedRoutes()[keep.id] != nil)
     }
 
+    @Test func signOutClearsEveryLocalStoreOfTrips() throws {
+        let suite = "removeAll-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let a = entry(), b = entry(), stray = entry()
+        for e in [a, b] {
+            PastTrips.record(tripId: e.id, name: e.name, destination: e.destination, endedAt: e.endedAt, defaults: defaults)
+        }
+        for e in [a, b, stray] {
+            var snap = RecapSnapshot.demo(); snap.tripId = e.id
+            RecapService.save(snap)
+            PastTripsMapService.remember(PastTripsMapLogic.route(id: e.id, name: e.name, destinationName: "Ipoh",
+                                                                 destination: snap.destination, encodedRoute: snap.route))
+        }
+        UserDefaults.standard.set("\(a.id)|x", forKey: HistoryDelete.askedKey)
+        HistoryDelete.removeAllLocal(defaults: defaults)
+        #expect(PastTrips.all(defaults: defaults).isEmpty)
+        for e in [a, b, stray] {
+            #expect(RecapService.cached(tripId: e.id) == nil)
+            #expect(PastTripsMapService.cachedRoutes()[e.id] == nil)
+        }
+        #expect(UserDefaults.standard.string(forKey: HistoryDelete.askedKey) == nil)
+    }
+
     @Test func aSecondDeleteWhileOneRunsIsIgnoredAndTheMarkClears() async {
         let a = entry("a")
         let model = HomeModel(past: [a])

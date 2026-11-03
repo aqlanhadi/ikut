@@ -1,11 +1,10 @@
+import AuthenticationServices
 import FirebaseAuth
 import Foundation
 import Observation
 
-/// Tracks the Firebase user and signs joiners in anonymously with just a name.
-///
-/// The anonymous user stays the identity (it is later linked to Sign in with Apple);
-/// the name lives on the Auth profile.
+/// Tracks the Firebase user. A joiner signs in anonymously with just a name (a guest); Sign in with Apple replaces
+/// any guest with the Apple user (no linking: decision 732). The name lives on the Auth profile.
 @Observable @MainActor
 final class AuthModel {
     enum State: Equatable {
@@ -17,6 +16,8 @@ final class AuthModel {
     private(set) var state: State = .loading
     private(set) var userID: String?
     private(set) var displayName: String?
+    /// How the signed-in person got in; nil when signed out.
+    private(set) var signInMethod: SignInMethod?
 
     // Only written in init and read in deinit; the handle isn't Sendable, so it
     // can't be touched from a nonisolated deinit otherwise.
@@ -27,7 +28,8 @@ final class AuthModel {
         listener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             let uid = user?.uid
             let name = user?.displayName
-            Task { @MainActor in self?.apply(uid: uid, name: name) }
+            let method = user.map { SignInMethod.of(providerIDs: $0.providerData.map(\.providerID)) }
+            Task { @MainActor in self?.apply(uid: uid, name: name, method: method) }
         }
         Task { await Self.dropMissingUser() }
         // A write that hits its deadline may be waiting on a token the server won't give a deleted user.
@@ -43,7 +45,22 @@ final class AuthModel {
         guard let current = Auth.auth().currentUser else { return false }
         nonisolated(unsafe) let user = current
         return await dropIfMissing(reload: { try await user.reload() }, signOut: {
-            try? Auth.auth().signOut()
+            performSignOut(signOut: { try Auth.auth().signOut() }, forget: JoinTowns.forgetAll)
+        })
+    }
+
+    /// Signs out and forgets the towns this person joined from, as one step (Settings' Sign out, and a user the
+    /// backend lost). A sign-out that throws leaves the user, and nothing is forgotten.
+    static func performSignOut(signOut: () throws -> Void, forget: () -> Void) {
+        guard (try? signOut()) != nil else { return }
+        forget()
+    }
+
+    /// Settings' Sign out. The state listener then moves `state` to `.signedOut`.
+    /// It also clears this phone's local history, so the next person to sign in doesn't see these trips.
+    func signOut() {
+        Self.performSignOut(signOut: { try Auth.auth().signOut() }, forget: {
+            HistoryDelete.removeAllLocal()
             JoinTowns.forgetAll()
         })
     }
@@ -94,6 +111,21 @@ final class AuthModel {
         try await setName(cleaned)
     }
 
+    /// Finishes Apple's sheet: signs in with Firebase using the sheet's nonce (replacing a guest user), and takes
+    /// Apple's name when the profile has none. `.cancelled` is not a problem.
+    func signInWithApple(_ result: Result<ASAuthorization, Error>, rawNonce: String) async throws -> AppleSignIn.Outcome {
+        let mapped = result.flatMap { authorization in Result { try AppleSignIn.identity(from: authorization) } }
+        return try await AppleSignIn.complete(mapped, rawNonce: rawNonce, signIn: { identity, nonce in
+            let credential = OAuthProvider.appleCredential(withIDToken: identity.idToken, rawNonce: nonce,
+                                                           fullName: identity.fullName)
+            let user = try await Auth.auth().signIn(with: credential).user
+            // Now, not when the listener's task runs: the sheet reads the name and method straight after.
+            self.apply(uid: user.uid, name: user.displayName,
+                       method: SignInMethod.of(providerIDs: user.providerData.map(\.providerID)))
+            return user.displayName
+        }, saveName: { try await self.setName($0) })
+    }
+
     func updateDisplayName(_ name: String) async throws {
         let cleaned = try DisplayName.validate(name).get()
         try await setName(cleaned)
@@ -105,13 +137,20 @@ final class AuthModel {
         change.displayName = name
         try await change.commitChanges()
         try await user.reload()
-        apply(uid: user.uid, name: user.displayName)
+        apply(uid: user.uid, name: user.displayName,
+              method: SignInMethod.of(providerIDs: user.providerData.map(\.providerID)))
     }
 
-    private func apply(uid: String?, name: String?) {
+    /// A user without a name yet (an interrupted guest sign-in, or an Apple user Apple sent no name for) still needs the
+    /// name screen, so it counts as signed out until the name is set.
+    nonisolated static func state(uid: String?, name: String?) -> State {
+        (uid != nil && name?.isEmpty == false) ? .signedIn : .signedOut
+    }
+
+    private func apply(uid: String?, name: String?, method: SignInMethod?) {
         userID = uid
         displayName = name
-        // An anonymous user without a name yet (interrupted sign-in) still needs the name screen.
-        state = (uid != nil && name?.isEmpty == false) ? .signedIn : .signedOut
+        signInMethod = method
+        state = Self.state(uid: uid, name: name)
     }
 }
