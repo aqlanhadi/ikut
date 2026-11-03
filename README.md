@@ -58,6 +58,8 @@ Console steps, in this order:
 1. Firebase console, App Check, Apps: register the iOS app (`dev.aqlan.ikut`) with App Attest.
 2. Every phone that runs ikut against production, Release too until App Attest is on, needs its debug token added (Manage debug tokens). Find it in Console.app with the phone selected: search "App Check debug token". Deleting and reinstalling the app makes a new token.
 3. Set `APPCHECK_ENFORCE=true` in `firebase/functions/.env.ikut-b1083` (a local file, not committed), then deploy the functions. The committed `firebase/functions/.env` says `false`, which is what a deploy uses without that file: `joinTrip` and `previewTrip` then accept calls with or without a token. The emulators stay off either way.
+**One debug token for simulators and the qa scripts.** A simulator (or any Debug build) that talks to production, and `qa/prod-smoke.mjs`, `demo --backend production` and `battery-watch`, present a debug token registered in App Check (Manage debug tokens). Keep it in `~/.config/ikut/appcheck-debug-token` (one line, mode 600, never committed or printed); the qa scripts read it there (or from `QA_APPCHECK_DEBUG_TOKEN`) through `qa/lib/appcheck.mjs`. For a simulator, launch with `SIMCTL_CHILD_FIRAAppCheckDebugToken="$(cat ~/.config/ikut/appcheck-debug-token)" xcrun simctl launch <udid> dev.aqlan.ikut` (in Xcode: the scheme's environment variable `FIRAAppCheckDebugToken`), so a reinstall doesn't need a new registration. To rotate it, delete the token in the console and register a new one.
+
 4. Check that joining a trip still works from a registered build, then switch on Enforce for Cloud Firestore in the App Check page.
 
 ## Cloud Functions
