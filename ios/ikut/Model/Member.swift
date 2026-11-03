@@ -12,4 +12,6 @@ struct Member: Codable, Sendable, Equatable, Identifiable {
     var carId: String
     var role: MemberRole
     var pushToken: String?
+    /// The member's own uid, written by the functions so deleteAccount can find their trips; absent on older members.
+    var userId: String?
 }

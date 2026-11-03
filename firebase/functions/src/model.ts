@@ -33,6 +33,7 @@ export interface Trip {
   name: string;
   /** 6-character join code. */
   code: string;
+  /** The organiser's uid; "deleted" on an ended trip whose organiser deleted their account (never empty). */
   organizerId: string;
   route: string;
   destination: Destination;
@@ -138,6 +139,8 @@ export interface Member {
   carId: string;
   role: MemberRole;
   pushToken?: string;
+  /** The member's own uid (also the doc id), written by createTrip and joinTrip so deleteAccount can find every trip a person is in with one collection-group query. Absent on members from before it existed. */
+  userId?: string;
 }
 
 /** trips/{tripId}/positions/{carId} */

@@ -13,3 +13,4 @@ export { endIdleTripsJob } from "./endIdleTrips.js";
 export { purgeTripDataJob, purgeExpiredEventsJob, purgeTripsFullJob } from "./purgeTripDataJob.js";
 export { onMemberDeleted } from "./memberCleanup.js";
 export { onTripEnded } from "./summary.js";
+export { deleteAccount } from "./deleteAccountCall.js";
