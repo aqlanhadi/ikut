@@ -69,7 +69,7 @@ private struct FamilyRoot: View {
 
     var body: some View {
         switch family {
-        case .small: SmallCard(context: context)
+        case .small: SmallCard(state: context.state, isStale: context.isStale)
         default: LockCard(context: context)
         }
     }
@@ -267,12 +267,12 @@ private struct ExpandedBottom: View {
 
 // MARK: .small (CarPlay Dashboard, Apple Watch Smart Stack)
 
-private struct SmallCard: View {
-    let context: ActivityViewContext<ConvoyActivityAttributes>
+struct SmallCard: View {
+    let state: ConvoyActivityAttributes.ContentState
+    let isStale: Bool
 
     var body: some View {
-        let state = context.state
-        let words = ActivityWords(state, display: ConvoyActivityPresentation.display(state, isStale: context.isStale), now: Date())
+        let words = ActivityWords(state, display: ConvoyActivityPresentation.display(state, isStale: isStale), now: Date())
         VStack(alignment: .leading) {
             HStack(spacing: 6) {
                 ActivityGlyph(words: words, size: 16)

@@ -5,8 +5,9 @@ import Testing
 struct ActivityTrackMetricsTests {
     typealias M = ActivityTrackMetrics
 
-    @Test func endDotsAreTheBarsHeightAndGap() {
-        #expect(M.endDotSize == M.bar)
+    @Test func endDotsAreHalfAPointOverTheBarAndItsGap() {
+        let dot = Double(M.endDotSize), bar = Double(M.bar)
+        #expect(dot == bar + 0.5)
         #expect(M.endSpacing == M.bar)
     }
 

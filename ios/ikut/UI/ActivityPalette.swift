@@ -57,9 +57,9 @@ enum ActivityTrackMetrics {
     static let mine: CGFloat = base + 2 * ring
     /// The hazard diamond's side, so its corners reach `base`.
     static let diamondSide: CGFloat = base / 2.0.squareRoot()
-    /// The row of dots at each end: the bar's height, the bar's gap, fading away from the bar.
+    /// The row of dots at each end: half a point taller than the bar (the owner's call), the bar's gap, fading away from the bar.
     static let endDots = 3
-    static let endDotSize: CGFloat = bar
+    static let endDotSize: CGFloat = bar + 0.5
     static let endSpacing: CGFloat = bar
     /// The unfilled bar's white, and each end dot's share of the bar colour it continues, nearest the bar first.
     static let trackOpacity = 0.2

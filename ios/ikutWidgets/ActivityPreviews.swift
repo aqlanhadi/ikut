@@ -8,7 +8,7 @@ import WidgetKit
 /// launch states), so a preview is the real state. Debug builds only.
 ///
 /// Open this file, show the canvas, and pick a preview by name: "Lock Screen", "Island compact", "Island minimal",
-/// "Island expanded" (use the state stepper under the canvas for each state, in the order of
+/// "Island expanded", "Small (CarPlay, Watch)" (use the state stepper under the canvas for each state, in the order of
 /// `LiveActivitySamples.names`), and "Track: cars", "Track: hazard", "Track: stop ring", "Track: dimmed".
 /// The previews can't mark a state stale, so "not-updating" shows the greyed look only in "Track: dimmed" (the card
 /// greys the same way when `isStale` is true).
@@ -39,6 +39,19 @@ private enum Samples {
     ConvoyLiveActivity()
 } contentStates: {
     for name in LiveActivitySamples.names { Samples.state(name) }
+}
+
+/// The `.small` card (CarPlay Dashboard, Apple Watch Smart Stack), one per state; the system's own size is about 160 x 80 pt.
+/// A fresh and a stale copy of every state, since the card greys when the data is old.
+#Preview("Small (CarPlay, Watch)", traits: .fixedLayout(width: 170, height: 90)) {
+    ScrollView {
+        VStack(spacing: 8) {
+            ForEach(LiveActivitySamples.names, id: \.self) { name in
+                SmallCard(state: Samples.state(name), isStale: name == "not-updating")
+                    .frame(width: 170, height: 90).background(ActivityPalette.trackGap)
+            }
+        }
+    }
 }
 
 /// The track on the card's own background and width (366 pt card less its margins), one state per preview.
