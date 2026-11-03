@@ -114,6 +114,7 @@
 		4D11B5DC7920EBE2BA241A9F /* GlassSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4551043A8FEBBCFB88C17D20 /* GlassSurface.swift */; };
 		4E324AFC395CD6805AFFEED4 /* StopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 644401FB5F0CAB8C10EF3B3B /* StopTests.swift */; };
 		4EDC16B825285A145AFE88C1 /* StopDelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01E0F9C4A3658B6AB1A4B07F /* StopDelayTests.swift */; };
+		50D6A61A6CD04E9EDFF69266 /* LiveActivitySamples.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9BCB0351F2296820F0BECCE /* LiveActivitySamples.swift */; };
 		5120D81232DF1D6218DB0AF9 /* SheetChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30345C006D29E7B55E755058 /* SheetChrome.swift */; };
 		514BD804AD5B56C6DA3FBF85 /* HazardLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4BB0967E567C0D099EDCC3 /* HazardLogic.swift */; };
 		5154B6F0F7D17F6C6A153092 /* SymbolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 384006EAE2516E1932D44513 /* SymbolTests.swift */; };
@@ -137,6 +138,7 @@
 		596F5A6485CB1896B8902941 /* ConvoyActivityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033AF6A5E21A87CA70D7E645 /* ConvoyActivityPresentation.swift */; };
 		5A3DA96314D84E3905601EC8 /* TripServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B60214D010449BFA91F229 /* TripServiceTests.swift */; };
 		5A4D6B4B863E8EC2FA5727C3 /* TripMapContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94110B44C36ABA8B33885499 /* TripMapContentTests.swift */; };
+		5A75DD677D6A83B3B4508B82 /* ConvoyActivityLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = D278F4DEDDD5B7826C759896 /* ConvoyActivityLogic.swift */; };
 		5C4B1C353923F9934A5F3D01 /* AppCheckSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4CFFBB865974E7B13D6A7AE /* AppCheckSetup.swift */; };
 		5C5315B337B1E03783D95E49 /* StopAnswerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB09C76879DEECF2EC83A0D /* StopAnswerService.swift */; };
 		5C5802422CD3A8000F637F23 /* ActivityWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F1837653A55D8F4385817D /* ActivityWords.swift */; };
@@ -208,6 +210,7 @@
 		8E5E18C2273234751092489C /* MapLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2DCD6B9BBE9B44F7A7D956 /* MapLogic.swift */; };
 		902FF2CE4308539543381C77 /* TrackingTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E2C4D6FFA56CAD6008809D /* TrackingTypes.swift */; };
 		90699FA2CC334EB3BF76387C /* LobbyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8576506422AFD08E8778B82 /* LobbyTests.swift */; };
+		907459EF8C50B0B6B7EB8453 /* LiveActivitySamples.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9BCB0351F2296820F0BECCE /* LiveActivitySamples.swift */; };
 		909509F297DDF4ACE804C90B /* RowSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD00F611D39EEED53A2FA52 /* RowSize.swift */; };
 		90EAC716678F6670B7A13A91 /* RecapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48AAE1E4ECEB3FDD4AEE0F07 /* RecapView.swift */; };
 		91048901E8ADA438604E985C /* DrivingGlance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1361DC3293C4BFA1B3D9DA1B /* DrivingGlance.swift */; };
@@ -268,6 +271,7 @@
 		AFDC7F89119C98D63362C915 /* RouteFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F972FD505779E98F561F7AA8 /* RouteFitTests.swift */; };
 		B0F4B34376AE0A0E2BCADA52 /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E8EC027CCE192C122FA9F7 /* Backend.swift */; };
 		B13B750323E3837F5F328EC2 /* IkutWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03BA46613ED5774351FAB76 /* IkutWidgetsBundle.swift */; };
+		B2802CD3152039C530EA762B /* ActivityPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74000E35B7476AAAA8C8391C /* ActivityPreviews.swift */; };
 		B308BB03553A6021C63E88C8 /* TripScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF3A138C2561DD559DD0517 /* TripScreenTests.swift */; };
 		B356ABB82113D622D0177610 /* LobbyContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7AA8B2835453FEEB6D32E /* LobbyContentTests.swift */; };
 		B3C529BECB3082B0900004F4 /* ConvoyActivityInput+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7913771436C9C84552D749EF /* ConvoyActivityInput+Snapshot.swift */; };
@@ -314,6 +318,7 @@
 		D7CD9FBA87F1C67C29A514D1 /* CarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8315D51E2F4BF5C77E216E3 /* CarBadge.swift */; };
 		D80A984085D33024BE6B519E /* PausedBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236F0C8AD5686F34C2F35CD8 /* PausedBanner.swift */; };
 		D823810299EDCF93BD262452 /* StopOurSideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C199021086844F76B783FE /* StopOurSideTests.swift */; };
+		D8BEB666208F8F1F16213600 /* ActivityTrackMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B47C5EE560664BAAD677E99 /* ActivityTrackMetricsTests.swift */; };
 		D9F460181FF4398216D4694B /* CoreLocationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1049ECF49BD8806E2646D99 /* CoreLocationSource.swift */; };
 		DCD70003B4B5C9DD7B7B2FE6 /* ButtonSizesDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930848C6717DEC58B1DC47B5 /* ButtonSizesDemo.swift */; };
 		DDFB1D5C15A1D5FEC996A11C /* AlertSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6117F5F8B2493D250C4083B /* AlertSettings.swift */; };
@@ -446,6 +451,7 @@
 		1A494FD1381005F8FB454B39 /* RouteGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGeometry.swift; sourceTree = "<group>"; };
 		1AB0B6EE647875B8999B3F6F /* BackendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendTests.swift; sourceTree = "<group>"; };
 		1AD72135383C0C50AA7ECE9D /* SessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTests.swift; sourceTree = "<group>"; };
+		1B47C5EE560664BAAD677E99 /* ActivityTrackMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityTrackMetricsTests.swift; sourceTree = "<group>"; };
 		1B50DAB16AF05373F2D608D1 /* MapPaddingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPaddingTests.swift; sourceTree = "<group>"; };
 		1BF9FBA1FB8EE5F440B0EA03 /* LobbyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyModel.swift; sourceTree = "<group>"; };
 		1C903802F99F75198A7E1391 /* RecapFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapFitTests.swift; sourceTree = "<group>"; };
@@ -572,6 +578,7 @@
 		7148AE156A6F86ACB4BB338C /* ConvoyActivityWordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyActivityWordsTests.swift; sourceTree = "<group>"; };
 		71B82F24EB5831D1B00E8EF6 /* ReportContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportContext.swift; sourceTree = "<group>"; };
 		733A27B1422ACC870244D3E8 /* HomeRenameAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRenameAlerts.swift; sourceTree = "<group>"; };
+		74000E35B7476AAAA8C8391C /* ActivityPreviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPreviews.swift; sourceTree = "<group>"; };
 		748CD4A57E10E29DAB8E981B /* ConvoyActivityLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyActivityLogicTests.swift; sourceTree = "<group>"; };
 		7597286138529A2317F2E764 /* ikutWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ikutWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		77791F51A29C0865B5076CFD /* TextContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContrastTests.swift; sourceTree = "<group>"; };
@@ -704,6 +711,7 @@
 		D5CC855754E9178514F37A36 /* ConvoyActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyActivityController.swift; sourceTree = "<group>"; };
 		D757ACAEB4EF983CCD2DA5F1 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		D7E497566EDDB0AA9FB70E25 /* ConvoyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyUITestCase.swift; sourceTree = "<group>"; };
+		D9BCB0351F2296820F0BECCE /* LiveActivitySamples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitySamples.swift; sourceTree = "<group>"; };
 		DB13FBCD12557ADA61A0AD93 /* MapLegal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapLegal.swift; sourceTree = "<group>"; };
 		DBB0A694CC1459C9224678CC /* ConvoyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoyModel.swift; sourceTree = "<group>"; };
 		DC0271B715040D99DB4103D4 /* TripsHomeView+Demo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TripsHomeView+Demo.swift"; sourceTree = "<group>"; };
@@ -786,6 +794,7 @@
 				D278F4DEDDD5B7826C759896 /* ConvoyActivityLogic.swift */,
 				033AF6A5E21A87CA70D7E645 /* ConvoyActivityPresentation.swift */,
 				F50873A6F391CEA85BA9EE87 /* LiveActivityDemo.swift */,
+				D9BCB0351F2296820F0BECCE /* LiveActivitySamples.swift */,
 			);
 			path = LiveActivity;
 			sourceTree = "<group>";
@@ -919,6 +928,7 @@
 		45C7EC053CF91523B7CEB544 /* ikutWidgets */ = {
 			isa = PBXGroup;
 			children = (
+				74000E35B7476AAAA8C8391C /* ActivityPreviews.swift */,
 				B75857C215E1845A8AEEE910 /* ActivityTrack.swift */,
 				5F5509881A45EDE95C9A4959 /* ConvoyLiveActivity.swift */,
 				D03BA46613ED5774351FAB76 /* IkutWidgetsBundle.swift */,
@@ -1192,6 +1202,7 @@
 		D7B8B479794B7C1CA1E5773F /* ikutTests */ = {
 			isa = PBXGroup;
 			children = (
+				1B47C5EE560664BAAD677E99 /* ActivityTrackMetricsTests.swift */,
 				6BBAE5CE8B29F5659AA605AB /* AddStopTests.swift */,
 				301CCB7DC568D10AFB1C2B1B /* AlertTests.swift */,
 				5E8F683B24F08AB39B44BCE9 /* AppCheckProviderChoiceTests.swift */,
@@ -1600,13 +1611,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				3DB002AC0CAD5351053F9411 /* ActivityPalette.swift in Sources */,
+				B2802CD3152039C530EA762B /* ActivityPreviews.swift in Sources */,
 				2AA38A86A141107CE722880F /* ActivityTrack.swift in Sources */,
 				406C62AD0DA7B238EB942094 /* ActivityWords.swift in Sources */,
 				9323FD1B4C5D04EFBF135565 /* ConvoyActivityAttributes.swift in Sources */,
+				5A75DD677D6A83B3B4508B82 /* ConvoyActivityLogic.swift in Sources */,
 				2831EC4060DDA71F2A7DFF37 /* ConvoyActivityPresentation.swift in Sources */,
 				61A34BF3C06ED3D8BA75D405 /* ConvoyFormat.swift in Sources */,
 				EAECDAF546E87856E651B8DA /* ConvoyLiveActivity.swift in Sources */,
 				B13B750323E3837F5F328EC2 /* IkutWidgetsBundle.swift in Sources */,
+				907459EF8C50B0B6B7EB8453 /* LiveActivitySamples.swift in Sources */,
 				2F780694AF9AAB9BC85B5424 /* Symbol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1706,6 +1720,7 @@
 				4B2726AABB0929C5FA48E233 /* JoinTowns.swift in Sources */,
 				CC753D5CE3CE3D2B64E15D04 /* LaunchRoute.swift in Sources */,
 				8CFE5D3ABBEDF35C1F8E1CB7 /* LiveActivityDemo.swift in Sources */,
+				50D6A61A6CD04E9EDFF69266 /* LiveActivitySamples.swift in Sources */,
 				66086EF8F71F7F9414B5ED2F /* LiveSpeechEngine.swift in Sources */,
 				BCED0277BCBF6132285AC51B /* LobbyContent.swift in Sources */,
 				06E8B7D6E99A761D1368E5D4 /* LobbyDemo.swift in Sources */,
@@ -1861,6 +1876,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4CDA24342C04EF465C54FE08 /* AXIDTests.swift in Sources */,
+				D8BEB666208F8F1F16213600 /* ActivityTrackMetricsTests.swift in Sources */,
 				603229DBA878868CF3EDDB49 /* AddStopTests.swift in Sources */,
 				EE9B601663917D691533A6BA /* AlertTests.swift in Sources */,
 				DFBA25AB9D8D1C8A7AB2DBAA /* AppCheckProviderChoiceTests.swift in Sources */,
@@ -2195,6 +2211,7 @@
 		A9426CA848DFE038E92BEE5D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				EXCLUDED_SOURCE_FILE_NAMES = "ConvoyActivityLogic.swift LiveActivitySamples.swift ActivityPreviews.swift";
 				INFOPLIST_FILE = ikutWidgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
